@@ -4,8 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/auth-context'
-import { Button, Input } from '../design-system'
+import { Button, Input, Modal } from '../design-system'
 import { ApiError } from '../services/httpClient'
+import { ConstructionIllustration } from './ConstructionIllustration'
 import './LoginPage.css'
 
 const loginSchema = z.object({
@@ -22,6 +23,7 @@ export function LoginPage() {
   const location = useLocation()
   const [formError, setFormError] = useState<string | null>(null)
   const [apiWaking, setApiWaking] = useState(false)
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false)
 
   const {
     register,
@@ -45,8 +47,10 @@ export function LoginPage() {
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setFormError('Correo o contraseña incorrectos.')
+      } else if (error instanceof ApiError) {
+        setFormError(`Error del servidor (${error.status}): ${error.message}`)
       } else {
-        setFormError('No se pudo conectar con el servidor. Intenta nuevamente.')
+        setFormError('No se pudo conectar con el servidor. Verifica tu conexión e intenta nuevamente.')
       }
     } finally {
       window.clearTimeout(wakeTimer)
@@ -58,9 +62,10 @@ export function LoginPage() {
     <div className="nx-login">
       <aside className="nx-login__brand">
         <div className="nx-login__brand-inner">
-          <span className="nx-login__logo">NEXORA</span>
-          <h1>Plataforma administrativa Nexora Group</h1>
-          <p>Tesorería, proyectos y operaciones en un solo lugar.</p>
+          <span className="nx-login__logo">NEXORA GROUP</span>
+          <h1>Gestión Empresarial y Control de Construcción</h1>
+          <p>Tesorería, proyectos, abastecimiento y control de obra en un solo lugar.</p>
+          <ConstructionIllustration className="nx-login__illustration" />
         </div>
       </aside>
       <main className="nx-login__panel">
@@ -80,10 +85,19 @@ export function LoginPage() {
             error={errors.password?.message}
             {...register('password')}
           />
-          <label className="nx-login__remember">
-            <input type="checkbox" {...register('rememberMe')} />
-            Recordarme
-          </label>
+          <div className="nx-login__row">
+            <label className="nx-login__remember">
+              <input type="checkbox" {...register('rememberMe')} />
+              Recordarme
+            </label>
+            <button
+              type="button"
+              className="nx-login__forgot"
+              onClick={() => setForgotPasswordOpen(true)}
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
 
           {apiWaking ? (
             <p className="nx-login__notice" role="status">
@@ -101,6 +115,21 @@ export function LoginPage() {
           </Button>
         </form>
       </main>
+
+      <Modal
+        open={forgotPasswordOpen}
+        title="Restablecer contraseña"
+        onClose={() => setForgotPasswordOpen(false)}
+      >
+        <p>
+          El flujo de autoservicio para restablecer contraseña todavía no está disponible
+          (NXR-REQ-0008, arquitectura de reseteo pendiente). Mientras tanto, contacta a un
+          administrador de Nexora Group para que restablezca tu acceso.
+        </p>
+        <Button variant="secondary" onClick={() => setForgotPasswordOpen(false)}>
+          Entendido
+        </Button>
+      </Modal>
     </div>
   )
 }

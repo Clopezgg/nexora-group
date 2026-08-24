@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,8 +18,21 @@ class Settings(BaseSettings):
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: str | None = None
 
+    # "none" (por defecto) | "azure_blob". Ver app/integrations/azure_blob.py.
     evidence_backend: str = "none"
+    evidence_container_name: str = "evidence"
     max_evidence_mb: int = 25
+
+    # Azure Key Vault: si está definido y app_env=production, get_settings()
+    # sobreescribe DATABASE_URL/SECRET_KEY/BOOTSTRAP_ADMIN_PASSWORD desde el
+    # vault antes de construir Settings. Ver app/integrations/azure_keyvault.py.
+    azure_key_vault_uri: str | None = None
+
+    # Azure Blob Storage (evidence_backend=azure_blob).
+    azure_storage_account_name: str | None = None
+
+    # Azure Monitor / Application Insights. Vacío = telemetría desactivada.
+    applicationinsights_connection_string: str | None = None
 
     session_cookie_name: str = "nexora_session"
     session_ttl_days: int = 7
@@ -30,4 +44,11 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    # Solo se intenta contactar Key Vault en producción: en local/dev/tests no
+    # hay credenciales Azure disponibles y no debe bloquear el arranque.
+    if os.environ.get("APP_ENV") == "production" and os.environ.get("AZURE_KEY_VAULT_URI"):
+        from app.integrations.azure_keyvault import load_secrets_from_key_vault
+
+        load_secrets_from_key_vault(os.environ["AZURE_KEY_VAULT_URI"])
+
     return Settings()

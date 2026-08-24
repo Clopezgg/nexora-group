@@ -35,12 +35,13 @@ verdad de la misión.
   proceso entre requests; toda sesión y estado persistente vive en
   PostgreSQL.
 - **PostgreSQL** es la única base de datos soportada.
-- **Render-compatible.** El backend debe arrancar con `$PORT` inyectado por
-  el entorno y no asumir infraestructura fuera de Render (sin Redis, sin
-  Celery, sin colas, salvo que se decida explícitamente lo contrario).
+- **Azure-compatible.** El backend corre en Azure Container Apps (consumption
+  plan); arranca con `$PORT`/puerto fijo del contenedor y no asume
+  infraestructura fuera de lo declarado en `infra/` (sin Redis, sin Celery,
+  sin colas, salvo que se decida explícitamente lo contrario).
 - **No filesystem persistente.** No se asume disco persistente entre deploys;
-  cualquier evidencia/archivo subido debe pensarse para un backend de
-  almacenamiento externo (`EVIDENCE_BACKEND`), no para `/var/...` local.
+  cualquier evidencia/archivo subido usa Azure Blob Storage
+  (`EVIDENCE_BACKEND=azure_blob`), no `/var/...` local.
 - **No mocks presentados como funcionalidad real.** Un endpoint que no está
   implementado de verdad no debe devolver datos inventados como si fueran
   reales; debe reflejar su estado real (vacío, 501, o UI en EmptyState).
@@ -71,7 +72,12 @@ psycopg, Argon2id para contraseñas.
 **Testing:** Pytest (backend), Vitest + React Testing Library (frontend),
 Playwright (E2E, fases posteriores).
 
-**Deploy:** Render, optimizado para Free Tier inicialmente.
+**Deploy:** Microsoft Azure (Static Web Apps, Container Apps, PostgreSQL
+Flexible Server, Blob Storage, Key Vault, Monitor/Application Insights),
+optimizado para el menor costo posible (consumption plan, tier Burstable/Free
+donde exista). Infraestructura como código en Bicep (`infra/`). Render fue la
+plataforma inicial del bootstrap y quedó completamente descartada — ver
+`docs/DEFERRED.md` y `infra/README.md`.
 
 ## 6. Roadmap por fases
 

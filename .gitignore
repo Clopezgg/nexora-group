@@ -20,6 +20,9 @@ backend/.env
 frontend/.env
 frontend/.env.local
 
+# Parámetros Bicep con secretos reales (usar infra/main.parameters.example.json)
+infra/main.parameters.json
+
 # OS / editor
 .DS_Store
 .vscode/

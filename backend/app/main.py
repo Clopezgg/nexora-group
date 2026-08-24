@@ -21,6 +21,12 @@ async def lifespan(_app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
+
+    if settings.applicationinsights_connection_string:
+        from azure.monitor.opentelemetry import configure_azure_monitor
+
+        configure_azure_monitor(connection_string=settings.applicationinsights_connection_string)
+
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
     app.add_middleware(

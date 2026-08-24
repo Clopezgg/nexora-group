@@ -72,12 +72,22 @@ npm run typecheck && npm run lint && npm run test && npm run build
 
 ## Deploy
 
-`render.yaml` define un Web Service (backend, Docker) y un Static Site
-(frontend) sobre el plan Free de Render, más una base PostgreSQL gestionada.
-Tras el primer deploy, completa manualmente en el dashboard de Render:
+Plataforma oficial: **Microsoft Azure**. Render fue descartado como destino
+de despliegue (ver `CLAUDE.md`).
 
-- `FRONTEND_URL` en el servicio backend (para CORS).
-- `VITE_API_BASE_URL` en el sitio estático (URL pública del backend + `/api`),
-  y vuelve a disparar un build del frontend.
-- `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` en el backend, para el
-  primer login de Administrator.
+- Frontend → Azure Static Web Apps (Free tier)
+- Backend → Azure Container Apps (consumption plan, scale-to-zero)
+- Base de datos → Azure Database for PostgreSQL Flexible Server (Burstable B1ms)
+- Evidencias/documentos → Azure Blob Storage
+- Secrets → Azure Key Vault
+- Observabilidad → Azure Monitor + Application Insights + Log Analytics
+- Infraestructura → Bicep (`infra/`), ver `infra/README.md` para el
+  procedimiento completo de despliegue y el detalle de cada módulo.
+- CI/CD → GitHub Actions con Azure OIDC/federated credentials
+  (`.github/workflows/deploy-azure.yml`); requiere que el usuario configure
+  los secrets del repo y apruebe el environment `production` antes de que
+  el deploy real se ejecute.
+
+Ningún recurso de Azure ha sido provisionado todavía: `infra/` solo contiene
+la infraestructura como código, validada con `az bicep build` y
+`az deployment sub what-if` (ambos sin costo, no crean recursos).

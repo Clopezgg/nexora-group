@@ -1,0 +1,111 @@
+name: Deploy Azure
+
+# Requiere, configurados como secrets/variables del repo antes de poder correr
+# el job "deploy" (el job "validate" no los necesita):
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#     -> federated credential (OIDC) apuntando a este repo/rama, sin client secret.
+#   POSTGRES_ADMIN_PASSWORD, BACKEND_SECRET_KEY, BOOTSTRAP_ADMIN_PASSWORD, BOOTSTRAP_ADMIN_EMAIL
+#     -> GitHub Secrets, nunca en este archivo ni en el repo.
+#   AZURE_SWA_DEPLOYMENT_TOKEN
+#     -> token de deployment de la Static Web App (se obtiene del recurso ya creado).
+#
+# El job "deploy" tiene `environment: production` con protection rules (aprobación
+# manual) configurables en Settings > Environments del repo. No se activa solo.
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/deploy-azure.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/deploy-azure.yml"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  validate:
+    name: Bicep what-if
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: What-if (no crea recursos)
+        run: |
+          az deployment sub what-if \
+            --name nexora-ci-whatif \
+            --location eastus2 \
+            --template-file infra/main.bicep \
+            --parameters \
+              postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
+              backendSecretKey='${{ secrets.BACKEND_SECRET_KEY }}' \
+              bootstrapAdminPassword='${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}' \
+              bootstrapAdminEmail='${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}'
+
+  deploy:
+    name: Deploy infra + apps
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push backend image to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          IMAGE=ghcr.io/${{ github.repository_owner }}/nexora-backend:${{ github.sha }}
+          docker build -t "$IMAGE" ./backend
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Deploy infraestructura (Bicep)
+        run: |
+          az deployment sub create \
+            --name nexora-deploy-${{ github.run_number }} \
+            --location eastus2 \
+            --template-file infra/main.bicep \
+            --parameters \
+              postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
+              backendSecretKey='${{ secrets.BACKEND_SECRET_KEY }}' \
+              bootstrapAdminPassword='${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}' \
+              bootstrapAdminEmail='${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}' \
+              backendImage='${{ env.IMAGE }}'
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+        env:
+          VITE_API_BASE_URL: /api
+
+      - name: Deploy frontend a Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: frontend/dist
+          skip_app_build: true

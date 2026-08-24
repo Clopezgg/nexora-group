@@ -7,3 +7,7 @@ alembic>=1.16,<2
 psycopg[binary]>=3.2,<4
 argon2-cffi>=25.1,<26
 python-dotenv>=1.0,<2
+azure-identity>=1.19,<2
+azure-keyvault-secrets>=4.9,<5
+azure-storage-blob>=12.24,<13
+azure-monitor-opentelemetry>=1.6,<2

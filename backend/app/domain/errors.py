@@ -29,3 +29,12 @@ class InvalidOperationScopeError(Exception):
 
 class IdempotencyConflictError(Exception):
     """INV-IDEM-002: misma idempotency key con payload distinto."""
+
+
+class BudgetBaselineExistsError(Exception):
+    """INV-BUD-001-adyacente: un proyecto solo puede tener un BASELINE; nunca
+    se sobrescribe, ver docs/BUDGET_CONTROLLING.md."""
+
+
+class InvalidChangeOrderStateError(Exception):
+    """Transición de estado de ChangeOrder inválida (orden maestra §43)."""

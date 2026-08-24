@@ -4,10 +4,11 @@ from sqlalchemy.orm import Session
 from app.models.permission import SCOPE_ANY, SCOPE_OWN, Permission, RolePermission
 from app.models.role import Role
 
-# Matriz de permisos inicial (docs/RBAC.md). Solo cubre los recursos que
-# YA existen en este track (core/company, accounting) -- cada track de
-# dominio agrega sus propias filas cuando construye su módulo, no se
-# inventan permisos para recursos que todavía no existen.
+# Matriz de permisos (docs/RBAC.md). Cubre los recursos que YA existen:
+# core/company, accounting (Track 1) y project/project.wbs/project.planning/
+# project.budget/project.change_order/project.progress (Track B) -- cada
+# track de dominio agrega sus propias filas cuando construye su módulo, no
+# se inventan permisos para recursos que todavía no existen.
 _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("core.company", "create", "Crear compañías"),
     ("core.company", "read", "Ver compañías"),
@@ -16,6 +17,21 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("accounting.journal_entry", "reverse", "Revertir asientos contables"),
     ("accounting.account", "create", "Crear cuentas del catálogo contable"),
     ("accounting.account", "read", "Ver el catálogo contable"),
+    # Track B -- Project Control (orden maestra §37-43, §72).
+    ("project", "create", "Crear proyectos"),
+    ("project", "read", "Ver proyectos"),
+    ("project.wbs", "create", "Crear nodos de WBS"),
+    ("project.wbs", "read", "Ver WBS"),
+    ("project.planning", "create", "Crear tareas/hitos de planeación"),
+    ("project.planning", "read", "Ver planeación del proyecto"),
+    ("project.budget", "create", "Crear/aprobar presupuesto de proyecto"),
+    ("project.budget", "read", "Ver presupuesto y forecast del proyecto"),
+    ("project.change_order", "create", "Crear órdenes de cambio"),
+    ("project.change_order", "read", "Ver órdenes de cambio"),
+    ("project.change_order", "submit", "Enviar orden de cambio a aprobación"),
+    ("project.change_order", "approve", "Aprobar orden de cambio"),
+    ("project.progress", "create", "Registrar avance de proyecto"),
+    ("project.progress", "read", "Ver avance de proyecto"),
 )
 # NOTA: ActiveUIContext (GET/PUT /api/context) NO pasa por este motor de
 # permisos -- es una preferencia personal del usuario autenticado (su
@@ -49,11 +65,49 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("core.company", "read", SCOPE_ANY),
         ("accounting.journal_entry", "read", SCOPE_ANY),
         ("accounting.account", "read", SCOPE_ANY),
+        ("project", "read", SCOPE_ANY),
+        ("project.wbs", "read", SCOPE_ANY),
+        ("project.planning", "read", SCOPE_ANY),
+        ("project.budget", "read", SCOPE_ANY),
+        ("project.change_order", "read", SCOPE_ANY),
+        ("project.progress", "read", SCOPE_ANY),
     ),
     "Viewer": (
         ("core.company", "read", SCOPE_ANY),
         ("accounting.journal_entry", "read", SCOPE_OWN),
         ("accounting.account", "read", SCOPE_OWN),
+        ("project", "read", SCOPE_OWN),
+        ("project.wbs", "read", SCOPE_OWN),
+        ("project.planning", "read", SCOPE_OWN),
+        ("project.budget", "read", SCOPE_OWN),
+        ("project.change_order", "read", SCOPE_OWN),
+        ("project.progress", "read", SCOPE_OWN),
+    ),
+    "Project Manager": (
+        ("core.company", "read", SCOPE_ANY),
+        ("project", "create", SCOPE_OWN),
+        ("project", "read", SCOPE_OWN),
+        ("project.wbs", "create", SCOPE_OWN),
+        ("project.wbs", "read", SCOPE_OWN),
+        ("project.planning", "create", SCOPE_OWN),
+        ("project.planning", "read", SCOPE_OWN),
+        ("project.budget", "read", SCOPE_OWN),
+        ("project.change_order", "create", SCOPE_OWN),
+        ("project.change_order", "read", SCOPE_OWN),
+        ("project.change_order", "submit", SCOPE_OWN),
+        ("project.progress", "create", SCOPE_OWN),
+        ("project.progress", "read", SCOPE_OWN),
+    ),
+    "Project Controller": (
+        ("core.company", "read", SCOPE_ANY),
+        ("project", "read", SCOPE_OWN),
+        ("project.wbs", "read", SCOPE_OWN),
+        ("project.planning", "read", SCOPE_OWN),
+        ("project.budget", "create", SCOPE_OWN),
+        ("project.budget", "read", SCOPE_OWN),
+        ("project.change_order", "read", SCOPE_OWN),
+        ("project.change_order", "approve", SCOPE_OWN),
+        ("project.progress", "read", SCOPE_OWN),
     ),
 }
 

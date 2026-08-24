@@ -64,18 +64,18 @@ placeholder.
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0028 | Projects | 🔶·🔶·🔶·🔶·🔶·⬜·⬜·⬜·⬜ | IN_PROGRESS | tabla + CRUD mínimo del bootstrap, falta modelo completo (§37) |
-| NXR-REQ-0029 | WBS (jerárquico) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0030 | Planning (tasks/milestones/deps) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0031 | Budgets | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0032 | Budget versions (baseline/revised) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0033 | Commitments | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0034 | Accruals | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0035 | Payments (project attribution) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0036 | Forecast (BAC/PV/EV/AC/CPI/SPI/ETC/EAC/VAC) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0037 | Earned Value | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0038 | Change Orders | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0039 | Progress (ProgressRecord) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0028 | Projects | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Track B: modelo completo (§37), `GET/POST /api/projects`, `ProjectsPage` real (crea compañía/proyecto), test `test_project_has_no_money_column` (INV-TRE-002) |
+| NXR-REQ-0029 | WBS (jerárquico) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `WBSNode` con parent/level, `WBSPage` real, test de jerarquía 2 niveles |
+| NXR-REQ-0030 | Planning (tasks/milestones/deps) | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `Task`/`Milestone` + API; sin pantalla dedicada todavía (`/proyectos/planeacion` sigue en EmptyState del bootstrap) |
+| NXR-REQ-0031 | Budgets | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `Budget`/`BudgetLine`, `budget_service.compute_summary`, `BudgetPage` con AUTHORIZED/COMMITTED/ACCRUED/PAID/AVAILABLE reales |
+| NXR-REQ-0032 | Budget versions (baseline/revised) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | BASELINE inmutable (`NXR-BUDGET-001` si se repite), REVISED generado por ChangeOrder aprobada, historial preservado — test dedicado |
+| NXR-REQ-0033 | Commitments | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track C (Procurement) — `budget_service.compute_summary` ya tiene el punto de integración documentado en docs/BUDGET_CONTROLLING.md |
+| NXR-REQ-0034 | Accruals | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A (AP) — mismo contrato de integración |
+| NXR-REQ-0035 | Payments (project attribution) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A (AP) |
+| NXR-REQ-0036 | Forecast (BAC/PV/EV/AC/CPI/SPI/ETC/EAC/VAC) | ✅·➖·✅·✅·✅·➖·➖·✅·⬜ | IMPLEMENTED | `forecast_service.compute_forecast`; valores no calculables devuelven `null` real, nunca 0 falso — test dedicado |
+| NXR-REQ-0037 | Earned Value | ✅·➖·✅·✅·✅·➖·➖·✅·⬜ | IMPLEMENTED | PV/EV derivados del `ProgressRecord` más reciente contra BAC — simplificación documentada en docs/BUDGET_CONTROLLING.md |
+| NXR-REQ-0038 | Change Orders | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Lifecycle DRAFT→SUBMITTED→APPROVED real, `ChangeOrdersPage`, test de transición inválida (`NXR-PROJECT-001`) |
+| NXR-REQ-0039 | Progress (ProgressRecord) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `ProgressRecord` (planned%/actual%/evidence_ref libre), `ProgressPage`, alimenta Forecast |
 
 ## PROCUREMENT
 
@@ -214,20 +214,21 @@ placeholder.
 
 ## Resumen
 
-Recontado por el coordinador directamente sobre la tabla combinada
-(Track F + Track 1 integrados) el 2026-08-24:
+Recontado tras Track B (Project Control), pendiente de integración por el
+coordinador, sobre la base de Track F + Track 1 ya integrados:
 
 - **VERIFIED:** 0 / 124 (reservado para cuando el coordinador confirme
   comportamiento end-to-end en `feat/nexora-greenfield` — ningún track se
   autootorga `VERIFIED`)
-- **IMPLEMENTED:** 21 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
+- **IMPLEMENTED:** 30 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
   0010/0011/0012/0013/0014/0015/0026/0027. Track F: NXR-REQ-0097 a 0104.
-- **IN_PROGRESS:** 21 / 124
-- **NOT_STARTED:** 80 / 124
+  Track B: NXR-REQ-0028/0029/0030/0031/0032/0036/0037/0038/0039.
+- **IN_PROGRESS:** 20 / 124
+- **NOT_STARTED:** 72 / 124
 - **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue
   real, no por incapacidad técnica)
 
-Suma verificada: 21+21+80+2 = 124.
+Suma verificada: 30+20+72+2 = 124.
 
 Este resumen se actualiza en cada integración de track. Ver progreso vivo
 en `docs/PROGRESS.md`.

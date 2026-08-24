@@ -11,6 +11,12 @@ DOCUMENT_TYPE_SEEDS = (
     ("JRN", "Asiento contable manual", "JRN"),
     ("COR", "Corrección contable", "COR"),
     ("ANU", "Anulación / reversal", "ANU"),
+    # Track C -- Procurement (orden maestra §25/§44-51).
+    ("PR", "Solicitud de compra", "PR"),
+    ("RFQ", "Solicitud de cotización", "RFQ"),
+    ("PO", "Orden de compra", "PO"),
+    ("GR", "Recepción de mercadería", "GR"),
+    ("SIN", "Entrada de servicio", "SIN"),
 )
 
 

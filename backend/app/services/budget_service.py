@@ -4,9 +4,19 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.domain.errors import BudgetBaselineExistsError, InvalidChangeOrderStateError
+from app.domain.errors import (
+    BudgetBaselineExistsError,
+    BudgetCurrencyMismatchError,
+    InvalidChangeOrderStateError,
+)
 from app.models.budget import Budget, BudgetLine
-from app.repositories import budget_repository, project_control_repository
+from app.models.company import Company
+from app.repositories import (
+    budget_repository,
+    procurement_repository,
+    project_control_repository,
+    project_repository,
+)
 
 """Budget / Controlling (orden maestra §40-41, docs/BUDGET_CONTROLLING.md).
 
@@ -19,12 +29,13 @@ propia ChangeOrder -- es una simplificación deliberada (no redistribuye
 línea por línea el presupuesto completo) documentada aquí y en
 docs/BUDGET_CONTROLLING.md.
 
-Métricas AUTHORIZED/COMMITTED/ACCRUED/PAID/AVAILABLE: COMMITTED (Procurement/
-Track C) y ACCRUED/PAID (AP/Track A) todavía no existen en este track --
-`compute_summary` los deja en 0 real (nunca inventado) mediante los stubs
-`committed_amount_stub`/`accrued_amount_stub`/`paid_amount_stub`, listos
-para que el coordinador los conecte a las tablas reales cuando esos tracks
-aterricen, sin cambiar la forma del contrato.
+Todo BASELINE usa `Company.functional_currency_code`; no se acepta otra
+moneda hasta que exista una política FX fechada y autoritativa.
+
+Métricas AUTHORIZED/COMMITTED/ACCRUED/PAID/AVAILABLE: COMMITTED consume
+Purchase Orders aprobadas de Procurement/Track C. ACCRUED/PAID siguen sin
+fuente AP/Track A y permanecen en 0 real por ausencia de datos, sin
+reinterpretar movimientos de inventario como devengo o efectivo.
 """
 
 
@@ -57,6 +68,21 @@ def create_baseline(
     if budget_repository.get_baseline_budget(db, project_id) is not None:
         raise BudgetBaselineExistsError(
             f"El proyecto {project_id} ya tiene un BASELINE; no se puede sobrescribir"
+        )
+    project = project_repository.get_by_id(db, project_id)
+    if project is None:
+        raise ValueError(f"Project {project_id} no existe")
+    company = db.get(Company, project.company_id)
+    if company is None:
+        raise ValueError(f"Company {project.company_id} no existe")
+    if company.functional_currency_code is None:
+        raise BudgetCurrencyMismatchError(
+            f"La company {company.id} no tiene moneda funcional; no se puede crear un Budget"
+        )
+    if currency_code != company.functional_currency_code:
+        raise BudgetCurrencyMismatchError(
+            f"El Budget usa {currency_code}, pero la moneda funcional de la company es "
+            f"{company.functional_currency_code}; no existe una política FX autoritativa"
         )
     budget = Budget(
         project_id=project_id,
@@ -146,9 +172,12 @@ def approve_change_order(db: Session, *, change_order_id: uuid.UUID, approved_by
 def compute_summary(db: Session, *, project_id: uuid.UUID) -> BudgetSummary:
     active = budget_repository.get_active_budget(db, project_id)
     authorized = budget_repository.sum_authorized(db, active.id) if active is not None else Decimal("0")
-    # Stubs honestos: 0 real hasta que Track A (AP) / Track C (Procurement)
-    # aporten las tablas reales de compromiso/devengo/pago. Nunca inventado.
-    committed = Decimal("0")
+    project = project_repository.get_by_id(db, project_id)
+    if project is None:
+        raise ValueError(f"Project {project_id} no existe")
+    committed = procurement_repository.project_commitment_total(
+        db, company_id=project.company_id, project_id=project_id
+    )
     accrued = Decimal("0")
     paid = Decimal("0")
     available = authorized - committed - accrued

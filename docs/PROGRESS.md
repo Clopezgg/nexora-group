@@ -177,6 +177,86 @@ Ningún requisito pasa a `VERIFIED` todavía solo por esta integración —
 pruebe de extremo a extremo, no solo que cada mitad pase sus propios
 tests por separado.
 
+### 2026-08-24 — Track C (Supply Chain) construido, pendiente de integrar
+
+Construido en `~/nexora-group-trackC`, rama `track/c-supply-chain`
+(worktree aislado). Evidencia real:
+
+- **Suppliers / base contractual**: `Supplier` (legal_name/trade_name/
+  tax_id/banking_details JSONB — explícitamente distinto de
+  `TreasuryAccount`) y `SupplierContract` (value/currency/advance/retention
+  %). Supplier Master es parte de Track C; Contracts/Subcontracts siguen
+  `IN_PROGRESS` hasta tener pruebas dedicadas, UI y distinción formal para
+  reporting de subcontratos.
+- **Procurement end-to-end**: `PurchaseRequisition`→`RequestForQuotation`
+  (multi-supplier)→`SupplierQuotation`→`PurchaseOrder`
+  (`DRAFT→APPROVED→SENT→PARTIALLY_RECEIVED/RECEIVED`)→`GoodsReceipt`
+  (recepción parcial y completa, actualiza `quantity_received` y dispara
+  `inventory_service.receive_stock`)→`ServiceEntry`. Numeración real vía
+  `numbering_service` (`PR`, `RFQ`, `PO`, `GR`, `SIN`).
+- **Three-Way Match (INV-PROC-001)**: `run_three_way_match` compara PO vs
+  recepción vs factura de proveedor (referencia libre, la factura real la
+  construye Track A en paralelo); las diferencias fuera de tolerancia
+  quedan en `exceptions`, **nunca se descartan silenciosamente** — el
+  registro se persiste tanto en MATCHED como en EXCEPTION.
+- **Inventory**: `Item`/`Warehouse`/`StockLedgerEntry` (append-only,
+  moving average real), `receive_stock`/`issue_to_project`
+  (INV-INV-002)/`transfer_stock`/`apply_physical_count`. `InsufficientStockError`
+  (INV-INV-001) bloquea cualquier emisión que dejaría stock negativo.
+- **Frontend**: `SuppliersPage`, `RequisitionsPage`, `PurchaseOrdersPage`
+  (con aprobar/enviar), `GoodsReceiptsPage` (selecciona PO pendiente →
+  registra recepción real), `InventoryPage`, `WarehousesPage` — reusan el
+  design system de Track F, sin datos fabricados (EmptyState honesto
+  cuando no hay compañía configurada).
+
+**Verificación real ejecutada**: backend 48/48 pytest (35 preexistentes +
+13 de procurement/inventory, incluidos los agregados documentales para
+Commitments/actuals y el aislamiento por compañía en el recurso PO) contra
+una base PostgreSQL aislada
+(`nexora_trackc`/`nexora_trackc_test`, para no pisar el schema de Track
+A/B/1 corriendo en paralelo sobre el mismo servidor Postgres local — nota
+dejada en `tests/conftest.py` para que el coordinador vuelva a
+`nexora_test` al integrar), `alembic revision --autogenerate` detectó las
+18 tablas nuevas sin conflictos, `alembic upgrade head` limpio.
+Frontend: `typecheck`/`lint` limpios, `vitest` 17/17 (15 preexistentes +
+2 nuevos de `SuppliersPage`), `build` OK.
+
+**Bugs reales encontrados y corregidos durante la propia verificación**:
+1. Primer intento de migración corrió contra la base compartida
+   `nexora_dev` (usada también por el coordinador) — se revirtió
+   (`alembic downgrade`) antes de continuar, para no contaminar el
+   estado que el coordinador usa para integrar Track 1/F.
+2. El endpoint `GET /inventory/stock/position` usa query params en
+   snake_case (`item_id`/`warehouse_id`, mismo patrón que
+   `master_data.list_accounts` de Track 1) — los primeros tests fallaron
+   por usar camelCase; corregido en los tests, no en el endpoint (para
+   mantener consistencia con el precedente ya establecido).
+3. Los tests de recepción de mercadería fallaban porque el helper de test
+   no aprobaba/enviaba la PO antes de recibir (el servicio correctamente
+   rechaza recepciones sobre una PO `DRAFT`) — corregido el helper, no el
+   servicio.
+
+**Desviaciones documentadas** (ver `docs/PROCUREMENT.md` /
+`docs/INVENTORY.md` para el detalle completo): Bid Comparison sin
+endpoint agregado ni pantalla dedicada (NXR-REQ-0044 queda
+`IN_PROGRESS`); Supplier Performance sin implementar por falta de datos
+históricos reales que no serían fabricados (NXR-REQ-0058 `NOT_STARTED`);
+`RETURN` como movement_type existe en el modelo pero sin service function
+(NXR-REQ-0054 `NOT_STARTED`); RFQ/Quotation/Comparison/Contracts sin
+pantalla de frontend (fuera del alcance de UI acordado para este track,
+con Contracts/Subcontracts explícitamente `IN_PROGRESS`).
+
+Filas actualizadas en `docs/REQUIREMENTS_TRACEABILITY.md`: NXR-REQ-0040 a
+0060 (Procurement + Supply Chain + Suppliers/Contracts). Ningún
+`VERIFIED` auto-otorgado.
+
+Commits de backend ya preservados en `track/c-supply-chain`: `6e92a87`
+(`feat(procurement): implement requisition-to-receipt supply chain flow`) y
+`9b5cb1f` (`test(procurement): certify INV-PROC-001 and
+INV-INV-001/002 with real tests`). La recuperación de UI/docs queda en un
+commit local explícito para que el coordinador la integre; este registro no
+afirma publicación remota.
+
 ### 2026-08-24 — Track B (Project Control) construido, pendiente de integración
 
 Rama `track/b-project-control` (worktree `~/nexora-group-trackB`, DB de

@@ -5,6 +5,12 @@ import { ProtectedRoute } from '../features/auth/ProtectedRoute'
 import { LoginPage } from '../pages/LoginPage'
 import { HomePage } from '../features/home/HomePage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
+import { GoodsReceiptsPage } from '../features/procurement/GoodsReceiptsPage'
+import { PurchaseOrdersPage } from '../features/procurement/PurchaseOrdersPage'
+import { RequisitionsPage } from '../features/procurement/RequisitionsPage'
+import { SuppliersPage } from '../features/procurement/SuppliersPage'
+import { InventoryPage } from '../features/inventory/InventoryPage'
+import { WarehousesPage } from '../features/inventory/WarehousesPage'
 import { BudgetPage } from '../features/projects/BudgetPage'
 import { ChangeOrdersPage } from '../features/projects/ChangeOrdersPage'
 import { ProgressPage } from '../features/projects/ProgressPage'
@@ -12,14 +18,21 @@ import { ProjectsPage } from '../features/projects/ProjectsPage'
 import { WBSPage } from '../features/projects/WBSPage'
 import { navItems } from './navigation'
 
-// Track B (Project Control) implementa estas rutas de verdad; el resto de
-// navItems sigue como PlaceholderPage hasta que su track dueño aterrice.
+// Track B (Project Control) y Track C (Supply Chain) implementan estas
+// rutas; el resto de navItems sigue como PlaceholderPage hasta que su track
+// dueño aterrice.
 const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/proyectos': <ProjectsPage />,
   '/proyectos/wbs': <WBSPage />,
   '/proyectos/presupuestos': <BudgetPage />,
   '/proyectos/ordenes-de-cambio': <ChangeOrdersPage />,
   '/proyectos/avances': <ProgressPage />,
+  '/abastecimiento/solicitudes': <RequisitionsPage />,
+  '/abastecimiento/ordenes-de-compra': <PurchaseOrdersPage />,
+  '/abastecimiento/recepciones': <GoodsReceiptsPage />,
+  '/abastecimiento/inventario': <InventoryPage />,
+  '/abastecimiento/almacenes': <WarehousesPage />,
+  '/abastecimiento/proveedores': <SuppliersPage />,
 }
 
 const placeholderRoutes: RouteObject[] = navItems

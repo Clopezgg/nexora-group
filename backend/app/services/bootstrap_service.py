@@ -3,7 +3,12 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.repositories import role_repository, user_repository
+from app.repositories import (
+    catalog_repository,
+    permission_repository,
+    role_repository,
+    user_repository,
+)
 from app.security.passwords import hash_password
 
 logger = logging.getLogger(__name__)
@@ -14,6 +19,10 @@ def bootstrap_admin_if_needed(db: Session) -> None:
     y las variables BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD están definidas."""
     settings = get_settings()
     role_repository.ensure_base_roles(db)
+    permission_repository.ensure_base_permissions(db)
+    catalog_repository.ensure_base_currencies(db)
+    catalog_repository.ensure_base_document_types(db)
+    db.commit()
 
     if user_repository.count_users(db) > 0:
         return

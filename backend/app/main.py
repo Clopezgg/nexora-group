@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, context, dashboard, health
+from app.api.error_handlers import register_error_handlers
+from app.api.routes import accounting, auth, context, dashboard, health, master_data
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.services.bootstrap_service import bootstrap_admin_if_needed
@@ -37,10 +38,14 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    register_error_handlers(app)
+
     app.include_router(health.router)
     app.include_router(auth.router, prefix="/api")
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(context.router, prefix="/api")
+    app.include_router(master_data.router, prefix="/api")
+    app.include_router(accounting.router, prefix="/api")
 
     return app
 

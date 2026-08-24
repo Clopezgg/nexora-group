@@ -4,16 +4,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
-from app.core.database import Base
-from app.models import (  # noqa: F401  (registran las tablas en Base.metadata)
-    Company,
-    Project,
-    Role,
-    Session,
-    User,
-    UserContext,
-    UserRole,
-)
+from app.core.database import Base  # noqa: F401  (importa app.models internamente)
 
 config = context.config
 

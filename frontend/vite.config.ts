@@ -8,14 +8,38 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg', 'pwa-icon.svg'],
       manifest: {
-        name: 'Nexora Group',
+        name: 'Nexora Group — Gestión Empresarial y Control de Construcción',
         short_name: 'Nexora',
-        description: 'Plataforma administrativa Nexora Group',
+        description: 'Plataforma administrativa Nexora Group: tesorería, proyectos, abastecimiento y control de obra.',
         theme_color: '#0B1F3A',
         background_color: '#0B1F3A',
         display: 'standalone',
-        icons: [],
+        start_url: '/',
+        icons: [
+          {
+            src: '/pwa-icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any',
+          },
+          {
+            src: '/pwa-icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      workbox: {
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            urlPattern: /\/api\//,
+            handler: 'NetworkOnly',
+          },
+        ],
       },
     }),
   ],

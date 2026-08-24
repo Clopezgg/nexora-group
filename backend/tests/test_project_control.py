@@ -1,6 +1,9 @@
 import uuid
 from decimal import Decimal
 
+from sqlalchemy import select
+
+from app.models.budget import Budget
 from app.models.procurement import PurchaseOrder
 from app.models.project import Project
 from tests.helpers import create_company, login_admin
@@ -125,6 +128,27 @@ def test_budget_baseline_cannot_be_created_twice(client):
     assert summary["authorized"] == "100000.00"
 
 
+def test_budget_baseline_rejects_non_functional_currency_without_persisting(client, db_session):
+    """Budget arithmetic must start in the company's functional currency until FX policy exists."""
+    login_admin(client)
+    company = create_company(client, currency="HNL")
+    project = _create_project(client, company_id=company["id"])
+
+    response = client.post(
+        f"/api/projects/{project['id']}/budgets/baseline",
+        json={"currencyCode": "USD", "lines": [{"authorizedAmount": "1000.00"}]},
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "NXR-BUDGET-002"
+    persisted = list(
+        db_session.execute(
+            select(Budget).where(Budget.project_id == uuid.UUID(project["id"]))
+        ).scalars()
+    )
+    assert persisted == []
+
+
 def test_budget_summary_uses_only_approved_project_purchase_orders_as_commitments(client):
     """Breaking the Procurement -> Project Control seam must lose the real
     commitment or incorrectly include the draft PO."""
@@ -219,6 +243,51 @@ def test_budget_summary_rejects_preexisting_non_functional_currency_commitment(c
 
     assert summary.status_code == 409, summary.text
     assert summary.json()["error"]["code"] == "NXR-PROCUREMENT-002"
+
+
+def test_foreign_currency_commitment_only_blocks_its_own_project_summary(client, db_session):
+    """A legacy invalid PO for project A must not deny a valid project B summary."""
+    login_admin(client)
+    company = create_company(client, currency="HNL")
+    project_a = _create_project(client, company_id=company["id"], name="Proyecto A")
+    project_b = _create_project(client, company_id=company["id"], name="Proyecto B")
+    supplier = _create_supplier(client, company_id=company["id"])
+    for project in (project_a, project_b):
+        baseline = client.post(
+            f"/api/projects/{project['id']}/budgets/baseline",
+            json={"currencyCode": "HNL", "lines": [{"authorizedAmount": "1000.00"}]},
+        )
+        assert baseline.status_code == 201, baseline.text
+
+    invalid_a = _create_purchase_order(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        project_id=project_a["id"],
+        unit_price="100.00",
+        currency_code="USD",
+    )
+    persisted_a = db_session.get(PurchaseOrder, uuid.UUID(invalid_a["id"]))
+    persisted_a.status = "APPROVED"
+    db_session.commit()
+    valid_b = _create_purchase_order(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        project_id=project_b["id"],
+        unit_price="50.00",
+    )
+    approval_b = client.post(f"/api/procurement/purchase-orders/{valid_b['id']}/approve")
+    assert approval_b.status_code == 200, approval_b.text
+
+    summary_b = client.get(f"/api/projects/{project_b['id']}/budgets/summary")
+    summary_a = client.get(f"/api/projects/{project_a['id']}/budgets/summary")
+
+    assert summary_b.status_code == 200, summary_b.text
+    assert Decimal(summary_b.json()["committed"]) == Decimal("50.00")
+    assert Decimal(summary_b.json()["available"]) == Decimal("950.00")
+    assert summary_a.status_code == 409, summary_a.text
+    assert summary_a.json()["error"]["code"] == "NXR-PROCUREMENT-002"
 
 
 def test_forecast_uses_project_inventory_issues_as_actual_cost_without_relabeling_cash(client):

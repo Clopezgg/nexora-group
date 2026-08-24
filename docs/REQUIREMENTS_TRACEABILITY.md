@@ -68,8 +68,8 @@ placeholder.
 | NXR-REQ-0029 | WBS (jerárquico) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `WBSNode` con parent/level, `WBSPage` real, test de jerarquía 2 niveles |
 | NXR-REQ-0030 | Planning (tasks/milestones/deps) | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `Task`/`Milestone` + API; sin pantalla dedicada todavía (`/proyectos/planeacion` sigue en EmptyState del bootstrap) |
 | NXR-REQ-0031 | Budgets | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `Budget`/`BudgetLine`, `budget_service.compute_summary`, `BudgetPage` con AUTHORIZED/COMMITTED/ACCRUED/PAID/AVAILABLE reales |
-| NXR-REQ-0032 | Budget versions (baseline/revised) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | BASELINE inmutable (`NXR-BUDGET-001` si se repite), REVISED generado por ChangeOrder aprobada, historial preservado — test dedicado |
-| NXR-REQ-0033 | Commitments | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Track C integrado: POs aprobadas por proyecto en moneda funcional alimentan `budget_service.compute_summary`; draft y moneda incompatible cubiertas por pruebas de integración |
+| NXR-REQ-0032 | Budget versions (baseline/revised) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | BASELINE inmutable (`NXR-BUDGET-001` si se repite) y obligado a moneda funcional (`NXR-BUDGET-002` antes de persistir); REVISED generado por ChangeOrder aprobada, historial preservado |
+| NXR-REQ-0033 | Commitments | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Track C integrado: POs aprobadas en moneda funcional alimentan el summary del proyecto solicitado; draft, moneda incompatible y aislamiento entre proyectos cubiertos por integración |
 | NXR-REQ-0034 | Accruals | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A (AP) — mismo contrato de integración |
 | NXR-REQ-0035 | Payments (project attribution) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A (AP) |
 | NXR-REQ-0036 | Forecast (BAC/PV/EV/AC/CPI/SPI/ETC/EAC/VAC) | ✅·➖·✅·✅·✅·➖·➖·✅·⬜ | IMPLEMENTED | `forecast_service.compute_forecast`; valores no calculables devuelven `null` real, nunca 0 falso — test dedicado |

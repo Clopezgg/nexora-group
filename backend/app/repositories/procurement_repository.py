@@ -221,13 +221,16 @@ def list_purchase_order_lines(db: Session, po_id: uuid.UUID) -> list[PurchaseOrd
     return list(db.execute(stmt).scalars())
 
 
-def project_commitments_by_project(db: Session, *, company_id: uuid.UUID) -> dict[uuid.UUID, Decimal]:
+def project_commitment_total(
+    db: Session, *, company_id: uuid.UUID, project_id: uuid.UUID
+) -> Decimal:
     """Documentary commitments for Budget/Project Control.
 
     A commitment exists only after purchase-order approval; receipts and
-    warehouse movements never create it. Currency remains part of the grouped
-    result until every row is validated against the company's functional
-    currency; nominal amounts are never combined across currencies.
+    warehouse movements never create it. The query is scoped to one project,
+    and currency remains grouped until every row is validated against the
+    company's functional currency; nominal amounts are never combined across
+    currencies or leaked across project summaries.
     """
     commitment_statuses = ("APPROVED", "SENT", "PARTIALLY_RECEIVED", "RECEIVED")
     company = db.get(Company, company_id)
@@ -235,17 +238,17 @@ def project_commitments_by_project(db: Session, *, company_id: uuid.UUID) -> dic
         raise ValueError(f"Company {company_id} no existe")
     total = func.sum(PurchaseOrderLine.quantity * PurchaseOrderLine.unit_price + PurchaseOrderLine.tax_amount)
     stmt = (
-        select(PurchaseOrder.project_id, PurchaseOrder.currency_code, total.label("total"))
+        select(PurchaseOrder.currency_code, total.label("total"))
         .join(PurchaseOrderLine, PurchaseOrderLine.purchase_order_id == PurchaseOrder.id)
         .where(
             PurchaseOrder.company_id == company_id,
-            PurchaseOrder.project_id.is_not(None),
+            PurchaseOrder.project_id == project_id,
             PurchaseOrder.status.in_(commitment_statuses),
         )
-        .group_by(PurchaseOrder.project_id, PurchaseOrder.currency_code)
+        .group_by(PurchaseOrder.currency_code)
     )
-    commitments: dict[uuid.UUID, Decimal] = {}
-    for project_id, currency_code, nominal_total in db.execute(stmt):
+    commitment = Decimal("0")
+    for currency_code, nominal_total in db.execute(stmt):
         if company.functional_currency_code is None:
             raise ProcurementCurrencyMismatchError(
                 f"La company {company.id} no tiene moneda funcional; no se pueden agregar compromisos"
@@ -255,8 +258,8 @@ def project_commitments_by_project(db: Session, *, company_id: uuid.UUID) -> dic
                 f"La PO usa {currency_code}, pero la moneda funcional de la company es "
                 f"{company.functional_currency_code}; no existe una política FX autoritativa"
             )
-        commitments[project_id] = commitments.get(project_id, Decimal("0")) + Decimal(nominal_total)
-    return commitments
+        commitment += Decimal(nominal_total)
+    return commitment
 
 
 def get_purchase_order_line(db: Session, line_id: uuid.UUID) -> PurchaseOrderLine | None:

@@ -5,7 +5,10 @@
 - `Budget.version = BASELINE`: se crea **una sola vez** por proyecto
   (`budget_service.create_baseline`, rechaza un segundo intento con
   `BudgetBaselineExistsError` / `NXR-BUDGET-001`). Sus `BudgetLine` nunca se
-  editan ni eliminan.
+  editan ni eliminan. Hasta que exista una política FX autoritativa, su
+  `currency_code` debe coincidir con `Company.functional_currency_code`; se
+  rechaza antes de persistir con `NXR-BUDGET-002` si difiere o falta la
+  moneda funcional.
 - `Budget.version = REVISED`: se crea automáticamente cuando una
   `ChangeOrder` en estado `SUBMITTED` se aprueba
   (`budget_service.approve_change_order`). Copia las líneas del budget
@@ -33,12 +36,13 @@ no existe esa necesidad real, así que no se construyó especulativamente.
 
 `budget_service.compute_summary` es el ÚNICO lugar que calcula estos
 números. Track C se integra mediante `procurement_repository.
-project_commitments_by_project`; cuando aterrice AP/Track A, ACCRUED y PAID
-deben conectarse a sus fuentes reales sin cambiar la forma de
-`BudgetSummary`. Sin una política FX autoritativa, una PO de proyecto en una
+project_commitment_total(db, company_id, project_id)`; cuando aterrice
+AP/Track A, ACCRUED y PAID deben conectarse a sus fuentes reales sin cambiar
+la forma de `BudgetSummary`. Sin una política FX autoritativa, una PO de proyecto en una
 moneda distinta de `Company.functional_currency_code` se rechaza al aprobar
-y también durante la agregación defensiva (`NXR-PROCUREMENT-002`); nunca se
-convierte, omite ni resta como si fuera moneda funcional.
+y también durante la agregación defensiva, limitada al proyecto solicitado
+(`NXR-PROCUREMENT-002`); nunca se convierte, omite, resta como si fuera
+moneda funcional ni bloquea el summary de otro proyecto.
 
 ## Forecast (`GET /api/projects/{id}/forecast`)
 

@@ -47,6 +47,11 @@ class ProcurementCurrencyMismatchError(Exception):
     distinta de la moneda funcional sin una política FX autoritativa."""
 
 
+class BudgetCurrencyMismatchError(Exception):
+    """Un Budget debe usar la moneda funcional de su company mientras no
+    exista una política FX autoritativa."""
+
+
 class BudgetBaselineExistsError(Exception):
     """INV-BUD-001-adyacente: un proyecto solo puede tener un BASELINE; nunca
     se sobrescribe, ver docs/BUDGET_CONTROLLING.md."""

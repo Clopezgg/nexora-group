@@ -4,8 +4,13 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.domain.errors import BudgetBaselineExistsError, InvalidChangeOrderStateError
+from app.domain.errors import (
+    BudgetBaselineExistsError,
+    BudgetCurrencyMismatchError,
+    InvalidChangeOrderStateError,
+)
 from app.models.budget import Budget, BudgetLine
+from app.models.company import Company
 from app.repositories import (
     budget_repository,
     procurement_repository,
@@ -23,6 +28,9 @@ delta de la ChangeOrder (positivo o negativo) contra el WBS que indique la
 propia ChangeOrder -- es una simplificación deliberada (no redistribuye
 línea por línea el presupuesto completo) documentada aquí y en
 docs/BUDGET_CONTROLLING.md.
+
+Todo BASELINE usa `Company.functional_currency_code`; no se acepta otra
+moneda hasta que exista una política FX fechada y autoritativa.
 
 Métricas AUTHORIZED/COMMITTED/ACCRUED/PAID/AVAILABLE: COMMITTED consume
 Purchase Orders aprobadas de Procurement/Track C. ACCRUED/PAID siguen sin
@@ -60,6 +68,21 @@ def create_baseline(
     if budget_repository.get_baseline_budget(db, project_id) is not None:
         raise BudgetBaselineExistsError(
             f"El proyecto {project_id} ya tiene un BASELINE; no se puede sobrescribir"
+        )
+    project = project_repository.get_by_id(db, project_id)
+    if project is None:
+        raise ValueError(f"Project {project_id} no existe")
+    company = db.get(Company, project.company_id)
+    if company is None:
+        raise ValueError(f"Company {project.company_id} no existe")
+    if company.functional_currency_code is None:
+        raise BudgetCurrencyMismatchError(
+            f"La company {company.id} no tiene moneda funcional; no se puede crear un Budget"
+        )
+    if currency_code != company.functional_currency_code:
+        raise BudgetCurrencyMismatchError(
+            f"El Budget usa {currency_code}, pero la moneda funcional de la company es "
+            f"{company.functional_currency_code}; no existe una política FX autoritativa"
         )
     budget = Budget(
         project_id=project_id,
@@ -152,10 +175,9 @@ def compute_summary(db: Session, *, project_id: uuid.UUID) -> BudgetSummary:
     project = project_repository.get_by_id(db, project_id)
     if project is None:
         raise ValueError(f"Project {project_id} no existe")
-    commitments = procurement_repository.project_commitments_by_project(
-        db, company_id=project.company_id
+    committed = procurement_repository.project_commitment_total(
+        db, company_id=project.company_id, project_id=project_id
     )
-    committed = commitments.get(project_id, Decimal("0"))
     accrued = Decimal("0")
     paid = Decimal("0")
     available = authorized - committed - accrued

@@ -63,15 +63,16 @@ Track A construye `SupplierInvoice` con un **placeholder de Supplier**
 `PurchaseOrder.project_id` (cuando la PO es atribuible a un proyecto) es
 el punto de entrada para que `budget_service.compute_summary` (Track B)
 obtenga `COMMITTED`. La fuente certificada es
-`procurement_repository.project_commitments_by_project(db, company_id)`,
-que devuelve totales `Decimal` por `project_id` de POs en
+`procurement_repository.project_commitment_total(db, company_id, project_id)`,
+que devuelve el total `Decimal` del proyecto solicitado para POs en
 `APPROVED/SENT/PARTIALLY_RECEIVED/RECEIVED`; una PO `DRAFT` no aporta nada.
 Hasta que exista una política FX fechada y autoritativa, una PO ligada a
 proyecto solo puede aprobarse si su `currency_code` coincide con
 `Company.functional_currency_code`; el rechazo explícito usa
-`NXR-PROCUREMENT-002`. La agregación conserva la moneda en su `GROUP BY` y
-repite la validación para bloquear datos aprobados preexistentes, nunca los
-omite ni suma importes nominales incompatibles.
+`NXR-PROCUREMENT-002`. La agregación se filtra por `project_id`, conserva la
+moneda en su `GROUP BY` y repite la validación para bloquear datos aprobados
+preexistentes solo en su proyecto propietario; nunca los omite, suma importes
+nominales incompatibles ni contamina otro proyecto de la company.
 
 Goods Receipt y Service Entry registran avance físico/documental, pero no
 crean por sí mismos actual de proyecto ni efectivo. Los actuals de material

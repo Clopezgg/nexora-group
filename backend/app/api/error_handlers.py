@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.domain.errors import (
     BudgetBaselineExistsError,
+    BudgetCurrencyMismatchError,
     FiscalPeriodClosedError,
     IdempotencyConflictError,
     ImmutableDocumentError,
@@ -36,6 +37,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     InvalidProcurementStateError: ("NXR-PROCUREMENT-001", 409),
     ProcurementCurrencyMismatchError: ("NXR-PROCUREMENT-002", 409),
     BudgetBaselineExistsError: ("NXR-BUDGET-001", 409),
+    BudgetCurrencyMismatchError: ("NXR-BUDGET-002", 409),
     InvalidChangeOrderStateError: ("NXR-PROJECT-001", 409),
 }
 

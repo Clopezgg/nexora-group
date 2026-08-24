@@ -51,11 +51,13 @@ def test_commitments_are_derived_from_approved_purchase_orders(client, db_sessio
     assert response.status_code == 200, response.text
     assert draft["status"] == "DRAFT"
 
-    commitments = procurement_repository.project_commitments_by_project(
-        db_session, company_id=uuid.UUID(company["id"])
+    commitment = procurement_repository.project_commitment_total(
+        db_session,
+        company_id=uuid.UUID(company["id"]),
+        project_id=project.id,
     )
 
-    assert commitments == {project.id: Decimal("125.50")}
+    assert commitment == Decimal("125.50")
 
 
 def test_company_access_blocks_cross_company_procurement_resource(client, db_session):

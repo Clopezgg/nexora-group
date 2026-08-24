@@ -29,3 +29,55 @@ bloque de la rúbrica se marca completo todavía).
   ampliado, chart of accounts, posting engine, GL, OperationScope) y
   Track F (Experience: design system ampliado, navegación empresarial)
   lanzados en paralelo.
+
+### 2026-08-24 — Track 1 (Foundation) completado en worktree, pendiente de integrar
+
+Construido en `~/nexora-group-track1`, rama `track/1-foundation` (worktree
+aislado del clon de integración). Evidencia real:
+
+- **Master data**: `Company` extendida (code/legal_name/functional_currency/
+  country/fiscal_id), `BusinessUnit`, `FiscalYear`/`FiscalPeriod`,
+  `Currency`/`ExchangeRate` (seed HNL/USD), `TaxCode`, `ChartOfAccount`/
+  `Account`, `CostCenter`/`EconomicCategory`, `DocumentType` (seed JRN/COR/
+  ANU), `NumberSequence`, `ApprovalPolicy` (esqueleto), `Permission`/
+  `RolePermission`/`UserCompanyAccess`.
+- **Identity/RBAC**: 14 roles (§87), motor central de permisos backend-
+  autoritativo (`require_permission` + `assert_company_access`), matriz de
+  permisos real para `core.company`/`accounting.*`.
+- **OperationScope**: CHECK constraint real de PostgreSQL
+  (`ck_accounting_documents_operation_scope`) confirmado con
+  `\d accounting_documents` contra una base recién migrada.
+- **Posting Engine / GL**: `AccountingDocument`/`JournalLine`/`PostingRule`/
+  `TaxLine`/`AccountingSourceLink`, `posting_service.post_manual` /
+  `reverse_document`, numeración concurrency-safe (`SELECT...FOR UPDATE`),
+  inmutabilidad de documentos posted, API `/api/accounting/journal-entries`.
+- **Idempotency**: `IdempotencyRecord` + `idempotency_service`.
+- **Company isolation (INV-COMP-001)**: `company_scope` ANY/OWN aplicado y
+  probado con 4 tests dedicados.
+- **Tests**: 35/35 pytest pasando (15 preexistentes + 20 nuevos). Frontend
+  sin tocar: 5/5 vitest, typecheck limpio, build OK (verificado de nuevo
+  tras los cambios).
+- **Migraciones**: `alembic revision --autogenerate` generó
+  `c622defc2308_add_foundation_master_data_accounting_...py`; aplicada
+  sobre `nexora_dev` y, por separado, verificada en un fresh-install
+  completo (`nexora_dev_fresh` creada, migrada desde cero con ambas
+  revisiones, 30 tablas confirmadas, base descartada al terminar).
+- **Documentación**: `docs/ACCOUNTING.md` (contrato del Posting Engine +
+  Idempotency + catálogo completo de invariantes §130 con dueño asignado
+  por invariante) y `docs/RBAC.md` (contrato del motor de permisos)
+  creados.
+- **Desviaciones**: `project_scope` existe en el modelo `RolePermission`
+  pero no se aplica en ningún endpoint todavía (documentado en
+  `docs/RBAC.md` para el próximo track que lo necesite). Dimensiones
+  contables sin tabla propia (supplier/customer/asset/warehouse) viven en
+  `JournalLine.extra_dimensions` (JSONB) como deuda intencional hasta que
+  el track dueño cree la entidad real (documentado en `docs/ACCOUNTING.md`).
+  `PostingRule` existe como modelo pero sin resolver automático
+  (`post_via_rule`) porque ningún dominio real lo necesitó todavía.
+- **Commits en `track/1-foundation`** (no integrados a
+  `feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
+  coordinador): ver `git log track/1-foundation`.
+- **Rúbrica**: este track por sí solo no cierra ningún bloque de la
+  rúbrica al 100% (Accounting/GL sigue abierto porque le falta reporting y
+  UI), pero deja la base sobre la que Treasury/AP/AR/Procurement/Inventory
+  pueden construir sin reinventar el motor contable.

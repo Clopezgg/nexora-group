@@ -18,7 +18,7 @@ describe('routing', () => {
     expect(await screen.findByRole('heading', { name: /iniciar sesión/i })).toBeInTheDocument()
   })
 
-  it('renders the dashboard for authenticated users at the root path', async () => {
+  it('renders the role-based home for authenticated users at the root path', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((input: RequestInfo | URL) => {
@@ -54,6 +54,32 @@ describe('routing', () => {
 
     render(renderApp('/'))
 
-    expect(await screen.findByRole('heading', { name: /^dashboard$/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /inicio — finanzas/i })).toBeInTheDocument()
+  })
+
+  it('renders every grouped nav route without crashing (placeholder or home)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              id: 'u1',
+              email: 'admin@nexora.group',
+              fullName: 'Administrador',
+              roles: ['Administrator'],
+            }),
+          } as Response)
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response)
+      }),
+    )
+
+    render(renderApp('/abastecimiento/rfq'))
+
+    expect(await screen.findByRole('heading', { name: /^rfq$/i })).toBeInTheDocument()
   })
 })

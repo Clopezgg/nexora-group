@@ -1,6 +1,6 @@
 .nx-app-shell {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 268px 1fr;
   min-height: 100vh;
   background: var(--nx-gray-50);
 }
@@ -11,7 +11,8 @@
   padding: var(--nx-space-6) var(--nx-space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--nx-space-6);
+  gap: var(--nx-space-4);
+  overflow-y: auto;
 }
 
 .nx-sidebar__brand {
@@ -20,6 +21,22 @@
   font-size: 13px;
   color: var(--nx-blue-400);
   padding: 0 var(--nx-space-3);
+}
+
+.nx-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-5);
+}
+
+.nx-sidebar__group-label {
+  margin: 0 0 var(--nx-space-2);
+  padding: 0 var(--nx-space-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nx-gray-400);
 }
 
 .nx-sidebar__list {
@@ -35,13 +52,14 @@
   display: flex;
   align-items: center;
   gap: var(--nx-space-3);
-  padding: var(--nx-space-3);
+  min-height: var(--nx-touch-target);
+  padding: var(--nx-space-2) var(--nx-space-3);
   border-radius: var(--nx-radius-md);
   color: var(--nx-gray-400);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--nx-motion-fast), color var(--nx-motion-fast);
 }
 
 .nx-sidebar__link:hover {
@@ -64,9 +82,36 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--nx-space-4) var(--nx-space-8);
+  gap: var(--nx-space-4);
+  padding: var(--nx-space-3) var(--nx-space-6);
   background: var(--nx-white);
   border-bottom: 1px solid var(--nx-gray-200);
+  position: sticky;
+  top: 0;
+  z-index: var(--nx-z-sticky);
+  flex-wrap: wrap;
+}
+
+.nx-topbar__left,
+.nx-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-3);
+  flex-wrap: wrap;
+}
+
+.nx-topbar__nav-toggle {
+  display: none;
+}
+
+.nx-topbar__company {
+  display: none;
+}
+
+.nx-topbar__company-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nx-navy-900);
 }
 
 .nx-topbar__context {
@@ -79,12 +124,19 @@
   font-size: 13px;
   color: var(--nx-gray-600);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .nx-topbar__user {
   display: flex;
   align-items: center;
-  gap: var(--nx-space-4);
+  gap: var(--nx-space-3);
+}
+
+.nx-topbar__user-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
 }
 
 .nx-topbar__user-name {
@@ -93,12 +145,19 @@
   color: var(--nx-navy-900);
 }
 
+.nx-topbar__user-role {
+  font-size: 11px;
+  color: var(--nx-gray-400);
+}
+
 .nx-topbar__logout {
   border: none;
   background: transparent;
   color: var(--nx-gray-600);
   font-size: 13px;
   cursor: pointer;
+  min-height: var(--nx-touch-target);
+  padding: 0 var(--nx-space-2);
 }
 
 .nx-topbar__logout:hover {
@@ -108,13 +167,60 @@
 .nx-app-shell__content {
   padding: var(--nx-space-8);
   flex: 1;
+  min-width: 0;
 }
 
-@media (max-width: 900px) {
+/* Desktop large: comfortable */
+@media (min-width: 1440px) {
+  .nx-app-shell {
+    grid-template-columns: 288px 1fr;
+  }
+  .nx-topbar__company {
+    display: block;
+  }
+}
+
+/* Laptop/tablet-landscape: tighten content padding */
+@media (max-width: 1280px) {
+  .nx-app-shell__content {
+    padding: var(--nx-space-6);
+  }
+}
+
+/* Tablet portrait and below: sidebar becomes a drawer */
+@media (max-width: 1024px) {
   .nx-app-shell {
     grid-template-columns: 1fr;
   }
   .nx-sidebar {
     display: none;
+  }
+  .nx-topbar__nav-toggle {
+    display: inline-flex;
+  }
+  .nx-topbar__context-label {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .nx-app-shell__content {
+    padding: var(--nx-space-4);
+  }
+  .nx-topbar {
+    padding: var(--nx-space-3) var(--nx-space-4);
+  }
+  .nx-topbar__user-info {
+    display: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .nx-topbar__context {
+    order: 3;
+    width: 100%;
+  }
+  .nx-topbar__context .nx-select {
+    width: 100%;
   }
 }

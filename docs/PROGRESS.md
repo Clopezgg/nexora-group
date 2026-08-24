@@ -29,3 +29,81 @@ bloque de la rúbrica se marca completo todavía).
   ampliado, chart of accounts, posting engine, GL, OperationScope) y
   Track F (Experience: design system ampliado, navegación empresarial)
   lanzados en paralelo.
+
+### 2026-08-24 — Track F (Experience) construido, pendiente de integración
+
+Rama `track/f-experience` (worktree aislado, no tocó `backend/`). Trabajo
+real, verificado con comandos reales, no solo escrito:
+
+- **Tokens**: cian sutil, motion, z-index, breakpoints (1440/1280/1024/768/
+  430/390/360) y touch target (44px) añadidos a `tokens.css` +
+  `tokens/motion.ts`.
+- **Design System**: de 12 a ~33 componentes (`IconButton`, `Textarea`,
+  `SearchInput`, `DatePicker`, `MoneyInput`, `CurrencyInput`, `Combobox`,
+  `EntitySelector` + 7 selectores de dominio, `StatCard`, `Metric`,
+  `ChartCard`, `DataGrid`, `FilterBar`, `Tooltip`, `Popover`, `Drawer`,
+  `Sheet`, `ToastProvider`/`useToast`, `Alert`, `Breadcrumb`, `Stepper`,
+  `Timeline`, `Tabs`, `Skeleton`, `CommandPalette`). Ninguno con datos
+  fabricados: donde no hay backend, `EntitySelector`/secciones de home
+  muestran `EmptyState` real.
+- **App Shell**: sidebar reagrupado en Inicio/Finanzas/Proyectos/
+  Abastecimiento/Comercial/Recursos/Control (~50 rutas reales, la mayoría
+  en `EmptyState` profesional porque su backend aún no existe — esperado
+  en esta etapa), drawer de navegación mobile, `CommandPalette` con
+  Cmd/Ctrl+K real (busca sobre las rutas reales de la app, contrato listo
+  para `GET /api/v1/search` cuando exista).
+- **Login rediseñado**: sin campo Project, split desktop con ilustración
+  de construcción inline (SVG, sin assets externos), mobile centrado,
+  "¿Olvidaste tu contraseña?" con aviso honesto (no hay backend de reset
+  todavía), estados loading/credenciales inválidas/error de servidor
+  (no-401)/error de red diferenciados.
+- **Role-based Home**: `HomePage` + `resolveHomeConfig` — Administrator/
+  Finance/Treasury/Accountant ven las cards reales de tesorería (API
+  existente); Project Manager/Controller, Procurement/Buyer, Warehouse
+  Manager y Auditor ven secciones con `EmptyState` honesto apuntando al
+  `NXR-REQ` que las activará.
+- **PWA**: manifest tenía `icons: []` (no instalable) — corregido con
+  icono real (`pwa-icon.svg`); `NetworkOnly` forzado sobre `/api/*` para
+  que el service worker nunca cachee datos financieros ni permita
+  mutación offline.
+
+**Verificación real ejecutada** (no solo "se ve bien"): `npm run
+typecheck` limpio, `npm run lint` limpio, `npm run build` OK (dist
+generado, PWA precache 7 entries), `npx vitest run` → **15/15** tests
+pasan (antes 5/5 — 10 tests nuevos: `design-system.test.tsx` ×6,
+`HomePage.test.tsx` ×2, `AppShell.test.tsx` ×2, más ampliación de
+`routing.test.tsx`), `vite preview` real sirvió `HTTP 200` con
+`<title>Nexora Group</title>`. Pase con el skill `impeccable`
+(`detect.mjs`) encontró un side-tab accent border (patrón reconocible de
+"AI slop") en `Toast`/`Alert` — corregido a icono de tono + fondo
+tintado sutil, sin borde grueso; re-ejecutado, 0 hallazgos.
+
+**Bug real encontrado y corregido durante la propia verificación**: el
+botón de búsqueda del Topbar simulaba el atajo Cmd/Ctrl+K con
+`window.dispatchEvent(...)`, pero el listener del `CommandPalette` está
+en `document` — un evento despachado en `window` no burbujea hacia abajo
+a `document`, así que el botón nunca habría abierto la paleta en un
+navegador real (los tests con mocks no lo habrían detectado sin una
+prueba de interacción real). Corregido a `document.dispatchEvent(...)` y
+cubierto con un test de interacción real
+(`AppShell.test.tsx`).
+
+**Limitación honesta**: no hay navegador/herramienta de captura de
+pantalla disponible en este entorno de subagente — la revisión visual
+(§135 de la orden) se hizo por código/CSS contra la matriz de breakpoints
+y el detector mecánico de `impeccable`, no con una captura real en
+navegador. Queda pendiente una pasada visual en navegador real antes de
+certificar `VERIFIED` (NXR-REQ-0101 a 0105 quedan `IMPLEMENTED`, no
+`VERIFIED`, por esta razón).
+
+Filas actualizadas en `docs/REQUIREMENTS_TRACEABILITY.md`: NXR-REQ-0097 a
+0104 → `IMPLEMENTED`; NXR-REQ-0105 → `IN_PROGRESS`. Ningún `VERIFIED`
+auto-otorgado — eso lo confirma el coordinador al integrar a
+`feat/nexora-greenfield`.
+
+Commits: `feat(ui): expand design system with tokens and ~20 new
+components`, `feat(ui): regroup sidebar into enterprise navigation with
+command palette`, `feat(ui): redesign login with construction
+illustration`, `feat(ui): add role-based home pages`, `fix(pwa): add
+real manifest icons and block API caching`, `docs: update traceability
+and progress for Track F`. Rama pusheada a `origin/track/f-experience`.

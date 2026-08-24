@@ -1,9 +1,16 @@
 export type RoleName =
   | 'Administrator'
-  | 'Treasury Manager'
   | 'Finance Manager'
+  | 'Treasury Manager'
+  | 'Accountant'
   | 'Project Manager'
+  | 'Project Controller'
+  | 'Procurement Manager'
+  | 'Buyer'
+  | 'Warehouse Manager'
   | 'Operations User'
+  | 'Sales Manager'
+  | 'Equipment Manager'
   | 'Auditor'
   | 'Viewer'
 

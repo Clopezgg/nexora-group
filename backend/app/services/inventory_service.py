@@ -13,11 +13,50 @@ desde un router ni se guarda "cantidad actual" en una columna mutable de
 Item/Warehouse. Valuación: moving average (orden maestra §54)."""
 
 
-def _current_position(db: Session, *, item_id: uuid.UUID, warehouse_id: uuid.UUID) -> tuple[Decimal, Decimal]:
-    last = inventory_repository.get_last_ledger_entry(db, item_id=item_id, warehouse_id=warehouse_id)
+def _current_position(
+    db: Session, *, company_id: uuid.UUID, item_id: uuid.UUID, warehouse_id: uuid.UUID
+) -> tuple[Decimal, Decimal]:
+    last = inventory_repository.get_last_ledger_entry(
+        db, company_id=company_id, item_id=item_id, warehouse_id=warehouse_id
+    )
     if last is None:
         return Decimal("0"), Decimal("0")
     return last.resulting_qty_on_hand, last.resulting_avg_cost
+
+
+def _receive_stock_entry(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    item_id: uuid.UUID,
+    warehouse_id: uuid.UUID,
+    quantity: Decimal,
+    unit_cost: Decimal,
+    source_type: str | None = None,
+    source_id: uuid.UUID | None = None,
+) -> StockLedgerEntry:
+    if quantity <= 0:
+        raise InsufficientStockError("La cantidad recibida debe ser positiva")
+    qty_before, avg_cost_before = _current_position(
+        db, company_id=company_id, item_id=item_id, warehouse_id=warehouse_id
+    )
+    new_qty = qty_before + quantity
+    new_value = (qty_before * avg_cost_before) + (quantity * unit_cost)
+    new_avg_cost = (new_value / new_qty) if new_qty > 0 else Decimal("0")
+    entry = inventory_repository.append_ledger_entry(
+        db,
+        company_id=company_id,
+        item_id=item_id,
+        warehouse_id=warehouse_id,
+        movement_type="RECEIPT",
+        quantity=quantity,
+        unit_cost=unit_cost,
+        resulting_qty_on_hand=new_qty,
+        resulting_avg_cost=new_avg_cost,
+        source_type=source_type,
+        source_id=source_id,
+    )
+    return entry
 
 
 def receive_stock(
@@ -32,22 +71,13 @@ def receive_stock(
     source_id: uuid.UUID | None = None,
 ) -> StockLedgerEntry:
     """RECEIPT. Actualiza el costo promedio ponderado (moving average)."""
-    if quantity <= 0:
-        raise InsufficientStockError("La cantidad recibida debe ser positiva")
-    qty_before, avg_cost_before = _current_position(db, item_id=item_id, warehouse_id=warehouse_id)
-    new_qty = qty_before + quantity
-    new_value = (qty_before * avg_cost_before) + (quantity * unit_cost)
-    new_avg_cost = (new_value / new_qty) if new_qty > 0 else Decimal("0")
-    entry = inventory_repository.append_ledger_entry(
+    entry = _receive_stock_entry(
         db,
         company_id=company_id,
         item_id=item_id,
         warehouse_id=warehouse_id,
-        movement_type="RECEIPT",
         quantity=quantity,
         unit_cost=unit_cost,
-        resulting_qty_on_hand=new_qty,
-        resulting_avg_cost=new_avg_cost,
         source_type=source_type,
         source_id=source_id,
     )
@@ -71,7 +101,9 @@ def _issue(
 ) -> StockLedgerEntry:
     if quantity <= 0:
         raise InsufficientStockError("La cantidad a emitir/transferir debe ser positiva")
-    qty_before, avg_cost = _current_position(db, item_id=item_id, warehouse_id=warehouse_id)
+    qty_before, avg_cost = _current_position(
+        db, company_id=company_id, item_id=item_id, warehouse_id=warehouse_id
+    )
     if quantity > qty_before:
         raise InsufficientStockError(
             f"Stock insuficiente: disponible={qty_before}, solicitado={quantity} (INV-INV-001)"
@@ -92,8 +124,6 @@ def _issue(
         source_id=source_id,
         notes=notes,
     )
-    db.commit()
-    db.refresh(entry)
     return entry
 
 
@@ -111,7 +141,7 @@ def issue_to_project(
     a costo de proyecto) lo conecta Track B/A cuando integren este track --
     ver docs/INVENTORY.md contrato de integración; aquí se deja el registro
     de consumo con project_id explícito, listo para ese posting."""
-    return _issue(
+    entry = _issue(
         db,
         company_id=company_id,
         item_id=item_id,
@@ -122,6 +152,9 @@ def issue_to_project(
         source_type="project_issue",
         source_id=project_id,
     )
+    db.commit()
+    db.refresh(entry)
+    return entry
 
 
 def transfer_stock(
@@ -133,28 +166,38 @@ def transfer_stock(
     to_warehouse_id: uuid.UUID,
     quantity: Decimal,
 ) -> tuple[StockLedgerEntry, StockLedgerEntry]:
-    _, avg_cost = _current_position(db, item_id=item_id, warehouse_id=from_warehouse_id)
-    outgoing = _issue(
-        db,
-        company_id=company_id,
-        item_id=item_id,
-        warehouse_id=from_warehouse_id,
-        quantity=quantity,
-        movement_type="TRANSFER",
-        project_id=None,
-        source_type="transfer_to",
-        source_id=to_warehouse_id,
+    """Move stock in one database transaction or leave neither ledger leg."""
+    _, avg_cost = _current_position(
+        db, company_id=company_id, item_id=item_id, warehouse_id=from_warehouse_id
     )
-    incoming = receive_stock(
-        db,
-        company_id=company_id,
-        item_id=item_id,
-        warehouse_id=to_warehouse_id,
-        quantity=quantity,
-        unit_cost=avg_cost,
-        source_type="transfer_from",
-        source_id=from_warehouse_id,
-    )
+    try:
+        outgoing = _issue(
+            db,
+            company_id=company_id,
+            item_id=item_id,
+            warehouse_id=from_warehouse_id,
+            quantity=quantity,
+            movement_type="TRANSFER",
+            project_id=None,
+            source_type="transfer_to",
+            source_id=to_warehouse_id,
+        )
+        incoming = _receive_stock_entry(
+            db,
+            company_id=company_id,
+            item_id=item_id,
+            warehouse_id=to_warehouse_id,
+            quantity=quantity,
+            unit_cost=avg_cost,
+            source_type="transfer_from",
+            source_id=from_warehouse_id,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(outgoing)
+    db.refresh(incoming)
     return outgoing, incoming
 
 
@@ -170,7 +213,9 @@ def apply_physical_count(db: Session, *, physical_count_id: uuid.UUID, approved_
         variance = line.counted_quantity - line.expected_quantity
         if variance == 0:
             continue
-        qty_before, avg_cost = _current_position(db, item_id=line.item_id, warehouse_id=count.warehouse_id)
+        qty_before, avg_cost = _current_position(
+            db, company_id=count.company_id, item_id=line.item_id, warehouse_id=count.warehouse_id
+        )
         new_qty = qty_before + variance
         inventory_repository.append_ledger_entry(
             db,

@@ -246,8 +246,20 @@ def create_purchase_order_from_quotation(
 def approve_purchase_order(
     po_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("procurement.purchase_order", "approve")),
+    user=Depends(require_permission("procurement.purchase_order", "approve")),
 ):
+    order = procurement_repository.get_purchase_order(db, po_id)
+    if order is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="procurement.purchase_order",
+        action="approve",
+        company_id=order.company_id,
+    )
     order = procurement_service.approve_purchase_order(db, purchase_order_id=po_id)
     return _purchase_order_response(db, order)
 
@@ -256,8 +268,20 @@ def approve_purchase_order(
 def send_purchase_order(
     po_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("procurement.purchase_order", "approve")),
+    user=Depends(require_permission("procurement.purchase_order", "approve")),
 ):
+    order = procurement_repository.get_purchase_order(db, po_id)
+    if order is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="procurement.purchase_order",
+        action="approve",
+        company_id=order.company_id,
+    )
     order = procurement_service.send_purchase_order(db, purchase_order_id=po_id)
     return _purchase_order_response(db, order)
 

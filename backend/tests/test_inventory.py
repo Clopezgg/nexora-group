@@ -1,8 +1,14 @@
 import uuid
 from decimal import Decimal
 
+import pytest
+from sqlalchemy import select
+
+from app.models.inventory import StockLedgerEntry
+from app.models.permission import UserCompanyAccess
 from app.repositories import inventory_repository
-from tests.helpers import create_company, login_admin
+from app.services import inventory_service
+from tests.helpers import create_company, create_user_with_role, login_admin, login_as
 
 
 def _setup(client):
@@ -16,6 +22,13 @@ def _setup(client):
         json={"companyId": company["id"], "code": "ALM-01", "name": "Almacén Central"},
     ).json()
     return company, item, warehouse
+
+
+def _login_warehouse_manager_for_company(client, db_session, *, company_id: str, email: str) -> None:
+    user = create_user_with_role(db_session, email=email, role_name="Warehouse Manager")
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_id))
+    db_session.commit()
+    login_as(client, email=email)
 
 
 def test_receive_stock_sets_moving_average(client):
@@ -127,6 +140,156 @@ def test_inventory_actuals_are_derived_from_project_issues(client, db_session):
     )
 
     assert actuals == {project.id: Decimal("80.00")}
+
+
+def test_stock_receive_rejects_foreign_item_or_warehouse_without_ledger_entry(client, db_session):
+    login_admin(client)
+    company_a, item_a, warehouse_a = _setup(client)
+    _company_b, item_b, warehouse_b = _setup(client)
+    _login_warehouse_manager_for_company(
+        client, db_session, company_id=company_a["id"], email="warehouse-foreign-resource@nexora.group"
+    )
+
+    foreign_item = client.post(
+        "/api/inventory/stock/receive",
+        json={
+            "companyId": company_a["id"],
+            "itemId": item_b["id"],
+            "warehouseId": warehouse_a["id"],
+            "quantity": "1.0000",
+            "unitCost": "10.0000",
+        },
+    )
+    foreign_warehouse = client.post(
+        "/api/inventory/stock/receive",
+        json={
+            "companyId": company_a["id"],
+            "itemId": item_a["id"],
+            "warehouseId": warehouse_b["id"],
+            "quantity": "1.0000",
+            "unitCost": "10.0000",
+        },
+    )
+
+    assert foreign_item.status_code == 403
+    assert foreign_warehouse.status_code == 403
+    assert list(db_session.execute(select(StockLedgerEntry)).scalars()) == []
+
+
+def test_project_issue_rejects_foreign_project_without_ledger_entry(client, db_session):
+    login_admin(client)
+    company_a, item_a, warehouse_a = _setup(client)
+    company_b = create_company(client, name="Constructora B")
+
+    from app.models.project import Project
+
+    foreign_project = Project(company_id=company_b["id"], name="Proyecto ajeno", status="ACTIVE")
+    db_session.add(foreign_project)
+    db_session.commit()
+    received = client.post(
+        "/api/inventory/stock/receive",
+        json={
+            "companyId": company_a["id"],
+            "itemId": item_a["id"],
+            "warehouseId": warehouse_a["id"],
+            "quantity": "10.0000",
+            "unitCost": "10.0000",
+        },
+    )
+    assert received.status_code == 201, received.text
+    _login_warehouse_manager_for_company(
+        client, db_session, company_id=company_a["id"], email="warehouse-foreign-project@nexora.group"
+    )
+
+    response = client.post(
+        "/api/inventory/stock/issue-to-project",
+        json={
+            "companyId": company_a["id"],
+            "itemId": item_a["id"],
+            "warehouseId": warehouse_a["id"],
+            "projectId": str(foreign_project.id),
+            "quantity": "1.0000",
+        },
+    )
+
+    assert response.status_code == 403
+    issues = list(
+        db_session.execute(select(StockLedgerEntry).where(StockLedgerEntry.movement_type == "ISSUE")).scalars()
+    )
+    assert issues == []
+
+
+def test_stock_position_does_not_leak_another_company(client, db_session):
+    login_admin(client)
+    company_a = create_company(client, name="Constructora A")
+    _company_b, item_b, warehouse_b = _setup(client)
+    received = client.post(
+        "/api/inventory/stock/receive",
+        json={
+            "companyId": item_b["companyId"],
+            "itemId": item_b["id"],
+            "warehouseId": warehouse_b["id"],
+            "quantity": "10.0000",
+            "unitCost": "10.0000",
+        },
+    )
+    assert received.status_code == 201, received.text
+    _login_warehouse_manager_for_company(
+        client, db_session, company_id=company_a["id"], email="warehouse-position@nexora.group"
+    )
+
+    response = client.get(
+        "/api/inventory/stock/position",
+        params={"item_id": item_b["id"], "warehouse_id": warehouse_b["id"]},
+    )
+
+    assert response.status_code == 403
+
+
+def test_transfer_rolls_back_both_legs_when_the_incoming_leg_fails(client, db_session, monkeypatch):
+    login_admin(client)
+    company, item, source_warehouse = _setup(client)
+    destination_warehouse = client.post(
+        "/api/inventory/warehouses",
+        json={"companyId": company["id"], "code": "ALM-02", "name": "Almacén Secundario"},
+    ).json()
+    received = client.post(
+        "/api/inventory/stock/receive",
+        json={
+            "companyId": company["id"],
+            "itemId": item["id"],
+            "warehouseId": source_warehouse["id"],
+            "quantity": "20.0000",
+            "unitCost": "8.0000",
+        },
+    )
+    assert received.status_code == 201, received.text
+    original_append = inventory_repository.append_ledger_entry
+    call_count = 0
+
+    def fail_on_incoming_append(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            raise RuntimeError("injected incoming transfer failure")
+        return original_append(*args, **kwargs)
+
+    monkeypatch.setattr(inventory_repository, "append_ledger_entry", fail_on_incoming_append)
+
+    with pytest.raises(RuntimeError, match="injected incoming transfer failure"):
+        inventory_service.transfer_stock(
+            db_session,
+            company_id=uuid.UUID(company["id"]),
+            item_id=uuid.UUID(item["id"]),
+            from_warehouse_id=uuid.UUID(source_warehouse["id"]),
+            to_warehouse_id=uuid.UUID(destination_warehouse["id"]),
+            quantity=Decimal("5.0000"),
+        )
+
+    entries = list(
+        db_session.execute(select(StockLedgerEntry).where(StockLedgerEntry.item_id == uuid.UUID(item["id"]))).scalars()
+    )
+    assert [entry.movement_type for entry in entries] == ["RECEIPT"]
 
 
 def test_issue_more_than_available_is_rejected(client):

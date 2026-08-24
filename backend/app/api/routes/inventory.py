@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.domain.errors import NotAuthorizedError
+from app.models.project import Project
 from app.repositories import inventory_repository
 from app.schemas.inventory import (
     ItemCreateRequest,
@@ -22,6 +24,27 @@ from app.services import inventory_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+
+def _assert_stock_resources_belong_to_company(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    item_id: uuid.UUID,
+    warehouse_ids: tuple[uuid.UUID, ...],
+    project_id: uuid.UUID | None = None,
+) -> None:
+    item = inventory_repository.get_item(db, item_id)
+    if item is None or item.company_id != company_id:
+        raise NotAuthorizedError("El ítem no pertenece a la compañía de la operación")
+    for warehouse_id in warehouse_ids:
+        warehouse = inventory_repository.get_warehouse(db, warehouse_id)
+        if warehouse is None or warehouse.company_id != company_id:
+            raise NotAuthorizedError("El almacén no pertenece a la compañía de la operación")
+    if project_id is not None:
+        project = db.get(Project, project_id)
+        if project is None or project.company_id != company_id:
+            raise NotAuthorizedError("El proyecto no pertenece a la compañía de la operación")
 
 
 @router.get("/items", response_model=list[ItemResponse])
@@ -99,9 +122,23 @@ def get_stock_position(
     item_id: uuid.UUID,
     warehouse_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("inventory.stock", "read")),
+    user=Depends(require_permission("inventory.stock", "read")),
 ):
-    last = inventory_repository.get_last_ledger_entry(db, item_id=item_id, warehouse_id=warehouse_id)
+    item = inventory_repository.get_item(db, item_id)
+    if item is None:
+        raise NotAuthorizedError("El ítem no existe o no pertenece a una compañía accesible")
+    _assert_stock_resources_belong_to_company(
+        db,
+        company_id=item.company_id,
+        item_id=item_id,
+        warehouse_ids=(warehouse_id,),
+    )
+    assert_company_access(
+        db, user_id=user.id, resource="inventory.stock", action="read", company_id=item.company_id
+    )
+    last = inventory_repository.get_last_ledger_entry(
+        db, company_id=item.company_id, item_id=item_id, warehouse_id=warehouse_id
+    )
     if last is None:
         return StockPositionResponse(
             item_id=item_id, warehouse_id=warehouse_id, quantity_on_hand=0, average_cost=0
@@ -123,6 +160,12 @@ def receive_stock(
     assert_company_access(
         db, user_id=user.id, resource="inventory.stock", action="move", company_id=payload.company_id
     )
+    _assert_stock_resources_belong_to_company(
+        db,
+        company_id=payload.company_id,
+        item_id=payload.item_id,
+        warehouse_ids=(payload.warehouse_id,),
+    )
     entry = inventory_service.receive_stock(
         db,
         company_id=payload.company_id,
@@ -143,6 +186,13 @@ def issue_to_project(
     assert_company_access(
         db, user_id=user.id, resource="inventory.stock", action="move", company_id=payload.company_id
     )
+    _assert_stock_resources_belong_to_company(
+        db,
+        company_id=payload.company_id,
+        item_id=payload.item_id,
+        warehouse_ids=(payload.warehouse_id,),
+        project_id=payload.project_id,
+    )
     entry = inventory_service.issue_to_project(
         db,
         company_id=payload.company_id,
@@ -162,6 +212,12 @@ def transfer_stock(
 ):
     assert_company_access(
         db, user_id=user.id, resource="inventory.stock", action="move", company_id=payload.company_id
+    )
+    _assert_stock_resources_belong_to_company(
+        db,
+        company_id=payload.company_id,
+        item_id=payload.item_id,
+        warehouse_ids=(payload.from_warehouse_id, payload.to_warehouse_id),
     )
     outgoing, incoming = inventory_service.transfer_stock(
         db,

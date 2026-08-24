@@ -11,7 +11,8 @@ mismo ítem/almacén no pisen el cálculo de moving average).
 
 `RECEIPT` (recepción de PO o entrada manual), `TRANSFER` (par de
 entradas: `TRANSFER` saliente + `RECEIPT` entrante con el mismo costo,
-generadas atómicamente por `inventory_service.transfer_stock`), `ISSUE`
+generadas en una sola transacción por `inventory_service.transfer_stock`
+(un fallo revierte ambas), `ISSUE`
 (consumo, incluye `issue_to_project`), `RETURN` (no implementado en este
 track — el modelo lo soporta como movement_type pero no hay caso de uso
 todavía; usar el mismo patrón de `_issue`/`receive_stock` cuando se

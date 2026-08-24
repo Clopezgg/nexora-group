@@ -62,7 +62,7 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
 _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "Administrator": tuple((resource, action, SCOPE_ANY) for resource, action, _ in _BASE_PERMISSIONS),
     "Finance Manager": (
-        ("core.company", "read", SCOPE_ANY),
+        ("core.company", "read", SCOPE_OWN),
         ("accounting.journal_entry", "create", SCOPE_OWN),
         ("accounting.journal_entry", "read", SCOPE_OWN),
         ("accounting.journal_entry", "reverse", SCOPE_OWN),
@@ -70,7 +70,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("accounting.account", "read", SCOPE_OWN),
     ),
     "Accountant": (
-        ("core.company", "read", SCOPE_ANY),
+        ("core.company", "read", SCOPE_OWN),
         ("accounting.journal_entry", "create", SCOPE_OWN),
         ("accounting.journal_entry", "read", SCOPE_OWN),
         ("accounting.account", "read", SCOPE_OWN),
@@ -93,12 +93,12 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("inventory.stock", "read", SCOPE_ANY),
     ),
     "Viewer": (
-        ("core.company", "read", SCOPE_ANY),
+        ("core.company", "read", SCOPE_OWN),
         ("accounting.journal_entry", "read", SCOPE_OWN),
         ("accounting.account", "read", SCOPE_OWN),
     ),
     "Procurement Manager": (
-        ("core.company", "read", SCOPE_ANY),
+        ("core.company", "read", SCOPE_OWN),
         ("procurement.supplier", "create", SCOPE_OWN),
         ("procurement.supplier", "read", SCOPE_OWN),
         ("procurement.contract", "create", SCOPE_OWN),
@@ -122,7 +122,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("inventory.stock", "read", SCOPE_OWN),
     ),
     "Buyer": (
-        ("core.company", "read", SCOPE_ANY),
+        ("core.company", "read", SCOPE_OWN),
         ("procurement.supplier", "read", SCOPE_OWN),
         ("procurement.requisition", "create", SCOPE_OWN),
         ("procurement.requisition", "read", SCOPE_OWN),
@@ -139,7 +139,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("inventory.warehouse", "read", SCOPE_OWN),
     ),
     "Warehouse Manager": (
-        ("core.company", "read", SCOPE_ANY),
+        ("core.company", "read", SCOPE_OWN),
         ("procurement.purchase_order", "read", SCOPE_OWN),
         ("procurement.goods_receipt", "create", SCOPE_OWN),
         ("procurement.goods_receipt", "read", SCOPE_OWN),

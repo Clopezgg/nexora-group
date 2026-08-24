@@ -46,6 +46,14 @@ def list_warehouses(db: Session, *, company_id: uuid.UUID) -> list[Warehouse]:
     )
 
 
+def get_item(db: Session, item_id: uuid.UUID) -> Item | None:
+    return db.get(Item, item_id)
+
+
+def get_warehouse(db: Session, warehouse_id: uuid.UUID) -> Warehouse | None:
+    return db.get(Warehouse, warehouse_id)
+
+
 def create_warehouse(
     db: Session,
     *,
@@ -61,7 +69,7 @@ def create_warehouse(
 
 
 def get_last_ledger_entry(
-    db: Session, *, item_id: uuid.UUID, warehouse_id: uuid.UUID
+    db: Session, *, company_id: uuid.UUID, item_id: uuid.UUID, warehouse_id: uuid.UUID
 ) -> StockLedgerEntry | None:
     """El "estado actual" de stock/costo NUNCA se guarda en una columna
     mutable de Item/Warehouse -- se deriva de la última entrada del ledger
@@ -69,7 +77,11 @@ def get_last_ledger_entry(
     paralela)."""
     stmt = (
         select(StockLedgerEntry)
-        .where(StockLedgerEntry.item_id == item_id, StockLedgerEntry.warehouse_id == warehouse_id)
+        .where(
+            StockLedgerEntry.company_id == company_id,
+            StockLedgerEntry.item_id == item_id,
+            StockLedgerEntry.warehouse_id == warehouse_id,
+        )
         .order_by(StockLedgerEntry.created_at.desc(), StockLedgerEntry.id.desc())
         .limit(1)
         .with_for_update()

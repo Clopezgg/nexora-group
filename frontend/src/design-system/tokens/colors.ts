@@ -12,6 +12,11 @@ export const colors = {
     400: '#5B93F8',
     100: '#E4EDFF',
   },
+  cyan: {
+    500: '#17B6C9',
+    400: '#4FD2E2',
+    100: '#DFF8FB',
+  },
   white: '#FFFFFF',
   gray: {
     50: '#F6F8FB',

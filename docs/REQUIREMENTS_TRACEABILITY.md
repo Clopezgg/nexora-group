@@ -172,15 +172,15 @@ placeholder.
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0097 | Login | ➖·➖·✅·✅·🔶·➖·⬜·✅·⬜ | IN_PROGRESS | funcional; falta rediseño exacto §92 (sin campo Project, split visual) |
-| NXR-REQ-0098 | Role-based Home | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | dashboard único actual, falta home por rol (§93) |
-| NXR-REQ-0099 | Enterprise Navigation | ➖·➖·➖·➖·🔶·⬜·➖·⬜·⬜ | IN_PROGRESS | sidebar plano del bootstrap, falta agrupación §94 |
-| NXR-REQ-0100 | Design System | ➖·➖·➖·➖·🔶·➖·➖·🔶·⬜ | IN_PROGRESS | 12 componentes base del bootstrap, faltan ~30 del catálogo §91 |
-| NXR-REQ-0101 | Responsive Desktop | ➖➖➖➖🔶➖➖⬜⬜ | IN_PROGRESS | no verificado contra matriz de breakpoints §124 |
-| NXR-REQ-0102 | Tablet | ➖➖➖➖⬜➖➖⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0103 | Mobile | ➖➖➖➖🔶➖➖⬜⬜ | IN_PROGRESS | login mobile-friendly, resto sin verificar |
-| NXR-REQ-0104 | PWA | ➖➖➖➖🔶➖➖⬜⬜ | IN_PROGRESS | manifest/service worker del bootstrap, sin auditoría completa |
-| NXR-REQ-0105 | Accessibility (WCAG AA) | ➖➖➖➖⬜➖➖⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0097 | Login | ➖·➖·✅·✅·✅·➖·⬜·✅·⬜ | IMPLEMENTED | rediseñado: sin campo Project, split desktop con ilustración, mobile centrado, forgot-password honesto, loading/invalid/server-error/network-error distinguidos — falta reset real (backend) |
+| NXR-REQ-0098 | Role-based Home | ➖·➖·🔶·✅·✅·➖·⬜·✅·⬜ | IMPLEMENTED | `HomePage` + `resolveHomeConfig` por rol (finance/project/procurement/warehouse/auditor/default); cards reales solo donde hay backend, EmptyState honesto en el resto |
+| NXR-REQ-0099 | Enterprise Navigation | ➖·➖·➖·➖·✅·⬜·➖·✅·⬜ | IMPLEMENTED | sidebar agrupado (Inicio/Finanzas/Proyectos/Abastecimiento/Comercial/Recursos/Control, ~50 rutas), drawer mobile, CommandPalette Cmd/Ctrl+K real |
+| NXR-REQ-0100 | Design System | ➖·➖·➖·➖·✅·➖·➖·✅·⬜ | IMPLEMENTED | ~33 componentes (12 base + IconButton, Textarea, SearchInput, DatePicker, MoneyInput, CurrencyInput, Combobox, EntitySelector+7 dominios, StatCard, Metric, ChartCard, DataGrid, FilterBar, Tooltip, Popover, Drawer, Sheet, Toast+Alert, Breadcrumb, Stepper, Timeline, Tabs, Skeleton, CommandPalette) + tokens de motion/z-index/breakpoints |
+| NXR-REQ-0101 | Responsive Desktop | ➖➖➖➖✅➖➖⬜⬜ | IMPLEMENTED | revisado por código contra 1440/1280/1024 (sin browser real disponible en este entorno, ver nota de verificación) |
+| NXR-REQ-0102 | Tablet | ➖➖➖➖✅➖➖⬜⬜ | IMPLEMENTED | sidebar→drawer en ≤1024px, revisado por código contra 768 (sin browser real disponible) |
+| NXR-REQ-0103 | Mobile | ➖➖➖➖✅➖➖⬜⬜ | IMPLEMENTED | revisado por código contra 430/390/360, touch targets ≥44px vía token `--nx-touch-target` (sin browser real disponible) |
+| NXR-REQ-0104 | PWA | ➖➖➖➖✅➖➖⬜⬜ | IMPLEMENTED | manifest con iconos reales (antes `icons: []`), `NetworkOnly` forzado en `/api/*` (sin caché de datos financieros/sensibles ni mutación offline) |
+| NXR-REQ-0105 | Accessibility (WCAG AA) | ➖➖➖➖🔶➖➖⬜⬜ | IN_PROGRESS | foco visible, labels, `role`/`aria-*` en overlays y estados, touch target ≥44px aplicado; falta auditoría de contraste real con herramienta y lector de pantalla |
 
 ## ENGINEERING
 
@@ -213,10 +213,10 @@ placeholder.
 
 ## Resumen
 
-- **VERIFIED:** 0 / 124
-- **IMPLEMENTED:** 0 / 124
-- **IN_PROGRESS:** 30 / 124
-- **NOT_STARTED:** 92 / 124
+- **VERIFIED:** 0 / 124 (reservado al coordinador tras integrar a `feat/nexora-greenfield`)
+- **IMPLEMENTED:** 8 / 124 (Track F: NXR-REQ-0097 a 0104)
+- **IN_PROGRESS:** 25 / 124
+- **NOT_STARTED:** 89 / 124
 - **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue real, no por incapacidad técnica)
 
 Este resumen se actualiza en cada integración de track. Ver progreso vivo

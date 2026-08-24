@@ -256,3 +256,54 @@ Commits de backend ya preservados en `track/c-supply-chain`: `6e92a87`
 INV-INV-001/002 with real tests`). La recuperación de UI/docs queda en un
 commit local explícito para que el coordinador la integre; este registro no
 afirma publicación remota.
+
+### 2026-08-24 — Track B (Project Control) construido, pendiente de integración
+
+Rama `track/b-project-control` (worktree `~/nexora-group-trackB`, DB de
+prueba propia `nexora_trackb` para no interferir con Track A corriendo en
+paralelo sobre `nexora_dev`). Evidencia real:
+
+- **Backend**: `Project` completado (§37, sin ninguna columna de saldo —
+  INV-TRE-002 con test de introspección del esquema), `WBSNode` jerárquico
+  (parent/level), `Task`/`Milestone` (planning), `Budget`/`BudgetLine` con
+  versionado real (BASELINE inmutable — `NXR-BUDGET-001` si se intenta
+  crear dos veces; REVISED generado automáticamente al aprobar una
+  `ChangeOrder`, historial preservado, nunca se borra), `ChangeOrder`
+  (lifecycle DRAFT→SUBMITTED→APPROVED real, `NXR-PROJECT-001` si se
+  aprueba sin pasar por SUBMITTED), `ProgressRecord`. `budget_service.
+  compute_summary` (AUTHORIZED real, COMMITTED/ACCRUED/PAID en 0 honesto
+  con el contrato de integración para Track A/C documentado) y
+  `forecast_service.compute_forecast` (BAC/PV/EV/AC/CPI/SPI/ETC/EAC/VAC —
+  valores no calculables son `null` real, nunca 0 inventado, con test
+  dedicado). 14 endpoints nuevos bajo `/api/projects`, permisos nuevos
+  (`project`, `project.wbs`, `project.planning`, `project.budget`,
+  `project.change_order`, `project.progress`) otorgados a Administrator/
+  Project Manager/Project Controller/Auditor/Viewer.
+- **Frontend**: `ProjectsPage` (crea compañía si no existe ninguna, crea/
+  lista proyectos, marca "proyecto activo" vía `ActiveUIContext` — el
+  mismo mecanismo de Fase 0/1, sin inventar un segundo concepto de
+  "proyecto actual"), `WBSPage`, `BudgetPage` (summary + forecast, crea
+  BASELINE), `ChangeOrdersPage` (crear/enviar/aprobar), `ProgressPage`.
+  Rutas reales conectadas en `routes.tsx` para `/proyectos`,
+  `/proyectos/wbs`, `/proyectos/presupuestos`, `/proyectos/ordenes-de-cambio`,
+  `/proyectos/avances` (el resto de rutas del sidebar sigue en
+  `PlaceholderPage`, incluida `/proyectos/planeacion` — Task/Milestone
+  tienen API real pero no pantalla dedicada todavía).
+- **Verificación real**: backend 46/46 pytest (35 previos + 11 nuevos),
+  `alembic upgrade head` limpio + fresh-install desde cero verificado (37
+  tablas). Frontend: typecheck/lint limpios, `vitest` 19/19 (15 previos +
+  4 nuevos, incluye un test que prueba que el forecast muestra `null`
+  honesto en vez de 0 falso sin datos de avance), `build` OK.
+- **Desviaciones documentadas**: `ChangeOrder.budget_change_amount` es un
+  monto agregado, no un desglose línea por línea (documentado en
+  docs/BUDGET_CONTROLLING.md); PV/EV se derivan del `ProgressRecord` más
+  reciente por falta de un motor de scheduling con distribución de $ por
+  fecha (misma razón, documentado); `Project.customer_ref` es texto libre
+  hasta que Track E aterrice `Customer` real.
+
+Filas actualizadas en `docs/REQUIREMENTS_TRACEABILITY.md`: NXR-REQ-0028,
+0029, 0030, 0031, 0032, 0036, 0037, 0038, 0039 → `IMPLEMENTED`. NXR-REQ-
+0033/0034/0035 (Commitments/Accruals/Payments) siguen `NOT_STARTED` —
+dueño Track A/C, contrato de integración ya documentado en
+docs/BUDGET_CONTROLLING.md para que no tengan que rediseñar nada al
+aterrizar.

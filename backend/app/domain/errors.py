@@ -40,3 +40,12 @@ class InvalidProcurementStateError(Exception):
     """Transición de estado inválida en el flujo de procurement (p.ej.
     recibir más de lo pendiente en una PO, o registrar un GR sobre una PO
     no aprobada)."""
+
+
+class BudgetBaselineExistsError(Exception):
+    """INV-BUD-001-adyacente: un proyecto solo puede tener un BASELINE; nunca
+    se sobrescribe, ver docs/BUDGET_CONTROLLING.md."""
+
+
+class InvalidChangeOrderStateError(Exception):
+    """Transición de estado de ChangeOrder inválida (orden maestra §43)."""

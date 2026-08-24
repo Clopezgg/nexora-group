@@ -11,13 +11,22 @@ import { RequisitionsPage } from '../features/procurement/RequisitionsPage'
 import { SuppliersPage } from '../features/procurement/SuppliersPage'
 import { InventoryPage } from '../features/inventory/InventoryPage'
 import { WarehousesPage } from '../features/inventory/WarehousesPage'
+import { BudgetPage } from '../features/projects/BudgetPage'
+import { ChangeOrdersPage } from '../features/projects/ChangeOrdersPage'
+import { ProgressPage } from '../features/projects/ProgressPage'
+import { ProjectsPage } from '../features/projects/ProjectsPage'
+import { WBSPage } from '../features/projects/WBSPage'
 import { navItems } from './navigation'
 
-// Track C -- Supply Chain: estas rutas ya tienen pantalla real, reemplazan
-// el PlaceholderPage genérico. El resto de rutas de abastecimiento (RFQ,
-// cotizaciones, comparativos, contratos) tienen backend real pero todavía
-// no UI -- siguen en EmptyState honesto hasta que se construya su pantalla.
-const realPageByPath: Record<string, RouteObject['element']> = {
+// Track B (Project Control) y Track C (Supply Chain) implementan estas
+// rutas; el resto de navItems sigue como PlaceholderPage hasta que su track
+// dueño aterrice.
+const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
+  '/proyectos': <ProjectsPage />,
+  '/proyectos/wbs': <WBSPage />,
+  '/proyectos/presupuestos': <BudgetPage />,
+  '/proyectos/ordenes-de-cambio': <ChangeOrdersPage />,
+  '/proyectos/avances': <ProgressPage />,
   '/abastecimiento/solicitudes': <RequisitionsPage />,
   '/abastecimiento/ordenes-de-compra': <PurchaseOrdersPage />,
   '/abastecimiento/recepciones': <GoodsReceiptsPage />,
@@ -30,7 +39,7 @@ const placeholderRoutes: RouteObject[] = navItems
   .filter((item) => item.path !== '/inicio')
   .map((item) => ({
     path: item.path.replace(/^\//, ''),
-    element: realPageByPath[item.path] ?? <PlaceholderPage title={item.label} />,
+    element: IMPLEMENTED_ROUTES[item.path] ?? <PlaceholderPage title={item.label} />,
   }))
 
 export const routes: RouteObject[] = [

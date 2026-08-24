@@ -13,6 +13,7 @@ from app.api.routes import (
     inventory,
     master_data,
     procurement,
+    projects,
     suppliers,
 )
 from app.core.config import get_settings
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(suppliers.router, prefix="/api")
     app.include_router(procurement.router, prefix="/api")
     app.include_router(inventory.router, prefix="/api")
+    app.include_router(projects.router, prefix="/api")
 
     return app
 

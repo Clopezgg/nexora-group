@@ -1,7 +1,7 @@
 """add supply chain: suppliers contracts procurement inventory
 
 Revision ID: 8bf7c353d327
-Revises: c622defc2308
+Revises: 131a6debf189
 Create Date: 2026-08-24 12:38:31.126172
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '8bf7c353d327'
-down_revision: Union[str, None] = 'c622defc2308'
+down_revision: Union[str, None] = '131a6debf189'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

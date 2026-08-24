@@ -29,3 +29,14 @@ class InvalidOperationScopeError(Exception):
 
 class IdempotencyConflictError(Exception):
     """INV-IDEM-002: misma idempotency key con payload distinto."""
+
+
+class InsufficientStockError(Exception):
+    """INV-INV-001: intento de emitir/transferir más stock del disponible
+    (no hay tal cosa como stock negativo silencioso)."""
+
+
+class InvalidProcurementStateError(Exception):
+    """Transición de estado inválida en el flujo de procurement (p.ej.
+    recibir más de lo pendiente en una PO, o registrar un GR sobre una PO
+    no aprobada)."""

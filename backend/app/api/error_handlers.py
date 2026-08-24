@@ -7,7 +7,9 @@ from app.domain.errors import (
     FiscalPeriodClosedError,
     IdempotencyConflictError,
     ImmutableDocumentError,
+    InsufficientStockError,
     InvalidOperationScopeError,
+    InvalidProcurementStateError,
     NotAuthorizedError,
     UnbalancedJournalEntryError,
 )
@@ -27,6 +29,8 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     ImmutableDocumentError: ("NXR-ACCOUNTING-004", 409),
     IdempotencyConflictError: ("NXR-IDEMPOTENCY-001", 409),
     NotAuthorizedError: ("NXR-PERM-001", 403),
+    InsufficientStockError: ("NXR-INVENTORY-001", 409),
+    InvalidProcurementStateError: ("NXR-PROCUREMENT-001", 409),
 }
 
 

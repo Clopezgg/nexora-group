@@ -1,6 +1,11 @@
 import os
 
-os.environ["DATABASE_URL"] = "postgresql+psycopg://nexora@localhost:5432/nexora_test"
+# NOTA PARA INTEGRACIÓN: apunta a una base aislada de este track para poder
+# desarrollar en paralelo con Track A/B/1 sin pisar el schema de otros
+# (cada track migraba/probaba contra el mismo Postgres local). Al integrar
+# a `feat/nexora-greenfield` el coordinador debe volver a "nexora_test"
+# (la convención original de Track 1) -- este nombre es temporal.
+os.environ["DATABASE_URL"] = "postgresql+psycopg://nexora@localhost:5432/nexora_trackc_test"
 os.environ["BOOTSTRAP_ADMIN_EMAIL"] = "admin@nexora.group"
 os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "NexoraAdmin123!"
 os.environ["FRONTEND_URL"] = "http://localhost:5173"

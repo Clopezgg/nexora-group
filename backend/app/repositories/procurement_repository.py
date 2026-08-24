@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.procurement import (
@@ -217,6 +217,29 @@ def list_purchase_orders(db: Session, *, company_id: uuid.UUID) -> list[Purchase
 def list_purchase_order_lines(db: Session, po_id: uuid.UUID) -> list[PurchaseOrderLine]:
     stmt = select(PurchaseOrderLine).where(PurchaseOrderLine.purchase_order_id == po_id)
     return list(db.execute(stmt).scalars())
+
+
+def project_commitments_by_project(db: Session, *, company_id: uuid.UUID) -> dict[uuid.UUID, Decimal]:
+    """Documentary commitments for Budget/Project Control.
+
+    A commitment exists only after purchase-order approval; receipts and
+    warehouse movements never create it. The result is deliberately keyed by
+    project so Budget can map the project to its WBS without a dependency on
+    this supply-chain service.
+    """
+    commitment_statuses = ("APPROVED", "SENT", "PARTIALLY_RECEIVED", "RECEIVED")
+    total = func.sum(PurchaseOrderLine.quantity * PurchaseOrderLine.unit_price + PurchaseOrderLine.tax_amount)
+    stmt = (
+        select(PurchaseOrder.project_id, total.label("total"))
+        .join(PurchaseOrderLine, PurchaseOrderLine.purchase_order_id == PurchaseOrder.id)
+        .where(
+            PurchaseOrder.company_id == company_id,
+            PurchaseOrder.project_id.is_not(None),
+            PurchaseOrder.status.in_(commitment_statuses),
+        )
+        .group_by(PurchaseOrder.project_id)
+    )
+    return {project_id: Decimal(total) for project_id, total in db.execute(stmt)}
 
 
 def get_purchase_order_line(db: Session, line_id: uuid.UUID) -> PurchaseOrderLine | None:

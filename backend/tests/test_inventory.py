@@ -1,3 +1,7 @@
+import uuid
+from decimal import Decimal
+
+from app.repositories import inventory_repository
 from tests.helpers import create_company, login_admin
 
 
@@ -68,6 +72,61 @@ def test_issue_to_project_reduces_warehouse_stock(client, db_session):
         "/api/inventory/stock/position", params={"item_id": item["id"], "warehouse_id": warehouse["id"]}
     ).json()
     assert float(position["quantityOnHand"]) == 70.0
+
+
+def test_inventory_actuals_are_derived_from_project_issues(client, db_session):
+    """Only posted project issues contribute actuals; transfers never do."""
+    login_admin(client)
+    company, item, warehouse = _setup(client)
+
+    from app.models.project import Project
+
+    project = Project(company_id=company["id"], name="Torre Nexora III", status="ACTIVE")
+    db_session.add(project)
+    db_session.commit()
+    other_warehouse = client.post(
+        "/api/inventory/warehouses",
+        json={"companyId": company["id"], "code": "ALM-02", "name": "Almacén Secundario"},
+    ).json()
+    received = client.post(
+        "/api/inventory/stock/receive",
+        json={
+            "companyId": company["id"],
+            "itemId": item["id"],
+            "warehouseId": warehouse["id"],
+            "quantity": "10.0000",
+            "unitCost": "10.0000",
+        },
+    )
+    assert received.status_code == 201, received.text
+    issue = client.post(
+        "/api/inventory/stock/issue-to-project",
+        json={
+            "companyId": company["id"],
+            "itemId": item["id"],
+            "warehouseId": warehouse["id"],
+            "projectId": str(project.id),
+            "quantity": "8.0000",
+        },
+    )
+    assert issue.status_code == 201, issue.text
+    transfer = client.post(
+        "/api/inventory/stock/transfer",
+        json={
+            "companyId": company["id"],
+            "itemId": item["id"],
+            "fromWarehouseId": warehouse["id"],
+            "toWarehouseId": other_warehouse["id"],
+            "quantity": "2.0000",
+        },
+    )
+    assert transfer.status_code == 201, transfer.text
+
+    actuals = inventory_repository.project_actuals_by_project(
+        db_session, company_id=uuid.UUID(company["id"])
+    )
+
+    assert actuals == {project.id: Decimal("80.00")}
 
 
 def test_issue_more_than_available_is_rejected(client):

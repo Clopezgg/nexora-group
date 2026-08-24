@@ -187,13 +187,20 @@ def list_purchase_orders(
 def get_purchase_order(
     po_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("procurement.purchase_order", "read")),
+    user=Depends(require_permission("procurement.purchase_order", "read")),
 ):
     order = procurement_repository.get_purchase_order(db, po_id)
     if order is None:
         from fastapi import HTTPException
 
         raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="procurement.purchase_order",
+        action="read",
+        company_id=order.company_id,
+    )
     return _purchase_order_response(db, order)
 
 

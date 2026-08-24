@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.inventory import PhysicalCount, PhysicalCountLine, StockLedgerEntry
@@ -110,6 +110,27 @@ def append_ledger_entry(
     db.add(entry)
     db.flush()
     return entry
+
+
+def project_actuals_by_project(db: Session, *, company_id: uuid.UUID) -> dict[uuid.UUID, Decimal]:
+    """Posted material-consumption actuals for Budget/Project Control.
+
+    The ledger is append-only, so an ISSUE created by ``issue_to_project`` is
+    already posted. Transfers are excluded by both movement type and source;
+    they relocate stock but never create project cost or cash.
+    """
+    total = func.sum(StockLedgerEntry.quantity * StockLedgerEntry.unit_cost)
+    stmt = (
+        select(StockLedgerEntry.project_id, total.label("total"))
+        .where(
+            StockLedgerEntry.company_id == company_id,
+            StockLedgerEntry.movement_type == "ISSUE",
+            StockLedgerEntry.source_type == "project_issue",
+            StockLedgerEntry.project_id.is_not(None),
+        )
+        .group_by(StockLedgerEntry.project_id)
+    )
+    return {project_id: Decimal(total) for project_id, total in db.execute(stmt)}
 
 
 def create_physical_count(

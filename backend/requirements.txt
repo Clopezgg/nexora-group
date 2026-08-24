@@ -1,0 +1,9 @@
+fastapi>=0.118,<0.119
+uvicorn[standard]>=0.38,<0.39
+pydantic[email]>=2.11,<3
+pydantic-settings>=2.11,<3
+sqlalchemy>=2.0,<2.1
+alembic>=1.16,<2
+psycopg[binary]>=3.2,<4
+argon2-cffi>=25.1,<26
+python-dotenv>=1.0,<2

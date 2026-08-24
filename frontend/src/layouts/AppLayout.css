@@ -1,0 +1,120 @@
+.nx-app-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+  background: var(--nx-gray-50);
+}
+
+.nx-sidebar {
+  background: var(--nx-navy-950);
+  color: var(--nx-white);
+  padding: var(--nx-space-6) var(--nx-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-6);
+}
+
+.nx-sidebar__brand {
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  font-size: 13px;
+  color: var(--nx-blue-400);
+  padding: 0 var(--nx-space-3);
+}
+
+.nx-sidebar__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-1);
+}
+
+.nx-sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-3);
+  padding: var(--nx-space-3);
+  border-radius: var(--nx-radius-md);
+  color: var(--nx-gray-400);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nx-sidebar__link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--nx-white);
+}
+
+.nx-sidebar__link--active {
+  background: var(--nx-blue-600);
+  color: var(--nx-white);
+}
+
+.nx-app-shell__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nx-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--nx-space-4) var(--nx-space-8);
+  background: var(--nx-white);
+  border-bottom: 1px solid var(--nx-gray-200);
+}
+
+.nx-topbar__context {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-3);
+}
+
+.nx-topbar__context-label {
+  font-size: 13px;
+  color: var(--nx-gray-600);
+  font-weight: 600;
+}
+
+.nx-topbar__user {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-4);
+}
+
+.nx-topbar__user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nx-navy-900);
+}
+
+.nx-topbar__logout {
+  border: none;
+  background: transparent;
+  color: var(--nx-gray-600);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.nx-topbar__logout:hover {
+  color: var(--nx-danger);
+}
+
+.nx-app-shell__content {
+  padding: var(--nx-space-8);
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .nx-app-shell {
+    grid-template-columns: 1fr;
+  }
+  .nx-sidebar {
+    display: none;
+  }
+}

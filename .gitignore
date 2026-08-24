@@ -1,0 +1,27 @@
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dev-dist/
+frontend/coverage/
+frontend/.vite/
+
+# Python / backend
+backend/.venv/
+backend/**/__pycache__/
+backend/*.egg-info/
+backend/.pytest_cache/
+backend/htmlcov/
+backend/.coverage
+
+# Environment secrets (nunca en git; usar los .env.example)
+.env
+.env.local
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,193 @@
+/* Input */
+.nx-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-1);
+}
+.nx-field__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nx-navy-800);
+}
+.nx-input,
+.nx-select {
+  height: 42px;
+  padding: 0 var(--nx-space-3);
+  border-radius: var(--nx-radius-md);
+  border: 1px solid var(--nx-gray-200);
+  background: var(--nx-white);
+  font-family: var(--nx-font-family);
+  font-size: 14px;
+  color: var(--nx-navy-900);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.nx-input:focus,
+.nx-select:focus {
+  border-color: var(--nx-blue-500);
+  box-shadow: 0 0 0 3px var(--nx-blue-100);
+}
+.nx-input--error,
+.nx-select--error {
+  border-color: var(--nx-danger);
+}
+.nx-field__error {
+  font-size: 12px;
+  color: var(--nx-danger);
+}
+
+/* Card */
+.nx-card {
+  background: var(--nx-white);
+  border: 1px solid var(--nx-gray-200);
+  border-radius: var(--nx-radius-lg);
+  box-shadow: var(--nx-shadow-sm);
+  padding: var(--nx-space-6);
+}
+.nx-card__title {
+  font-size: 14px;
+  color: var(--nx-gray-600);
+  font-weight: 600;
+  margin: 0 0 var(--nx-space-2);
+}
+.nx-card__value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--nx-navy-900);
+  margin: 0;
+}
+
+/* Badge */
+.nx-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--nx-space-2);
+  border-radius: var(--nx-radius-full);
+  font-size: 12px;
+  font-weight: 600;
+}
+.nx-badge--neutral {
+  background: var(--nx-gray-100);
+  color: var(--nx-gray-800);
+}
+.nx-badge--success {
+  background: rgba(30, 158, 107, 0.12);
+  color: var(--nx-success);
+}
+.nx-badge--warning {
+  background: rgba(200, 135, 26, 0.12);
+  color: var(--nx-warning);
+}
+.nx-badge--danger {
+  background: rgba(214, 57, 74, 0.12);
+  color: var(--nx-danger);
+}
+.nx-badge--info {
+  background: var(--nx-blue-100);
+  color: var(--nx-blue-600);
+}
+
+/* Modal */
+.nx-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 11, 24, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.nx-modal {
+  background: var(--nx-white);
+  border-radius: var(--nx-radius-lg);
+  box-shadow: var(--nx-shadow-lg);
+  width: min(480px, 92vw);
+  padding: var(--nx-space-6);
+}
+.nx-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--nx-space-4);
+}
+.nx-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--nx-navy-900);
+  margin: 0;
+}
+.nx-modal__close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--nx-gray-600);
+}
+
+/* Table */
+.nx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.nx-table th {
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nx-gray-600);
+  padding: var(--nx-space-3);
+  border-bottom: 1px solid var(--nx-gray-200);
+}
+.nx-table td {
+  padding: var(--nx-space-3);
+  border-bottom: 1px solid var(--nx-gray-100);
+  color: var(--nx-navy-900);
+}
+.nx-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* EmptyState / LoadingState / ErrorState */
+.nx-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nx-space-3);
+  text-align: center;
+  padding: var(--nx-space-12) var(--nx-space-6);
+  border-radius: var(--nx-radius-lg);
+  border: 1px dashed var(--nx-gray-200);
+  background: var(--nx-white);
+  min-height: 220px;
+}
+.nx-state__icon {
+  font-size: 28px;
+}
+.nx-state__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--nx-navy-900);
+  margin: 0;
+}
+.nx-state__description {
+  font-size: 14px;
+  color: var(--nx-gray-600);
+  max-width: 380px;
+  margin: 0;
+}
+.nx-state--error {
+  border-style: solid;
+  border-color: rgba(214, 57, 74, 0.3);
+  background: rgba(214, 57, 74, 0.04);
+}
+.nx-state__spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--nx-gray-200);
+  border-top-color: var(--nx-blue-500);
+  animation: nx-spin 0.8s linear infinite;
+}

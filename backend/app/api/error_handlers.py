@@ -4,9 +4,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.domain.errors import (
+    BudgetBaselineExistsError,
     FiscalPeriodClosedError,
     IdempotencyConflictError,
     ImmutableDocumentError,
+    InvalidChangeOrderStateError,
     InvalidOperationScopeError,
     NotAuthorizedError,
     UnbalancedJournalEntryError,
@@ -27,6 +29,8 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     ImmutableDocumentError: ("NXR-ACCOUNTING-004", 409),
     IdempotencyConflictError: ("NXR-IDEMPOTENCY-001", 409),
     NotAuthorizedError: ("NXR-PERM-001", 403),
+    BudgetBaselineExistsError: ("NXR-BUDGET-001", 409),
+    InvalidChangeOrderStateError: ("NXR-PROJECT-001", 409),
 }
 
 

@@ -1,5 +1,7 @@
+import uuid
 from decimal import Decimal
 
+from app.models.procurement import PurchaseOrder
 from app.models.project import Project
 from tests.helpers import create_company, login_admin
 
@@ -39,7 +41,13 @@ def _create_supplier(client, *, company_id: str) -> dict:
 
 
 def _create_purchase_order(
-    client, *, company_id: str, supplier_id: str, project_id: str, unit_price: str
+    client,
+    *,
+    company_id: str,
+    supplier_id: str,
+    project_id: str,
+    unit_price: str,
+    currency_code: str = "HNL",
 ) -> dict:
     response = client.post(
         "/api/procurement/purchase-orders",
@@ -47,7 +55,7 @@ def _create_purchase_order(
             "companyId": company_id,
             "supplierId": supplier_id,
             "projectId": project_id,
-            "currencyCode": "HNL",
+            "currencyCode": currency_code,
             "lines": [
                 {
                     "description": "Material comprometido",
@@ -154,6 +162,63 @@ def test_budget_summary_uses_only_approved_project_purchase_orders_as_commitment
     assert Decimal(body["accrued"]) == Decimal("0")
     assert Decimal(body["paid"]) == Decimal("0")
     assert Decimal(body["available"]) == Decimal("874.50")
+
+
+def test_project_purchase_order_approval_rejects_non_functional_currency(client, db_session):
+    """A foreign-currency project PO must never enter commitments without an FX policy."""
+    login_admin(client)
+    company = create_company(client, currency="HNL")
+    project = _create_project(client, company_id=company["id"])
+    supplier = _create_supplier(client, company_id=company["id"])
+    client.post(
+        f"/api/projects/{project['id']}/budgets/baseline",
+        json={"currencyCode": "HNL", "lines": [{"authorizedAmount": "1000.00"}]},
+    )
+    order = _create_purchase_order(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        project_id=project["id"],
+        unit_price="100.00",
+        currency_code="USD",
+    )
+
+    approval = client.post(f"/api/procurement/purchase-orders/{order['id']}/approve")
+
+    assert approval.status_code == 409, approval.text
+    assert approval.json()["error"]["code"] == "NXR-PROCUREMENT-002"
+    assert db_session.get(PurchaseOrder, uuid.UUID(order["id"])).status == "DRAFT"
+    summary = client.get(f"/api/projects/{project['id']}/budgets/summary")
+    assert summary.status_code == 200, summary.text
+    assert Decimal(summary.json()["committed"]) == Decimal("0")
+
+
+def test_budget_summary_rejects_preexisting_non_functional_currency_commitment(client, db_session):
+    """The aggregate must reject legacy approved foreign-currency POs, not sum nominal values."""
+    login_admin(client)
+    company = create_company(client, currency="HNL")
+    project = _create_project(client, company_id=company["id"])
+    supplier = _create_supplier(client, company_id=company["id"])
+    client.post(
+        f"/api/projects/{project['id']}/budgets/baseline",
+        json={"currencyCode": "HNL", "lines": [{"authorizedAmount": "1000.00"}]},
+    )
+    order = _create_purchase_order(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        project_id=project["id"],
+        unit_price="100.00",
+        currency_code="USD",
+    )
+    persisted = db_session.get(PurchaseOrder, uuid.UUID(order["id"]))
+    persisted.status = "APPROVED"
+    db_session.commit()
+
+    summary = client.get(f"/api/projects/{project['id']}/budgets/summary")
+
+    assert summary.status_code == 409, summary.text
+    assert summary.json()["error"]["code"] == "NXR-PROCUREMENT-002"
 
 
 def test_forecast_uses_project_inventory_issues_as_actual_cost_without_relabeling_cash(client):

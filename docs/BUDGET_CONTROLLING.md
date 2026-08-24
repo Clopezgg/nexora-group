@@ -26,7 +26,7 @@ no existe esa necesidad real, así que no se construyó especulativamente.
 | Métrica | Fuente real hoy | Fuente cuando aterricen los tracks dueños |
 |---|---|---|
 | `AUTHORIZED` | `SUM(BudgetLine.authorized_amount)` del budget activo | (ya es real) |
-| `COMMITTED` | Suma de Purchase Orders aprobadas del proyecto (Track C) | (ya es real) |
+| `COMMITTED` | Suma de Purchase Orders aprobadas del proyecto en la moneda funcional de su company (Track C) | (ya es real) |
 | `ACCRUED` | `0` (stub honesto) | Track A (AP) — Supplier Invoices no pagadas |
 | `PAID` | `0` (stub honesto) | Track A (AP) — pagos ejecutados |
 | `AVAILABLE` | `AUTHORIZED - COMMITTED - ACCRUED` | mismo cálculo, con datos reales |
@@ -35,7 +35,10 @@ no existe esa necesidad real, así que no se construyó especulativamente.
 números. Track C se integra mediante `procurement_repository.
 project_commitments_by_project`; cuando aterrice AP/Track A, ACCRUED y PAID
 deben conectarse a sus fuentes reales sin cambiar la forma de
-`BudgetSummary`.
+`BudgetSummary`. Sin una política FX autoritativa, una PO de proyecto en una
+moneda distinta de `Company.functional_currency_code` se rechaza al aprobar
+y también durante la agregación defensiva (`NXR-PROCUREMENT-002`); nunca se
+convierte, omite ni resta como si fuera moneda funcional.
 
 ## Forecast (`GET /api/projects/{id}/forecast`)
 

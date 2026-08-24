@@ -42,6 +42,11 @@ class InvalidProcurementStateError(Exception):
     no aprobada)."""
 
 
+class ProcurementCurrencyMismatchError(Exception):
+    """Una PO de proyecto no puede alimentar compromisos en una moneda
+    distinta de la moneda funcional sin una política FX autoritativa."""
+
+
 class BudgetBaselineExistsError(Exception):
     """INV-BUD-001-adyacente: un proyecto solo puede tener un BASELINE; nunca
     se sobrescribe, ver docs/BUDGET_CONTROLLING.md."""

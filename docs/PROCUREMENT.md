@@ -66,6 +66,12 @@ obtenga `COMMITTED`. La fuente certificada es
 `procurement_repository.project_commitments_by_project(db, company_id)`,
 que devuelve totales `Decimal` por `project_id` de POs en
 `APPROVED/SENT/PARTIALLY_RECEIVED/RECEIVED`; una PO `DRAFT` no aporta nada.
+Hasta que exista una política FX fechada y autoritativa, una PO ligada a
+proyecto solo puede aprobarse si su `currency_code` coincide con
+`Company.functional_currency_code`; el rechazo explícito usa
+`NXR-PROCUREMENT-002`. La agregación conserva la moneda en su `GROUP BY` y
+repite la validación para bloquear datos aprobados preexistentes, nunca los
+omite ni suma importes nominales incompatibles.
 
 Goods Receipt y Service Entry registran avance físico/documental, pero no
 crean por sí mismos actual de proyecto ni efectivo. Los actuals de material

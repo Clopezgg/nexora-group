@@ -4,6 +4,8 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.domain.errors import ProcurementCurrencyMismatchError
+from app.models.company import Company
 from app.models.procurement import (
     GoodsReceipt,
     GoodsReceiptLine,
@@ -223,23 +225,38 @@ def project_commitments_by_project(db: Session, *, company_id: uuid.UUID) -> dic
     """Documentary commitments for Budget/Project Control.
 
     A commitment exists only after purchase-order approval; receipts and
-    warehouse movements never create it. The result is deliberately keyed by
-    project so Budget can map the project to its WBS without a dependency on
-    this supply-chain service.
+    warehouse movements never create it. Currency remains part of the grouped
+    result until every row is validated against the company's functional
+    currency; nominal amounts are never combined across currencies.
     """
     commitment_statuses = ("APPROVED", "SENT", "PARTIALLY_RECEIVED", "RECEIVED")
+    company = db.get(Company, company_id)
+    if company is None:
+        raise ValueError(f"Company {company_id} no existe")
     total = func.sum(PurchaseOrderLine.quantity * PurchaseOrderLine.unit_price + PurchaseOrderLine.tax_amount)
     stmt = (
-        select(PurchaseOrder.project_id, total.label("total"))
+        select(PurchaseOrder.project_id, PurchaseOrder.currency_code, total.label("total"))
         .join(PurchaseOrderLine, PurchaseOrderLine.purchase_order_id == PurchaseOrder.id)
         .where(
             PurchaseOrder.company_id == company_id,
             PurchaseOrder.project_id.is_not(None),
             PurchaseOrder.status.in_(commitment_statuses),
         )
-        .group_by(PurchaseOrder.project_id)
+        .group_by(PurchaseOrder.project_id, PurchaseOrder.currency_code)
     )
-    return {project_id: Decimal(total) for project_id, total in db.execute(stmt)}
+    commitments: dict[uuid.UUID, Decimal] = {}
+    for project_id, currency_code, nominal_total in db.execute(stmt):
+        if company.functional_currency_code is None:
+            raise ProcurementCurrencyMismatchError(
+                f"La company {company.id} no tiene moneda funcional; no se pueden agregar compromisos"
+            )
+        if currency_code != company.functional_currency_code:
+            raise ProcurementCurrencyMismatchError(
+                f"La PO usa {currency_code}, pero la moneda funcional de la company es "
+                f"{company.functional_currency_code}; no existe una política FX autoritativa"
+            )
+        commitments[project_id] = commitments.get(project_id, Decimal("0")) + Decimal(nominal_total)
+    return commitments
 
 
 def get_purchase_order_line(db: Session, line_id: uuid.UUID) -> PurchaseOrderLine | None:

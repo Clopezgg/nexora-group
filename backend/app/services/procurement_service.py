@@ -3,7 +3,8 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.domain.errors import InvalidProcurementStateError
+from app.domain.errors import InvalidProcurementStateError, ProcurementCurrencyMismatchError
+from app.models.company import Company
 from app.models.procurement import (
     GoodsReceipt,
     PurchaseOrder,
@@ -205,6 +206,19 @@ def approve_purchase_order(db: Session, *, purchase_order_id: uuid.UUID) -> Purc
         raise ValueError(f"PurchaseOrder {purchase_order_id} no existe")
     if order.status not in ("DRAFT", "APPROVAL_PENDING"):
         raise InvalidProcurementStateError(f"No se puede aprobar una PO en estado {order.status}")
+    if order.project_id is not None:
+        company = db.get(Company, order.company_id)
+        if company is None:
+            raise ValueError(f"Company {order.company_id} no existe")
+        if company.functional_currency_code is None:
+            raise ProcurementCurrencyMismatchError(
+                f"La company {company.id} no tiene moneda funcional; no se puede aprobar una PO de proyecto"
+            )
+        if order.currency_code != company.functional_currency_code:
+            raise ProcurementCurrencyMismatchError(
+                f"La PO usa {order.currency_code}, pero la moneda funcional de la company es "
+                f"{company.functional_currency_code}; no existe una política FX autoritativa"
+            )
     order.status = "APPROVED"
     db.commit()
     db.refresh(order)

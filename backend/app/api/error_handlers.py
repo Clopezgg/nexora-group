@@ -13,6 +13,7 @@ from app.domain.errors import (
     InvalidOperationScopeError,
     InvalidProcurementStateError,
     NotAuthorizedError,
+    ProcurementCurrencyMismatchError,
     UnbalancedJournalEntryError,
 )
 
@@ -33,6 +34,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     NotAuthorizedError: ("NXR-PERM-001", 403),
     InsufficientStockError: ("NXR-INVENTORY-001", 409),
     InvalidProcurementStateError: ("NXR-PROCUREMENT-001", 409),
+    ProcurementCurrencyMismatchError: ("NXR-PROCUREMENT-002", 409),
     BudgetBaselineExistsError: ("NXR-BUDGET-001", 409),
     InvalidChangeOrderStateError: ("NXR-PROJECT-001", 409),
 }

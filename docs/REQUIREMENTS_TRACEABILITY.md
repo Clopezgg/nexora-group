@@ -69,7 +69,7 @@ placeholder.
 | NXR-REQ-0030 | Planning (tasks/milestones/deps) | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `Task`/`Milestone` + API; sin pantalla dedicada todavía (`/proyectos/planeacion` sigue en EmptyState del bootstrap) |
 | NXR-REQ-0031 | Budgets | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `Budget`/`BudgetLine`, `budget_service.compute_summary`, `BudgetPage` con AUTHORIZED/COMMITTED/ACCRUED/PAID/AVAILABLE reales |
 | NXR-REQ-0032 | Budget versions (baseline/revised) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | BASELINE inmutable (`NXR-BUDGET-001` si se repite), REVISED generado por ChangeOrder aprobada, historial preservado — test dedicado |
-| NXR-REQ-0033 | Commitments | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Track C integrado: POs aprobadas por proyecto alimentan `budget_service.compute_summary`; PO draft excluida por prueba de integración |
+| NXR-REQ-0033 | Commitments | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Track C integrado: POs aprobadas por proyecto en moneda funcional alimentan `budget_service.compute_summary`; draft y moneda incompatible cubiertas por pruebas de integración |
 | NXR-REQ-0034 | Accruals | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A (AP) — mismo contrato de integración |
 | NXR-REQ-0035 | Payments (project attribution) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A (AP) |
 | NXR-REQ-0036 | Forecast (BAC/PV/EV/AC/CPI/SPI/ETC/EAC/VAC) | ✅·➖·✅·✅·✅·➖·➖·✅·⬜ | IMPLEMENTED | `forecast_service.compute_forecast`; valores no calculables devuelven `null` real, nunca 0 falso — test dedicado |
@@ -86,7 +86,7 @@ placeholder.
 | NXR-REQ-0042 | RFQ | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `RequestForQuotation`+`RfqSupplier` (multi-supplier), numeración `RFQ-YYYY-NNNNNN`; sin pantalla dedicada (backend-only, como se acordó en el alcance) |
 | NXR-REQ-0043 | Supplier Quotations | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `SupplierQuotation`+líneas, `quotation_total()`; sin pantalla dedicada |
 | NXR-REQ-0044 | Bid Comparison | 🔶·➖·✅·✅·⬜·⬜·⬜·⬜·⬜ | IN_PROGRESS | `quotation_total()` por cotización permite comparar manualmente; no hay endpoint agregado de comparación ni pantalla — ver `docs/PROCUREMENT.md` pendiente |
-| NXR-REQ-0045 | Purchase Order | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Lifecycle completo `DRAFT→APPROVED→SENT→PARTIALLY_RECEIVED/RECEIVED`, `PurchaseOrdersPage`, numeración `PO-YYYY-NNNNNN`, test end-to-end desde PR |
+| NXR-REQ-0045 | Purchase Order | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Lifecycle completo `DRAFT→APPROVED→SENT→PARTIALLY_RECEIVED/RECEIVED`; PO de proyecto rechaza moneda no funcional (`NXR-PROCUREMENT-002`); UI, numeración y tests reales |
 | NXR-REQ-0046 | Goods Receipt | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Recepción parcial y completa, actualiza `quantity_received` + status de PO + Stock Ledger real, `GoodsReceiptsPage`, test de sobre-recepción rechazada |
 | NXR-REQ-0047 | Service Entry | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `ServiceEntry` con período/avance/valor aceptado, numeración `SIN-YYYY-NNNNNN`; sin pantalla dedicada (no estaba en el alcance de frontend acordado) |
 | NXR-REQ-0048 | Three-Way Match | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `run_three_way_match` (INV-PROC-001): diferencias fuera de tolerancia nunca se descartan, siempre quedan en `exceptions`; test MATCHED y EXCEPTION reales |

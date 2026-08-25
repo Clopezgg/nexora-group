@@ -4,19 +4,24 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.repositories import budget_repository, project_control_repository
-from app.services import budget_service
+from app.repositories import (
+    budget_repository,
+    inventory_repository,
+    project_control_repository,
+    project_repository,
+)
 
 """Forecast / Earned Value (orden maestra §42, docs/BUDGET_CONTROLLING.md).
 
 Simplificación honesta y documentada: no existe todavía un motor de
 scheduling con asignación de $ por fecha, así que PV/EV se derivan del
 `planned_percent`/`actual_percent` del ProgressRecord más reciente contra
-BAC (Budget At Completion = AUTHORIZED del budget activo). AC = accrued +
-paid del budget summary (hoy 0 real porque AP/Track A no ha aterrizado).
-Ningún valor se inventa: si no hay ProgressRecord todavía, PV/EV/CPI/SPI/
-ETC/EAC/VAC son `None` (no 0 falso, no fake) -- la orden maestra §42 exige
-"solo mostrar valores calculables con datos disponibles"."""
+BAC (Budget At Completion = AUTHORIZED del budget activo). AC consume el
+costo real de emisiones de inventario posteadas al proyecto; no representa
+efectivo ni se deriva de PAID. Ningún valor se inventa: si no hay
+ProgressRecord todavía, PV/EV/CPI/SPI/ETC/EAC/VAC son `None` (no 0 falso,
+no fake) -- la orden maestra §42 exige "solo mostrar valores calculables
+con datos disponibles"."""
 
 
 @dataclass
@@ -36,8 +41,11 @@ def compute_forecast(db: Session, *, project_id: uuid.UUID) -> ForecastSnapshot:
     active_budget = budget_repository.get_active_budget(db, project_id)
     bac = budget_repository.sum_authorized(db, active_budget.id) if active_budget is not None else Decimal("0")
 
-    summary = budget_service.compute_summary(db, project_id=project_id)
-    ac = summary.accrued + summary.paid
+    project = project_repository.get_by_id(db, project_id)
+    if project is None:
+        raise ValueError(f"Project {project_id} no existe")
+    actuals = inventory_repository.project_actuals_by_project(db, company_id=project.company_id)
+    ac = actuals.get(project_id, Decimal("0"))
 
     latest_progress = project_control_repository.latest_progress(db, project_id)
     if latest_progress is None:

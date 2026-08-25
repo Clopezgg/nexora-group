@@ -19,13 +19,41 @@ def test_viewer_cannot_create_company(client, db_session):
 
 def test_viewer_can_read_companies(client, db_session):
     login_admin(client)
-    create_company(client, name="Constructora Visible")
-    create_user_with_role(db_session, email="viewer2@nexora.group", role_name="Viewer")
+    company = create_company(client, name="Constructora Visible")
+    user = create_user_with_role(db_session, email="viewer2@nexora.group", role_name="Viewer")
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company["id"]))
+    db_session.commit()
     login_as(client, email="viewer2@nexora.group")
 
     response = client.get("/api/master-data/companies")
     assert response.status_code == 200
     assert any(c["name"] == "Constructora Visible" for c in response.json())
+
+
+def test_company_listing_excludes_companies_outside_own_scope(client, db_session):
+    login_admin(client)
+    company_a = create_company(client, name="Constructora A")
+    create_company(client, name="Constructora B")
+    user = create_user_with_role(db_session, email="procurement-scope@nexora.group", role_name="Procurement Manager")
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_a["id"]))
+    db_session.commit()
+
+    login_as(client, email="procurement-scope@nexora.group")
+    response = client.get("/api/master-data/companies")
+
+    assert response.status_code == 200
+    assert [company["id"] for company in response.json()] == [company_a["id"]]
+
+
+def test_company_listing_includes_all_companies_for_any_scope(client):
+    login_admin(client)
+    company_a = create_company(client, name="Constructora A")
+    company_b = create_company(client, name="Constructora B")
+
+    response = client.get("/api/master-data/companies")
+
+    assert response.status_code == 200
+    assert {company["id"] for company in response.json()} == {company_a["id"], company_b["id"]}
 
 
 def test_accountant_without_company_access_is_denied(client, db_session):

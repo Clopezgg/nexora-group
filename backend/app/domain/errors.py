@@ -31,6 +31,45 @@ class IdempotencyConflictError(Exception):
     """INV-IDEM-002: misma idempotency key con payload distinto."""
 
 
+class InvalidTransferError(Exception):
+    """Track A: transferencia de tesorería inválida (misma cuenta origen/
+    destino, moneda incompatible, etc.)."""
+
+
+class InvalidInvoiceStateError(Exception):
+    """Track A: transición de estado inválida sobre SupplierInvoice/
+    CustomerInvoice (p.ej. pagar una factura CANCELLED)."""
+
+
+class OverpaymentError(Exception):
+    """Track A: un pago/cobro excede el saldo pendiente de la factura."""
+
+
+class InvalidFinancialReferenceError(Exception):
+    """Track A: una FK financiera no pertenece a la compañía propietaria."""
+
+
+class InsufficientStockError(Exception):
+    """INV-INV-001: intento de emitir/transferir más stock del disponible
+    (no hay tal cosa como stock negativo silencioso)."""
+
+
+class InvalidProcurementStateError(Exception):
+    """Transición de estado inválida en el flujo de procurement (p.ej.
+    recibir más de lo pendiente en una PO, o registrar un GR sobre una PO
+    no aprobada)."""
+
+
+class ProcurementCurrencyMismatchError(Exception):
+    """Una PO de proyecto no puede alimentar compromisos en una moneda
+    distinta de la moneda funcional sin una política FX autoritativa."""
+
+
+class BudgetCurrencyMismatchError(Exception):
+    """Un Budget debe usar la moneda funcional de su company mientras no
+    exista una política FX autoritativa."""
+
+
 class BudgetBaselineExistsError(Exception):
     """INV-BUD-001-adyacente: un proyecto solo puede tener un BASELINE; nunca
     se sobrescribe, ver docs/BUDGET_CONTROLLING.md."""
@@ -38,3 +77,24 @@ class BudgetBaselineExistsError(Exception):
 
 class InvalidChangeOrderStateError(Exception):
     """Transición de estado de ChangeOrder inválida (orden maestra §43)."""
+
+
+# Track D -- Enterprise Resources (orden maestra §62-66).
+class InvalidAssetStateError(Exception):
+    """Transición de estado de FixedAsset inválida (p.ej. depreciar un
+    activo DISPOSED/RETIRED)."""
+
+
+class DepreciationAlreadyPostedError(Exception):
+    """INV-AST-001: ya existe un DepreciationEntry para ese asset+periodo;
+    nunca se genera un segundo posting DEP para el mismo periodo."""
+
+
+class ImmutableMaintenanceOrderError(Exception):
+    """INV-EQP-001: un MaintenanceOrder CLOSED/CANCELLED es terminal -- no se
+    permite ninguna mutación posterior, solo lectura."""
+
+
+class InvalidTimeEntryStateError(Exception):
+    """Transición de estado de TimeEntry inválida (p.ej. aprobar/rechazar un
+    registro que ya fue decidido)."""

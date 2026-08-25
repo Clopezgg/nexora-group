@@ -5,21 +5,48 @@ import { ProtectedRoute } from '../features/auth/ProtectedRoute'
 import { LoginPage } from '../pages/LoginPage'
 import { HomePage } from '../features/home/HomePage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
+import { TreasuryPage } from '../features/treasury/TreasuryPage'
+import { AccountsPayablePage } from '../features/treasury/AccountsPayablePage'
+import { AccountsReceivablePage } from '../features/treasury/AccountsReceivablePage'
+import { GoodsReceiptsPage } from '../features/procurement/GoodsReceiptsPage'
+import { PurchaseOrdersPage } from '../features/procurement/PurchaseOrdersPage'
+import { RequisitionsPage } from '../features/procurement/RequisitionsPage'
+import { SuppliersPage } from '../features/procurement/SuppliersPage'
+import { InventoryPage } from '../features/inventory/InventoryPage'
+import { WarehousesPage } from '../features/inventory/WarehousesPage'
 import { BudgetPage } from '../features/projects/BudgetPage'
 import { ChangeOrdersPage } from '../features/projects/ChangeOrdersPage'
 import { ProgressPage } from '../features/projects/ProgressPage'
 import { ProjectsPage } from '../features/projects/ProjectsPage'
 import { WBSPage } from '../features/projects/WBSPage'
+import { FixedAssetsPage } from '../features/assets/FixedAssetsPage'
+import { EquipmentPage } from '../features/equipment/EquipmentPage'
 import { navItems } from './navigation'
 
-// Track B (Project Control) implementa estas rutas de verdad; el resto de
+// Track A (Financial Core), Track B (Project Control), Track C (Supply
+// Chain) y Track D (Enterprise Resources -- Assets/Equipment/Maintenance;
+// Workforce/Time y Documents/Site/Quality quedan NOT_STARTED en el
+// frontend, ver docs/PROGRESS.md) implementan estas rutas; el resto de
 // navItems sigue como PlaceholderPage hasta que su track dueño aterrice.
 const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
+  '/finanzas/tesoreria': <TreasuryPage />,
+  '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
+  '/finanzas/cuentas-por-cobrar': <AccountsReceivablePage />,
+  '/finanzas/activos': <FixedAssetsPage />,
   '/proyectos': <ProjectsPage />,
   '/proyectos/wbs': <WBSPage />,
   '/proyectos/presupuestos': <BudgetPage />,
   '/proyectos/ordenes-de-cambio': <ChangeOrdersPage />,
   '/proyectos/avances': <ProgressPage />,
+  '/abastecimiento/solicitudes': <RequisitionsPage />,
+  '/abastecimiento/ordenes-de-compra': <PurchaseOrdersPage />,
+  '/abastecimiento/recepciones': <GoodsReceiptsPage />,
+  '/abastecimiento/inventario': <InventoryPage />,
+  '/abastecimiento/almacenes': <WarehousesPage />,
+  '/abastecimiento/proveedores': <SuppliersPage />,
+  '/recursos/equipos': <EquipmentPage />,
+  '/recursos/combustible': <EquipmentPage />,
+  '/recursos/mantenimiento': <EquipmentPage />,
 }
 
 const placeholderRoutes: RouteObject[] = navItems
@@ -37,10 +64,7 @@ export const routes: RouteObject[] = [
     children: [
       {
         element: <AppLayout />,
-        children: [
-          { path: 'inicio', element: <HomePage /> },
-          ...placeholderRoutes,
-        ],
+        children: [{ path: 'inicio', element: <HomePage /> }, ...placeholderRoutes],
       },
     ],
   },

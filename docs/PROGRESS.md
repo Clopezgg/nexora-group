@@ -177,6 +177,124 @@ Ningún requisito pasa a `VERIFIED` todavía solo por esta integración —
 pruebe de extremo a extremo, no solo que cada mitad pase sus propios
 tests por separado.
 
+### 2026-08-24 — Track A (Financial Core) endurecido, pendiente de integración
+
+Rama `track/a-financial-core`, worktree aislado. Se recuperó y auditó el
+trabajo heredado de Treasury/AP/AR y se corrigieron brechas con ciclos TDD
+reales:
+
+- Treasury sigue siendo el único dueño de efectivo; Project permanece sin
+  campos de saldo y las restricciones de fondos solo etiquetan uso.
+- Toda FK financiera se resuelve y valida contra la company propietaria:
+  invoice, treasury account, cuentas GL, Project, CostCenter, statements,
+  líneas, cierres, restricciones y vouchers.
+- Scope y montos están limitados en schema, dominio y CHECK constraints;
+  ningún movimiento admite cero/negativos.
+- Conciliación acumula matches bajo `SELECT ... FOR UPDATE`, bloquea
+  overmatch y documentos de otra company.
+- Remesas, transferencias, gastos generales, aprobación de cierre, pagos AP
+  y cobros AR componen idempotencia + posting + entidad en una transacción.
+- AP/AR exponen colecciones GET por company y las pantallas recargan facturas
+  persistidas desde PostgreSQL. AR queda en Financial Core; Track E posee el
+  workflow comercial y consumirá AR sin duplicarlo.
+- La numeración contable se corrigió a unicidad `(company_id,
+  document_number)`, compatible con secuencias por compañía.
+- Corrección 1/5: el Posting Engine central valida compañía para Project del
+  documento y cuenta/Project/CostCenter de cada línea antes de persistir.
+- Cada cuenta GL solo puede respaldar una TreasuryAccount, evitando duplicar
+  el mismo saldo al presentar la posición de efectivo.
+- Conciliación exige cuenta GL, signo y capacidad disponible del documento,
+  serializa asignaciones entre líneas y restringe MATCH/EXCLUDED a estados
+  válidos.
+- Las cinco mutaciones monetarias de UI envían un UUID idempotente estable en
+  sus variables de mutación, reutilizado por los reintentos de transporte.
+- Migración `58ce35982711`: fresh-install completo hasta head, 43 tablas y
+  constraints críticos inspeccionados en PostgreSQL temporal.
+- Migraciones hasta `a91c7d4e2f36`: fresh-install y `alembic check` sin drift.
+- Evidencia de rama: backend combinado 81 tests, frontend 24 tests,
+  typecheck/lint/build y Alembic gates ejecutados. Las filas se marcan
+  `IMPLEMENTED`, nunca `VERIFIED`, hasta integración coordinada/E2E.
+
+### 2026-08-24 — Track C (Supply Chain) construido, pendiente de integrar
+
+Construido en `~/nexora-group-trackC`, rama `track/c-supply-chain`
+(worktree aislado). Evidencia real:
+
+- **Suppliers / base contractual**: `Supplier` (legal_name/trade_name/
+  tax_id/banking_details JSONB — explícitamente distinto de
+  `TreasuryAccount`) y `SupplierContract` (value/currency/advance/retention
+  %). Supplier Master es parte de Track C; Contracts/Subcontracts siguen
+  `IN_PROGRESS` hasta tener pruebas dedicadas, UI y distinción formal para
+  reporting de subcontratos.
+- **Procurement end-to-end**: `PurchaseRequisition`→`RequestForQuotation`
+  (multi-supplier)→`SupplierQuotation`→`PurchaseOrder`
+  (`DRAFT→APPROVED→SENT→PARTIALLY_RECEIVED/RECEIVED`)→`GoodsReceipt`
+  (recepción parcial y completa, actualiza `quantity_received` y dispara
+  `inventory_service.receive_stock`)→`ServiceEntry`. Numeración real vía
+  `numbering_service` (`PR`, `RFQ`, `PO`, `GR`, `SIN`).
+- **Three-Way Match (INV-PROC-001)**: `run_three_way_match` compara PO vs
+  recepción vs factura de proveedor (referencia libre, la factura real la
+  construye Track A en paralelo); las diferencias fuera de tolerancia
+  quedan en `exceptions`, **nunca se descartan silenciosamente** — el
+  registro se persiste tanto en MATCHED como en EXCEPTION.
+- **Inventory**: `Item`/`Warehouse`/`StockLedgerEntry` (append-only,
+  moving average real), `receive_stock`/`issue_to_project`
+  (INV-INV-002)/`transfer_stock`/`apply_physical_count`. `InsufficientStockError`
+  (INV-INV-001) bloquea cualquier emisión que dejaría stock negativo.
+- **Frontend**: `SuppliersPage`, `RequisitionsPage`, `PurchaseOrdersPage`
+  (con aprobar/enviar), `GoodsReceiptsPage` (selecciona PO pendiente →
+  registra recepción real), `InventoryPage`, `WarehousesPage` — reusan el
+  design system de Track F, sin datos fabricados (EmptyState honesto
+  cuando no hay compañía configurada).
+
+**Verificación real ejecutada**: backend 48/48 pytest (35 preexistentes +
+13 de procurement/inventory, incluidos los agregados documentales para
+Commitments/actuals y el aislamiento por compañía en el recurso PO) contra
+una base PostgreSQL aislada
+(`nexora_trackc`/`nexora_trackc_test`, para no pisar el schema de Track
+A/B/1 corriendo en paralelo sobre el mismo servidor Postgres local — nota
+dejada en `tests/conftest.py` para que el coordinador vuelva a
+`nexora_test` al integrar), `alembic revision --autogenerate` detectó las
+18 tablas nuevas sin conflictos, `alembic upgrade head` limpio.
+Frontend: `typecheck`/`lint` limpios, `vitest` 17/17 (15 preexistentes +
+2 nuevos de `SuppliersPage`), `build` OK.
+
+**Bugs reales encontrados y corregidos durante la propia verificación**:
+1. Primer intento de migración corrió contra la base compartida
+   `nexora_dev` (usada también por el coordinador) — se revirtió
+   (`alembic downgrade`) antes de continuar, para no contaminar el
+   estado que el coordinador usa para integrar Track 1/F.
+2. El endpoint `GET /inventory/stock/position` usa query params en
+   snake_case (`item_id`/`warehouse_id`, mismo patrón que
+   `master_data.list_accounts` de Track 1) — los primeros tests fallaron
+   por usar camelCase; corregido en los tests, no en el endpoint (para
+   mantener consistencia con el precedente ya establecido).
+3. Los tests de recepción de mercadería fallaban porque el helper de test
+   no aprobaba/enviaba la PO antes de recibir (el servicio correctamente
+   rechaza recepciones sobre una PO `DRAFT`) — corregido el helper, no el
+   servicio.
+
+**Desviaciones documentadas** (ver `docs/PROCUREMENT.md` /
+`docs/INVENTORY.md` para el detalle completo): Bid Comparison sin
+endpoint agregado ni pantalla dedicada (NXR-REQ-0044 queda
+`IN_PROGRESS`); Supplier Performance sin implementar por falta de datos
+históricos reales que no serían fabricados (NXR-REQ-0058 `NOT_STARTED`);
+`RETURN` como movement_type existe en el modelo pero sin service function
+(NXR-REQ-0054 `NOT_STARTED`); RFQ/Quotation/Comparison/Contracts sin
+pantalla de frontend (fuera del alcance de UI acordado para este track,
+con Contracts/Subcontracts explícitamente `IN_PROGRESS`).
+
+Filas actualizadas en `docs/REQUIREMENTS_TRACEABILITY.md`: NXR-REQ-0040 a
+0060 (Procurement + Supply Chain + Suppliers/Contracts). Ningún
+`VERIFIED` auto-otorgado.
+
+Commits de backend ya preservados en `track/c-supply-chain`: `6e92a87`
+(`feat(procurement): implement requisition-to-receipt supply chain flow`) y
+`9b5cb1f` (`test(procurement): certify INV-PROC-001 and
+INV-INV-001/002 with real tests`). La recuperación de UI/docs queda en un
+commit local explícito para que el coordinador la integre; este registro no
+afirma publicación remota.
+
 ### 2026-08-24 — Track B (Project Control) construido, pendiente de integración
 
 Rama `track/b-project-control` (worktree `~/nexora-group-trackB`, DB de
@@ -227,3 +345,135 @@ Filas actualizadas en `docs/REQUIREMENTS_TRACEABILITY.md`: NXR-REQ-0028,
 dueño Track A/C, contrato de integración ya documentado en
 docs/BUDGET_CONTROLLING.md para que no tengan que rediseñar nada al
 aterrizar.
+
+### 2026-08-24 — Track A integrado sobre B+C (Task 4)
+
+Merge `feat/nexora-greenfield` (Track 1+F+B+C, HEAD `1401ca2`) → `track/a-
+financial-core`, `--no-ff`, todos los conflictos resueltos de forma
+aditiva. Dos hallazgos reales durante la integración, no solo mecánica de
+merge:
+
+- **Colisión de PK real en `document_types.code`**: Track A y Track C
+  sembraron el mismo código `SIN` con significados distintos (Track A =
+  "Factura de proveedor / accrual"; Track C = "Entrada de servicio", ver
+  la entrada de Track C arriba en esta bitácora, que describe el estado
+  *antes* de esta integración). Como `code` es PK real, habría roto la
+  numeración de uno de los dos flujos. Se renombró el código de Track C a
+  `SEN` (`entryNumber` ahora usa el prefijo `SEN-YYYY-NNNNNN`, no
+  `SIN-YYYY-NNNNNN`); el `SIN` de Track A (ya certificado con tests AP)
+  quedó intacto. `docs/PROCUREMENT.md` y la fila NXR-REQ-0047 de
+  `docs/REQUIREMENTS_TRACEABILITY.md` actualizadas para reflejar `SEN-`.
+- **Placeholder de texto libre → FK real**: `SupplierInvoice.supplier_name`/
+  `supplier_tax_id` reemplazados por `supplier_id` FK real a
+  `Supplier` (Track C), validado contra la company propietaria
+  (INV-COMP-001) igual que el resto de FKs financieras.
+
+Alembic `58ce35982711` (Track A, sin publicar) relinkeado a
+`down_revision = '8bf7c353d327'` (head real de Track C, verificado desde
+los archivos de migración, no asumido). Cadena única, un solo head
+(`a91c7d4e2f36`), `alembic upgrade head` limpio en base descartable.
+Backend 120/120 pytest + compileall limpio; frontend typecheck/lint
+limpios, 30/30 vitest, build OK.
+
+Rama `track/a-financial-core` preparada e integration-ready, no fusionada
+a `feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
+coordinador (mismo patrón que Task 2).
+
+### 2026-08-24 — Track D (Enterprise Resources) construido sobre Track 1+F+B+C+A (Task 5)
+
+Worktree `/Users/clopezg/nexora-group-trackD`, branch `track/d-
+enterprise-resources`. Punto de partida: el merge de Track B (`5f60a18`),
+sin trabajo propio de Track D todavía commiteado, más dos drafts de
+modelo reales (`asset.py`/`equipment.py`) dejados sin commitear por una
+sesión interrumpida anterior — preservados primero en un commit dedicado,
+después extendidos (nunca reescritos sin razón).
+
+Merge `feat/nexora-greenfield` (HEAD `dd00a59`, Track 1+F+B+C+A ya
+integrados) → `track/d-enterprise-resources`, `--no-ff`. Sin conflictos
+(Track D no tenía trabajo propio todavía sobre el que colisionar).
+
+**Implementado — cuatro slices verticales, prioridad honesta (Assets y
+Equipment/Maintenance completos primero, per instrucción explícita del
+brief):**
+
+- **Assets (IMPLEMENTED)**: `FixedAsset` extiende el draft recuperado con
+  `scope`/`project_id`/`cost_center_id` (mismo patrón de atribución que
+  AP, Project nunca custodia dinero) y cuentas de depreciación propias
+  (`depreciation_expense_account_id`/`accumulated_depreciation_account_id`
+  — nunca hardcodeadas). `asset_service.generate_depreciation_entry`
+  calcula straight-line real `(cost-salvage)/useful_life_months` y postea
+  SIEMPRE vía `posting_service.post_manual` (documento `DEP`, nunca
+  `JournalLine` a mano). INV-AST-001 (mismo asset+periodo nunca genera dos
+  postings) con doble garantía: rechazo de dominio (`NXR-ASSET-002`) +
+  `uq_depreciation_entries_asset_period` real en PostgreSQL. Activo
+  `DISPOSED`/`RETIRED` es terminal (`NXR-ASSET-001`). 8 endpoints bajo
+  `/api/assets`, permisos `asset.fixed_asset`/`asset.depreciation`,
+  `FixedAssetsPage` (crear activo, generar depreciación por periodo, dar
+  de baja), 7 tests backend + 2 tests frontend.
+- **Equipment/Maintenance (IMPLEMENTED)**: `Equipment`/`FuelLog`/
+  `MaintenancePlan`/`MaintenanceOrder` extendidos con CHECK constraints
+  reales (montos positivos, status válido). `FuelLog.total_cost` se
+  calcula SIEMPRE server-side (nunca del cliente); scope GENERAL/PROJECT
+  con `ck_fuel_logs_operation_scope` (constraint real, ya existía en el
+  draft recuperado, ahora con test directo de DB). Renombrado
+  `MAINTENANCE_ORDER_STATUSES` `COMPLETED`→`CLOSED` para que el nombre
+  coincida con el comportamiento: INV-EQP-001, un `MaintenanceOrder`
+  `CLOSED`/`CANCELLED` es terminal — `update_maintenance_order` rechaza
+  CUALQUIER mutación antes de tocar un campo (`NXR-EQUIPMENT-001`).
+  Crear una orden mueve el equipo a `UNDER_MAINTENANCE`; cerrarla lo
+  regresa a `AVAILABLE`. 13 endpoints bajo `/api/equipment`, permisos
+  `equipment.*`, `EquipmentPage` con tabs Equipos/Combustible/
+  Mantenimiento, 6 tests backend + 2 tests frontend.
+- **Workforce/Time (IN_PROGRESS — backend completo, frontend
+  NOT_STARTED)**: `Worker`/`TimeEntry` nuevos. INV-WFC-001: `labor_cost =
+  hourly_rate * approved_hours` calculado SIEMPRE en el servidor al
+  aprobar (nunca aceptado del cliente) — verificado con el caso exacto
+  del brief (125.50 × 8 = 1004.00). `TimeEntry` solo se aprueba/rechaza
+  una vez (decisión terminal, `NXR-WORKFORCE-001` si se reintenta). 6
+  endpoints bajo `/api/workforce`, permisos `workforce.*`, 4 tests
+  backend. Sin pantalla dedicada — decisión explícita de priorizar
+  Assets/Equipment completos sobre las cuatro áreas superficialmente.
+  Posting del costo de mano de obra hacia el GL queda deuda intencional
+  documentada (`docs/ENTERPRISE_RESOURCES.md`), mismo patrón que
+  Fuel/Maintenance.
+- **Documents/Site/Quality (NOT_STARTED)**: no se tocó en este corte. Ver
+  `docs/ENTERPRISE_RESOURCES.md` y la fila NXR-REQ-0077-0086 en
+  `docs/REQUIREMENTS_TRACEABILITY.md`.
+
+**RBAC**: `Equipment Manager` y `Operations User` (roles ya pre-sembrados
+en `ROLE_NAMES` anticipando este track, sin permisos otorgados todavía)
+recibieron su matriz de permisos en vez de inventar roles nuevos —
+`Equipment Manager` custodia física (asset/equipment/maintenance, sin
+`asset.depreciation`), `Operations User` combustible/mantenimiento/horas
+de campo sin permisos de aprobación. `asset.depreciation` es exclusivo de
+Finance Manager/Accountant/Administrator/Auditor (contabilización ≠
+custodia física). `workforce.time_entry approve` otorgado a Project
+Manager/Project Controller (el costo de mano de obra impacta el
+presupuesto del proyecto).
+
+**TDD real (RED/GREEN) para los cuatro comportamientos nombrados en el
+brief** — guard deshabilitado temporalmente, test corrido (RED
+confirmado con el error real), guard restaurado, test corrido de nuevo
+(GREEN), para cada uno de: doble-posting de depreciación (sin el guard de
+servicio, el `UniqueViolation` de PostgreSQL sale como 500 sin manejar en
+vez de 409 `NXR-ASSET-002`), fuel log PROJECT sin project_id (sin el
+guard, el `CheckViolation` de PostgreSQL sale como 500 sin manejar en vez
+de 422 `NXR-ACCOUNTING-002`), orden de mantenimiento CLOSED inmutable (sin
+el guard, `partsCost`/`description` se sobrescriben silenciosamente), y
+labor cost = rate × hours (con el cálculo hardcodeado a `1.00`, el test
+detecta la fuga inmediatamente). Evidencia completa (comandos + output
+real) en `task-5-report.md`.
+
+**Migración**: `7423072b11d4` (down_revision `a91c7d4e2f36`, el head real
+de Track A tras el merge — no un head viejo de Track B), único head.
+`alembic upgrade head` limpio en base descartable (`nexora_trackd_migrate`
+y `nexora_trackd_gatecheck`, ambas creadas y eliminadas durante la
+verificación), `alembic check` sin operaciones pendientes.
+
+**Verificación real**: backend 136/136 pytest (120 previos + 16 nuevos),
+`compileall` limpio. Frontend: typecheck/lint limpios, 34/34 vitest (30
+previos + 4 nuevos), `build` OK (832 módulos, PWA precache 7 entradas).
+
+Rama `track/d-enterprise-resources` preparada e integration-ready, no
+fusionada a `feat/nexora-greenfield` todavía — pendiente de revisión/merge
+por el coordinador (mismo patrón que Tracks A/B/C).

@@ -4,7 +4,24 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.error_handlers import register_error_handlers
-from app.api.routes import accounting, auth, context, dashboard, health, master_data, projects
+from app.api.routes import (
+    accounting,
+    ap,
+    ar,
+    assets,
+    auth,
+    context,
+    dashboard,
+    equipment,
+    health,
+    inventory,
+    master_data,
+    procurement,
+    projects,
+    suppliers,
+    treasury,
+    workforce,
+)
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.services.bootstrap_service import bootstrap_admin_if_needed
@@ -46,7 +63,18 @@ def create_app() -> FastAPI:
     app.include_router(context.router, prefix="/api")
     app.include_router(master_data.router, prefix="/api")
     app.include_router(accounting.router, prefix="/api")
+    app.include_router(suppliers.router, prefix="/api")
+    app.include_router(procurement.router, prefix="/api")
+    app.include_router(inventory.router, prefix="/api")
     app.include_router(projects.router, prefix="/api")
+    # Track A - Financial Core.
+    app.include_router(treasury.router, prefix="/api")
+    app.include_router(ap.router, prefix="/api")
+    app.include_router(ar.router, prefix="/api")
+    # Track D - Enterprise Resources.
+    app.include_router(assets.router, prefix="/api")
+    app.include_router(equipment.router, prefix="/api")
+    app.include_router(workforce.router, prefix="/api")
 
     return app
 

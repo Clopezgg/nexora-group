@@ -11,6 +11,10 @@ from app.schemas.supplier import (
     SupplierCreateRequest,
     SupplierResponse,
 )
+from app.services.financial_validation_service import (
+    assert_project_belongs_to_company,
+    assert_supplier_belongs_to_company,
+)
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/procurement/suppliers", tags=["suppliers"])
@@ -78,6 +82,12 @@ def create_contract(
 ):
     assert_company_access(
         db, user_id=user.id, resource="procurement.contract", action="create", company_id=payload.company_id
+    )
+    assert_supplier_belongs_to_company(
+        db, supplier_id=payload.supplier_id, company_id=payload.company_id
+    )
+    assert_project_belongs_to_company(
+        db, project_id=payload.project_id, company_id=payload.company_id
     )
     contract = supplier_repository.create_contract(
         db,

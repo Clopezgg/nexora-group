@@ -633,3 +633,89 @@ hasta la próxima revisión de código real sobre esta rama.
 Próximo paso: continuar con el roadmap de `docs/MASTER_PLAN.md` (siguiente
 track con menos dependencias sin cumplir), y bajar `docs/DEFERRED.md` a
 cero antes de certificar cualquier 100%.
+
+### 2026-08-25 — Track D (Construction Control) — Documents + Evidence foundation (Task 1)
+
+Nuevo plan (`docs/superpowers/sdd/2026-08-25-track-d-construction-control/`)
+continuando el bloque CONSTRUCTION CONTROL (`NXR-REQ-0077`-`0086`) que
+Track D dejó honestamente `NOT_STARTED` en Task 5. Worktree
+`/Users/clopezg/nexora-group-trackD`, branch `track/d-enterprise-resources`,
+recién sincronizada con el head de integración más reciente (`322b320`,
+Track 1+F+B+C+A+D+E completos). Este task es la fundación de la que
+dependen las dos tareas siguientes del mismo plan (Daily Site
+Reports/Quality/Safety y RFI/Submittals): entidades `Document`/
+`DocumentVersion`/`Evidence` reales — antes solo existía el cliente Azure
+Blob (`app/integrations/azure_blob.py`) sin ninguna entidad ni endpoint que
+lo llamara.
+
+**Implementado (`NXR-REQ-0077`/`0078`/`0079`, IMPLEMENTED):**
+
+- `Evidence` (`app/models/evidence.py`): metadata real de un upload a
+  Azure Blob — `blob_key` único, `mime_type`, `size_bytes`, `category`
+  libre, `entity_type`/`entity_id` polimórfico informativo (no FK real,
+  documentado explícitamente como no-autoritativo). `evidence_service.
+  upload_evidence` valida MIME allowlist (PDF/JPEG/PNG/WEBP) y
+  `settings.max_evidence_mb` (default 25MB) **antes** de llamar a
+  `get_evidence_container_client()` — nunca se gasta una llamada de red en
+  un archivo que se va a rechazar. Si el storage no está configurado,
+  `EvidenceStorageNotConfigured` (ya existía) se registra en
+  `error_handlers.py` como 503 real `NXR-EVIDENCE-001` — nunca un 200 con
+  una URL fabricada (verificado con test real contra el entorno de test,
+  que deja `EVIDENCE_BACKEND` sin configurar a propósito).
+- `Document`/`DocumentVersion` (`app/models/document.py`): versionado
+  inmutable real. Subir una nueva versión marca la anterior `SUPERSEDED`
+  (nunca `UPDATE`/`DELETE`) y crea una fila nueva `ACTIVE`; el índice único
+  parcial `uq_document_versions_one_active_per_document` (constraint real
+  de PostgreSQL, no solo invariante de servicio) garantiza que nunca
+  existan dos versiones `ACTIVE` simultáneas, incluso bajo escritura
+  concurrente. Se evitó deliberadamente una FK circular
+  `Document.current_version_id` — el "current version" se deriva de la
+  única versión `ACTIVE` (propiedad Python + índice único), mismo criterio
+  que Track E usó para evitar ciclos en `customers→leads→opportunities`.
+- **`ProgressRecord.evidence_ref` → `evidence_id` (FK real)**: mismo
+  patrón que Task 4 dio a `Supplier`/`SupplierInvoice` y Task 6 a
+  `CustomerInvoice.customer_id` — el campo de texto libre original se
+  reemplazó por una FK real a `evidence.id`, validada con el nuevo helper
+  `assert_evidence_belongs_to_company` (`financial_validation_service.py`,
+  reutiliza el mismo módulo central de asserts cross-dominio que ya usan
+  Supplier/Customer/Account/Project/CostCenter) antes de persistir.
+- API: `/api/documents` (crear con v1, listar, obtener, listar versiones,
+  agregar versión) y `/api/evidence` (subir multipart/form-data, listar,
+  obtener). Permisos nuevos `document.document`
+  (`create`/`read`/`version`) y `document.evidence` (`create`/`read`),
+  otorgados a Administrator/Project Manager/Project Controller/Auditor/
+  Viewer según corresponde.
+- Frontend: `DocumentsPage.tsx` real (no `PlaceholderPage`) — lista
+  documentos con su versión actual, modal de creación (sube archivo real
+  vía `documentService.uploadEvidence` + crea el `Document`), modal de
+  historial de versiones con formulario para subir una nueva versión.
+  `httpClient.apiFetch` extendido de forma aditiva para no forzar
+  `Content-Type: application/json` cuando el body es `FormData`.
+- `docs/DOCUMENTS_EVIDENCE.md`: contrato de adjunto documentado
+  explícitamente para las dos tareas siguientes del plan — FK única
+  `evidence_id` por defecto, tabla de unión con el mismo patrón que
+  `RfqSupplier` si un dominio necesita adjuntos múltiples, y por qué
+  `entity_type`/`entity_id` en `Evidence` NO es ese contrato autoritativo.
+
+**TDD real**: los 6 comportamientos de aceptación del brief (versionado +
+inmutabilidad, MIME rechazado, tamaño rechazado, error real sin storage
+configurado, aislamiento de compañía, FK de evidence rechazada
+cross-compañía) se escribieron como tests contra endpoints/tablas que no
+existían todavía en esta rama antes de este task (fallo real por
+ausencia, no un mock) y ahora pasan — ver `task-1-report.md` para el
+detalle RED/GREEN de cada uno.
+
+**Verificación real**: `alembic revision --autogenerate` detectó
+exactamente el diff esperado (3 tablas nuevas + 1 columna
+`progress_records.evidence_id` + drop de `evidence_ref`), single head
+(`eaf5b6c0d061`), `alembic upgrade head` limpio en una base descartable
+completamente fresca (cadena completa desde `create_initial_schema`) y en
+otra ya en el head anterior. Backend: 154/154 pytest (145 previos + 9
+nuevos de `test_documents.py`/`test_evidence.py`), `compileall` limpio.
+Frontend: typecheck/lint limpios, 40/40 vitest (38 previos + 2 nuevos de
+`DocumentsPage.test.tsx`), `build` OK (841 módulos, PWA precache 7
+entradas).
+
+Rama `track/d-enterprise-resources` preparada e integration-ready, no
+fusionada a `feat/nexora-greenfield` todavía — pendiente de revisión/merge
+por el coordinador (mismo patrón que todos los tracks anteriores).

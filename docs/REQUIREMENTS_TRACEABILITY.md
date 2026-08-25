@@ -15,13 +15,14 @@ placeholder.
 **Estados:** `NOT_STARTED` · `IN_PROGRESS` · `IMPLEMENTED` ·
 `VERIFIED` · `BLOCKED_EXTERNAL`.
 
-Última actualización: Track D (Enterprise Resources — Assets/Equipment/
-Maintenance/Workforce) construido en `track/d-enterprise-resources` sobre
-la integración completa de Track 1+F+B+C+A, pendiente de integración
-coordinada. Documents/Site/Quality (bloque CONSTRUCTION CONTROL,
-NXR-REQ-0077-0086) sigue `NOT_STARTED`/`IN_PROGRESS` sin cambios — Track D
-priorizó completar Assets y Equipment/Maintenance honestamente en vez de
-tocar las cuatro áreas superficialmente (ver task-5-report.md).
+Última actualización: plan "track-d-construction-control" task-1
+(Documents + Evidence foundation, `NXR-REQ-0077/0078/0079`), construido en
+`track/d-enterprise-resources` sobre la integración completa de
+Track 1+F+B+C+A+D+E. `Document`/`DocumentVersion`/`Evidence` reales +
+`ProgressRecord.evidence_id` (FK real, ya no texto libre) — ver
+`docs/DOCUMENTS_EVIDENCE.md` y `task-1-report.md`. El resto del bloque
+CONSTRUCTION CONTROL (Daily Site Reports/Quality/Safety/RFI/Submittals,
+NXR-REQ-0081-0086) sigue `NOT_STARTED`, tareas posteriores del mismo plan.
 
 ## CORE
 
@@ -148,9 +149,9 @@ tocar las cuatro áreas superficialmente (ver task-5-report.md).
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0077 | Documents (enterprise entity + Blob) | ⬜·⬜·🔶·⬜·⬜·⬜·⬜·⬜·⬜ | IN_PROGRESS | cliente Azure Blob (`azure_blob.py`) listo, falta entidad `Document`/API/UI |
-| NXR-REQ-0078 | Document Versioning | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0079 | Evidence (PDF/JPEG/PNG/WEBP validado) | ⬜·⬜·🔶·⬜·⬜·⬜·⬜·⬜·⬜ | IN_PROGRESS | backend de storage listo, falta validación MIME/tamaño + endpoints |
+| NXR-REQ-0077 | Documents (enterprise entity + Blob) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-1): `Document`/`DocumentVersion` reales (`app/models/document.py`), `document_service`/`document_repository`, API `/api/documents`, `DocumentsPage.tsx` real (lista/crea/versiona, no placeholder); falta descarga del archivo real (SAS token, deuda documentada en `docs/DOCUMENTS_EVIDENCE.md`) y E2E |
+| NXR-REQ-0078 | Document Versioning | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-1): versión anterior SUPERSEDED (nunca borrada/editada), índice único parcial `uq_document_versions_one_active_per_document` garantiza una sola versión ACTIVE por documento incluso bajo escritura concurrente, RED/GREEN evidence real (ver task-1-report.md) |
+| NXR-REQ-0079 | Evidence (PDF/JPEG/PNG/WEBP validado) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-1): `Evidence` real (`app/models/evidence.py`), `evidence_service.upload_evidence` valida MIME allowlist + `max_evidence_mb` ANTES de tocar Azure Blob, `EvidenceStorageNotConfigured` registrado como 503 real `NXR-EVIDENCE-001` (nunca URL fabricada), `ProgressRecord.evidence_ref` migrado a FK real `evidence_id` (mismo patrón que Supplier/Customer) |
 | NXR-REQ-0080 | Vouchers / comprobantes (PDF profesional) | ✅·➖·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: PDF vectorial generado desde AccountingDocument real con ReportLab; endpoint protegido por company; falta UI dedicada |
 | NXR-REQ-0081 | Daily Site Reports | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0082 | Quality (Inspection/Checklist) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |

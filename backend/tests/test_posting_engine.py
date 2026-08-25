@@ -1,4 +1,7 @@
+import uuid
+
 from app.models.accounting import AccountingDocument
+from app.models.audit import AuditLog
 from app.models.cost_center import CostCenter
 from app.models.project import Project
 from tests.helpers import create_account, create_company, login_admin
@@ -287,3 +290,76 @@ def test_journal_rejects_line_cost_center_from_another_company(client, db_sessio
             ],
         },
     )
+
+
+def test_creating_journal_entry_creates_audit_log_entry(client, db_session):
+    """Closes the General Ledger (manual entries) gap in docs/AUDIT.md's
+    honest backlog -- same instrumentation pattern as AP approve/pay."""
+    login_admin(client)
+    company, debit_account, credit_account = _setup_company_and_accounts(client)
+
+    response = client.post(
+        "/api/accounting/journal-entries",
+        json={
+            "companyId": company["id"],
+            "scope": "GENERAL",
+            "currencyCode": "HNL",
+            "description": "Asiento auditado",
+            "lines": [
+                {"accountId": debit_account["id"], "debitAmount": "10.00"},
+                {"accountId": credit_account["id"], "creditAmount": "10.00"},
+            ],
+        },
+    )
+    assert response.status_code == 201, response.text
+    document = response.json()
+
+    rows = (
+        db_session.query(AuditLog)
+        .filter(
+            AuditLog.entity_type == "accounting.journal_entry",
+            AuditLog.entity_id == uuid.UUID(document["id"]),
+        )
+        .all()
+    )
+    assert len(rows) == 1
+    assert rows[0].action == "accounting.journal_entry.create"
+    assert rows[0].after["status"] == "POSTED"
+    assert rows[0].after["documentNumber"] == document["documentNumber"]
+
+
+def test_reversing_journal_entry_creates_audit_log_entry(client, db_session):
+    login_admin(client)
+    company, debit_account, credit_account = _setup_company_and_accounts(client)
+    created = client.post(
+        "/api/accounting/journal-entries",
+        json={
+            "companyId": company["id"],
+            "scope": "GENERAL",
+            "currencyCode": "HNL",
+            "lines": [
+                {"accountId": debit_account["id"], "debitAmount": "10.00"},
+                {"accountId": credit_account["id"], "creditAmount": "10.00"},
+            ],
+        },
+    ).json()
+
+    reversal = client.post(
+        f"/api/accounting/journal-entries/{created['id']}/reverse",
+        json={"reason": "Error de captura"},
+    )
+    assert reversal.status_code == 200, reversal.text
+
+    rows = (
+        db_session.query(AuditLog)
+        .filter(
+            AuditLog.entity_type == "accounting.journal_entry",
+            AuditLog.entity_id == uuid.UUID(created["id"]),
+            AuditLog.action == "accounting.journal_entry.reverse",
+        )
+        .all()
+    )
+    assert len(rows) == 1
+    assert rows[0].before["status"] == "POSTED"
+    assert rows[0].after["status"] == "REVERSED"
+    assert rows[0].after["reversalDocumentId"] == reversal.json()["id"]

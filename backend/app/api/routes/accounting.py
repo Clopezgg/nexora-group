@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.models.accounting import AccountingDocument, JournalLine
 from app.schemas.accounting import (
     JournalEntryCreateRequest,
@@ -12,7 +13,7 @@ from app.schemas.accounting import (
     JournalEntryResponse,
     JournalLineResponse,
 )
-from app.services import posting_service
+from app.services import audit_service, posting_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
@@ -54,6 +55,7 @@ def create_journal_entry(
     payload: JournalEntryCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("accounting.journal_entry", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> JournalEntryResponse:
     assert_company_access(
         db,
@@ -84,6 +86,19 @@ def create_journal_entry(
         lines=lines,
         description=payload.description,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="accounting.journal_entry.create",
+        entity_type="accounting.journal_entry",
+        entity_id=document.id,
+        company_id=document.company_id,
+        project_id=document.project_id,
+        before=None,
+        after={"status": document.status, "documentNumber": document.document_number},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _to_response(document, _get_lines(db, document.id))
 
 
@@ -112,6 +127,7 @@ def reverse_journal_entry(
     payload: JournalEntryReverseRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("accounting.journal_entry", "reverse")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> JournalEntryResponse:
     document = db.get(AccountingDocument, document_id)
     if document is None:
@@ -123,5 +139,19 @@ def reverse_journal_entry(
         action="reverse",
         company_id=document.company_id,
     )
+    before_status = document.status
     reversal = posting_service.reverse_document(db, document_id=document_id, reason=payload.reason)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="accounting.journal_entry.reverse",
+        entity_type="accounting.journal_entry",
+        entity_id=document.id,
+        company_id=document.company_id,
+        project_id=document.project_id,
+        before={"status": before_status},
+        after={"status": document.status, "reversalDocumentId": str(reversal.id)},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _to_response(reversal, _get_lines(db, reversal.id))

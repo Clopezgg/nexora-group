@@ -2071,3 +2071,52 @@ Verification: `cd backend && ./.venv/bin/pytest -q` → 272/272 (+5 tests);
 Traceability: `NXR-REQ-0006` moved `IN_PROGRESS` → `IMPLEMENTED`. Tally
 now 99 `IMPLEMENTED` (+1), 18 `IN_PROGRESS` (-1), 5 `NOT_STARTED`, 2
 `BLOCKED_EXTERNAL`, 0 `VERIFIED`.
+
+## 2026-08-25 — Authentication lockout + CSRF guard (closes NXR-REQ-0008/0009)
+
+The row named two concrete missing pieces: rate-limit/lockout and CSRF.
+Both closed.
+
+**Lockout**: `User.failed_login_attempts`/`locked_until` (migration
+`c15db6e5d9ca`, `server_default='0'` so it backfills safely against the
+existing bootstrap admin row rather than failing on the NOT NULL add).
+`auth_service.login` locks the account for `settings.lockout_minutes`
+(default 15) after `settings.max_login_attempts` (default 5) consecutive
+failures — even the *correct* password returns 423 while locked, which
+is the point: once tripped, the request can't be distinguished from an
+attacker who's guessed the real password on attempt 6. State lives in
+PostgreSQL, not process memory, per CLAUDE.md §3 (stateless backend,
+works identically across N Container Apps replicas).
+
+**CSRF**: made an explicit, documented decision instead of leaving it
+unaddressed. `SameSite=Lax` (dev) already blocks most CSRF; `SameSite=
+None` (prod, since frontend/backend live on different subdomains)
+doesn't. CORS (`allow_origins=[frontend_url]`) already blocks any JSON
+fetch/XHR from an unconfigured origin via preflight — covering nearly
+the whole API, which is JSON-only. The real gap: `POST /api/evidence`
+uses `multipart/form-data`, a "simple" content-type that skips preflight
+entirely, so a malicious cross-site HTML `<form>` could submit it using
+the victim's cookies. Rather than patch that one endpoint, added a
+uniform `Origin`-header guard (`app/api/csrf.py`) on every mutating
+request (POST/PUT/PATCH/DELETE), so a future multipart endpoint doesn't
+silently reopen the same hole. Missing `Origin` (curl, TestClient,
+non-browser clients) is allowed through — that's not the CSRF vector,
+which requires a real browser making the request, and browsers always
+set `Origin` on cross-site non-trivial requests.
+
+IP-based rate-limiting (distinct from per-account lockout) is
+deliberately left as an infrastructure concern (Azure Front Door/WAF),
+appropriate for the 90%+ hardening phase per
+`docs/PRODUCTION_READINESS.md`, not this track — documented, not
+ignored.
+
+Verification: `cd backend && ./.venv/bin/pytest -q` → 277/277 (+6 new
+auth/CSRF tests over the previous 272 plus one prior test file addition
+already counted — see exact numbers in the commit); `compileall` clean;
+`alembic check` → no drift, single head `c15db6e5d9ca`. The CSRF guard
+runs globally, so the full suite passing confirms it doesn't break any
+existing request path (none of the ~277 tests send an `Origin` header).
+
+Traceability: `NXR-REQ-0008`/`NXR-REQ-0009` both moved `IN_PROGRESS` →
+`IMPLEMENTED`. Tally now 101 `IMPLEMENTED` (+2), 16 `IN_PROGRESS` (-2),
+5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 0 `VERIFIED`.

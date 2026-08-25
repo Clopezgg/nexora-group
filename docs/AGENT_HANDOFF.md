@@ -12,7 +12,8 @@ Crews: `b8ee232`/`7c7cda3`; Supplier Contracts + company-isolation fix:
 `a1cdb47`/`53908a3`; RFQ/Quotation company-isolation fixes + Bid
 Comparison: `66364b2`/`a3c1c65`/`2a9e6d2`; systematic route audit:
 `83ca9f0`/`2aa138f`; Corrections/reversal-sync for AP/AR: `6cfca55`;
-Tax architecture: `66cebf1`, docs commit follows this file)
+Tax architecture: `66cebf1`; Auth lockout + CSRF guard: `9858ee9`, docs
+commit follows this file)
 
 **This session is now operating under the user's "CANDADO FINAL" order**:
 no partial/rounded completion claims, `main` stays locked until every
@@ -136,10 +137,10 @@ session, real PostgreSQL, real commands — not inferred):
   `approval_service.register_decision_adapter`) fixes it for AP/AR;
   payment/receipt reversal explicitly deferred as `DEFERRED-FINAL-018`
   (not silently dropped). 267/267 backend tests.
-- Traceability tally after all of the above: 0 `VERIFIED`, 99
-  `IMPLEMENTED`, 18 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
+- Traceability tally after all of the above: 0 `VERIFIED`, 101
+  `IMPLEMENTED`, 16 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
   across 124 rows. **This is still far from 100\% by the CANDADO FINAL
-  definition** — 23 rows are not yet `IMPLEMENTED`, and zero rows are
+  definition** — 21 rows are not yet `IMPLEMENTED`, and zero rows are
   `VERIFIED` (VERIFIED requires E2E/independent verification per row,
   which hasn't started). Do not round this up.
 
@@ -197,6 +198,16 @@ payment/receipt-reversal follow-up. Also `NXR-REQ-0006` Tax architecture
 `compute_tax` and `GET/POST /api/master-data/tax-codes` are real. AP/AR/
 Procurement still take a manual `tax_amount` rather than a computed one —
 deliberate, documented scope boundary, not wiring further this round.
+Also `NXR-REQ-0008`/`NXR-REQ-0009` Authentication/Sessions (commit
+`9858ee9`): `User.failed_login_attempts`/`locked_until` (migration
+`c15db6e5d9ca`) lock an account for `settings.lockout_minutes` after
+`settings.max_login_attempts` consecutive failures (423, even with the
+correct password once tripped); `app/api/csrf.py` adds a uniform
+`Origin`-header guard on every mutating request (documented decision —
+CORS+SameSite already cover the JSON API, the real gap was
+`multipart/form-data` on `POST /api/evidence` skipping CORS preflight).
+IP-based rate-limiting (vs. per-account lockout) stays a deliberate
+90%+-phase infra item (Azure Front Door/WAF), not done this round.
 
 **Working pattern that paid off repeatedly this session — keep using
 it**: pick a row whose description names a *specific, narrow* gap (not
@@ -216,18 +227,16 @@ Remaining domain-logic `IN_PROGRESS` rows worth this same treatment
 `IN_PROGRESS` rows like `NXR-REQ-0105-0121`, which need actual Azure work,
 not code review):
 
-1. `NXR-REQ-0008`/`NXR-REQ-0009` Authentication/Sessions — row says
-   "sigue faltando CSRF/rate-limit/lockout"; this overlaps with
-   `NXR-REQ-0107` Security, which is more clearly a 90%+ hardening-phase
-   item covered by `docs/PRODUCTION_READINESS.md` §13 (Security). Could
-   still pick off the narrow, code-level pieces now (CSRF decision,
-   rate-limit/lockout on login) separately from the full hardening pass.
-2. `NXR-REQ-0001` Core platform — very broad ("🔶" across most columns),
+1. `NXR-REQ-0001` Core platform — very broad ("🔶" across most columns),
    likely not a single reconcilable gap; read what it actually still
-   expects before touching it.
+   expects before touching it. This is the last domain-logic
+   `IN_PROGRESS` row that looks code-reconcilable at a glance — read it
+   carefully before assuming so, per the row's own breadth warning.
 
 That's close to exhausting the well-scoped `IN_PROGRESS` domain-logic
-rows (down to ~18, mostly infra/hardening/deployment).
+rows (down to ~16, mostly infra/deployment/hardening —
+`NXR-REQ-0105-0121` and similar, which need actual Azure work or a full
+`docs/PRODUCTION_READINESS.md` pass, not more code-reconciliation).
 
 **The systematic company-isolation route audit is DONE** (commit
 `83ca9f0`, see above) — every file in `backend/app/api/routes/*.py` was

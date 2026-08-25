@@ -1992,3 +1992,44 @@ Traceability: no row changed `IMPLEMENTED`/`IN_PROGRESS` status — these
 were quality/security fixes inside already-`IMPLEMENTED` rows
 (`NXR-REQ-0040`, `0046`, `0048`, `0051`), evidence notes added to each.
 Tally unchanged at 97/20/5/2/0.
+
+## 2026-08-25 — Corrections / posted-document reversal now syncs AP/AR (closes NXR-REQ-0025)
+
+Per the master order: determine whether `reverse_document` already
+satisfies this requirement, or whether some domain genuinely needs a
+distinct "correction" flow — don't build anything speculative. Verified:
+`reverse_document` (INV-ACC-002) already reverses ANY posted
+`AccountingDocument` regardless of owning domain, and CLAUDE.md §8
+defines "Corrección = reversal/correction enlazado al original" without
+demanding a separate verb. So the row's premise ("falta un flujo
+distinto") was not quite right — but investigating it surfaced a real,
+reachable defect instead: reversing an AP/AR document's accrual through
+the generic endpoint left the `SupplierInvoice`/`CustomerInvoice` at
+`APPROVED` — still payable/collectible — pointing at a document that was
+now `REVERSED`. Finance Manager already holds
+`accounting.journal_entry/reverse`, so this was directly reachable, not
+theoretical.
+
+Fixed with `posting_service.register_reversal_hook(source_type, hook)`,
+the same adapter-registration pattern `approval_service` already uses:
+`reverse_document` looks up the `AccountingSourceLink` for the document
+being reversed and calls the registered hook (if any) *before* creating
+the reversal, so it can raise and prevent an invalid reversal from
+creating any state at all. `ap_service.apply_accrual_reversal`/
+`ar_service.apply_invoice_reversal` cancel the invoice when its accrual
+(`SIN`/`CIN`) is reversed, and reject the reversal outright once the
+invoice has any payment/collection against it. Both `source_type`s are
+shared with a second `document_type_code` (`PAY`/`REC`) for the
+payment/receipt posting itself — reversing *those* is explicitly
+rejected for now (`InvalidInvoiceStateError`) rather than silently
+leaving inconsistent state; recorded as `DEFERRED-FINAL-018`, not
+ignored. `asset_service`/`procurement_service` post with their own
+`source_type` and have no hook registered yet either — same entry.
+
+Verification: `cd backend && ./.venv/bin/pytest -q` → 267/267 (+3 tests);
+`compileall` clean; `alembic check` → no drift (no schema change, pure
+service-layer addition).
+
+Traceability: `NXR-REQ-0025` moved `IN_PROGRESS` → `IMPLEMENTED`. Tally
+now 98 `IMPLEMENTED` (+1), 19 `IN_PROGRESS` (-1), 5 `NOT_STARTED`, 2
+`BLOCKED_EXTERNAL`, 0 `VERIFIED`.

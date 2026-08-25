@@ -10,7 +10,9 @@ instrumentation: `adff21c`/`97e2d33`; real AP accrued/paid in Budget vs
 Actual: `0db6ecf`/`17bb521`; Inventory Returns: `dc91a68`/`06213ed`;
 Crews: `b8ee232`/`7c7cda3`; Supplier Contracts + company-isolation fix:
 `a1cdb47`/`53908a3`; RFQ/Quotation company-isolation fixes + Bid
-Comparison: `66364b2`/`a3c1c65`/`2a9e6d2`, docs commit follows this file)
+Comparison: `66364b2`/`a3c1c65`/`2a9e6d2`; systematic route audit:
+`83ca9f0`/`2aa138f`; Corrections/reversal-sync for AP/AR: `6cfca55`,
+docs commit follows this file)
 
 **This session is now operating under the user's "CANDADO FINAL" order**:
 no partial/rounded completion claims, `main` stays locked until every
@@ -125,12 +127,19 @@ session, real PostgreSQL, real commands — not inferred):
   every company's active projects for every authenticated user,
   regardless of access). 264/264 backend tests. **This audit already
   covered every route file — do not repeat it from scratch.**
-- Traceability tally after all of the above: 0 `VERIFIED`, 97
-  `IMPLEMENTED`, 20 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
-  across 124 rows (unchanged by the audit fixes — those were
-  quality/security fixes inside already-`IMPLEMENTED` rows, not new
-  capability). **This is still far from 100\% by the CANDADO FINAL
-  definition** — 25 rows are not yet `IMPLEMENTED`, and zero rows are
+- `NXR-REQ-0025` Corrections (commit `6cfca55`): reversal already
+  satisfied the general requirement (CLAUDE.md §8), but reversing an
+  AP/AR accrual through the generic endpoint left the invoice `APPROVED`
+  (still payable/collectible) pointing at a `REVERSED` document — a real,
+  reachable financial-invariant gap, not speculative.
+  `posting_service.register_reversal_hook` (same pattern as
+  `approval_service.register_decision_adapter`) fixes it for AP/AR;
+  payment/receipt reversal explicitly deferred as `DEFERRED-FINAL-018`
+  (not silently dropped). 267/267 backend tests.
+- Traceability tally after all of the above: 0 `VERIFIED`, 98
+  `IMPLEMENTED`, 19 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
+  across 124 rows. **This is still far from 100\% by the CANDADO FINAL
+  definition** — 24 rows are not yet `IMPLEMENTED`, and zero rows are
   `VERIFIED` (VERIFIED requires E2E/independent verification per row,
   which hasn't started). Do not round this up.
 
@@ -177,7 +186,11 @@ approval, a latent 500-instead-of-404 bug on two routes, and a
 platform-wide dashboard leak. **Do not re-run that audit from scratch —
 it already covered every route file.** If you add a NEW entity-id route
 in the future, apply the same check yourself rather than waiting for
-another audit pass.
+another audit pass. Also `NXR-REQ-0025` Corrections (commit `6cfca55`):
+`posting_service.register_reversal_hook` now syncs
+`SupplierInvoice`/`CustomerInvoice` status when their accrual is
+reversed — see `DEFERRED-FINAL-018` for the explicitly-scoped-out
+payment/receipt-reversal follow-up.
 
 **Working pattern that paid off repeatedly this session — keep using
 it**: pick a row whose description names a *specific, narrow* gap (not
@@ -197,19 +210,15 @@ Remaining domain-logic `IN_PROGRESS` rows worth this same treatment
 `IN_PROGRESS` rows like `NXR-REQ-0105-0121`, which need actual Azure work,
 not code review):
 
-1. `NXR-REQ-0025` Corrections (posted docs) — row says reversal covers
-   the general case but a domain might need a distinct "correction" flow;
-   verify whether any domain has actually hit this gap in practice before
-   building anything speculative.
-2. `NXR-REQ-0006` Tax architecture — `TaxCode`/`TaxLine` exist and feed
+1. `NXR-REQ-0006` Tax architecture — `TaxCode`/`TaxLine` exist and feed
    `posting_service.post_manual`, but there's no tax calculation service
    or API. Verify whether any domain actually needs computed tax before
    building — this could be legitimately out of scope rather than a gap.
-3. `NXR-REQ-0008`/`NXR-REQ-0009` Authentication/Sessions — row says
+2. `NXR-REQ-0008`/`NXR-REQ-0009` Authentication/Sessions — row says
    "sigue faltando CSRF/rate-limit/lockout"; this overlaps with
    `NXR-REQ-0107` Security, which is more clearly a 90%+ hardening-phase
-   item. Lower priority than 1-2 above.
-4. `NXR-REQ-0001` Core platform — very broad ("🔶" across most columns),
+   item. Lower priority than 1 above.
+3. `NXR-REQ-0001` Core platform — very broad ("🔶" across most columns),
    likely not a single reconcilable gap; read what it actually still
    expects before touching it.
 

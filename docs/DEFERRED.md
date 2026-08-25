@@ -194,6 +194,27 @@ certificar el 100%.
   500 kB y necesita code splitting antes de la certificación de performance.
   Ninguno altera los resultados verificados de este plan, pero todos deben
   revisarse durante FINAL HARDENING.
+- `DEFERRED-FINAL-018` — 2026-08-25, NXR-REQ-0025 (Corrections):
+  `posting_service.register_reversal_hook` sincroniza el status de
+  `SupplierInvoice`/`CustomerInvoice` cuando se revierte su documento de
+  *accrual* (`SIN`/`CIN`). Revertir el documento de un **pago o recibo**
+  (`PAY`/`REC` -- mismo `source_type` que el accrual, distinto
+  `document_type_code`) se rechaza explícitamente
+  (`InvalidInvoiceStateError`, `NXR-AP-001`/409) en vez de dejar un
+  estado a medias, porque no existe todavía un flujo que reduzca
+  `amount_paid`/`amount_collected` y reabra la factura de forma
+  consistente. Ningún dominio lo ha necesitado todavía (no hay caller que
+  intente revertir un `PAY`/`REC` en producción); si aparece esa
+  necesidad real, construir `ap_service.reverse_payment`/
+  `ar_service.reverse_receipt` con el mismo criterio (validar estado,
+  reducir el monto pagado/cobrado, reabrir la factura al estado que
+  corresponda) en vez de ampliar el hook existente a ciegas.
+  `asset_service`/`procurement_service` (`DepreciationEntry`,
+  `goods_receipt`) también postean con `source_type` propio y no tienen
+  hook de reversal registrado todavía -- mismo patrón, sin caller
+  reachable que lo haya necesitado en esta sesión; revisar si Enterprise
+  Resources/Procurement construyen un flujo de reversal para esos
+  documentos antes de asumir que ya está cubierto.
 
 ## Bloqueos externos
 

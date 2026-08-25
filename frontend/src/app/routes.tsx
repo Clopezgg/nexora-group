@@ -5,13 +5,24 @@ import { ProtectedRoute } from '../features/auth/ProtectedRoute'
 import { LoginPage } from '../pages/LoginPage'
 import { HomePage } from '../features/home/HomePage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
+import { TreasuryPage } from '../features/treasury/TreasuryPage'
+import { AccountsPayablePage } from '../features/treasury/AccountsPayablePage'
+import { AccountsReceivablePage } from '../features/treasury/AccountsReceivablePage'
 import { navItems } from './navigation'
+
+// Track A (Financial Core) ya construyó pantallas reales para estas rutas;
+// el resto sigue en PlaceholderPage hasta que su track dueño las construya.
+const trackARoutes: Record<string, RouteObject['element']> = {
+  '/finanzas/tesoreria': <TreasuryPage />,
+  '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
+  '/finanzas/cuentas-por-cobrar': <AccountsReceivablePage />,
+}
 
 const placeholderRoutes: RouteObject[] = navItems
   .filter((item) => item.path !== '/inicio')
   .map((item) => ({
     path: item.path.replace(/^\//, ''),
-    element: <PlaceholderPage title={item.label} />,
+    element: trackARoutes[item.path] ?? <PlaceholderPage title={item.label} />,
   }))
 
 export const routes: RouteObject[] = [
@@ -22,10 +33,7 @@ export const routes: RouteObject[] = [
     children: [
       {
         element: <AppLayout />,
-        children: [
-          { path: 'inicio', element: <HomePage /> },
-          ...placeholderRoutes,
-        ],
+        children: [{ path: 'inicio', element: <HomePage /> }, ...placeholderRoutes],
       },
     ],
   },

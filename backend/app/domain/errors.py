@@ -29,3 +29,21 @@ class InvalidOperationScopeError(Exception):
 
 class IdempotencyConflictError(Exception):
     """INV-IDEM-002: misma idempotency key con payload distinto."""
+
+
+class InvalidTransferError(Exception):
+    """Track A: transferencia de tesorería inválida (misma cuenta origen/
+    destino, moneda incompatible, etc.)."""
+
+
+class InvalidInvoiceStateError(Exception):
+    """Track A: transición de estado inválida sobre SupplierInvoice/
+    CustomerInvoice (p.ej. pagar una factura CANCELLED)."""
+
+
+class OverpaymentError(Exception):
+    """Track A: un pago/cobro excede el saldo pendiente de la factura."""
+
+
+class InvalidFinancialReferenceError(Exception):
+    """Track A: una FK financiera no pertenece a la compañía propietaria."""

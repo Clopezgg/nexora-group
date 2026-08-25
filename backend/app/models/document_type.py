@@ -11,6 +11,15 @@ DOCUMENT_TYPE_SEEDS = (
     ("JRN", "Asiento contable manual", "JRN"),
     ("COR", "Corrección contable", "COR"),
     ("ANU", "Anulación / reversal", "ANU"),
+    # Track A - Financial Core (orden maestra §25).
+    ("REM", "Remesa", "REM"),
+    ("GGE", "Gasto general", "GGE"),
+    ("TRF", "Transferencia de tesorería", "TRF"),
+    ("CCL", "Ajuste de cierre de caja", "CCL"),
+    ("SIN", "Factura de proveedor (accrual)", "SIN"),
+    ("PAY", "Pago a proveedor", "PAY"),
+    ("CIN", "Factura de cliente", "CIN"),
+    ("REC", "Cobro de cliente", "REC"),
 )
 
 

@@ -106,6 +106,7 @@ def post_manual(
     source_type: str | None = None,
     source_id: uuid.UUID | None = None,
     tax_lines: list[tuple[uuid.UUID, Decimal, Decimal]] | None = None,
+    commit: bool = True,
 ) -> AccountingDocument:
     """Crea y contabiliza (POSTED) un AccountingDocument balanceado. Lanza
     UnbalancedJournalEntryError / InvalidOperationScopeError /
@@ -166,7 +167,10 @@ def post_manual(
             )
         )
 
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(document)
     return document
 

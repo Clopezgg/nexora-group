@@ -46,3 +46,20 @@ def create_account(client, *, company_id: str, code: str, name: str, account_typ
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def create_treasury_account(
+    client, *, company_id: str, gl_account_id: str, name: str = "Banco Principal", kind: str = "BANK"
+) -> dict:
+    response = client.post(
+        "/api/treasury/accounts",
+        json={
+            "companyId": company_id,
+            "name": name,
+            "kind": kind,
+            "currencyCode": "HNL",
+            "glAccountId": gl_account_id,
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()

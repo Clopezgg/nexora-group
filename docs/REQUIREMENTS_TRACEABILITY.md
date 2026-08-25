@@ -15,8 +15,13 @@ placeholder.
 **Estados:** `NOT_STARTED` · `IN_PROGRESS` · `IMPLEMENTED` ·
 `VERIFIED` · `BLOCKED_EXTERNAL`.
 
-Última actualización: Track A (Financial Core) endurecido en
-`track/a-financial-core`, pendiente de integración coordinada.
+Última actualización: Track D (Enterprise Resources — Assets/Equipment/
+Maintenance/Workforce) construido en `track/d-enterprise-resources` sobre
+la integración completa de Track 1+F+B+C+A, pendiente de integración
+coordinada. Documents/Site/Quality (bloque CONSTRUCTION CONTROL,
+NXR-REQ-0077-0086) sigue `NOT_STARTED`/`IN_PROGRESS` sin cambios — Track D
+priorizó completar Assets y Equipment/Maintenance honestamente en vez de
+tocar las cuatro áreas superficialmente (ver task-5-report.md).
 
 ## CORE
 
@@ -129,15 +134,15 @@ placeholder.
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0068 | Fixed Assets | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0069 | Depreciation (straight-line) | ⬜⬜⬜⬜➖⬜⬜⬜➖ | NOT_STARTED | — |
-| NXR-REQ-0070 | Equipment | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0071 | Fuel log | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0072 | Maintenance (plan/order) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0073 | Employees | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0068 | Fixed Assets | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D: `FixedAsset` (scope/project/cost_center + cuentas de depreciación propias, `ck_fixed_assets_*`), `FixedAssetsPage`, permisos `asset.fixed_asset`, 7 tests (incluye constraint DB directo) |
+| NXR-REQ-0069 | Depreciation (straight-line) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D: `(cost-salvage)/useful_life_months`, posting DEP real vía `posting_service.post_manual` (nunca hardcodeado), INV-AST-001 doble garantía (service + `uq_depreciation_entries_asset_period`), RED/GREEN evidence real (ver task-5-report.md) |
+| NXR-REQ-0070 | Equipment | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D: `Equipment` (asset_id opcional), `EquipmentPage` tab "Equipos", permisos `equipment.equipment` |
+| NXR-REQ-0071 | Fuel log | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D: `FuelLog` (total_cost calculado server-side, nunca del cliente), scope GENERAL/PROJECT con `ck_fuel_logs_operation_scope` (INV real a nivel DB, test directo), `EquipmentPage` tab "Combustible" |
+| NXR-REQ-0072 | Maintenance (plan/order) | ✅·✅·✅·✅·🔶·✅·⬜·✅·⬜ | IMPLEMENTED | Track D: `MaintenancePlan`/`MaintenanceOrder`, INV-EQP-001 (CLOSED/CANCELLED inmutable, RED/GREEN evidence real), `EquipmentPage` tab "Mantenimiento" cubre creación/cierre de órdenes; falta UI de `MaintenancePlan` (API existe, sin pantalla dedicada) |
+| NXR-REQ-0073 | Employees | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IN_PROGRESS | Track D: `Worker` (nombre/rol/tarifa estándar) cubre lo mínimo que `TimeEntry` necesita — no es un módulo de RRHH completo (sin expediente, documentos, contratos); sin pantalla dedicada todavía |
 | NXR-REQ-0074 | Crews | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0075 | Time Entries | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0076 | Labor Cost (rate × hours) | ⬜⬜⬜⬜➖⬜⬜⬜➖ | NOT_STARTED | — |
+| NXR-REQ-0075 | Time Entries | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IN_PROGRESS | Track D: `TimeEntry` (SUBMITTED→APPROVED/REJECTED, decisión terminal), API `/api/workforce/time-entries`; sin pantalla dedicada todavía |
+| NXR-REQ-0076 | Labor Cost (rate × hours) | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IN_PROGRESS | Track D: INV-WFC-001, `labor_cost = hourly_rate * approved_hours` calculado SIEMPRE en el servidor al aprobar (RED/GREEN evidence real: rate 125.50 × 8h = 1004.00); posting hacia el GL queda deuda intencional documentada (docs/ENTERPRISE_RESOURCES.md), sin pantalla dedicada |
 
 ## CONSTRUCTION CONTROL
 
@@ -220,24 +225,29 @@ coordinador, sobre la base de Track F + Track 1 ya integrados:
 - **VERIFIED:** 0 / 124 (reservado para cuando el coordinador confirme
   comportamiento end-to-end en `feat/nexora-greenfield` — ningún track se
   autootorga `VERIFIED`)
-- **IMPLEMENTED:** 56 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
+- **IMPLEMENTED:** 61 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
   0010/0011/0012/0013/0014/0015/0026/0027 (13). Track A: NXR-REQ-0017 a
   0024, 0080 y 0111 (10). Track F: NXR-REQ-0097 a 0104 (8). Track B:
   NXR-REQ-0028/0029/0030/0031/0032/0036/0037/0038/0039 (9). Track C:
   NXR-REQ-0040/0041/0042/0043/0045/0046/0047/0048/0049/0050/0051/0052/
-  0053/0055/0056/0057 (16).
-- **IN_PROGRESS:** 23 / 124 (20 previos + 3 de Track C: 0044 Bid
-  Comparison, 0059/0060 Contracts/Subcontracts)
-- **NOT_STARTED:** 43 / 124 (incluye 0054 Returns y 0058 Supplier
+  0053/0055/0056/0057 (16). Track D: NXR-REQ-0068/0069/0070/0071/0072 —
+  Fixed Assets/Depreciation/Equipment/Fuel log/Maintenance (5).
+- **IN_PROGRESS:** 26 / 124 (20 previos + 3 de Track C: 0044 Bid
+  Comparison, 0059/0060 Contracts/Subcontracts + 3 de Track D: 0073/0075/
+  0076 — Employees/Time Entries/Labor Cost, backend+API+tests completos,
+  sin pantalla dedicada todavía)
+- **NOT_STARTED:** 35 / 124 (incluye 0054 Returns y 0058 Supplier
   Performance de Track C — deuda intencional documentada en
-  `docs/PROCUREMENT.md`/`docs/INVENTORY.md`)
+  `docs/PROCUREMENT.md`/`docs/INVENTORY.md`; incluye 0074 Crews y todo el
+  bloque CONSTRUCTION CONTROL — Documents/Site/Quality, 0077-0079/0081-
+  0086 — que Track D no tocó en este corte, ver task-5-report.md)
 - **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue
   real, no por incapacidad técnica)
 
-Suma verificada: 0+56+23+43+2 = 124.
+Suma verificada: 0+61+26+35+2 = 124.
 
 Este resumen se actualiza en cada integración de track. Ver progreso vivo
-en `docs/PROGRESS.md`. Recontado durante la integración de Track A sobre
-B+C (Task 4 de `2026-08-24-interrupted-tracks-recovery`); sigue sujeto a
-una pasada final de verificación end-to-end antes de certificar cualquier
-`VERIFIED`.
+en `docs/PROGRESS.md`. Recontado durante la construcción de Track D
+(Enterprise Resources) sobre Track 1+F+B+C+A ya integrados (Task 5 de
+`2026-08-24-interrupted-tracks-recovery`); sigue sujeto a una pasada final
+de verificación end-to-end antes de certificar cualquier `VERIFIED`.

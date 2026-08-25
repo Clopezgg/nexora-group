@@ -378,3 +378,102 @@ limpios, 30/30 vitest, build OK.
 Rama `track/a-financial-core` preparada e integration-ready, no fusionada
 a `feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
 coordinador (mismo patrón que Task 2).
+
+### 2026-08-24 — Track D (Enterprise Resources) construido sobre Track 1+F+B+C+A (Task 5)
+
+Worktree `/Users/clopezg/nexora-group-trackD`, branch `track/d-
+enterprise-resources`. Punto de partida: el merge de Track B (`5f60a18`),
+sin trabajo propio de Track D todavía commiteado, más dos drafts de
+modelo reales (`asset.py`/`equipment.py`) dejados sin commitear por una
+sesión interrumpida anterior — preservados primero en un commit dedicado,
+después extendidos (nunca reescritos sin razón).
+
+Merge `feat/nexora-greenfield` (HEAD `dd00a59`, Track 1+F+B+C+A ya
+integrados) → `track/d-enterprise-resources`, `--no-ff`. Sin conflictos
+(Track D no tenía trabajo propio todavía sobre el que colisionar).
+
+**Implementado — cuatro slices verticales, prioridad honesta (Assets y
+Equipment/Maintenance completos primero, per instrucción explícita del
+brief):**
+
+- **Assets (IMPLEMENTED)**: `FixedAsset` extiende el draft recuperado con
+  `scope`/`project_id`/`cost_center_id` (mismo patrón de atribución que
+  AP, Project nunca custodia dinero) y cuentas de depreciación propias
+  (`depreciation_expense_account_id`/`accumulated_depreciation_account_id`
+  — nunca hardcodeadas). `asset_service.generate_depreciation_entry`
+  calcula straight-line real `(cost-salvage)/useful_life_months` y postea
+  SIEMPRE vía `posting_service.post_manual` (documento `DEP`, nunca
+  `JournalLine` a mano). INV-AST-001 (mismo asset+periodo nunca genera dos
+  postings) con doble garantía: rechazo de dominio (`NXR-ASSET-002`) +
+  `uq_depreciation_entries_asset_period` real en PostgreSQL. Activo
+  `DISPOSED`/`RETIRED` es terminal (`NXR-ASSET-001`). 8 endpoints bajo
+  `/api/assets`, permisos `asset.fixed_asset`/`asset.depreciation`,
+  `FixedAssetsPage` (crear activo, generar depreciación por periodo, dar
+  de baja), 7 tests backend + 2 tests frontend.
+- **Equipment/Maintenance (IMPLEMENTED)**: `Equipment`/`FuelLog`/
+  `MaintenancePlan`/`MaintenanceOrder` extendidos con CHECK constraints
+  reales (montos positivos, status válido). `FuelLog.total_cost` se
+  calcula SIEMPRE server-side (nunca del cliente); scope GENERAL/PROJECT
+  con `ck_fuel_logs_operation_scope` (constraint real, ya existía en el
+  draft recuperado, ahora con test directo de DB). Renombrado
+  `MAINTENANCE_ORDER_STATUSES` `COMPLETED`→`CLOSED` para que el nombre
+  coincida con el comportamiento: INV-EQP-001, un `MaintenanceOrder`
+  `CLOSED`/`CANCELLED` es terminal — `update_maintenance_order` rechaza
+  CUALQUIER mutación antes de tocar un campo (`NXR-EQUIPMENT-001`).
+  Crear una orden mueve el equipo a `UNDER_MAINTENANCE`; cerrarla lo
+  regresa a `AVAILABLE`. 13 endpoints bajo `/api/equipment`, permisos
+  `equipment.*`, `EquipmentPage` con tabs Equipos/Combustible/
+  Mantenimiento, 6 tests backend + 2 tests frontend.
+- **Workforce/Time (IN_PROGRESS — backend completo, frontend
+  NOT_STARTED)**: `Worker`/`TimeEntry` nuevos. INV-WFC-001: `labor_cost =
+  hourly_rate * approved_hours` calculado SIEMPRE en el servidor al
+  aprobar (nunca aceptado del cliente) — verificado con el caso exacto
+  del brief (125.50 × 8 = 1004.00). `TimeEntry` solo se aprueba/rechaza
+  una vez (decisión terminal, `NXR-WORKFORCE-001` si se reintenta). 6
+  endpoints bajo `/api/workforce`, permisos `workforce.*`, 4 tests
+  backend. Sin pantalla dedicada — decisión explícita de priorizar
+  Assets/Equipment completos sobre las cuatro áreas superficialmente.
+  Posting del costo de mano de obra hacia el GL queda deuda intencional
+  documentada (`docs/ENTERPRISE_RESOURCES.md`), mismo patrón que
+  Fuel/Maintenance.
+- **Documents/Site/Quality (NOT_STARTED)**: no se tocó en este corte. Ver
+  `docs/ENTERPRISE_RESOURCES.md` y la fila NXR-REQ-0077-0086 en
+  `docs/REQUIREMENTS_TRACEABILITY.md`.
+
+**RBAC**: `Equipment Manager` y `Operations User` (roles ya pre-sembrados
+en `ROLE_NAMES` anticipando este track, sin permisos otorgados todavía)
+recibieron su matriz de permisos en vez de inventar roles nuevos —
+`Equipment Manager` custodia física (asset/equipment/maintenance, sin
+`asset.depreciation`), `Operations User` combustible/mantenimiento/horas
+de campo sin permisos de aprobación. `asset.depreciation` es exclusivo de
+Finance Manager/Accountant/Administrator/Auditor (contabilización ≠
+custodia física). `workforce.time_entry approve` otorgado a Project
+Manager/Project Controller (el costo de mano de obra impacta el
+presupuesto del proyecto).
+
+**TDD real (RED/GREEN) para los cuatro comportamientos nombrados en el
+brief** — guard deshabilitado temporalmente, test corrido (RED
+confirmado con el error real), guard restaurado, test corrido de nuevo
+(GREEN), para cada uno de: doble-posting de depreciación (sin el guard de
+servicio, el `UniqueViolation` de PostgreSQL sale como 500 sin manejar en
+vez de 409 `NXR-ASSET-002`), fuel log PROJECT sin project_id (sin el
+guard, el `CheckViolation` de PostgreSQL sale como 500 sin manejar en vez
+de 422 `NXR-ACCOUNTING-002`), orden de mantenimiento CLOSED inmutable (sin
+el guard, `partsCost`/`description` se sobrescriben silenciosamente), y
+labor cost = rate × hours (con el cálculo hardcodeado a `1.00`, el test
+detecta la fuga inmediatamente). Evidencia completa (comandos + output
+real) en `task-5-report.md`.
+
+**Migración**: `7423072b11d4` (down_revision `a91c7d4e2f36`, el head real
+de Track A tras el merge — no un head viejo de Track B), único head.
+`alembic upgrade head` limpio en base descartable (`nexora_trackd_migrate`
+y `nexora_trackd_gatecheck`, ambas creadas y eliminadas durante la
+verificación), `alembic check` sin operaciones pendientes.
+
+**Verificación real**: backend 136/136 pytest (120 previos + 16 nuevos),
+`compileall` limpio. Frontend: typecheck/lint limpios, 34/34 vitest (30
+previos + 4 nuevos), `build` OK (832 módulos, PWA precache 7 entradas).
+
+Rama `track/d-enterprise-resources` preparada e integration-ready, no
+fusionada a `feat/nexora-greenfield` todavía — pendiente de revisión/merge
+por el coordinador (mismo patrón que Tracks A/B/C).

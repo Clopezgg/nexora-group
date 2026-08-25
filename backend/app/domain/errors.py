@@ -137,3 +137,32 @@ class InvalidSubmittalStateError(Exception):
     """Transición de estado inválida sobre un Submittal (p.ej. aprobar/
     rechazar sin una respuesta de revisor previamente registrada, o decidir
     sobre un Submittal que ya tiene una decisión final)."""
+
+
+# Track D -- Construction Control: Daily Site Reports / Quality / Safety
+# (orden maestra §81-84).
+class InvalidSiteReportStateError(Exception):
+    """Transición de estado inválida de DailySiteReport (p.ej. aprobar uno
+    que no está SUBMITTED, o enviar uno que ya fue aprobado)."""
+
+
+class InvalidQualityStateError(Exception):
+    """Transición de estado inválida de NonConformance/CorrectiveAction
+    (p.ej. completar una CorrectiveAction ya COMPLETED, o volver a cerrar
+    una NonConformance ya CLOSED)."""
+
+
+class NonConformanceRequiresCorrectiveActionError(Exception):
+    """INV-QUALITY-001: una NonConformance no puede cerrarse sin al menos
+    una CorrectiveAction registrada."""
+
+
+class InvalidSafetyRecordError(Exception):
+    """INV-SAFETY-001: un SafetyObservation/SafetyIncident de severidad
+    HIGH/CRITICAL requiere responsible_user_id -- la severidad determina qué
+    campos son obligatorios, nunca al revés."""
+
+
+class InvalidSafetyStateError(Exception):
+    """Transición de estado inválida de SafetyObservation/SafetyIncident
+    (p.ej. volver a cerrar un registro ya CLOSED)."""

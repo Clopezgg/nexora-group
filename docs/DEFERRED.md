@@ -75,18 +75,20 @@ certificar el 100%.
   `docs/PROGRESS.md`). Pendiente de revisión/merge del coordinador a
   `feat/nexora-greenfield` — no se marca `VERIFIED` en
   `docs/REQUIREMENTS_TRACEABILITY.md` hasta que eso ocurra.
-- `DEFERRED-FINAL-009` — **PARCIALMENTE RESUELTO.** Documents/Evidence
-  (`NXR-REQ-0077/0078/0079`) se implementó en Track D task-1
-  (`track/d-enterprise-resources`, ya fusionado a
-  `feat/nexora-greenfield`) — ver `docs/DOCUMENTS_EVIDENCE.md`. RFI/
-  Submittals (`NXR-REQ-0085/0086`) se implementó en el mismo plan,
-  task-4 (`track/d-rfi-submittals`, pendiente de revisión/merge del
-  coordinador — no se marca `VERIFIED` hasta que eso ocurra): dominio +
-  DB + service + API + RBAC + `RfiPage`/`SubmittalsPage` reales, ver
-  `docs/PROGRESS.md` y `docs/REQUIREMENTS_TRACEABILITY.md`. Sigue
-  `NOT_STARTED` únicamente Daily Site Reports/Quality/Safety
-  (`NXR-REQ-0081-0084`), tarea separada del mismo plan (task-3, worktree
-  paralelo -- ver su propio report para el estado real).
+- `DEFERRED-FINAL-009` — **RESUELTO (2026-08-25, plan
+  `2026-08-25-track-d-construction-control`, Tasks 1/3/4, todas
+  fusionadas a `feat/nexora-greenfield`).** Cuando se escribió este item
+  el bloque CONSTRUCTION CONTROL completo estaba NOT_STARTED. Ahora:
+  Documents/Evidence (`NXR-REQ-0077/0078/0079`, Task 1, ver
+  `docs/DOCUMENTS_EVIDENCE.md`), RFI/Submittals (`NXR-REQ-0085/0086`,
+  Task 4, dominio+DB+service+API+RBAC+`RfiPage`/`SubmittalsPage` reales),
+  y Daily Site Reports/Quality/Safety (`NXR-REQ-0081/0082/0083/0084`,
+  Task 3, con constraint real de PostgreSQL para PROJECT-scoped
+  obligatorio y para severidad→responsable, UI real
+  `DailyReportsPage`/`QualityPage`/`SafetyPage`) están todos
+  implementados y fusionados. Ver `docs/PROGRESS.md` y
+  `docs/REQUIREMENTS_TRACEABILITY.md` para el detalle; ninguno se marca
+  `VERIFIED` todavía.
 - `DEFERRED-FINAL-010` — Track D: `FixedAssetsPage` y el formulario de
   bitácora de combustible de `EquipmentPage` fijan `scope: 'GENERAL'` en el
   cliente; el backend soporta completamente activos/bitácoras de
@@ -122,6 +124,37 @@ certificar el 100%.
   Notifications) — no bloquea Documents/Evidence ni los tracks que los
   consuman mientras tanto (Daily Site Reports/Quality/Safety, RFI/
   Submittals).
+- `DEFERRED-FINAL-015` — Track D (Task 3, Site/Quality/Safety): no existe
+  todavía ningún directorio/selector de usuarios en el frontend (ningún
+  track anterior lo construyó — Track A tampoco lo necesitó para
+  `approved_by`/`uploaded_by`, que siempre usan el usuario autenticado
+  actual). `NonConformance`/`CorrectiveAction`/`SafetyObservation`/
+  `SafetyIncident` requieren `responsible_user_id`; `QualityPage.tsx`/
+  `SafetyPage.tsx` lo resuelven con un campo de texto UUID pre-rellenado
+  con el usuario autenticado (editable para asignar a otro usuario si se
+  conoce su UUID de memoria) en vez de un selector real con nombres.
+  **Corrección (2026-08-25, review de Task 3): `responsible_user_id` NO
+  está realmente validado por el backend.** `quality_service.py`/
+  `safety_service.py` no tienen ningún chequeo de existencia ni de
+  pertenencia a la compañía sobre ese campo — solo existe la FK cruda de
+  PostgreSQL. Un UUID que no corresponde a ningún `User` no produce un
+  error de validación limpio: como no hay un handler genérico de
+  violación de FK en `app/api/error_handlers.py`, la inserción falla con
+  un `IntegrityError` sin capturar, que sale como un 500 no controlado, no
+  como un 422 con código `NXR-*`. Y un UUID que sí existe pero pertenece a
+  un usuario de **otra compañía** se acepta sin ningún rechazo — no hay
+  equivalente a `assert_evidence_belongs_to_company` para
+  `responsible_user_id`, así que hoy es posible asignar la responsabilidad
+  de una no conformidad/incidente a un usuario de otra compañía sin que el
+  sistema lo impida. Este gap es el mismo patrón preexistente que ya tiene
+  `treasury_service.create_cash_closing` en otro track — no es nuevo de
+  esta tarea, pero tampoco estaba documentado hasta ahora. Se resuelve
+  agregando (a) un chequeo de existencia + pertenencia a compañía sobre
+  `responsible_user_id` en `quality_service`/`safety_service` (mismo
+  criterio que `assert_evidence_belongs_to_company`), (b) un handler de
+  `IntegrityError` de FK genérico o específico en `error_handlers.py`, y
+  (c) un endpoint de listado de usuarios por compañía (no existe hoy) para
+  reemplazar el campo de texto por un `Select`/`Combobox` real.
 
 ## Bloqueos externos
 

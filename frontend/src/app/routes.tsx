@@ -25,6 +25,9 @@ import { WorkersPage } from '../features/workforce/WorkersPage'
 import { TimeEntriesPage } from '../features/workforce/TimeEntriesPage'
 import { DocumentsPage } from '../features/documents/DocumentsPage'
 import { RfiSubmittalsPage } from '../features/rfi/RfiSubmittalsPage'
+import { DailyReportsPage } from '../features/site/DailyReportsPage'
+import { QualityPage } from '../features/quality/QualityPage'
+import { SafetyPage } from '../features/safety/SafetyPage'
 import { CustomersPage } from '../features/commercial/CustomersPage'
 import { LeadsPage } from '../features/commercial/LeadsPage'
 import { OpportunitiesPage } from '../features/commercial/OpportunitiesPage'
@@ -32,22 +35,22 @@ import { QuotationsPage } from '../features/commercial/QuotationsPage'
 import { SalesContractsPage } from '../features/commercial/SalesContractsPage'
 import { navItems } from './navigation'
 
-// Track A (Financial Core), Track B (Project Control), Track C (Supply
-// Chain), Track D (Enterprise Resources -- Assets/Equipment/Maintenance/
-// Workforce/Time; Documents/Evidence y RFI/Submittals también
-// implementados, ver docs/DOCUMENTS_EVIDENCE.md y
-// docs/REQUIREMENTS_TRACEABILITY.md NXR-REQ-0085/0086; Daily Site
-// Reports/Quality/Safety quedan NOT_STARTED en el frontend, ver
-// DEFERRED-FINAL-009 -- tarea separada del mismo plan) y
-// Track E (Commercial -- Lead/Opportunity/Customer/Quotation/
-// SalesContract; Facturación y Cobros del menú Comercial se resuelven
-// desde las páginas de AR ya existentes en Finanzas -- Track E nunca
-// duplica esa UI, ver docs/ACCOUNTING.md) implementan estas rutas; el
-// resto de navItems sigue como PlaceholderPage hasta que su track dueño
-// aterrice. Workers/TimeEntry viven en las rutas ya reservadas para ellos
-// en navigation.ts (`/recursos/personal`, `/recursos/tiempo`) -- no existe
-// un ítem de navegación `/recursos/mano-de-obra`, así que no se inventa uno
-// nuevo (DEFERRED-FINAL-008).
+// Workforce/Time; Documents/Evidence, RFI/Submittals, and Daily Site
+// Reports/Quality/Safety are all implemented too -- ver
+// docs/DOCUMENTS_EVIDENCE.md, docs/PROGRESS.md, and
+// docs/REQUIREMENTS_TRACEABILITY.md NXR-REQ-0077-0086) and Track E
+// (Commercial -- Lead/Opportunity/Customer/Quotation/SalesContract;
+// Facturación y Cobros del menú Comercial se resuelven desde las páginas de
+// AR ya existentes en Finanzas -- Track E nunca duplica esa UI, ver
+// docs/ACCOUNTING.md) implementan estas rutas; el resto de navItems sigue
+// como PlaceholderPage hasta que su track dueño aterrice. Workers/TimeEntry
+// viven en las rutas ya reservadas para ellos en navigation.ts
+// (`/recursos/personal`, `/recursos/tiempo`) -- no existe un ítem de
+// navegación `/recursos/mano-de-obra`, así que no se inventa uno nuevo
+// (DEFERRED-FINAL-008). `/proyectos/seguridad` es un ítem de navegación
+// nuevo agregado por Task 3 (Safety, NXR-REQ-0084) -- no existía una
+// entrada reservada para Seguridad en navigation.ts, mismo criterio que
+// RFI/Submittals usó para `/proyectos/rfi-submittals`.
 const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/finanzas/tesoreria': <TreasuryPage />,
   '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
@@ -71,6 +74,9 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/recursos/combustible': <EquipmentPage />,
   '/recursos/mantenimiento': <EquipmentPage />,
   '/control/documentos': <DocumentsPage />,
+  '/proyectos/diario-de-obra': <DailyReportsPage />,
+  '/proyectos/calidad': <QualityPage />,
+  '/proyectos/seguridad': <SafetyPage />,
   '/comercial/leads': <LeadsPage />,
   '/comercial/oportunidades': <OpportunitiesPage />,
   '/comercial/clientes': <CustomersPage />,

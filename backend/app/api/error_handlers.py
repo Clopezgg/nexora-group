@@ -21,10 +21,15 @@ from app.domain.errors import (
     InvalidInvoiceStateError,
     InvalidOperationScopeError,
     InvalidProcurementStateError,
+    InvalidQualityStateError,
     InvalidRfiStateError,
+    InvalidSafetyRecordError,
+    InvalidSafetyStateError,
+    InvalidSiteReportStateError,
     InvalidSubmittalStateError,
     InvalidTimeEntryStateError,
     InvalidTransferError,
+    NonConformanceRequiresCorrectiveActionError,
     NotAuthorizedError,
     OverpaymentError,
     ProcurementCurrencyMismatchError,
@@ -69,6 +74,11 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     InvalidDocumentStateError: ("NXR-DOCUMENT-001", 409),
     InvalidRfiStateError: ("NXR-RFI-001", 409),
     InvalidSubmittalStateError: ("NXR-SUBMITTAL-001", 409),
+    InvalidSiteReportStateError: ("NXR-SITE-001", 409),
+    InvalidQualityStateError: ("NXR-QUALITY-001", 409),
+    NonConformanceRequiresCorrectiveActionError: ("NXR-QUALITY-002", 409),
+    InvalidSafetyRecordError: ("NXR-SAFETY-001", 422),
+    InvalidSafetyStateError: ("NXR-SAFETY-002", 409),
 }
 
 

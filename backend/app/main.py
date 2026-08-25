@@ -21,7 +21,10 @@ from app.api.routes import (
     master_data,
     procurement,
     projects,
+    quality,
     rfi,
+    safety,
+    site_reports,
     submittals,
     suppliers,
     treasury,
@@ -87,6 +90,10 @@ def create_app() -> FastAPI:
     app.include_router(evidence.router, prefix="/api")
     app.include_router(rfi.router, prefix="/api")
     app.include_router(submittals.router, prefix="/api")
+    # Track D - Construction Control (Daily Site Reports/Quality/Safety).
+    app.include_router(site_reports.router, prefix="/api")
+    app.include_router(quality.router, prefix="/api")
+    app.include_router(safety.router, prefix="/api")
 
     return app
 

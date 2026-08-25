@@ -44,9 +44,12 @@ from app.models.procurement import (
 from app.models.planning import Milestone, Task
 from app.models.progress import ProgressRecord
 from app.models.project import Project
+from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
 from app.models.rfi import RequestForInformation
 from app.models.role import Role
+from app.models.safety import SafetyIncident, SafetyObservation
 from app.models.session import Session
+from app.models.site_report import DailySiteReport, DailySiteReportPhoto
 from app.models.submittal import Submittal
 from app.models.supplier import Supplier, SupplierContract
 from app.models.tax import TaxCode
@@ -82,11 +85,14 @@ __all__ = [
     "ChangeOrder",
     "ChartOfAccount",
     "Company",
+    "CorrectiveAction",
     "CostCenter",
     "Currency",
     "Customer",
     "CustomerInvoice",
     "CustomerReceipt",
+    "DailySiteReport",
+    "DailySiteReportPhoto",
     "DepreciationEntry",
     "Document",
     "DocumentType",
@@ -110,6 +116,7 @@ __all__ = [
     "MaintenanceOrder",
     "MaintenancePlan",
     "Milestone",
+    "NonConformance",
     "NumberSequence",
     "Opportunity",
     "Permission",
@@ -122,6 +129,7 @@ __all__ = [
     "PurchaseOrderLine",
     "PurchaseRequisition",
     "PurchaseRequisitionLine",
+    "QualityInspection",
     "Quotation",
     "ReconciliationMatch",
     "Remittance",
@@ -129,6 +137,8 @@ __all__ = [
     "RequestForQuotation",
     "RfqSupplier",
     "Role",
+    "SafetyIncident",
+    "SafetyObservation",
     "SalesContract",
     "RolePermission",
     "ServiceEntry",

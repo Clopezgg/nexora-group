@@ -2033,3 +2033,41 @@ service-layer addition).
 Traceability: `NXR-REQ-0025` moved `IN_PROGRESS` → `IMPLEMENTED`. Tally
 now 98 `IMPLEMENTED` (+1), 19 `IN_PROGRESS` (-1), 5 `NOT_STARTED`, 2
 `BLOCKED_EXTERNAL`, 0 `VERIFIED`.
+
+## 2026-08-25 — Real Tax architecture (closes NXR-REQ-0006)
+
+Per the master order: determine exactly what's missing (calculation,
+integration, posting, invoice use, reporting, API, tests) and either
+complete it if genuinely required, or resolve the exclusion formally and
+justifiably — don't leave it ignored. `TaxCode`/`TaxLine` already existed
+as a data model and `posting_service.post_manual` already accepted an
+optional `tax_lines` param, but nothing could ever create a `TaxCode`
+(no service, no API) and nothing ever called `post_manual` with
+`tax_lines`. This was pure unused scaffolding, not a partial capability —
+exactly what CLAUDE.md §9 says never counts toward a requirement.
+
+Added `tax_repository`/`tax_service` (`create_tax_code` with a real
+duplicate-code guard — `TaxCodeExistsError` → `NXR-TAX-001`/409;
+`list_tax_codes`; `compute_tax` as a pure function, `base_amount *
+rate_percent / 100` HALF_UP to 2 decimals — the "servicio de cálculo"
+the row said was missing) and `GET`/`POST /api/master-data/tax-codes`,
+alongside the existing Chart of Accounts routes in the same file. New
+`tax.tax_code` permission (Finance Manager create/read, Auditor
+read-only).
+
+Explicit scope boundary, not silently dropped: AP/AR/Procurement still
+accept a manually-entered `tax_amount` rather than computing it from a
+selected `TaxCode` — wiring that in touches those domains' already-
+shipped, tested invoice flows, a separate and larger change with its own
+regression risk. Any domain that wants computed tax now has a real,
+tested function to call when it chooses to adopt it. No frontend screen
+either — same precedent RFQ/Quotations had before Bid Comparison gave
+them one: no reserved nav slot, no consuming UI flow yet.
+
+Verification: `cd backend && ./.venv/bin/pytest -q` → 272/272 (+5 tests);
+`compileall` clean; `alembic check` → no drift (no schema change,
+`TaxCode` table already existed).
+
+Traceability: `NXR-REQ-0006` moved `IN_PROGRESS` → `IMPLEMENTED`. Tally
+now 99 `IMPLEMENTED` (+1), 18 `IN_PROGRESS` (-1), 5 `NOT_STARTED`, 2
+`BLOCKED_EXTERNAL`, 0 `VERIFIED`.

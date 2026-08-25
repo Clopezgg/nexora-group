@@ -11,8 +11,8 @@ Actual: `0db6ecf`/`17bb521`; Inventory Returns: `dc91a68`/`06213ed`;
 Crews: `b8ee232`/`7c7cda3`; Supplier Contracts + company-isolation fix:
 `a1cdb47`/`53908a3`; RFQ/Quotation company-isolation fixes + Bid
 Comparison: `66364b2`/`a3c1c65`/`2a9e6d2`; systematic route audit:
-`83ca9f0`/`2aa138f`; Corrections/reversal-sync for AP/AR: `6cfca55`,
-docs commit follows this file)
+`83ca9f0`/`2aa138f`; Corrections/reversal-sync for AP/AR: `6cfca55`;
+Tax architecture: `66cebf1`, docs commit follows this file)
 
 **This session is now operating under the user's "CANDADO FINAL" order**:
 no partial/rounded completion claims, `main` stays locked until every
@@ -136,10 +136,10 @@ session, real PostgreSQL, real commands — not inferred):
   `approval_service.register_decision_adapter`) fixes it for AP/AR;
   payment/receipt reversal explicitly deferred as `DEFERRED-FINAL-018`
   (not silently dropped). 267/267 backend tests.
-- Traceability tally after all of the above: 0 `VERIFIED`, 98
-  `IMPLEMENTED`, 19 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
+- Traceability tally after all of the above: 0 `VERIFIED`, 99
+  `IMPLEMENTED`, 18 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
   across 124 rows. **This is still far from 100\% by the CANDADO FINAL
-  definition** — 24 rows are not yet `IMPLEMENTED`, and zero rows are
+  definition** — 23 rows are not yet `IMPLEMENTED`, and zero rows are
   `VERIFIED` (VERIFIED requires E2E/independent verification per row,
   which hasn't started). Do not round this up.
 
@@ -190,7 +190,13 @@ another audit pass. Also `NXR-REQ-0025` Corrections (commit `6cfca55`):
 `posting_service.register_reversal_hook` now syncs
 `SupplierInvoice`/`CustomerInvoice` status when their accrual is
 reversed — see `DEFERRED-FINAL-018` for the explicitly-scoped-out
-payment/receipt-reversal follow-up.
+payment/receipt-reversal follow-up. Also `NXR-REQ-0006` Tax architecture
+(commit `66cebf1`): `TaxCode`/`TaxLine` were pure unused scaffolding
+(model only, no service, no API, nothing ever created one or called
+`post_manual` with `tax_lines`) — now `tax_service.create_tax_code`/
+`compute_tax` and `GET/POST /api/master-data/tax-codes` are real. AP/AR/
+Procurement still take a manual `tax_amount` rather than a computed one —
+deliberate, documented scope boundary, not wiring further this round.
 
 **Working pattern that paid off repeatedly this session — keep using
 it**: pick a row whose description names a *specific, narrow* gap (not
@@ -210,20 +216,18 @@ Remaining domain-logic `IN_PROGRESS` rows worth this same treatment
 `IN_PROGRESS` rows like `NXR-REQ-0105-0121`, which need actual Azure work,
 not code review):
 
-1. `NXR-REQ-0006` Tax architecture — `TaxCode`/`TaxLine` exist and feed
-   `posting_service.post_manual`, but there's no tax calculation service
-   or API. Verify whether any domain actually needs computed tax before
-   building — this could be legitimately out of scope rather than a gap.
-2. `NXR-REQ-0008`/`NXR-REQ-0009` Authentication/Sessions — row says
+1. `NXR-REQ-0008`/`NXR-REQ-0009` Authentication/Sessions — row says
    "sigue faltando CSRF/rate-limit/lockout"; this overlaps with
    `NXR-REQ-0107` Security, which is more clearly a 90%+ hardening-phase
-   item. Lower priority than 1 above.
-3. `NXR-REQ-0001` Core platform — very broad ("🔶" across most columns),
+   item covered by `docs/PRODUCTION_READINESS.md` §13 (Security). Could
+   still pick off the narrow, code-level pieces now (CSRF decision,
+   rate-limit/lockout on login) separately from the full hardening pass.
+2. `NXR-REQ-0001` Core platform — very broad ("🔶" across most columns),
    likely not a single reconcilable gap; read what it actually still
    expects before touching it.
 
 That's close to exhausting the well-scoped `IN_PROGRESS` domain-logic
-rows (down to ~19, mostly infra/hardening/deployment).
+rows (down to ~18, mostly infra/hardening/deployment).
 
 **The systematic company-isolation route audit is DONE** (commit
 `83ca9f0`, see above) — every file in `backend/app/api/routes/*.py` was

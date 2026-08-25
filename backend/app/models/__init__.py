@@ -15,6 +15,7 @@ from app.models.change_order import ChangeOrder
 from app.models.chart_of_accounts import Account, ChartOfAccount
 from app.models.company import Company
 from app.models.cost_center import CostCenter, EconomicCategory
+from app.models.crm import Customer, Lead, Opportunity, Quotation, SalesContract
 from app.models.currency import Currency, ExchangeRate
 from app.models.document_type import DocumentType
 from app.models.equipment import Equipment, FuelLog, MaintenanceOrder, MaintenancePlan
@@ -79,6 +80,7 @@ __all__ = [
     "Company",
     "CostCenter",
     "Currency",
+    "Customer",
     "CustomerInvoice",
     "CustomerReceipt",
     "DepreciationEntry",
@@ -97,10 +99,12 @@ __all__ = [
     "IdempotencyRecord",
     "Item",
     "JournalLine",
+    "Lead",
     "MaintenanceOrder",
     "MaintenancePlan",
     "Milestone",
     "NumberSequence",
+    "Opportunity",
     "Permission",
     "PhysicalCount",
     "PhysicalCountLine",
@@ -111,11 +115,13 @@ __all__ = [
     "PurchaseOrderLine",
     "PurchaseRequisition",
     "PurchaseRequisitionLine",
+    "Quotation",
     "ReconciliationMatch",
     "Remittance",
     "RequestForQuotation",
     "RfqSupplier",
     "Role",
+    "SalesContract",
     "RolePermission",
     "ServiceEntry",
     "Session",

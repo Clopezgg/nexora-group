@@ -21,13 +21,22 @@ import { ProjectsPage } from '../features/projects/ProjectsPage'
 import { WBSPage } from '../features/projects/WBSPage'
 import { FixedAssetsPage } from '../features/assets/FixedAssetsPage'
 import { EquipmentPage } from '../features/equipment/EquipmentPage'
+import { CustomersPage } from '../features/commercial/CustomersPage'
+import { LeadsPage } from '../features/commercial/LeadsPage'
+import { OpportunitiesPage } from '../features/commercial/OpportunitiesPage'
+import { QuotationsPage } from '../features/commercial/QuotationsPage'
+import { SalesContractsPage } from '../features/commercial/SalesContractsPage'
 import { navItems } from './navigation'
 
 // Track A (Financial Core), Track B (Project Control), Track C (Supply
-// Chain) y Track D (Enterprise Resources -- Assets/Equipment/Maintenance;
+// Chain), Track D (Enterprise Resources -- Assets/Equipment/Maintenance;
 // Workforce/Time y Documents/Site/Quality quedan NOT_STARTED en el
-// frontend, ver docs/PROGRESS.md) implementan estas rutas; el resto de
-// navItems sigue como PlaceholderPage hasta que su track dueño aterrice.
+// frontend) y Track E (Commercial -- Lead/Opportunity/Customer/Quotation/
+// SalesContract; Facturación y Cobros del menú Comercial se resuelven
+// desde las páginas de AR ya existentes en Finanzas -- Track E nunca
+// duplica esa UI, ver docs/ACCOUNTING.md) implementan estas rutas; el
+// resto de navItems sigue como PlaceholderPage hasta que su track dueño
+// aterrice.
 const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/finanzas/tesoreria': <TreasuryPage />,
   '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
@@ -47,6 +56,11 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/recursos/equipos': <EquipmentPage />,
   '/recursos/combustible': <EquipmentPage />,
   '/recursos/mantenimiento': <EquipmentPage />,
+  '/comercial/leads': <LeadsPage />,
+  '/comercial/oportunidades': <OpportunitiesPage />,
+  '/comercial/clientes': <CustomersPage />,
+  '/comercial/cotizaciones': <QuotationsPage />,
+  '/comercial/contratos': <SalesContractsPage />,
 }
 
 const placeholderRoutes: RouteObject[] = navItems

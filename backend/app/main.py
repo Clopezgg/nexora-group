@@ -11,6 +11,7 @@ from app.api.routes import (
     assets,
     auth,
     context,
+    crm,
     dashboard,
     equipment,
     health,
@@ -75,6 +76,8 @@ def create_app() -> FastAPI:
     app.include_router(assets.router, prefix="/api")
     app.include_router(equipment.router, prefix="/api")
     app.include_router(workforce.router, prefix="/api")
+    # Track E - Commercial (CRM).
+    app.include_router(crm.router, prefix="/api")
 
     return app
 

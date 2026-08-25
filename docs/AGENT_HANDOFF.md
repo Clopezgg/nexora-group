@@ -8,7 +8,8 @@ Latest integrated SHA: see `git log -1` on `feat/nexora-greenfield`
 Approval Inbox slice: `8500050`/`3b804c8`/`49b7409`; GL audit
 instrumentation: `adff21c`/`97e2d33`; real AP accrued/paid in Budget vs
 Actual: `0db6ecf`/`17bb521`; Inventory Returns: `dc91a68`/`06213ed`;
-Crews: `b8ee232`/`7c7cda3`, docs commit follows this file)
+Crews: `b8ee232`/`7c7cda3`; Supplier Contracts + company-isolation fix:
+`a1cdb47`/`53908a3`, docs commit follows this file)
 
 **This session is now operating under the user's "CANDADO FINAL" order**:
 no partial/rounded completion claims, `main` stays locked until every
@@ -86,10 +87,20 @@ session, real PostgreSQL, real commands — not inferred):
   409 — do NOT let membership errors fall through as a bare 500).
   `CrewsPage.tsx` at `/recursos/cuadrillas` (was a reserved-but-unwired
   nav entry). 247/247 backend, 83/83 frontend tests.
-- Traceability tally after all of the above: 0 `VERIFIED`, 94
-  `IMPLEMENTED`, 23 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
+- Supplier Contracts + a real bug fix (commits `a1cdb47`/`53908a3`,
+  closes `NXR-REQ-0059`/`NXR-REQ-0060`): switched strategy here — from
+  working the `NOT_STARTED` list to reconciling `IN_PROGRESS` rows against
+  the real code, since that technique had already found two real defects
+  this session. Writing the tests `NXR-REQ-0059`'s row said were missing
+  exposed a genuine `INV-COMP-001` gap: contract creation never validated
+  `supplier_id`/`project_id` against the company. Fixed with the same
+  guards AP/Budget/Treasury already use. `SupplierContractsPage.tsx` at
+  `/abastecimiento/contratos` (reserved-but-unwired nav entry). 251/251
+  backend, 86/86 frontend tests.
+- Traceability tally after all of the above: 0 `VERIFIED`, 96
+  `IMPLEMENTED`, 21 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
   across 124 rows. **This is still far from 100\% by the CANDADO FINAL
-  definition** — 28 rows are not yet `IMPLEMENTED`, and zero rows are
+  definition** — 26 rows are not yet `IMPLEMENTED`, and zero rows are
   `VERIFIED` (VERIFIED requires E2E/independent verification per row,
   which hasn't started). Do not round this up.
 
@@ -123,42 +134,50 @@ RESOLVED this session — do not re-do any of these: `DEFERRED-FINAL-016`
 accrued/paid in Budget vs Actual (`NXR-REQ-0034`/`0035`), the
 `NXR-REQ-0016` traceability reconciliation, `NXR-REQ-0054` Returns
 (`inventory_service.return_to_supplier`, commit `dc91a68`), `NXR-REQ-0074`
-Crews (`Crew`/`CrewMember`, commits `b8ee232`/`7c7cda3`).
+Crews (`Crew`/`CrewMember`, commits `b8ee232`/`7c7cda3`),
+`NXR-REQ-0059`/`0060` Supplier Contracts/Subcontracts + the
+`SupplierContract` company-isolation fix (commits `a1cdb47`/`53908a3`).
 
-The 5 rows genuinely `NOT_STARTED` as of this checkpoint (verify with
-`grep -oE '\| NOT_STARTED \|' docs/REQUIREMENTS_TRACEABILITY.md` combined
-with the row names before trusting this list — it will drift):
+**Working pattern that paid off repeatedly this session**: pick a row
+whose description names a *specific, narrow* gap (not "needs full
+hardening"), write the tests that gap implies, and see what breaks before
+assuming the description is accurate. This found three real defects
+hiding behind rows that looked like simple scope gaps: hardcoded
+`Decimal("0")` financial figures (`NXR-REQ-0034/0035`), a stale
+traceability ownership note (`NXR-REQ-0016`), and a missing
+`INV-COMP-001` cross-company guard (`NXR-REQ-0059`). Keep using it.
 
-1. `NXR-REQ-0058` Supplier Performance — deliberately deferred (not
-   enough real PO/GR volume to compute honest metrics without fabricating
-   them); re-evaluate only if that premise has changed. This is genuinely
-   the last row on the list with no clear resolution path — everything
-   else NOT_STARTED is now infra/hardening-phase.
-2. `NXR-REQ-0109` Backup/Restore, `NXR-REQ-0112` E2E (Playwright),
-   `NXR-REQ-0113` Critical User Journey — these are 90–100%
-   feature-freeze-phase items per `CLAUDE.md` §10's own "Build Width
-   First" philosophy. With 28/124 rows still not `IMPLEMENTED`, this
-   project is not at 90% width yet — prioritize closing more
-   `IN_PROGRESS` rows (there are 23 — a deliberate reconciliation pass
-   over their descriptions against the real code, the same technique that
-   found `NXR-REQ-0034/0035`'s hardcoded zeros and `NXR-REQ-0016`'s stale
-   ownership this session, is likely the next-highest-value use of time)
-   before jumping to these, unless the user explicitly asks to jump
-   ahead.
-3. `NXR-REQ-0122` OIDC deployment — blocked on GitHub federated
-   credentials configuration; likely an `EXTERNAL-BLOCKER`, confirm before
-   attempting.
+Remaining domain-logic `IN_PROGRESS` rows worth this same treatment
+(narrow, code-reconcilable — NOT the infra/deployment/hardening
+`IN_PROGRESS` rows like `NXR-REQ-0105-0121`, which need actual Azure work,
+not code review):
+
+1. `NXR-REQ-0044` Bid Comparison — `quotation_total()` exists per
+   quotation; row says "no hay endpoint agregado de comparación ni
+   pantalla". `/abastecimiento/comparativos` is ALSO a reserved-but-unwired
+   nav entry (like Crews/Contracts were) — check `docs/PROCUREMENT.md`
+   before designing the aggregate endpoint.
+2. `NXR-REQ-0025` Corrections (posted docs) — row says reversal covers
+   the general case but a domain might need a distinct "correction" flow;
+   verify whether any domain has actually hit this gap in practice before
+   building anything speculative.
+3. `NXR-REQ-0006` Tax architecture — `TaxCode`/`TaxLine` exist and feed
+   `posting_service.post_manual`, but there's no tax calculation service
+   or API. Verify whether any domain actually needs computed tax before
+   building — this could be legitimately out of scope rather than a gap.
+4. `NXR-REQ-0008`/`NXR-REQ-0009` Authentication/Sessions — row says
+   "sigue faltando CSRF/rate-limit/lockout"; this overlaps with
+   `NXR-REQ-0107` Security, which is more clearly a 90%+ hardening-phase
+   item. Lower priority than 1-3 above.
+5. `NXR-REQ-0001` Core platform — very broad ("🔶" across most columns),
+   likely not a single reconcilable gap; read what it actually still
+   expects before touching it.
 
 Then continue the audit-instrumentation backlog in `docs/AUDIT.md` (still
 open: Project Control, Enterprise Resources, Commercial, Construction
 Control, and Transfers/General Expenses/Fund Restrictions/Bank
 Reconciliation within Financial Core; also AP invoice create/cancel
-specifically). Also worth a scan: this session found TWO real bugs
-(hardcoded `Decimal("0")` financial figures, a stale traceability row)
-just by reading code adjacent to what it was already touching — a
-deliberate pass over the 23 `IN_PROGRESS` rows' descriptions against the
-real code, looking for the same class of issue, is likely to surface
-more before jumping to E2E/hardening.
+specifically).
 
 Lower priority / optional: extend the Approval Inbox pattern to
 `submittal_service` (deliberately left out — Submittal has its own

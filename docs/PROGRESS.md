@@ -1854,3 +1854,38 @@ pre-existing `DEFERRED-FINAL-017` chunk warning).
 Traceability tally: 0 `VERIFIED`, 94 `IMPLEMENTED` (+1), 23
 `IN_PROGRESS`, 5 `NOT_STARTED` (-1), 2 `BLOCKED_EXTERNAL` — 124 rows
 total.
+
+## 2026-08-25 — Supplier Contracts / Subcontracts (closes NXR-REQ-0059/0060) + a real company-isolation fix
+
+Switched from the `NOT_STARTED` list (exhausted, down to genuinely
+infra/hardening-phase items and one deliberately-deferred row) to a
+reconciliation pass over the 23 `IN_PROGRESS` rows, looking for the same
+class of issue that surfaced `NXR-REQ-0034/0035`'s hardcoded zeros and
+`NXR-REQ-0016`'s stale ownership earlier this session. `NXR-REQ-0059`
+("Supplier Contracts") was `IN_PROGRESS` specifically because it had no
+dedicated tests. Writing them (RED, per TDD) exposed a real `INV-COMP-001`
+gap: `POST /api/procurement/suppliers/contracts` never validated
+`supplier_id`/`project_id` against the requesting `company_id` — a
+contract could be created referencing a Supplier or Project belonging to
+a completely different company, something every comparable financial
+write path in this codebase (AP, Budget, Treasury) already guards
+against. Fixed with the same `assert_supplier_belongs_to_company`/
+`assert_project_belongs_to_company` helpers those paths already use.
+
+Frontend: `SupplierContractsPage.tsx` at `/abastecimiento/contratos`
+(reserved nav entry, "Contratos", previously unwired) — lists contracts,
+creates one against a supplier and an optional project.
+`NXR-REQ-0060` (Subcontracts) shares the exact same model/fix/evidence —
+`SupplierContract` covers both with no distinguishing field, as already
+noted in its row.
+
+Verification: `cd backend && ./.venv/bin/pytest -q` → 251/251 (+4 tests:
+real create+list, cross-company supplier rejected, cross-company project
+rejected, cross-company list isolation); `compileall` clean; `alembic
+check` → no drift (no schema change needed for this fix). `cd frontend &&
+npm run typecheck && npm run lint` clean; `npm test -- --run` → 86/86
+(+3 tests); `npm run build` clean.
+
+Traceability tally: 0 `VERIFIED`, 96 `IMPLEMENTED` (+2), 21
+`IN_PROGRESS` (-2), 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL` — 124 rows
+total.

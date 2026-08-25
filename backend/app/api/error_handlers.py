@@ -24,6 +24,7 @@ from app.domain.errors import (
     InvalidQualityStateError,
     InvalidRfiStateError,
     InvalidSafetyRecordError,
+    InvalidApprovalStateError,
     InvalidSafetyStateError,
     InvalidSiteReportStateError,
     InvalidSubmittalStateError,
@@ -33,6 +34,7 @@ from app.domain.errors import (
     NotAuthorizedError,
     OverpaymentError,
     ProcurementCurrencyMismatchError,
+    SegregationOfDutiesError,
     UnbalancedJournalEntryError,
     UnsupportedEvidenceMimeTypeError,
 )
@@ -79,6 +81,8 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     NonConformanceRequiresCorrectiveActionError: ("NXR-QUALITY-002", 409),
     InvalidSafetyRecordError: ("NXR-SAFETY-001", 422),
     InvalidSafetyStateError: ("NXR-SAFETY-002", 409),
+    SegregationOfDutiesError: ("NXR-WORKFLOW-001", 422),
+    InvalidApprovalStateError: ("NXR-WORKFLOW-002", 409),
 }
 
 

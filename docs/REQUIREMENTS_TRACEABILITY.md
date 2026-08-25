@@ -34,9 +34,22 @@ CONSTRUCTION CONTROL completo (`NXR-REQ-0077-0086`) está ahora
 construido en `track/g-workflow-audit`: `AuditLog` real, append-only,
 instrumentando AP approve/pay, Treasury cash-closing approve + remittance
 create, y Procurement PO approve — ver `docs/AUDIT.md` y `task-1-report.md`
-para el backlog honesto de dominios que faltan. `NXR-REQ-0087/0088/0089/0091`
-(Workflow engine/Approval Inbox/SoD/Notifications) siguen `NOT_STARTED`,
-son responsabilidad de tasks posteriores del mismo plan.
+para el backlog honesto de dominios que faltan. Task 2 (Approval Inbox +
+Segregation of Duties, `NXR-REQ-0087/0088/0089`), mismo plan: `ApprovalRequest`
+real (`app/models/approval_request.py`) sobre la `ApprovalPolicy` ya
+extendida (`entity_type`, `requires_third_role`); `approval_service.decide()`
+nunca muta el estado de un dominio directamente, llama a un adaptador
+registrado (`register_decision_adapter`) que delega en la función de
+transición ya probada de ese dominio (`ap_service.apply_approval_decision`,
+`submittal_service.apply_approval_decision`, ambas funciones nuevas, ninguna
+firma existente cambió). `NXR-REQ-0087` se cierra explícitamente con el
+alcance de la Ruling de
+`docs/superpowers/specs/2026-08-25-track-g-workflow-audit-design.md`: NO es
+un motor de estados genérico/admin-configurable que reemplace las
+transiciones de dominio -- es el conjunto de servicios cross-cutting
+(Approval Inbox + SoD) que los dominios ya construidos usan por
+composición. `NXR-REQ-0091` (Notifications) sigue `NOT_STARTED`,
+responsabilidad de una task posterior del mismo plan.
 
 ## CORE
 
@@ -178,9 +191,9 @@ son responsabilidad de tasks posteriores del mismo plan.
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0087 | Workflow engine central | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0088 | Approval Inbox | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0089 | Segregation of Duties | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0087 | Workflow engine central | ✅·✅·✅·✅·✅·✅·✅·✅·⬜ | IMPLEMENTED | Track G (task-2): alcance deliberadamente acotado por la Ruling de `docs/superpowers/specs/2026-08-25-track-g-workflow-audit-design.md` -- NO es un motor de estados genérico/admin-configurable; es el conjunto de servicios cross-cutting (`ApprovalRequest`/`ApprovalPolicy`, `approval_service`) que los dominios ya construidos (AP, Submittal) usan por composición vía adaptadores registrados (`register_decision_adapter`), manteniendo cada uno su propia lógica de transición ya probada; falta E2E |
+| NXR-REQ-0088 | Approval Inbox | ✅·✅·✅·✅·✅·✅·✅·✅·⬜ | IMPLEMENTED | Track G (task-2): `ApprovalRequest` real (`app/models/approval_request.py`), migración `773bebddf1a9` sobre head real `e91bb3d86df2`; `create_request`/`decide` en `approval_service.py`, `decide()` nunca muta el dominio directamente -- llama al adaptador de `ap_service.apply_approval_decision`/`submittal_service.apply_approval_decision` (funciones nuevas, ninguna firma existente cambió, RED/GREEN evidence real probando la transición del `SupplierInvoice` real, no solo la fila `ApprovalRequest`); API `GET/POST /api/approvals`, permisos `workflow.approval` read/decide (decide solo Finance Manager/Project Manager/Administrator, read también Auditor); `audit_service.record` en el propio decide de la ApprovalRequest; `ApprovalInboxPage.tsx` real en `/inicio/aprobaciones` (entrada de nav ya reservada, no se inventó `/plataforma/aprobaciones`); falta E2E |
+| NXR-REQ-0089 | Segregation of Duties | ✅·✅·✅·✅·➖·✅·✅·✅·⬜ | IMPLEMENTED | Track G (task-2): `requested_by != decided_by` siempre (422 `NXR-WORKFLOW-001`, `SegregationOfDutiesError`), RED/GREEN evidence real; doble-decisión rechazada (409 `NXR-WORKFLOW-002`, `InvalidApprovalStateError`); `ApprovalPolicy.requires_third_role` exige un `executed_by` distinto de solicitante y aprobador cuando aplica, RED/GREEN evidence real con los dos casos (rechazo y aceptación); sin UI dedicada propia (se expresa como el propio flujo de decide en `ApprovalInboxPage.tsx`); falta E2E |
 | NXR-REQ-0090 | Audit (append-only) | ✅·✅·✅·✅·✅·✅·➖·✅·⬜ | IMPLEMENTED | Track G (task-1): `AuditLog` real (`app/models/audit.py`), append-only (nunca UPDATE/DELETE), migración `e91bb3d86df2` sobre head real `04d3e460a8a7`; `audit_service.record(...)` invocado explícitamente desde la capa de ruta (nunca hook oculto de ORM, nunca cambio de firma de servicio existente); `GET /api/audit` con aislamiento de company real (`assert_company_access`, test cruzado con rol `Finance Manager` porque `Auditor` ya es `SCOPE_ANY`); permiso `audit.log`/`read`; `AuditLogPage.tsx` real en `/control/auditoria` (entrada de nav ya reservada, no se inventó sección nueva). Instrumentado por ahora: AP approve+pay, Treasury cash-closing approve + remittance create, Procurement PO approve (5 rutas, ver `docs/AUDIT.md`) — el resto de dominios (Project Control, Enterprise Resources, Commercial, Construction Control, y el resto de Financial Core) sigue sin instrumentar, backlog honesto en `docs/AUDIT.md`; falta E2E |
 | NXR-REQ-0091 | Notifications | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0092 | Global Search (Cmd/Ctrl+K) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |

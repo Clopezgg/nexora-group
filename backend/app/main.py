@@ -7,6 +7,7 @@ from app.api.error_handlers import register_error_handlers
 from app.api.routes import (
     accounting,
     ap,
+    approvals,
     ar,
     assets,
     audit,
@@ -66,6 +67,21 @@ def create_app() -> FastAPI:
 
     register_error_handlers(app)
 
+    from app.services import ap_service, approval_service, submittal_service
+
+    approval_service.register_decision_adapter(
+        "ap.supplier_invoice",
+        lambda db, entity_id, decision, decided_by: ap_service.apply_approval_decision(
+            db, invoice_id=entity_id, decision=decision
+        ),
+    )
+    approval_service.register_decision_adapter(
+        "construction.submittal",
+        lambda db, entity_id, decision, decided_by: submittal_service.apply_approval_decision(
+            db, submittal_id=entity_id, decision=decision, decided_by=decided_by
+        ),
+    )
+
     app.include_router(health.router)
     app.include_router(auth.router, prefix="/api")
     app.include_router(dashboard.router, prefix="/api")
@@ -95,8 +111,10 @@ def create_app() -> FastAPI:
     app.include_router(site_reports.router, prefix="/api")
     app.include_router(quality.router, prefix="/api")
     app.include_router(safety.router, prefix="/api")
-    # Track G - Platform (Audit trail, NXR-REQ-0090).
+    # Track G - Platform (Audit trail, NXR-REQ-0090; Approval Inbox / SoD,
+    # NXR-REQ-0087/0088/0089).
     app.include_router(audit.router, prefix="/api")
+    app.include_router(approvals.router, prefix="/api")
 
     return app
 

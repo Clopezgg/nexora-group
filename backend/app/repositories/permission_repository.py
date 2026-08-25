@@ -166,6 +166,13 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     # Track G -- Platform: Audit trail (orden maestra §90, NXR-REQ-0090,
     # docs/AUDIT.md).
     ("audit.log", "read", "Ver bitácora de auditoría"),
+    # Track G -- Platform: Approval Inbox / Segregación de Funciones (orden
+    # maestra §87-89, NXR-REQ-0087/0088/0089). "decide" solo se otorga a
+    # roles que plausiblemente aprueban/rechazan AP o Submittal (Finance
+    # Manager, Project Manager) -- "read" es más amplio (también
+    # Administrator/Auditor, mismo patrón que audit.log).
+    ("workflow.approval", "read", "Ver la bandeja de aprobaciones"),
+    ("workflow.approval", "decide", "Aprobar/rechazar una solicitud de aprobación"),
 )
 # NOTA: ActiveUIContext (GET/PUT /api/context) NO pasa por este motor de
 # permisos -- es una preferencia personal del usuario autenticado (su
@@ -223,6 +230,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("asset.depreciation", "create", SCOPE_OWN),
         ("asset.depreciation", "read", SCOPE_OWN),
         ("audit.log", "read", SCOPE_OWN),
+        ("workflow.approval", "read", SCOPE_OWN),
+        ("workflow.approval", "decide", SCOPE_OWN),
     ),
     "Treasury Manager": (
         ("core.company", "read", SCOPE_ANY),
@@ -327,6 +336,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("safety.observation", "read", SCOPE_ANY),
         ("safety.incident", "read", SCOPE_ANY),
         ("audit.log", "read", SCOPE_ANY),
+        ("workflow.approval", "read", SCOPE_ANY),
     ),
     "Viewer": (
         ("core.company", "read", SCOPE_OWN),
@@ -401,6 +411,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("safety.incident", "create", SCOPE_OWN),
         ("safety.incident", "read", SCOPE_OWN),
         ("safety.incident", "close", SCOPE_OWN),
+        ("workflow.approval", "read", SCOPE_OWN),
+        ("workflow.approval", "decide", SCOPE_OWN),
     ),
     "Project Controller": (
         ("core.company", "read", SCOPE_ANY),

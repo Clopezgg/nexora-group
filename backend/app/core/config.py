@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     session_cookie_name: str = "nexora_session"
     session_ttl_days: int = 7
 
+    # NXR-REQ-0008 (brute-force lockout).
+    max_login_attempts: int = 5
+    lockout_minutes: int = 15
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"

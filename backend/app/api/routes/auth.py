@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.config import get_settings
-from app.domain.errors import InvalidCredentialsError
+from app.domain.errors import AccountLockedError, InvalidCredentialsError
 from app.models.user import User
 from app.schemas.auth import CurrentUserResponse, LoginRequest
 from app.services import auth_service
@@ -32,6 +32,8 @@ def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=str(error)
         ) from error
+    except AccountLockedError as error:
+        raise HTTPException(status_code=status.HTTP_423_LOCKED, detail=str(error)) from error
 
     max_age = int((expires_at - datetime.now(timezone.utc)).total_seconds())
     # En producción frontend y backend viven en subdominios distintos (Render):

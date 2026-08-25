@@ -3,11 +3,18 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.domain.errors import InvalidCredentialsError, NotAuthenticatedError
+from app.domain.errors import AccountLockedError, InvalidCredentialsError, NotAuthenticatedError
 from app.models.user import User
 from app.repositories import role_repository, session_repository, user_repository
 from app.security.passwords import verify_password
 from app.security.tokens import generate_session_token, hash_token
+
+
+def _register_failed_attempt(db: Session, user: User, *, settings) -> None:
+    user.failed_login_attempts += 1
+    if user.failed_login_attempts >= settings.max_login_attempts:
+        user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=settings.lockout_minutes)
+    db.commit()
 
 
 def login(
@@ -15,8 +22,27 @@ def login(
 ) -> tuple[User, list[str], str, datetime]:
     settings = get_settings()
     user = user_repository.get_by_email(db, email)
+
+    if user is not None and user.locked_until is not None:
+        now = datetime.now(timezone.utc)
+        if user.locked_until > now:
+            raise AccountLockedError(
+                f"Cuenta bloqueada temporalmente por demasiados intentos fallidos; "
+                f"vuelve a intentar después de {user.locked_until.isoformat()}.",
+                locked_until=user.locked_until,
+            )
+        # El bloqueo ya expiró -- se limpia aquí para no evaluarlo en cada
+        # login futuro; el intento actual sigue su curso normal debajo.
+        user.locked_until = None
+        user.failed_login_attempts = 0
+
     if user is None or not user.is_active or not verify_password(password, user.password_hash):
+        if user is not None:
+            _register_failed_attempt(db, user, settings=settings)
         raise InvalidCredentialsError("Correo o contraseña incorrectos.")
+
+    user.failed_login_attempts = 0
+    user.locked_until = None
 
     raw_token = generate_session_token()
     expires_at = datetime.now(timezone.utc) + timedelta(days=settings.session_ttl_days)

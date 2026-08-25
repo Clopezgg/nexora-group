@@ -6,6 +6,14 @@ class NotAuthenticatedError(Exception):
     pass
 
 
+class AccountLockedError(Exception):
+    """NXR-REQ-0008: demasiados intentos fallidos de login consecutivos."""
+
+    def __init__(self, message: str, *, locked_until):
+        super().__init__(message)
+        self.locked_until = locked_until
+
+
 class NotAuthorizedError(Exception):
     """Usuario autenticado pero sin permiso para la acción (INV-COMP-001,
     motor de permisos)."""

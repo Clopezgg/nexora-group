@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.csrf import register_csrf_guard
 from app.api.error_handlers import register_error_handlers
 from app.api.routes import (
     accounting,
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    register_csrf_guard(app)
 
     register_error_handlers(app)
 

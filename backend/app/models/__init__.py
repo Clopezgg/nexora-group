@@ -44,8 +44,10 @@ from app.models.procurement import (
 from app.models.planning import Milestone, Task
 from app.models.progress import ProgressRecord
 from app.models.project import Project
+from app.models.rfi import RequestForInformation
 from app.models.role import Role
 from app.models.session import Session
+from app.models.submittal import Submittal
 from app.models.supplier import Supplier, SupplierContract
 from app.models.tax import TaxCode
 from app.models.treasury import (
@@ -123,6 +125,7 @@ __all__ = [
     "Quotation",
     "ReconciliationMatch",
     "Remittance",
+    "RequestForInformation",
     "RequestForQuotation",
     "RfqSupplier",
     "Role",
@@ -131,6 +134,7 @@ __all__ = [
     "ServiceEntry",
     "Session",
     "StockLedgerEntry",
+    "Submittal",
     "Supplier",
     "SupplierContract",
     "SupplierInvoice",

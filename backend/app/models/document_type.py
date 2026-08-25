@@ -31,6 +31,11 @@ DOCUMENT_TYPE_SEEDS = (
     ("SEN", "Entrada de servicio", "SEN"),
     # Track D -- Enterprise Resources (orden maestra §62-69).
     ("DEP", "Depreciación de activo fijo", "DEP"),
+    # Track D -- Construction Control: RFI / Submittals (orden maestra §80,
+    # NXR-REQ-0085/0086). Numeración concurrency-safe vía NumberSequence,
+    # igual que AP/AR/Procurement -- ver app/services/numbering_service.py.
+    ("RFI", "Request For Information", "RFI"),
+    ("SUB", "Submittal", "SUB"),
 )
 
 

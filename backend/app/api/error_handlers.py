@@ -21,6 +21,8 @@ from app.domain.errors import (
     InvalidInvoiceStateError,
     InvalidOperationScopeError,
     InvalidProcurementStateError,
+    InvalidRfiStateError,
+    InvalidSubmittalStateError,
     InvalidTimeEntryStateError,
     InvalidTransferError,
     NotAuthorizedError,
@@ -65,6 +67,8 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     EvidenceTooLargeError: ("NXR-EVIDENCE-003", 422),
     EvidenceStorageNotConfigured: ("NXR-EVIDENCE-001", 503),
     InvalidDocumentStateError: ("NXR-DOCUMENT-001", 409),
+    InvalidRfiStateError: ("NXR-RFI-001", 409),
+    InvalidSubmittalStateError: ("NXR-SUBMITTAL-001", 409),
 }
 
 

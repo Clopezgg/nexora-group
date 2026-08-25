@@ -15,14 +15,16 @@ placeholder.
 **Estados:** `NOT_STARTED` · `IN_PROGRESS` · `IMPLEMENTED` ·
 `VERIFIED` · `BLOCKED_EXTERNAL`.
 
-Última actualización: plan "track-d-construction-control" task-1
-(Documents + Evidence foundation, `NXR-REQ-0077/0078/0079`), construido en
-`track/d-enterprise-resources` sobre la integración completa de
-Track 1+F+B+C+A+D+E. `Document`/`DocumentVersion`/`Evidence` reales +
-`ProgressRecord.evidence_id` (FK real, ya no texto libre) — ver
-`docs/DOCUMENTS_EVIDENCE.md` y `task-1-report.md`. El resto del bloque
-CONSTRUCTION CONTROL (Daily Site Reports/Quality/Safety/RFI/Submittals,
-NXR-REQ-0081-0086) sigue `NOT_STARTED`, tareas posteriores del mismo plan.
+Última actualización: plan "track-d-construction-control" task-4 (RFI +
+Submittals, `NXR-REQ-0085/0086`), construido en `track/d-rfi-submittals`
+sobre la integración completa de Track 1+F+B+C+A+D+E + Documents/Evidence
+(task-1). `RequestForInformation`/`Submittal` reales, numeración
+company-scoped vía `numbering_service` (mismo servicio que AP/AR/
+Procurement), referencia opcional de `Submittal` a Track C `Supplier`/
+`SupplierContract` — ver `docs/DOCUMENTS_EVIDENCE.md` y `task-4-report.md`.
+El resto del bloque CONSTRUCTION CONTROL (Daily Site Reports/Quality/
+Safety, `NXR-REQ-0081-0084`) sigue como lo deje task-3 del mismo plan
+(worktree paralelo, ver su propio report).
 
 ## CORE
 
@@ -157,8 +159,8 @@ NXR-REQ-0081-0086) sigue `NOT_STARTED`, tareas posteriores del mismo plan.
 | NXR-REQ-0082 | Quality (Inspection/Checklist) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0083 | Non-Conformance / Corrective Action | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0084 | Safety (Incident/Observation/Checklist) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0085 | RFI | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0086 | Submittals | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0085 | RFI | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-4): `RequestForInformation` real (`app/models/rfi.py`), número vía `numbering_service.next_document_number` (document_type_code="RFI", `UniqueConstraint(company_id, number)` -- company-scoped, dos companies pueden emitir cada una su "RFI-2026-000001" sin colisión, RED/GREEN evidence real), flujo OPEN→ANSWERED→CLOSED (`InvalidRfiStateError`/`NXR-RFI-001`), API `/api/rfis` (create/list/get/respond/close), permisos `construction.rfi`, `RfiPage.tsx` real (crear/responder/cerrar, no placeholder) montada como tab en `/proyectos/rfi-submittals`; falta audit trail (deuda system-wide, NXR-REQ-0090) y E2E |
+| NXR-REQ-0086 | Submittals | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-4): `Submittal` real (`app/models/submittal.py`), número vía `numbering_service` (document_type_code="SUB", company-scoped), referencia opcional a Track C `Supplier`/`SupplierContract` (`assert_supplier_contract_belongs_to_company` nuevo en `financial_validation_service.py`), adjunto único `evidence_id` (contrato de `docs/DOCUMENTS_EVIDENCE.md`), flujo de revisión de dos pasos SUBMITTED→UNDER_REVIEW→APPROVED/REJECTED -- aprobar/rechazar sin `reviewer_response` ya registrado se rechaza (`InvalidSubmittalStateError`/`NXR-SUBMITTAL-001`, RED/GREEN evidence real), API `/api/submittals` (create/list/get/response/decision), permisos `construction.submittal`, `SubmittalsPage.tsx` real (crear/revisar/aprobar/rechazar, no placeholder); falta audit trail (deuda system-wide, NXR-REQ-0090) y E2E |
 
 ## PLATFORM
 

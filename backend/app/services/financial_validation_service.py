@@ -10,7 +10,7 @@ from app.models.cost_center import CostCenter
 from app.models.crm import Customer
 from app.models.evidence import Evidence
 from app.models.project import Project
-from app.models.supplier import Supplier
+from app.models.supplier import Supplier, SupplierContract
 
 
 def assert_operation_scope(scope: str, project_id: uuid.UUID | None) -> None:
@@ -75,6 +75,22 @@ def assert_supplier_belongs_to_company(
             "supplier_id debe pertenecer a la compañía propietaria"
         )
     return supplier
+
+
+def assert_supplier_contract_belongs_to_company(
+    db: Session, *, contract_id: uuid.UUID | None, company_id: uuid.UUID
+) -> SupplierContract | None:
+    """Track D (Construction Control): validación de la referencia opcional
+    Submittal -> SupplierContract (Track C) -- mismo patrón nullable-aware
+    que assert_project_belongs_to_company/assert_cost_center_belongs_to_company."""
+    if contract_id is None:
+        return None
+    contract = db.get(SupplierContract, contract_id)
+    if contract is None or contract.company_id != company_id:
+        raise InvalidFinancialReferenceError(
+            "contract_id debe pertenecer a la compañía propietaria"
+        )
+    return contract
 
 
 def assert_customer_belongs_to_company(

@@ -75,8 +75,18 @@ certificar el 100%.
   `docs/PROGRESS.md`). Pendiente de revisión/merge del coordinador a
   `feat/nexora-greenfield` — no se marca `VERIFIED` en
   `docs/REQUIREMENTS_TRACEABILITY.md` hasta que eso ocurra.
-- `DEFERRED-FINAL-009` — Track D: el slice Documents/Site/Quality está
-  NOT_STARTED (no existe dominio, DB, service, API ni UI todavía).
+- `DEFERRED-FINAL-009` — **PARCIALMENTE RESUELTO.** Documents/Evidence
+  (`NXR-REQ-0077/0078/0079`) se implementó en Track D task-1
+  (`track/d-enterprise-resources`, ya fusionado a
+  `feat/nexora-greenfield`) — ver `docs/DOCUMENTS_EVIDENCE.md`. RFI/
+  Submittals (`NXR-REQ-0085/0086`) se implementó en el mismo plan,
+  task-4 (`track/d-rfi-submittals`, pendiente de revisión/merge del
+  coordinador — no se marca `VERIFIED` hasta que eso ocurra): dominio +
+  DB + service + API + RBAC + `RfiPage`/`SubmittalsPage` reales, ver
+  `docs/PROGRESS.md` y `docs/REQUIREMENTS_TRACEABILITY.md`. Sigue
+  `NOT_STARTED` únicamente Daily Site Reports/Quality/Safety
+  (`NXR-REQ-0081-0084`), tarea separada del mismo plan (task-3, worktree
+  paralelo -- ver su propio report para el estado real).
 - `DEFERRED-FINAL-010` — Track D: `FixedAssetsPage` y el formulario de
   bitácora de combustible de `EquipmentPage` fijan `scope: 'GENERAL'` en el
   cliente; el backend soporta completamente activos/bitácoras de

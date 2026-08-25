@@ -113,17 +113,18 @@ certificar el 100%.
   existe data real todavía en ningún ambiente; sigue abierto como
   recordatorio de que un ambiente sembrado con datos antes de un backfill
   explícito requeriría uno.
-- `DEFERRED-FINAL-014` — No existe ningún mecanismo real de audit log en
-  el codebase todavía (ni `AuditLog` ni repositorio equivalente) —
-  confirmado sistémico, no específico de un track: `INV-AUD-001` en
-  `docs/ACCOUNTING.md` ya está `IN_PROGRESS`/dueño Track G. Surgió
-  explícitamente durante el review de Track D construction-control Task 1
-  (Documents/Evidence, 2026-08-25): cada mutación de Document/Evidence
-  queda sin rastro de auditoría, igual que el resto del sistema hoy.
-  Prioridad para cuando se construya Track G (Workflow/Approvals/Audit/
-  Notifications) — no bloquea Documents/Evidence ni los tracks que los
-  consuman mientras tanto (Daily Site Reports/Quality/Safety, RFI/
-  Submittals).
+- `DEFERRED-FINAL-014` — **PARCIALMENTE RESUELTO (2026-08-25, Track G
+  Task 1).** No existía ningún mecanismo real de audit log en el
+  codebase. Ahora existe `AuditLog` real (`app/models/audit.py`,
+  append-only, nunca UPDATE/DELETE), invocado explícitamente desde la
+  capa de ruta (nunca hook oculto de ORM, nunca cambio de firma de
+  servicio existente) — ver `docs/AUDIT.md`. Instrumentado por ahora: AP
+  approve+pay, Treasury cash-closing approve + remittance create,
+  Procurement PO approve (5 rutas) y `workflow.approval.decide` (Track G
+  Task 2). Sigue `NOT_STARTED` la instrumentación de Project Control,
+  Enterprise Resources, Commercial, Construction Control, y el resto de
+  Financial Core — backlog honesto en `docs/AUDIT.md`, no bloquea el
+  resto de esos tracks mientras tanto.
 - `DEFERRED-FINAL-015` — Track D (Task 3, Site/Quality/Safety): no existe
   todavía ningún directorio/selector de usuarios en el frontend (ningún
   track anterior lo construyó — Track A tampoco lo necesitó para
@@ -155,6 +156,22 @@ certificar el 100%.
   `IntegrityError` de FK genérico o específico en `error_handlers.py`, y
   (c) un endpoint de listado de usuarios por compañía (no existe hoy) para
   reemplazar el campo de texto por un `Select`/`Combobox` real.
+- `DEFERRED-FINAL-016` — Track G (Task 3, Notifications, 2026-08-25):
+  `approval_service.create_request` no tiene todavía ningún llamador real
+  en producción — confirmado por grep sobre todo `backend/app`: ni
+  `ap_service.py` ni `submittal_service.py` lo invocan, ambos solo
+  registran su adaptador de `decide()` vía `register_decision_adapter`
+  (`app/main.py`). El disparo de notificación "assigned_to al crear un
+  ApprovalRequest" (Task 3) está correctamente conectado al único punto
+  real de creación, pero ese punto en sí mismo nunca se ejecuta hoy en un
+  flujo de negocio real — es código muerto arquitectónicamente correcto,
+  no un defecto de Task 3 (su propio brief le pidió verificar contra el
+  código real de Task 2 y conectar el punto real, que es exactamente lo
+  que se hizo). Se resuelve conectando `ap_service`/`submittal_service`
+  (o el track que corresponda) para que llamen `approval_service.
+  create_request(...)` en el punto real donde hoy transicionan
+  directamente a un estado que debería requerir aprobación humana, en vez
+  de mutar su propio estado sin pasar por el Approval Inbox.
 
 ## Bloqueos externos
 

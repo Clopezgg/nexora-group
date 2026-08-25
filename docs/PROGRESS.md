@@ -176,3 +176,31 @@ Ningún requisito pasa a `VERIFIED` todavía solo por esta integración —
 `VERIFIED` requiere que el sistema combinado (backend + frontend) se
 pruebe de extremo a extremo, no solo que cada mitad pase sus propios
 tests por separado.
+
+### 2026-08-24 — Track A (Financial Core) endurecido, pendiente de integración
+
+Rama `track/a-financial-core`, worktree aislado. Se recuperó y auditó el
+trabajo heredado de Treasury/AP/AR y se corrigieron brechas con ciclos TDD
+reales:
+
+- Treasury sigue siendo el único dueño de efectivo; Project permanece sin
+  campos de saldo y las restricciones de fondos solo etiquetan uso.
+- Toda FK financiera se resuelve y valida contra la company propietaria:
+  invoice, treasury account, cuentas GL, Project, CostCenter, statements,
+  líneas, cierres, restricciones y vouchers.
+- Scope y montos están limitados en schema, dominio y CHECK constraints;
+  ningún movimiento admite cero/negativos.
+- Conciliación acumula matches bajo `SELECT ... FOR UPDATE`, bloquea
+  overmatch y documentos de otra company.
+- Remesas, transferencias, gastos generales, aprobación de cierre, pagos AP
+  y cobros AR componen idempotencia + posting + entidad en una transacción.
+- AP/AR exponen colecciones GET por company y las pantallas recargan facturas
+  persistidas desde PostgreSQL. AR queda en Financial Core; Track E posee el
+  workflow comercial y consumirá AR sin duplicarlo.
+- La numeración contable se corrigió a unicidad `(company_id,
+  document_number)`, compatible con secuencias por compañía.
+- Migración `58ce35982711`: fresh-install completo hasta head, 43 tablas y
+  constraints críticos inspeccionados en PostgreSQL temporal.
+- Evidencia de rama: backend combinado 70 tests, frontend 19 tests,
+  typecheck/lint/build y Alembic gates ejecutados. Las filas se marcan
+  `IMPLEMENTED`, nunca `VERIFIED`, hasta integración coordinada/E2E.

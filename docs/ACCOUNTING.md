@@ -39,11 +39,11 @@ Qué garantiza el servicio (y qué NO hace):
   datos. Si algo falla, no se persiste nada.
 - Numera el documento vía `NumberSequence` (concurrency-safe, `SELECT ...
   FOR UPDATE`, nunca `MAX()+1`).
-- Persiste y hace `commit()` — es una unidad de trabajo completa, el
-  caller no necesita envolver esto en su propia transacción salvo que
-  necesite componerlo con más escrituras (en ese caso, ver
-  `docs/IDEMPOTENCY.md`... este mismo documento, sección Idempotency, más
-  abajo).
+- Por defecto persiste y hace `commit()`. Los dominios que necesitan
+  componer posting + documento de negocio + idempotencia en una sola unidad
+  pasan `commit=False`; en ese modo el servicio hace `flush()` y el caller
+  confirma o revierte la transacción completa. Treasury/AP/AR usan este modo
+  en toda mutación que mueve efectivo.
 - **NO decide qué cuentas usar.** Eso es responsabilidad del módulo de
   dominio (Treasury sabe qué cuenta de banco corresponde a una remesa; AP
   sabe qué cuenta de proveedores usar). Si tu caso es un par
@@ -92,6 +92,10 @@ if outcome.is_replay:
 idempotency_service.complete(db, outcome.record, result={...}, entity_type="remittance", entity_id=entity.id)
 db.commit()
 ```
+
+La operación incluida entre `begin()` y `complete()` debe llamar al Posting
+Engine y a su servicio de dominio con `commit=False`; ningún commit intermedio
+puede dejar un posting confirmado con el registro idempotente aún `PENDING`.
 
 `begin()` con la misma key y payload distinto lanza `IdempotencyConflictError`
 (`NXR-IDEMPOTENCY-001`, HTTP 409) — mapeado automáticamente si tu endpoint

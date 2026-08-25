@@ -15,8 +15,8 @@ placeholder.
 **Estados:** `NOT_STARTED` · `IN_PROGRESS` · `IMPLEMENTED` ·
 `VERIFIED` · `BLOCKED_EXTERNAL`.
 
-Última actualización: integración de Track 1 (Foundation) + Track F
-(Experience) en `feat/nexora-greenfield`.
+Última actualización: Track A (Financial Core) endurecido en
+`track/a-financial-core`, pendiente de integración coordinada.
 
 ## CORE
 
@@ -48,17 +48,17 @@ placeholder.
 | NXR-REQ-0014 | Double-entry (debit=credit invariant) | ✅·✅·✅·➖·➖·➖·➖·✅·➖ | IMPLEMENTED | INV-ACC-001 con test real, ver docs/ACCOUNTING.md |
 | NXR-REQ-0015 | Posting engine (PostingRule/PostingService) | ✅·✅·✅·➖·➖·➖·➖·✅·➖ | IMPLEMENTED | `posting_service.post_manual`/`reverse_document`, `PostingRule` (modelo, sin resolver automático todavía — ver docs/ACCOUNTING.md); contrato documentado para que otros tracks lo consuman |
 | NXR-REQ-0016 | Financial statements (TB, GL, BS, P&L, Cash Flow) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track G (Reporting), sobre los datos que ya deja el GL de este track |
-| NXR-REQ-0017 | Treasury (accounts, position) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A |
-| NXR-REQ-0018 | Remittances (scope=CENTRAL) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A — puede consumir `posting_service` + OperationScope ya construidos |
-| NXR-REQ-0019 | Transfers (bank/cash) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A |
-| NXR-REQ-0020 | Cash (closing, position) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A |
-| NXR-REQ-0021 | Bank reconciliation | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A |
-| NXR-REQ-0022 | Fund restrictions | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A |
-| NXR-REQ-0023 | Accounts Payable | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A |
-| NXR-REQ-0024 | Accounts Receivable | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track E |
+| NXR-REQ-0017 | Treasury (accounts, position) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: cuentas BANK/CASH/OTHER, posición derivada del GL, API y pantalla reales; ownership por company en cada recurso |
+| NXR-REQ-0018 | Remittances (scope=CENTRAL) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: remesa CENTRAL cash-in, posting atómico e idempotente y formulario Treasury |
+| NXR-REQ-0019 | Transfers (bank/cash) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: transferencia entre activos de Treasury, sin Revenue/Expense, idempotente; FX entre cuentas diferido explícitamente |
+| NXR-REQ-0020 | Cash (closing, position) | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: cierre de caja DRAFT→APPROVED con ajuste atómico/idempotente; sin pantalla específica de cierres |
+| NXR-REQ-0021 | Bank reconciliation | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: statement/lines append-only, matches acumulativos con `FOR UPDATE`, rechazo de overmatch y documento extranjero; sin UI específica |
+| NXR-REQ-0022 | Fund restrictions | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: restricción etiqueta uso sin transferir propiedad del efectivo al Project; validación company/project |
+| NXR-REQ-0023 | Accounts Payable | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: invoices/accrual/aprobación/pagos parciales, GET persistido por company, UI y pagos idempotentes |
+| NXR-REQ-0024 | Accounts Receivable | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A retiene AR como Financial Core: invoices/receipts, GET persistido, UI e idempotencia. Track E posee el workflow comercial y debe llamar AR, no duplicar receivables |
 | NXR-REQ-0025 | Corrections (posted docs) | 🔶·✅·✅·➖·➖·➖·⬜·✅·➖ | IN_PROGRESS | Mecanismo de reversal cubre el caso general (INV-ACC-002); falta un flujo de "correction" distinto al reversal simple si algún dominio lo necesita — dueño: track que lo requiera |
 | NXR-REQ-0026 | Annulments (reversal, no delete) | ✅·✅·✅·✅·⬜·➖·⬜·✅·⬜ | IMPLEMENTED | `posting_service.reverse_document`, endpoint `POST /api/accounting/journal-entries/{id}/reverse`, documento tipo `ANU`; falta UI |
-| NXR-REQ-0027 | Idempotency (Idempotency-Key) | ✅·✅·✅·⬜·➖·➖·⬜·✅·➖ | IMPLEMENTED | `idempotency_service.begin/complete`, `IdempotencyRecord`; sin middleware HTTP que lea el header `Idempotency-Key` automáticamente todavía — cada dominio lo invoca explícitamente por ahora |
+| NXR-REQ-0027 | Idempotency (Idempotency-Key) | ✅·✅·✅·✅·➖·➖·⬜·✅·➖ | IMPLEMENTED | Track A consume el header persistido explícitamente en remesas, transferencias, gastos generales, aprobación de cierres, pagos y cobros; posting + operación + resultado se confirman en una transacción |
 
 ## PROJECT CONTROL
 
@@ -146,7 +146,7 @@ placeholder.
 | NXR-REQ-0077 | Documents (enterprise entity + Blob) | ⬜·⬜·🔶·⬜·⬜·⬜·⬜·⬜·⬜ | IN_PROGRESS | cliente Azure Blob (`azure_blob.py`) listo, falta entidad `Document`/API/UI |
 | NXR-REQ-0078 | Document Versioning | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0079 | Evidence (PDF/JPEG/PNG/WEBP validado) | ⬜·⬜·🔶·⬜·⬜·⬜·⬜·⬜·⬜ | IN_PROGRESS | backend de storage listo, falta validación MIME/tamaño + endpoints |
-| NXR-REQ-0080 | Vouchers / comprobantes (PDF profesional) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0080 | Vouchers / comprobantes (PDF profesional) | ✅·➖·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: PDF vectorial generado desde AccountingDocument real con ReportLab; endpoint protegido por company; falta UI dedicada |
 | NXR-REQ-0081 | Daily Site Reports | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0082 | Quality (Inspection/Checklist) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0083 | Non-Conformance / Corrective Action | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
@@ -191,8 +191,8 @@ placeholder.
 | NXR-REQ-0107 | Security (CSRF/rate-limit/lockout/headers) | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | Argon2id + HttpOnly + Secure-en-prod; falta el resto de §121 |
 | NXR-REQ-0108 | Observability | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | App Insights opcional wired; falta logging estructurado con correlation_id |
 | NXR-REQ-0109 | Backup / Restore | ⬜⬜⬜⬜➖⬜➖⬜➖ | NOT_STARTED | — |
-| NXR-REQ-0110 | Unit tests | ➖➖✅➖✅➖➖✅➖ | IN_PROGRESS | 15/15 backend, 5/5 frontend — crecerá con cada módulo |
-| NXR-REQ-0111 | Integration tests (PostgreSQL) | ➖➖⬜➖➖➖➖⬜➖ | NOT_STARTED | — |
+| NXR-REQ-0110 | Unit tests | ➖➖✅➖✅➖➖✅➖ | IN_PROGRESS | Track A: suite combinada 70 backend + 19 frontend; crecerá con los tracks restantes |
+| NXR-REQ-0111 | Integration tests (PostgreSQL) | ➖➖✅➖➖➖➖✅➖ | IMPLEMENTED | Track A: pruebas reales contra PostgreSQL para lifecycle, aislamiento, constraints, postings, idempotencia y conciliación |
 | NXR-REQ-0112 | E2E (Playwright) | ➖➖➖➖➖➖➖➖⬜ | NOT_STARTED | — |
 | NXR-REQ-0113 | Critical User Journey | ➖➖➖➖➖➖➖➖⬜ | NOT_STARTED | — |
 | NXR-REQ-0114 | CI/CD | ➖➖🔶➖➖➖➖🔶➖ | IN_PROGRESS | workflows build+test+bicep-what-if existen; falta gate completo §118-119 |
@@ -220,14 +220,15 @@ Recontado por el coordinador directamente sobre la tabla combinada
 - **VERIFIED:** 0 / 124 (reservado para cuando el coordinador confirme
   comportamiento end-to-end en `feat/nexora-greenfield` — ningún track se
   autootorga `VERIFIED`)
-- **IMPLEMENTED:** 21 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
-  0010/0011/0012/0013/0014/0015/0026/0027. Track F: NXR-REQ-0097 a 0104.
-- **IN_PROGRESS:** 21 / 124
-- **NOT_STARTED:** 80 / 124
+- **IMPLEMENTED:** 31 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
+  0010/0011/0012/0013/0014/0015/0026/0027. Track A: NXR-REQ-0017 a
+  0024, 0080 y 0111. Track F: NXR-REQ-0097 a 0104.
+- **IN_PROGRESS:** 20 / 124
+- **NOT_STARTED:** 71 / 124
 - **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue
   real, no por incapacidad técnica)
 
-Suma verificada: 21+21+80+2 = 124.
+Suma verificada: 31+20+71+2 = 124.
 
 Este resumen se actualiza en cada integración de track. Ver progreso vivo
 en `docs/PROGRESS.md`.

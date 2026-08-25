@@ -17,8 +17,10 @@ from app.models.company import Company
 from app.models.cost_center import CostCenter, EconomicCategory
 from app.models.crm import Customer, Lead, Opportunity, Quotation, SalesContract
 from app.models.currency import Currency, ExchangeRate
+from app.models.document import Document, DocumentVersion
 from app.models.document_type import DocumentType
 from app.models.equipment import Equipment, FuelLog, MaintenanceOrder, MaintenancePlan
+from app.models.evidence import Evidence
 from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.models.idempotency import IdempotencyRecord
 from app.models.inventory import PhysicalCount, PhysicalCountLine, StockLedgerEntry
@@ -84,9 +86,12 @@ __all__ = [
     "CustomerInvoice",
     "CustomerReceipt",
     "DepreciationEntry",
+    "Document",
     "DocumentType",
+    "DocumentVersion",
     "EconomicCategory",
     "Equipment",
+    "Evidence",
     "ExchangeRate",
     "FiscalPeriod",
     "FiscalYear",

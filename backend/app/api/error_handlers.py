@@ -7,6 +7,7 @@ from app.domain.errors import (
     BudgetBaselineExistsError,
     BudgetCurrencyMismatchError,
     DepreciationAlreadyPostedError,
+    EvidenceTooLargeError,
     FiscalPeriodClosedError,
     IdempotencyConflictError,
     ImmutableDocumentError,
@@ -15,6 +16,7 @@ from app.domain.errors import (
     InvalidAssetStateError,
     InvalidChangeOrderStateError,
     InvalidCommercialStateError,
+    InvalidDocumentStateError,
     InvalidFinancialReferenceError,
     InvalidInvoiceStateError,
     InvalidOperationScopeError,
@@ -25,7 +27,9 @@ from app.domain.errors import (
     OverpaymentError,
     ProcurementCurrencyMismatchError,
     UnbalancedJournalEntryError,
+    UnsupportedEvidenceMimeTypeError,
 )
+from app.integrations.azure_blob import EvidenceStorageNotConfigured
 
 """API error standard (orden maestra §108): {"error": {"code", "message",
 "field", "correlationId"}}. Cubre NXR-ACCOUNTING/NXR-IDEMPOTENCY/NXR-PERM
@@ -57,6 +61,10 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     ImmutableMaintenanceOrderError: ("NXR-EQUIPMENT-001", 409),
     InvalidTimeEntryStateError: ("NXR-WORKFORCE-001", 409),
     InvalidCommercialStateError: ("NXR-CRM-001", 409),
+    UnsupportedEvidenceMimeTypeError: ("NXR-EVIDENCE-002", 422),
+    EvidenceTooLargeError: ("NXR-EVIDENCE-003", 422),
+    EvidenceStorageNotConfigured: ("NXR-EVIDENCE-001", 503),
+    InvalidDocumentStateError: ("NXR-DOCUMENT-001", 409),
 }
 
 

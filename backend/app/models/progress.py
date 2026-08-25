@@ -9,9 +9,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
-# ProgressRecord (orden maestra §72). `evidence_ref` es una referencia libre
-# (URL/id) hasta que el track de Document Management (Azure Blob) aterrice
-# la entidad Document real -- documentado como deuda intencional.
+# ProgressRecord (orden maestra §72). `evidence_id` es una FK real a
+# `evidence.id` (app/models/evidence.py, bloque CONSTRUCTION CONTROL) --
+# reemplaza el campo de texto libre original ahora que la entidad Evidence
+# real existe (mismo patrón que Track A dio a Supplier/Customer, ver
+# docs/DOCUMENTS_EVIDENCE.md "Attachment contract").
 
 
 class ProgressRecord(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -28,4 +30,6 @@ class ProgressRecord(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     actual_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     description: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     responsible: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    evidence_ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    evidence_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("evidence.id", ondelete="SET NULL"), nullable=True
+    )

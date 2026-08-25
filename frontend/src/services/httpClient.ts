@@ -9,11 +9,15 @@ export class ApiError extends Error {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // Un body FormData (subida de archivos, ver documentService.uploadEvidence)
+  // nunca debe forzar Content-Type: application/json -- el navegador debe
+  // fijar el `multipart/form-data; boundary=...` correcto por sí mismo.
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: 'include',
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     },
   })

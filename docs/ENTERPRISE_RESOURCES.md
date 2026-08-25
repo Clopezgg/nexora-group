@@ -1,10 +1,12 @@
 # Enterprise Resources — Track D
 
 Fixed Assets/Depreciación, Equipment/Fuel/Maintenance y Workforce/Time
-(orden maestra §62-66). Documents/Site/Quality (§62/§66, bloque "Documents /
-Evidence / Progress / Site / Quality" en `docs/MASTER_PLAN.md`) **NOT_STARTED**
-en este track — ver `docs/PROGRESS.md` y `docs/REQUIREMENTS_TRACEABILITY.md`
-para el estado honesto, no se reporta como implementado.
+(orden maestra §62-66). Documents/Evidence (§77-79, bloque CONSTRUCTION
+CONTROL) se construyó en un plan posterior sobre este mismo track --
+ver `docs/DOCUMENTS_EVIDENCE.md`. Site/Quality/RFI/Submittals
+(`NXR-REQ-0081`-`0086`) siguen **NOT_STARTED** — ver `docs/PROGRESS.md` y
+`docs/REQUIREMENTS_TRACEABILITY.md` para el estado honesto, no se reporta
+como implementado.
 
 ## Fixed Assets / Depreciación straight-line (INV-AST-001)
 

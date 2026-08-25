@@ -105,3 +105,22 @@ class InvalidCommercialStateError(Exception):
     """Transición de estado inválida en el flujo comercial (p.ej. convertir
     una Quotation que no está ACCEPTED, o volver a facturar un SalesContract
     ya BILLED)."""
+
+
+# Track D -- Construction Control: Documents/Evidence (orden maestra
+# §77-79, docs/DOCUMENTS_EVIDENCE.md).
+class UnsupportedEvidenceMimeTypeError(Exception):
+    """El MIME type del archivo subido no está en el allowlist
+    (PDF/JPEG/PNG/WEBP). Se rechaza ANTES de llamar a
+    get_evidence_container_client() -- nunca se intenta un upload real de
+    un archivo no permitido."""
+
+
+class EvidenceTooLargeError(Exception):
+    """El archivo excede `settings.max_evidence_mb`. Se rechaza ANTES de
+    llamar a get_evidence_container_client()."""
+
+
+class InvalidDocumentStateError(Exception):
+    """Transición de estado inválida sobre Document/DocumentVersion (p.ej.
+    subir una nueva versión sobre un Document ARCHIVED)."""

@@ -27,6 +27,7 @@ from app.api.routes import (
     quality,
     rfi,
     safety,
+    search,
     site_reports,
     submittals,
     suppliers,
@@ -117,6 +118,8 @@ def create_app() -> FastAPI:
     app.include_router(audit.router, prefix="/api")
     app.include_router(approvals.router, prefix="/api")
     app.include_router(notifications.router, prefix="/api")
+    # Track H - Reports/Search/Analytics (NXR-REQ-0092).
+    app.include_router(search.router, prefix="/api")
 
     return app
 

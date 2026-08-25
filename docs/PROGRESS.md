@@ -1347,3 +1347,88 @@ Integration architecture (`NXR-REQ-0092`-`0096`, Prioridad 4 del
 usuario). `DEFERRED-FINAL-014` (audit log) parcialmente resuelto,
 `DEFERRED-FINAL-016` nuevo (`create_request` sin llamador real). Próximo:
 continuar con Reports/Search/Analytics per `docs/MASTER_PLAN.md`.
+
+## Track H, Task 1 — Global Search (`NXR-REQ-0092`)
+
+Plan `2026-08-25-reports-search-analytics`, Task 1, construido en
+`track/h-search` (worktree separado de `feat/nexora-greenfield`@`e9cc998`).
+`search_service.search(db, *, company_id, query, limit_per_type=5)`
+(`backend/app/services/search_service.py`) hace un `select(...).where(Model.company_id == company_id, Model.<campo>.ilike(f"%{query}%")).limit(limit_per_type)`
+por cada uno de los diez tipos de entidad del alcance del brief —
+`Project.name`, `Supplier.legal_name`, `Customer.legal_name`
+(`app/models/crm.py`, no `app/models/customer.py` — verificado antes de
+escribir el import), `SupplierInvoice.invoice_number`,
+`CustomerInvoice.invoice_number`, `PurchaseOrder.po_number`,
+`Document.title`, `RequestForInformation.subject`, `FixedAsset.name`,
+`Equipment.name` — los diez, ninguno cortado. Ninguno de estos modelos
+se tocó (solo lectura); no hay migración nueva. API real
+`GET /api/search?companyId=&q=` (`backend/app/api/routes/search.py`,
+registrado en `main.py`, prefijo real `/api/search` — **no**
+`/api/v1/search` como decía el docstring viejo de `CommandPalette.tsx`,
+corregido); `company_id` usa `Query(alias="companyId")` (mismo bug que
+Track G Task 2 ya había encontrado en `approvals.py`); permiso nuevo
+`search.global`/`read` en `permission_repository.py`, otorgado a
+`Administrator` (automático, `SCOPE_ANY` vía la comprehension sobre
+`_BASE_PERMISSIONS`) y explícitamente a los 13 roles operativos restantes
+(`SCOPE_OWN`, `SCOPE_ANY` solo para `Auditor` — mismo patrón que
+`document.document`/`read`); `assert_company_access` real
+(INV-COMP-001). `q` con menos de 2 caracteres devuelve `[]` sin tocar la
+base de datos.
+
+Frontend real: `frontend/src/types/search.ts` +
+`frontend/src/services/searchService.ts` (`globalSearch`, corta en
+cliente si `query.trim().length < 2`, mismo patrón que
+`auditService.ts`). `CommandPalette.tsx` (compartido, usado solo por
+`AppLayout.tsx`) gana un prop opcional `searchRemote` — debounce de
+200ms, resultado etiquetado con la query que responde
+(`{query, results}`) para que un resultado tardío de una query anterior
+nunca se mezcle con el filtro local actual, y **mezcla aditiva** con
+`filtered` (los matches locales de navegación siempre aparecen primero;
+los resultados remotos solo agregan, nunca reemplazan) — el palette
+nunca queda en blanco mientras la llamada real está en curso o falla.
+`AppLayout.tsx` arma ese `searchRemote` con `useActiveCompany()` (mismo
+hook que ya usan las páginas) + `globalSearch`; si todavía no hay
+company activa, `searchRemote` es `undefined` y el palette sigue
+funcionando como filtro local puro (comportamiento preexistente
+intacto).
+
+TDD real, RED antes de GREEN: `test_search_finds_project_by_name`
+falló primero con `404` (sin ruta), luego con el servicio implementado
+pasó; para los nueve tipos restantes se demostró RED genuino reduciendo
+temporalmente `search_service.search()` a solo el bloque de `Project`
+(archivo respaldado, no un commit) y confirmando que los nueve tests
+fallan con `assert False` (no un 500/404 — la ruta y el resto del
+pipeline ya funcionan, solo falta el query de cada entidad), luego se
+restauró la implementación completa y los 11 tests de
+`test_search.py` (10 tipos + 1 de aislamiento de company) volvieron a
+`GREEN`. Mismo patrón en frontend: `GlobalSearch.test.tsx` con
+`AppLayout` momentáneamente sin pasar `searchRemote` -- el test de
+"aparece un resultado real de `/api/search`" falla como se espera (el
+segundo test, que solo prueba el filtro local preexistente, sigue en
+verde, confirmando que no rompimos nada existente); restaurado, ambos en
+verde.
+
+Verificación: backend 206/206 pytest (195 previos + 11 nuevos en
+`test_search.py`), `compileall` limpio, único head de Alembic
+(`234785d5331f`, sin cambios — este task no agrega tabla ni migración).
+Frontend: typecheck limpio, `eslint .` limpio (una ronda de fix real:
+el primer borrador de `CommandPalette.tsx` violaba
+`react-hooks/set-state-in-effect` llamando `setRemoteResults([])`
+síncronamente en el cuerpo del efecto — se resolvió con el patrón
+`{query, results}` etiquetado en vez de resetear estado, no
+suprimiendo la regla), 63/63 vitest (61 previos + 2 nuevos en
+`GlobalSearch.test.tsx`), `npm run build` OK (863 módulos, mismo warning
+preexistente de chunk >500kB).
+
+**Los diez tipos de entidad del alcance del brief están cubiertos, sin
+cortes.** `NXR-REQ-0092` pasa a `IMPLEMENTED` (nunca `VERIFIED` — falta
+E2E real, ver `docs/superpowers/sdd/2026-08-25-reports-search-analytics/task-1-report.md`
+para el detalle completo).
+
+Rama `track/h-search` preparada e integration-ready, no fusionada a
+`feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
+coordinador. Corre en paralelo con Tasks 2 (Reporting) y 3
+(Settings + Integration architecture) del mismo plan, cada una en su
+propio worktree; sin dependencia de archivo compartida salvo `main.py`/
+`permission_repository.py`, que el controlador resuelve de forma
+aditiva al fusionar.

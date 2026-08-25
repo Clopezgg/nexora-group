@@ -62,6 +62,34 @@ requisito propio en esta matriz -- quedan como sub-alcance NOT_STARTED de
 `NXR-REQ-0091` mismo, ver `task-3-report.md` para qué read path
 reutilizaría cada uno.
 
+Plan "reports-search-analytics", Task 1 (Global Search, `NXR-REQ-0092`)
+construido en `track/h-search`: `search_service.search()` real
+(`app/services/search_service.py`) hace un `ilike` acotado por
+`company_id` de su propio modelo por cada uno de los diez tipos de
+entidad del alcance (`Project`, `Supplier`, `Customer`,
+`SupplierInvoice`, `CustomerInvoice`, `PurchaseOrder`, `Document`,
+`RequestForInformation`, `FixedAsset`, `Equipment`) -- ninguno de estos
+modelos se modificó, es puramente de solo lectura sobre datos existentes
+(sin tabla/migración nueva, por eso `DB` se marca `➖`). API real
+`GET /api/search?companyId=&q=` (permiso nuevo `search.global`/`read`,
+otorgado ampliamente igual que `document.document`/`read`, más
+`assert_company_access` -- INV-COMP-001 real, con test dedicado que
+prueba que una company nunca ve resultados de otra). Frontend real:
+`CommandPalette.tsx` ahora acepta un `searchRemote` opcional (debounce
+200ms) cuyos resultados se **mezclan de forma aditiva** con el filtro
+local de navegación existente -- nunca lo reemplazan, así el palette
+nunca queda en blanco mientras la llamada real está en curso o falla;
+`AppLayout.tsx` provee ese `searchRemote` vía `searchService.ts` usando
+`useActiveCompany()`. RED/GREEN evidence real para los diez tipos de
+entidad (un test por tipo, más el test de aislamiento por company) y
+para el frontend (una corrida con `AppLayout` desconectado del
+`searchRemote` real confirma que el test de "aparece un resultado real"
+falla; se restauró y todo vuelve a `GREEN`) -- ver `task-1-report.md`.
+`Audit` se marca `➖`: una búsqueda de solo lectura no es un evento de
+negocio auditable (mismo criterio que `NXR-REQ-0091`/Notifications).
+`E2E` queda `⬜` (consistente con el resto del proyecto, sin Playwright
+todavía).
+
 ## CORE
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
@@ -207,7 +235,7 @@ reutilizaría cada uno.
 | NXR-REQ-0089 | Segregation of Duties | ✅·✅·✅·✅·➖·✅·✅·✅·⬜ | IMPLEMENTED | Track G (task-2): `requested_by != decided_by` siempre (422 `NXR-WORKFLOW-001`, `SegregationOfDutiesError`), RED/GREEN evidence real; doble-decisión rechazada (409 `NXR-WORKFLOW-002`, `InvalidApprovalStateError`); `ApprovalPolicy.requires_third_role` exige un `executed_by` distinto de solicitante y aprobador cuando aplica, RED/GREEN evidence real con los dos casos (rechazo y aceptación); sin UI dedicada propia (se expresa como el propio flujo de decide en `ApprovalInboxPage.tsx`); falta E2E |
 | NXR-REQ-0090 | Audit (append-only) | ✅·✅·✅·✅·✅·✅·➖·✅·⬜ | IMPLEMENTED | Track G (task-1): `AuditLog` real (`app/models/audit.py`), append-only (nunca UPDATE/DELETE), migración `e91bb3d86df2` sobre head real `04d3e460a8a7`; `audit_service.record(...)` invocado explícitamente desde la capa de ruta (nunca hook oculto de ORM, nunca cambio de firma de servicio existente); `GET /api/audit` con aislamiento de company real (`assert_company_access`, test cruzado con rol `Finance Manager` porque `Auditor` ya es `SCOPE_ANY`); permiso `audit.log`/`read`; `AuditLogPage.tsx` real en `/control/auditoria` (entrada de nav ya reservada, no se inventó sección nueva). Instrumentado por ahora: AP approve+pay, Treasury cash-closing approve + remittance create, Procurement PO approve (5 rutas, ver `docs/AUDIT.md`) — el resto de dominios (Project Control, Enterprise Resources, Commercial, Construction Control, y el resto de Financial Core) sigue sin instrumentar, backlog honesto en `docs/AUDIT.md`; falta E2E |
 | NXR-REQ-0091 | Notifications | ✅·✅·✅·✅·✅·✅·➖·✅·⬜ | IMPLEMENTED | Track G (task-3): `Notification` real (`app/models/notification.py`, `recipient_user_id` FK real a `users.id`), migración `234785d5331f` sobre head real `773bebddf1a9`; disparada desde los call sites reales de Task 2 -- `approval_service.create_request()` notifica a `assigned_to` (`type="approval.assigned"`), `approval_service.decide()` notifica a `requested_by` (`type="approval.decided"`), ambos dentro del propio servicio (no la ruta) porque `decide()` es un entry point llamado directamente por otro código además de la ruta HTTP, RED/GREEN evidence real; API `GET/POST /api/notifications` (`unreadOnly`, mark-read) sin `assert_company_access` -- una `Notification` pertenece a un usuario, no a una compañía, la propiedad se verifica directo contra `current_user.id` (403 `NXR-PERM-001` si no coincide, RED/GREEN evidence real incluyendo mutación temporal del guard para confirmar que el test realmente lo cubre); `NotificationBell.tsx` montado en `Topbar.tsx` real (reemplaza el ícono placeholder `disabled` que ya existía), poll real cada 30s vía `refetchInterval`, badge de no-leídas, marcar-como-leída invalida la query (refetch real, no mutación local, test de frontend lo prueba). Columna Audit marcada `➖`: crear/leer una notificación no es en sí un evento de negocio auditable (no es un `AccountingDocument` ni una decisión de dominio), así que no se instrumentó con `audit_service`. Alcance explícitamente no cubierto: los disparadores de alertas financieras/de proyecto nombrados en el brief de esta task (presupuesto excedido, factura AP vencida) -- no tienen ID de requisito propio en esta matriz (`NXR-REQ-0092-0096` ya están asignados a Global Search/Reporting/Export/Settings/Integration, sin relación); quedan NOT_STARTED como sub-alcance de este mismo requisito, ver `task-3-report.md` para el read path que reutilizaría cada uno; falta E2E |
-| NXR-REQ-0092 | Global Search (Cmd/Ctrl+K) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0092 | Global Search (Cmd/Ctrl+K) | ✅·➖·✅·✅·✅·✅·➖·✅·⬜ | IMPLEMENTED | Track H (task-1): `search_service.search()` real (ilike, company-scoped) sobre los diez tipos de entidad del alcance; `GET /api/search` real (permiso `search.global`/read, `assert_company_access`); `CommandPalette.tsx` mezcla resultados reales vía `searchRemote` (debounce, aditivo, nunca en blanco); RED/GREEN real por tipo + aislamiento de company + frontend; ver `task-1-report.md` |
 | NXR-REQ-0093 | Reporting (por dominio) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0094 | Export (CSV/XLSX/PDF) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0095 | Settings | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |

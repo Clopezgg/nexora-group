@@ -10,19 +10,34 @@ export interface CommandItem {
 
 interface CommandPaletteProps {
   items: CommandItem[]
+  /**
+   * Optional cross-entity search (NXR-REQ-0092, `GET /api/search`). Called
+   * (debounced) whenever the query is >= 2 chars; its results are merged
+   * additively into the local nav-filter matches, never replacing them, so
+   * the palette is never blank while a remote lookup is in flight or fails.
+   */
+  searchRemote?: (query: string) => Promise<CommandItem[]>
 }
 
 /**
- * Global Cmd/Ctrl+K launcher. Today it searches the app's own navigation
- * (real, live data — every route that exists), not a placeholder. Cross-entity
- * search (documents, journals, suppliers, POs, …) plugs in here once
- * `GET /api/v1/search` exists (NXR-REQ-0092, owned by Track G) — this
- * component's contract (items: id/label/group/path) is designed to accept
- * that feed without changing shape.
+ * Global Cmd/Ctrl+K launcher. Always searches the app's own navigation
+ * (real, live data — every route that exists) as a client-side filter; when
+ * `searchRemote` is provided, cross-entity results (documents, journals,
+ * suppliers, POs, …) are merged in as the user types.
  */
-export function CommandPalette({ items }: CommandPaletteProps) {
+export function CommandPalette({ items, searchRemote }: CommandPaletteProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  // Remote results are tagged with the query they answer -- `filtered` only
+  // consumes them when that query still matches the current one, so an
+  // in-flight/stale response from a shorter or earlier query never gets
+  // merged in. This avoids resetting state synchronously inside the effect
+  // below (react-hooks/set-state-in-effect): the effect only ever calls
+  // setRemoteState from its async callbacks, never from its own body.
+  const [remoteState, setRemoteState] = useState<{ query: string; results: CommandItem[] }>({
+    query: '',
+    results: [],
+  })
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -38,11 +53,41 @@ export function CommandPalette({ items }: CommandPaletteProps) {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  useEffect(() => {
+    const q = query.trim()
+    if (!searchRemote || q.length < 2) return
+    let cancelled = false
+    const timer = setTimeout(() => {
+      searchRemote(q)
+        .then((results) => {
+          if (!cancelled) setRemoteState({ query: q, results })
+        })
+        .catch(() => {
+          if (!cancelled) setRemoteState({ query: q, results: [] })
+        })
+    }, 200)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [query, searchRemote])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return items.slice(0, 8)
-    return items.filter((item) => item.label.toLowerCase().includes(q)).slice(0, 20)
-  }, [items, query])
+    const localMatches = items.filter((item) => item.label.toLowerCase().includes(q))
+    const merged = [...localMatches]
+    const seen = new Set(merged.map((item) => item.id))
+    if (remoteState.query === query.trim()) {
+      for (const result of remoteState.results) {
+        if (!seen.has(result.id)) {
+          merged.push(result)
+          seen.add(result.id)
+        }
+      }
+    }
+    return merged.slice(0, 20)
+  }, [items, query, remoteState])
 
   if (!open) return null
 

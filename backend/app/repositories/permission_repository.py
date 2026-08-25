@@ -173,6 +173,11 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     # Administrator/Auditor, mismo patrón que audit.log).
     ("workflow.approval", "read", "Ver la bandeja de aprobaciones"),
     ("workflow.approval", "decide", "Aprobar/rechazar una solicitud de aprobación"),
+    # Track H -- Reports/Search/Analytics (orden maestra §92-96, NXR-REQ-0092
+    # Global Search). Se otorga ampliamente (mismo patrón que
+    # document.document/read) porque casi todo rol operativo necesita poder
+    # buscar entidades por nombre/número dentro de su propio company scope.
+    ("search.global", "read", "Buscar entidades globalmente"),
 )
 # NOTA: ActiveUIContext (GET/PUT /api/context) NO pasa por este motor de
 # permisos -- es una preferencia personal del usuario autenticado (su
@@ -232,6 +237,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("audit.log", "read", SCOPE_OWN),
         ("workflow.approval", "read", SCOPE_OWN),
         ("workflow.approval", "decide", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     "Treasury Manager": (
         ("core.company", "read", SCOPE_ANY),
@@ -257,6 +263,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("ap.supplier_payment", "read", SCOPE_OWN),
         ("ar.customer_receipt", "create", SCOPE_OWN),
         ("ar.customer_receipt", "read", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     "Accountant": (
         ("core.company", "read", SCOPE_OWN),
@@ -277,6 +284,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("ar.customer_invoice", "read", SCOPE_OWN),
         ("asset.fixed_asset", "read", SCOPE_OWN),
         ("asset.depreciation", "read", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     "Auditor": (
         ("core.company", "read", SCOPE_ANY),
@@ -337,6 +345,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("safety.incident", "read", SCOPE_ANY),
         ("audit.log", "read", SCOPE_ANY),
         ("workflow.approval", "read", SCOPE_ANY),
+        ("search.global", "read", SCOPE_ANY),
     ),
     "Viewer": (
         ("core.company", "read", SCOPE_OWN),
@@ -362,6 +371,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("quality.corrective_action", "read", SCOPE_OWN),
         ("safety.observation", "read", SCOPE_OWN),
         ("safety.incident", "read", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     "Project Manager": (
         ("core.company", "read", SCOPE_ANY),
@@ -413,6 +423,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("safety.incident", "close", SCOPE_OWN),
         ("workflow.approval", "read", SCOPE_OWN),
         ("workflow.approval", "decide", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     "Project Controller": (
         ("core.company", "read", SCOPE_ANY),
@@ -436,6 +447,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("quality.corrective_action", "read", SCOPE_OWN),
         ("safety.observation", "read", SCOPE_OWN),
         ("safety.incident", "read", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     "Procurement Manager": (
         ("core.company", "read", SCOPE_OWN),
@@ -460,6 +472,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("inventory.item", "read", SCOPE_OWN),
         ("inventory.warehouse", "read", SCOPE_OWN),
         ("inventory.stock", "read", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     "Buyer": (
         ("core.company", "read", SCOPE_OWN),
@@ -477,6 +490,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("procurement.three_way_match", "read", SCOPE_OWN),
         ("inventory.item", "read", SCOPE_OWN),
         ("inventory.warehouse", "read", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     "Warehouse Manager": (
         ("core.company", "read", SCOPE_OWN),
@@ -491,6 +505,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("inventory.stock", "move", SCOPE_OWN),
         ("inventory.physical_count", "create", SCOPE_OWN),
         ("inventory.physical_count", "approve", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     # Track D -- Enterprise Resources. "Equipment Manager" tiene la custodia
     # física de activos/equipos/mantenimiento; no otorga asset.depreciation
@@ -512,6 +527,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("equipment.maintenance_order", "update", SCOPE_OWN),
         ("workforce.worker", "create", SCOPE_OWN),
         ("workforce.worker", "read", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     # "Operations User": personal de campo/site que registra combustible,
     # abre órdenes de mantenimiento y reporta sus propias horas -- no
@@ -526,6 +542,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("workforce.worker", "read", SCOPE_OWN),
         ("workforce.time_entry", "create", SCOPE_OWN),
         ("workforce.time_entry", "read", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
     # Track E -- Commercial. "Sales Manager" es dueño del flujo Lead ->
     # Opportunity -> Customer/Quotation -> SalesContract; para facturar
@@ -548,6 +565,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("crm.quotation", "convert", SCOPE_OWN),
         ("crm.sales_contract", "read", SCOPE_OWN),
         ("crm.sales_contract", "bill", SCOPE_OWN),
+        ("search.global", "read", SCOPE_OWN),
     ),
 }
 

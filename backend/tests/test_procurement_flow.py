@@ -450,3 +450,84 @@ def test_quotation_exposes_delivery_and_payment_terms_for_bid_comparison(client)
 
     listed = client.get(f"/api/procurement/rfqs/{rfq['id']}/quotations").json()
     assert listed[0]["deliveryDays"] == 15
+
+
+def _login_as_finance_manager_for(client, db_session, *, company_id: str, email: str):
+    user = create_user_with_role(db_session, email=email, role_name="Finance Manager")
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_id))
+    db_session.commit()
+    login_as(client, email=email)
+
+
+def test_requisition_approval_requires_access_to_its_company(client, db_session):
+    """INV-COMP-001: sin este guard cualquier usuario con
+    `procurement.requisition/approve` en SU compañía podía aprobar la
+    requisición de otra compañía."""
+    login_admin(client)
+    company_a = create_company(client, name="Requisition Approve A")
+    company_b = create_company(client, name="Requisition Approve B")
+    pr = client.post(
+        "/api/procurement/requisitions",
+        json={"companyId": company_a["id"], "lines": [{"description": "Arena", "quantity": "5.0000"}]},
+    ).json()
+
+    _login_as_finance_manager_for(client, db_session, company_id=company_b["id"], email="req-approve@nexora.group")
+
+    response = client.post(f"/api/procurement/requisitions/{pr['id']}/approve")
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_goods_receipts_listing_requires_access_to_the_pos_company(client, db_session):
+    """INV-COMP-001: `GET /procurement/goods-receipts` no llamaba
+    `assert_company_access` en absoluto -- fuga de lectura cross-company."""
+    login_admin(client)
+    company_a = create_company(client, name="Goods Receipt List A")
+    company_b = create_company(client, name="Goods Receipt List B")
+    supplier = _create_supplier(client, company_id=company_a["id"])
+    item = _create_item(client, company_id=company_a["id"])
+    warehouse = _create_warehouse(client, company_id=company_a["id"])
+    po = _create_po(client, company_id=company_a["id"], supplier_id=supplier["id"], item_id=item["id"])
+
+    _login_as_finance_manager_for(client, db_session, company_id=company_b["id"], email="gr-list@nexora.group")
+
+    response = client.get(f"/api/procurement/goods-receipts?purchase_order_id={po['id']}")
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_three_way_match_requires_access_to_the_pos_company(client, db_session):
+    login_admin(client)
+    company_a = create_company(client, name="3WM Access A")
+    company_b = create_company(client, name="3WM Access B")
+    supplier = _create_supplier(client, company_id=company_a["id"])
+    item = _create_item(client, company_id=company_a["id"])
+    warehouse = _create_warehouse(client, company_id=company_a["id"])
+    po = _create_po(client, company_id=company_a["id"], supplier_id=supplier["id"], item_id=item["id"])
+
+    _login_as_finance_manager_for(client, db_session, company_id=company_b["id"], email="3wm-access@nexora.group")
+
+    response = client.post(
+        "/api/procurement/three-way-match",
+        json={
+            "purchaseOrderId": po["id"],
+            "supplierInvoiceAmount": "1000.00",
+            "supplierInvoiceQuantity": "100.0000",
+        },
+    )
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_goods_receipt_creation_on_unknown_po_returns_404_not_500(client):
+    login_admin(client)
+    response = client.post(
+        "/api/procurement/goods-receipts",
+        json={
+            "purchaseOrderId": "00000000-0000-0000-0000-000000000000",
+            "warehouseId": "00000000-0000-0000-0000-000000000000",
+            "receivedAt": "2026-08-24",
+            "lines": [],
+        },
+    )
+    assert response.status_code == 404, response.text

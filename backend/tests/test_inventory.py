@@ -456,3 +456,34 @@ def test_return_to_supplier_rejects_a_supplier_from_another_company(client, db_s
 
     assert response.status_code == 422, response.text
     assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_physical_count_approval_requires_access_to_its_company(client, db_session):
+    """INV-COMP-001: sin este guard cualquier usuario con
+    `inventory.physical_count/approve` en SU compañía podía aprobar el
+    conteo físico de otra compañía, generando ajustes de stock ajenos."""
+    login_admin(client)
+    company, item, warehouse = _setup(client)
+    client.post(
+        "/api/inventory/stock/receive",
+        json={"companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
+              "quantity": "50.0000", "unitCost": "4.0000"},
+    )
+    count = client.post(
+        "/api/inventory/physical-counts",
+        json={
+            "companyId": company["id"],
+            "warehouseId": warehouse["id"],
+            "countDate": "2026-08-24",
+            "lines": [{"itemId": item["id"], "expectedQuantity": "50.0000", "countedQuantity": "47.0000"}],
+        },
+    ).json()
+
+    company_b = create_company(client, name="Foreign count company")
+    _login_warehouse_manager_for_company(
+        client, db_session, company_id=company_b["id"], email="foreign-count@nexora.group"
+    )
+
+    response = client.post(f"/api/inventory/physical-counts/{count['id']}/approve")
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "NXR-PERM-001"

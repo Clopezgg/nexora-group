@@ -88,6 +88,18 @@ def approve_requisition(
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.requisition", "approve")),
 ):
+    requisition = procurement_repository.get_requisition(db, requisition_id)
+    if requisition is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Requisición no encontrada")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="procurement.requisition",
+        action="approve",
+        company_id=requisition.company_id,
+    )
     requisition = procurement_service.approve_requisition(db, requisition_id=requisition_id, approved_by_id=user.id)
     return _requisition_response(db, requisition)
 
@@ -339,8 +351,20 @@ def send_purchase_order(
 def list_goods_receipts(
     purchase_order_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("procurement.goods_receipt", "read")),
+    user=Depends(require_permission("procurement.goods_receipt", "read")),
 ):
+    order = procurement_repository.get_purchase_order(db, purchase_order_id)
+    if order is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="procurement.goods_receipt",
+        action="read",
+        company_id=order.company_id,
+    )
     receipts = procurement_repository.list_goods_receipts_for_po(db, purchase_order_id)
     return [GoodsReceiptResponse.model_validate(r, from_attributes=True) for r in receipts]
 
@@ -352,10 +376,13 @@ def create_goods_receipt(
     user=Depends(require_permission("procurement.goods_receipt", "create")),
 ):
     order = procurement_repository.get_purchase_order(db, payload.purchase_order_id)
-    if order is not None:
-        assert_company_access(
-            db, user_id=user.id, resource="procurement.goods_receipt", action="create", company_id=order.company_id
-        )
+    if order is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+    assert_company_access(
+        db, user_id=user.id, resource="procurement.goods_receipt", action="create", company_id=order.company_id
+    )
     receipt = procurement_service.record_goods_receipt(
         db,
         company_id=order.company_id,
@@ -376,10 +403,13 @@ def create_service_entry(
     user=Depends(require_permission("procurement.service_entry", "create")),
 ):
     order = procurement_repository.get_purchase_order(db, payload.purchase_order_id)
-    if order is not None:
-        assert_company_access(
-            db, user_id=user.id, resource="procurement.service_entry", action="create", company_id=order.company_id
-        )
+    if order is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+    assert_company_access(
+        db, user_id=user.id, resource="procurement.service_entry", action="create", company_id=order.company_id
+    )
     entry = procurement_service.record_service_entry(
         db,
         company_id=order.company_id,
@@ -397,8 +427,20 @@ def create_service_entry(
 def run_three_way_match(
     payload: ThreeWayMatchRequest,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("procurement.three_way_match", "create")),
+    user=Depends(require_permission("procurement.three_way_match", "create")),
 ):
+    order = procurement_repository.get_purchase_order(db, payload.purchase_order_id)
+    if order is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="procurement.three_way_match",
+        action="create",
+        company_id=order.company_id,
+    )
     result = procurement_service.run_three_way_match(
         db,
         purchase_order_id=payload.purchase_order_id,

@@ -16,6 +16,17 @@ def count_active_projects(db: Session) -> int:
     return db.execute(stmt).scalar_one()
 
 
+def count_active_projects_for_companies(db: Session, *, company_ids: list[uuid.UUID]) -> int:
+    if not company_ids:
+        return 0
+    stmt = (
+        select(func.count())
+        .select_from(Project)
+        .where(Project.status == "ACTIVE", Project.company_id.in_(company_ids))
+    )
+    return db.execute(stmt).scalar_one()
+
+
 def list_projects_for_company(db: Session, company_id: uuid.UUID) -> list[Project]:
     stmt = select(Project).where(Project.company_id == company_id).order_by(Project.created_at)
     return list(db.execute(stmt).scalars())

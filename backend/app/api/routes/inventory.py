@@ -297,5 +297,17 @@ def approve_physical_count(
     db: Session = Depends(get_db),
     user=Depends(require_permission("inventory.physical_count", "approve")),
 ):
+    existing = inventory_repository.get_physical_count(db, physical_count_id)
+    if existing is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Conteo físico no encontrado")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="inventory.physical_count",
+        action="approve",
+        company_id=existing.company_id,
+    )
     count = inventory_service.apply_physical_count(db, physical_count_id=physical_count_id, approved_by_id=user.id)
     return PhysicalCountResponse.model_validate(count, from_attributes=True)

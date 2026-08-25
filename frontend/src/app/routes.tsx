@@ -25,6 +25,7 @@ import { WorkersPage } from '../features/workforce/WorkersPage'
 import { TimeEntriesPage } from '../features/workforce/TimeEntriesPage'
 import { DocumentsPage } from '../features/documents/DocumentsPage'
 import { AuditLogPage } from '../features/audit/AuditLogPage'
+import { ReportsPage } from '../features/reports/ReportsPage'
 import { ApprovalInboxPage } from '../features/approvals/ApprovalInboxPage'
 import { RfiSubmittalsPage } from '../features/rfi/RfiSubmittalsPage'
 import { DailyReportsPage } from '../features/site/DailyReportsPage'
@@ -63,6 +64,12 @@ import { navItems } from './navigation'
 // `/control/configuracion` (Task 3, NXR-REQ-0095, Settings) mismo criterio:
 // ya existía como entrada reservada ("Configuración") en navigation.ts --
 // no se inventó una sección nueva, se implementó la ruta ya reservada.
+// `/control/reportes` (Task 2 de este plan, NXR-REQ-0093/0094) mismo
+// criterio: ya existía como entrada reservada ("Reportes") en
+// navigation.ts -- no se inventó una ruta nueva. Los dos reportes de esta
+// fase (Trial Balance + Budget vs Actual) viven bajo ese único slot como
+// tabs (ReportsPage), mismo patrón que EquipmentPage ya usa para alojar
+// varias sub-vistas bajo distintas entradas de nav.
 const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/finanzas/tesoreria': <TreasuryPage />,
   '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
@@ -88,6 +95,7 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/control/documentos': <DocumentsPage />,
   '/control/auditoria': <AuditLogPage />,
   '/control/configuracion': <CompanySettingsPage />,
+  '/control/reportes': <ReportsPage />,
   '/inicio/aprobaciones': <ApprovalInboxPage />,
   '/proyectos/diario-de-obra': <DailyReportsPage />,
   '/proyectos/calidad': <QualityPage />,

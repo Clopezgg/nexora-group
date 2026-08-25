@@ -25,6 +25,7 @@ from app.api.routes import (
     procurement,
     projects,
     quality,
+    reports,
     rfi,
     safety,
     site_reports,
@@ -117,6 +118,11 @@ def create_app() -> FastAPI:
     app.include_router(audit.router, prefix="/api")
     app.include_router(approvals.router, prefix="/api")
     app.include_router(notifications.router, prefix="/api")
+    # Track H - Reports/Search/Analytics (NXR-REQ-0093/0094): Trial
+    # Balance + Budget vs Actual + CSV export only -- see
+    # docs/superpowers/specs/2026-08-25-reports-search-analytics-design.md
+    # for what is deliberately out of scope in this phase.
+    app.include_router(reports.router, prefix="/api")
 
     return app
 

@@ -24,6 +24,7 @@ import { EquipmentPage } from '../features/equipment/EquipmentPage'
 import { WorkersPage } from '../features/workforce/WorkersPage'
 import { TimeEntriesPage } from '../features/workforce/TimeEntriesPage'
 import { DocumentsPage } from '../features/documents/DocumentsPage'
+import { AuditLogPage } from '../features/audit/AuditLogPage'
 import { RfiSubmittalsPage } from '../features/rfi/RfiSubmittalsPage'
 import { DailyReportsPage } from '../features/site/DailyReportsPage'
 import { QualityPage } from '../features/quality/QualityPage'
@@ -50,7 +51,10 @@ import { navItems } from './navigation'
 // (DEFERRED-FINAL-008). `/proyectos/seguridad` es un ítem de navegación
 // nuevo agregado por Task 3 (Safety, NXR-REQ-0084) -- no existía una
 // entrada reservada para Seguridad en navigation.ts, mismo criterio que
-// RFI/Submittals usó para `/proyectos/rfi-submittals`.
+// RFI/Submittals usó para `/proyectos/rfi-submittals`. `/control/auditoria`
+// (Track G, NXR-REQ-0090) ya existía como entrada reservada en
+// navigation.ts ("Auditoría") -- no se inventó una sección Plataforma
+// nueva, se implementó la ruta ya reservada.
 const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/finanzas/tesoreria': <TreasuryPage />,
   '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
@@ -74,6 +78,7 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/recursos/combustible': <EquipmentPage />,
   '/recursos/mantenimiento': <EquipmentPage />,
   '/control/documentos': <DocumentsPage />,
+  '/control/auditoria': <AuditLogPage />,
   '/proyectos/diario-de-obra': <DailyReportsPage />,
   '/proyectos/calidad': <QualityPage />,
   '/proyectos/seguridad': <SafetyPage />,

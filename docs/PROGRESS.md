@@ -1210,3 +1210,106 @@ mismo warning preexistente de chunk >500kB, sin relación con este task).
 Rama `track/g-workflow-audit` preparada e integration-ready con Task 1 +
 Task 2, no fusionada a `feat/nexora-greenfield` todavía — pendiente de
 revisión/merge por el coordinador.
+
+## Track G, Task 3 — Notifications (`NXR-REQ-0091`)
+
+Construido en la misma rama `track/g-workflow-audit`/worktree
+`nexora-group-trackG`, sobre el head real de Task 2 ya fusionado
+(`773bebddf1a9`, confirmado con `alembic heads` antes de generar la
+migración de esta task).
+
+**Corrección de numeración detectada al verificar el brief contra
+`docs/REQUIREMENTS_TRACEABILITY.md` (fuente de verdad real)**: el brief de
+esta task y el título de la task titulan Notifications como
+`NXR-REQ-0092`. La tabla PLATFORM real del traceability matrix asigna
+`NXR-REQ-0091` a Notifications y `NXR-REQ-0092` a un requisito
+**distinto y no relacionado** (Global Search Cmd/Ctrl+K); `0093-0096`
+tampoco son alertas financieras/de proyecto — son Reporting/Export/
+Settings/Integration architecture. Esta entrada actualiza `NXR-REQ-0091`,
+no `NXR-REQ-0092`; `NXR-REQ-0092` se deja intacto (Global Search sigue
+`NOT_STARTED`, no es responsabilidad de este task).
+
+`Notification` (`app/models/notification.py`): `recipient_user_id` FK real
+a `users.id` (`ondelete=CASCADE`), `type`/`title`/`body`, `entity_type`/
+`entity_id` opcionales, `read_at` nullable. Migración `234785d5331f`
+(`down_revision` = `773bebddf1a9`, verificado real). El test del brief
+para el modelo usaba un `uuid.uuid4()` al azar como `recipient_user_id`;
+como la FK se aplica de verdad contra Postgres (no es un mock), ese
+uuid random viola la constraint — se corrigió el test para usar el admin
+de bootstrap real, sin relajar la FK del modelo (el diseño explícitamente
+la pide como FK real).
+
+`notification_service.notify()`/`mark_read()` — capa delgada sobre
+`notification_repository`, sin importar ningún servicio de dominio (evita
+el riesgo de import circular con `approval_service`).
+
+**Wiring real verificado contra el código real de Task 2, no asumido**:
+el test `test_deciding_an_approval_request_notifies_the_requester` llama a
+`approval_service.decide()` **directamente**, sin pasar por la ruta HTTP
+— por eso el disparo de notificación no puede vivir en
+`app/api/routes/approvals.py` (ese layer nunca se ejecuta en ese test), y
+tiene que vivir dentro de `approval_service.py` mismo. Dos puntos de
+disparo reales:
+- `approval_service.create_request()` (`app/services/approval_service.py`):
+  tras crear la fila, si `assigned_to` es un usuario puntual (no solo
+  `assigned_role`), notifica a `assigned_to` (`type="approval.assigned"`).
+  Si solo hay `assigned_role` sin usuario resuelto todavía, no se notifica
+  a nadie individual — no se inventa un fan-out a todo el rol.
+- `approval_service.decide()`: tras aplicar la decisión (y el adaptador de
+  dominio si existe), notifica a `request.requested_by`
+  (`type="approval.decided"`).
+
+RED real confirmado antes de escribir el wiring (`assert len(notes) == 1`
+fallaba con `0 == 1`); GREEN real después.
+
+API `GET/POST /api/notifications` (`app/api/routes/notifications.py`,
+registrada en `main.py`). A diferencia de todas las demás rutas de este
+repo, **no** llama a `assert_company_access` — una `Notification`
+pertenece a un usuario, no a una compañía, así que la verificación de
+propiedad en `POST /{id}/read` compara `row.recipient_user_id` contra
+`current_user.id` directamente y lanza `NotAuthorizedError` (`NXR-PERM-001`,
+403) si no coinciden. Verificado con mutación real: se deshabilitó
+temporalmente el `if` de la ruta, se confirmó que el test de aislamiento
+fallaba (200 en vez de 403), y se restauró el check — evidencia RED/GREEN
+real, no solo lectura del código.
+
+Frontend: `NotificationBell.tsx` montado en `frontend/src/layouts/Topbar.tsx`
+(no en `AppLayout.tsx` directamente — se leyó `AppLayout.tsx` primero, que
+solo compone `<Topbar>`; el icono de campana ya existía como placeholder
+`disabled` en el topbar real, se reemplazó por el componente real).
+`useQuery(['notifications'], ...)` con `refetchInterval: 30000` (no había
+convención previa de polling en el repo; se usó el valor por defecto
+sugerido por el brief). El badge de no-leídas se calcula filtrando la
+misma respuesta por `readAt == null` — una sola query real, sin duplicar
+polling. Marcar como leída invalida la query (`invalidateQueries`) en vez
+de mutar estado local — el test de frontend confirma que, tras marcar
+como leída, el botón de "Marcar como leída" desaparece del panel
+**porque hubo un refetch real**, mismo patrón de prueba que
+`ApprovalInboxPage.test.tsx`.
+
+Verificación: backend 195/195 pytest (191 previos + 4 nuevos en
+`test_notifications.py` -- nota: el entry de Task 2 en este mismo archivo
+reporta 189, no 191, como baseline; no se re-auditó esa aritmética, se
+reporta el número real observado en este worktree), `alembic upgrade head`
+limpio, un único head de
+Alembic (`234785d5331f`). Frontend: typecheck limpio, `eslint .` limpio,
+61/61 vitest (59 previos + 2 nuevos en `NotificationBell.test.tsx`),
+`npm run build` OK (862 módulos, mismo warning preexistente de chunk
+>500kB, sin relación con este task).
+
+**Alcance explícitamente NO cubierto esta task** (honesto, no implícito):
+los disparadores de alertas financieras/de proyecto nombrados en el brief
+(umbral de presupuesto excedido, factura AP vencida) — el brief los
+etiquetaba como "NXR-REQ-0093-0096", pero esos IDs ya están asignados en
+el traceability matrix real a Reporting/Export/Settings/Integration, no
+hay un ID de requisito dedicado para estas alertas específicas; quedan
+como sub-alcance no iniciado de `NXR-REQ-0091` mismo. Reutilizarían,
+cuando se construyan: el read path de `budget_service`
+(`app/services/budget_service.py`, ya calcula consumido vs. presupuestado
+por WBS/proyecto) para el umbral de presupuesto, y el read path de
+`ap_service` sobre `SupplierInvoice.due_date`/`status` para facturas AP
+vencidas — ninguno de los dos se tocó en este task.
+
+Rama `track/g-workflow-audit` preparada e integration-ready con Task 1 +
+Task 2 + Task 3, no fusionada a `feat/nexora-greenfield` todavía —
+pendiente de revisión/merge por el coordinador.

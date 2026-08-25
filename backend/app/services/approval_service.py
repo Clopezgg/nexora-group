@@ -13,6 +13,7 @@ from app.domain.errors import (
 from app.models.approval_policy import ApprovalPolicy
 from app.models.approval_request import ApprovalRequest
 from app.repositories import approval_repository
+from app.services import notification_service
 
 # Mismo patrón que submittal_service.py::SUBMITTAL_DECISIONS -- whitelist
 # explícito, no un enum de dominio separado por módulo. `decide()` valida
@@ -63,7 +64,7 @@ def create_request(
     amount: Decimal | None = None,
     project_id: uuid.UUID | None = None,
 ) -> ApprovalRequest:
-    return approval_repository.create(
+    request = approval_repository.create(
         db,
         policy_id=policy_id,
         entity_type=entity_type,
@@ -78,6 +79,21 @@ def create_request(
         amount=amount,
         status="PENDING",
     )
+    # Notifica a `assigned_to` -- si la solicitud solo tiene `assigned_role`
+    # (sin un usuario puntual todavía), no hay destinatario único a quien
+    # notificar; ese caso queda para cuando el inbox resuelva el rol a un
+    # usuario concreto, no se inventa un fan-out a todo el rol aquí.
+    if assigned_to is not None:
+        notification_service.notify(
+            db,
+            recipient_user_id=assigned_to,
+            type="approval.assigned",
+            title="Nueva aprobación pendiente",
+            body=f"Tienes una solicitud de aprobación de {module} esperando tu decisión",
+            entity_type=entity_type,
+            entity_id=entity_id,
+        )
+    return request
 
 
 def decide(
@@ -119,4 +135,16 @@ def decide(
         adapter(db, request.entity_id, decision, decided_by)
 
     db.flush()
+
+    decision_label = "aprobada" if decision == "APPROVED" else "rechazada"
+    notification_service.notify(
+        db,
+        recipient_user_id=request.requested_by,
+        type="approval.decided",
+        title="Tu solicitud de aprobación fue decidida",
+        body=f"Tu solicitud de {request.module} fue {decision_label}",
+        entity_type=request.entity_type,
+        entity_id=request.entity_id,
+    )
+
     return request

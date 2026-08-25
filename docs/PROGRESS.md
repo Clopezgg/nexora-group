@@ -345,3 +345,36 @@ Filas actualizadas en `docs/REQUIREMENTS_TRACEABILITY.md`: NXR-REQ-0028,
 dueño Track A/C, contrato de integración ya documentado en
 docs/BUDGET_CONTROLLING.md para que no tengan que rediseñar nada al
 aterrizar.
+
+### 2026-08-24 — Track A integrado sobre B+C (Task 4)
+
+Merge `feat/nexora-greenfield` (Track 1+F+B+C, HEAD `1401ca2`) → `track/a-
+financial-core`, `--no-ff`, todos los conflictos resueltos de forma
+aditiva. Dos hallazgos reales durante la integración, no solo mecánica de
+merge:
+
+- **Colisión de PK real en `document_types.code`**: Track A y Track C
+  sembraron el mismo código `SIN` con significados distintos (Track A =
+  "Factura de proveedor / accrual"; Track C = "Entrada de servicio", ver
+  la entrada de Track C arriba en esta bitácora, que describe el estado
+  *antes* de esta integración). Como `code` es PK real, habría roto la
+  numeración de uno de los dos flujos. Se renombró el código de Track C a
+  `SEN` (`entryNumber` ahora usa el prefijo `SEN-YYYY-NNNNNN`, no
+  `SIN-YYYY-NNNNNN`); el `SIN` de Track A (ya certificado con tests AP)
+  quedó intacto. `docs/PROCUREMENT.md` y la fila NXR-REQ-0047 de
+  `docs/REQUIREMENTS_TRACEABILITY.md` actualizadas para reflejar `SEN-`.
+- **Placeholder de texto libre → FK real**: `SupplierInvoice.supplier_name`/
+  `supplier_tax_id` reemplazados por `supplier_id` FK real a
+  `Supplier` (Track C), validado contra la company propietaria
+  (INV-COMP-001) igual que el resto de FKs financieras.
+
+Alembic `58ce35982711` (Track A, sin publicar) relinkeado a
+`down_revision = '8bf7c353d327'` (head real de Track C, verificado desde
+los archivos de migración, no asumido). Cadena única, un solo head
+(`a91c7d4e2f36`), `alembic upgrade head` limpio en base descartable.
+Backend 120/120 pytest + compileall limpio; frontend typecheck/lint
+limpios, 30/30 vitest, build OK.
+
+Rama `track/a-financial-core` preparada e integration-ready, no fusionada
+a `feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
+coordinador (mismo patrón que Task 2).

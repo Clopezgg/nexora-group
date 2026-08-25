@@ -15,7 +15,9 @@ documento independiente — nunca un "mega documento".
 
 Numeración (vía `numbering_service`, la misma infraestructura
 concurrency-safe de Track 1): `PR-YYYY-NNNNNN`, `RFQ-YYYY-NNNNNN`,
-`PO-YYYY-NNNNNN`, `GR-YYYY-NNNNNN`, `SIN-YYYY-NNNNNN` (Service Entry).
+`PO-YYYY-NNNNNN`, `GR-YYYY-NNNNNN`, `SEN-YYYY-NNNNNN` (Service Entry —
+`SIN` ya está tomado por Track A, factura de proveedor/accrual; ver
+`app/models/document_type.py`).
 
 ## Servicio (`app/services/procurement_service.py`)
 

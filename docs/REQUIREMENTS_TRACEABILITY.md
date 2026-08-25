@@ -88,7 +88,7 @@ placeholder.
 | NXR-REQ-0044 | Bid Comparison | 🔶·➖·✅·✅·⬜·⬜·⬜·⬜·⬜ | IN_PROGRESS | `quotation_total()` por cotización permite comparar manualmente; no hay endpoint agregado de comparación ni pantalla — ver `docs/PROCUREMENT.md` pendiente |
 | NXR-REQ-0045 | Purchase Order | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Lifecycle completo `DRAFT→APPROVED→SENT→PARTIALLY_RECEIVED/RECEIVED`; PO de proyecto rechaza moneda no funcional (`NXR-PROCUREMENT-002`); UI, numeración y tests reales |
 | NXR-REQ-0046 | Goods Receipt | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Recepción parcial y completa, actualiza `quantity_received` + status de PO + Stock Ledger real, `GoodsReceiptsPage`, test de sobre-recepción rechazada |
-| NXR-REQ-0047 | Service Entry | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `ServiceEntry` con período/avance/valor aceptado, numeración `SIN-YYYY-NNNNNN`; sin pantalla dedicada (no estaba en el alcance de frontend acordado) |
+| NXR-REQ-0047 | Service Entry | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `ServiceEntry` con período/avance/valor aceptado, numeración `SEN-YYYY-NNNNNN`; sin pantalla dedicada (no estaba en el alcance de frontend acordado) |
 | NXR-REQ-0048 | Three-Way Match | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `run_three_way_match` (INV-PROC-001): diferencias fuera de tolerancia nunca se descartan, siempre quedan en `exceptions`; test MATCHED y EXCEPTION reales |
 
 ## SUPPLY CHAIN

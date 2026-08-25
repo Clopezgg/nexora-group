@@ -224,6 +224,35 @@ un dominio nuevo.
 - `frontend/tests/AuditLogPage.test.tsx`: página real contra la API real
   (mockeada a nivel de `fetch`), nunca datos fabricados.
 
+## Limitación conocida: no atomicidad entre la decisión y el audit write
+
+`approval_service.decide()` (Track G Task 2) invoca el adaptador de
+decisión del dominio propietario (p.ej. `ap_service.apply_approval_decision`),
+que a su vez llama a una función de servicio existente
+(`approve_supplier_invoice`) que ya hace su propio `db.commit()`
+internamente. La ruta (`POST /api/approvals/{id}/decide`) recién después
+llama `audit_service.record(...)` y hace su propio `db.commit()`. Si el
+proceso falla en la ventana entre esos dos commits, la decisión y la
+mutación real de dominio ya quedaron persistidas, pero el registro de
+auditoría de ese evento se pierde — sin riesgo de integridad financiera
+ni de datos (la transacción de negocio ya es correcta y completa), solo
+un hueco de completitud del audit trail para ese evento puntual.
+
+Este mismo patrón ya existe, sin marcar, en las 5 rutas que instrumentó
+Task 1 (`approve_supplier_invoice`/`pay_supplier_invoice`/
+`create_remittance`/`approve_cash_closing`/`approve_purchase_order`
+todas hacen su propio `db.commit()` interno antes de que la ruta llegue
+a su propio `audit_service.record()` + `db.commit()`). No es un defecto
+introducido por Task 2 — es una consecuencia estructural de instrumentar
+auditoría en la capa de ruta sin cambiar la firma/contrato de commit de
+los servicios de dominio existentes (que este plan prohíbe
+explícitamente tocar). Se resolvería dando a cada servicio de dominio
+instrumentado un parámetro `commit: bool = True` (por defecto
+preservando el comportamiento actual para todo el resto de llamadores)
+para que la ruta controle el límite real de la transacción — cambio que
+un futuro task dedicado a esta contract de commit-boundary a nivel de
+proyecto debería hacer, no una instrumentación de auditoría puntual.
+
 ## Frontend
 
 `frontend/src/features/audit/AuditLogPage.tsx` — ruta `/control/auditoria`

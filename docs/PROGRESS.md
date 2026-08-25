@@ -777,3 +777,139 @@ entradas).
 Rama `track/d-enterprise-resources` preparada e integration-ready, no
 fusionada a `feat/nexora-greenfield` todavía — pendiente de revisión/merge
 por el coordinador (mismo patrón que todos los tracks anteriores).
+
+### 2026-08-25 — Track D (Construction Control) — Daily Site Reports + Quality + Safety (Task 3)
+
+Mismo plan que Task 1 (`docs/superpowers/sdd/2026-08-25-track-d-construction-control/`),
+`NXR-REQ-0081`/`0082`/`0083`/`0084`. Worktree
+`/Users/clopezg/nexora-group-trackD-site`, branch
+`track/d-site-quality-safety`, ramificada de `feat/nexora-greenfield` desde
+el ancestro `9eba0ac` (Task 1 ya incluido). Un implementador anterior en
+este mismo worktree dejó el trabajo como WIP (commit `08b7635`) al chocar
+con el límite de sesión de la cuenta — ese commit dejó explícito que nada
+estaba verificado (sin compilar, sin tests corridos, sin UI, sin
+self-review). Esta sesión retomó ese WIP: se revisó archivo por archivo
+contra `docs/DOCUMENTS_EVIDENCE.md` y el resto de convenciones del repo
+antes de confiar en él, se completó lo que faltaba (frontend real) y se
+verificó todo con evidencia real — nada se dio por bueno solo porque "se
+veía correcto".
+
+**Hallazgo del WIP**: el backend heredado (dominio/DB/repositorios/
+servicios/rutas/schemas/tests de `DailySiteReport`, `QualityInspection`/
+`NonConformance`/`CorrectiveAction`, `SafetyObservation`/`SafetyIncident`,
+más la migración Alembic) seguía correctamente el contrato de adjunto de
+`docs/DOCUMENTS_EVIDENCE.md` (`evidence_id` FK única con
+`assert_evidence_belongs_to_company` antes de persistir, tabla de unión
+`daily_site_report_photos` para los adjuntos múltiples del reporte diario,
+igual que `RfqSupplier`), el registro aditivo de permisos/rutas/modelos
+era correcto, y los 4 comportamientos nombrados en el brief ya tenían test
+real escrito (no solo happy-path). No se descartó nada — se verificó y se
+completó.
+
+**Implementado (`NXR-REQ-0081`/`0082`/`0083`/`0084`, IMPLEMENTED):**
+
+- `DailySiteReport` (`app/models/site_report.py`): PROJECT-scoped
+  obligatorio (`project_id NOT NULL`, mismo criterio que `WBSNode`/
+  `ChangeOrder`/`ProgressRecord` — sin columna `company_id` propia, se
+  deriva de `project.company_id`), flujo `DRAFT → SUBMITTED →
+  APPROVED/REJECTED` con transición única por estado (mismo criterio que
+  `TimeEntry`/`ChangeOrder`). `DailySiteReportPhoto` es la tabla de unión
+  de adjuntos múltiples (`evidence_id` FK `ondelete=RESTRICT`, validada con
+  `assert_evidence_belongs_to_company` antes de insertar).
+- `QualityInspection`/`NonConformance`/`CorrectiveAction`
+  (`app/models/quality.py`): INV-QUALITY-001 — una `NonConformance` no
+  puede pasar a `CLOSED` sin al menos una `CorrectiveAction` registrada
+  (validado en el service, no expresable como `CHECK` de una sola tabla).
+- `SafetyObservation`/`SafetyIncident` (`app/models/safety.py`):
+  INV-SAFETY-001 — la severidad determina qué campos son obligatorios: un
+  registro `HIGH`/`CRITICAL` siempre requiere `responsible_user_id`,
+  validado **dos veces** (service, antes de cualquier `db.add`/`flush`, Y
+  `CHECK` real de PostgreSQL
+  `ck_safety_{observations,incidents}_high_severity_requires_responsible`
+  — defensa en profundidad).
+- API: `/api/site-reports` (crear/listar/obtener/adjuntar foto/enviar/
+  aprobar/rechazar), `/api/quality/inspections`,
+  `/api/quality/non-conformances` (crear/listar/obtener/cerrar),
+  `/api/quality/non-conformances/{id}/corrective-actions` (crear/listar),
+  `/api/quality/corrective-actions/{id}/complete`,
+  `/api/safety/observations` y `/api/safety/incidents`
+  (crear/listar/obtener/cerrar). Permisos nuevos `site.daily_report`,
+  `quality.inspection`, `quality.non_conformance`,
+  `quality.corrective_action`, `safety.observation`, `safety.incident`,
+  otorgados a Administrator (`ANY`, automático vía `_BASE_PERMISSIONS`),
+  Project Manager (`OWN`, create/read/approve/close/complete),
+  Project Controller/Auditor/Viewer (`read` únicamente).
+- Errores de dominio nuevos (`app/domain/errors.py` +
+  `error_handlers.py`): `InvalidSiteReportStateError` (`NXR-SITE-001`,
+  409), `InvalidQualityStateError` (`NXR-QUALITY-001`, 409),
+  `NonConformanceRequiresCorrectiveActionError` (`NXR-QUALITY-002`, 409),
+  `InvalidSafetyRecordError` (`NXR-SAFETY-001`, 422),
+  `InvalidSafetyStateError` (`NXR-SAFETY-002`, 409).
+- Frontend real (no `PlaceholderPage`): `DailyReportsPage.tsx`
+  (`/proyectos/diario-de-obra`) — lista reportes del proyecto activo
+  (`RequiresActiveProject`, mismo patrón que `ProgressPage`/`BudgetPage`),
+  modal de creación, modal de detalle con envío/aprobación/rechazo y subida
+  de fotos reales (`documentService.uploadEvidence` + `attachPhoto`).
+  `QualityPage.tsx` (`/proyectos/calidad`) — pestañas Inspecciones/No
+  conformidades (`Tabs` del design system); No conformidades incluye modal
+  de acciones correctivas con "Completar" y "Cerrar no conformidad" (el
+  botón de cierre existe siempre que la no conformidad esté `OPEN`; si el
+  backend la rechaza por no tener ninguna acción correctiva, el error real
+  de la API se muestra en el formulario — no se oculta ni se simula éxito).
+  `SafetyPage.tsx` (`/proyectos/seguridad`, ítem de navegación nuevo en
+  `navigation.ts` — no existía, mismo criterio que RFI/Submittals usó para
+  agregar el suyo) — pestañas Observaciones/Incidentes, formulario marca
+  "ID de usuario responsable" como obligatorio en el cliente cuando la
+  severidad es Alta/Crítica (validación real vive en el backend; el
+  cliente solo evita un round-trip innecesario). No existe todavía un
+  directorio de usuarios en el frontend (ningún track anterior lo
+  construyó) — el campo de responsable es un UUID de texto libre
+  pre-rellenado con el usuario autenticado actual, editable.
+
+**TDD real**: los 4 comportamientos nombrados en el brief ya tenían test
+real en el WIP heredado —
+`test_daily_site_report_requires_project_id_at_domain_and_db_level`
+(rechazo 422 a nivel de schema Pydantic Y `IntegrityError` real insertando
+directo contra el modelo sin pasar por el service),
+`test_non_conformance_requires_corrective_action_before_closure`
+(`NXR-QUALITY-002` al cerrar sin acción correctiva, éxito después de
+agregar una), `test_safety_incident_severity_drives_required_fields`
+(`NXR-SAFETY-001` en HIGH sin responsable, éxito con responsable, LOW sin
+responsable también exitoso) y
+`test_company_access_blocks_cross_company_quality_resource` (403
+`NXR-PERM-001`). Esta sesión no pudo re-derivar RED por mutación
+deliberada de código (el harness de permisos bloqueó los intentos de
+edición temporal como medida de seguridad contra sabotaje accidental) —
+la verificación de rigor se hizo por inspección estática línea por línea
+de cada guard (service + constraint real de PostgreSQL) contra la
+aserción exacta de cada test, confirmando que el guard removido
+produciría el fallo esperado. Los 3 tests de frontend nuevos
+(`DailyReportsPage.test.tsx`, `QualityPage.test.tsx`,
+`SafetyPage.test.tsx`, 9 casos) sí se escribieron esta sesión contra
+comportamiento real (empty state sin proyecto activo, listado real sin
+filas fabricadas, cambio de pestaña con carga real).
+
+**Verificación real**: merge limpio de `feat/nexora-greenfield` (`3c81160`)
+sin conflictos (solo trajo `docs/AGENT_HANDOFF.md`, sin cambios de código
+— Task 4/RFI-Submittals seguía sin fusionar en ese momento). `alembic
+heads` → un solo head (`04d3e460a8a7`, `down_revision=eaf5b6c0d061`),
+`alembic upgrade head` limpio en una base Postgres descartable
+completamente fresca (`nexora_freshcheck_task3`, creada y destruida en
+esta sesión, cadena completa desde `create_initial_schema`). Backend:
+167/167 pytest (154 previos + 13 nuevos de
+`test_site_reports.py`/`test_quality.py`/`test_safety.py`), `compileall`
+limpio, sin config de lint/typecheck en `backend/` (no existe
+`pyproject.toml`/`.flake8`, mismo estado que tracks anteriores). Frontend:
+typecheck limpio, `eslint .` limpio, 53/53 vitest (44 previos + 9 nuevos),
+`npm run build` OK (850 módulos, PWA precache 7 entradas, mismo warning
+preexistente de chunk >500kB que ya traían los tracks anteriores).
+
+`DEFERRED-FINAL-009` queda resuelto — ver `docs/DEFERRED.md` (ya estaba
+desactualizado: Documents se resolvió en Task 1, y ahora Site/Quality/
+Safety se resuelven en esta Task 3; solo RFI/Submittals del bloque
+`NXR-REQ-0077`-`0086` queda pendiente de integración, tarea separada del
+mismo plan).
+
+Rama `track/d-site-quality-safety` preparada e integration-ready, no
+fusionada a `feat/nexora-greenfield` todavía — pendiente de revisión/merge
+por el coordinador (mismo patrón que todos los tracks anteriores).

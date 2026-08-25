@@ -75,8 +75,20 @@ certificar el 100%.
   `docs/PROGRESS.md`). Pendiente de revisión/merge del coordinador a
   `feat/nexora-greenfield` — no se marca `VERIFIED` en
   `docs/REQUIREMENTS_TRACEABILITY.md` hasta que eso ocurra.
-- `DEFERRED-FINAL-009` — Track D: el slice Documents/Site/Quality está
-  NOT_STARTED (no existe dominio, DB, service, API ni UI todavía).
+- `DEFERRED-FINAL-009` — **RESUELTO (2026-08-25, Track D Task 1 +
+  Task 3).** Cuando se escribió este item el slice Documents/Site/Quality
+  estaba NOT_STARTED. Documents/Evidence se resolvió en Task 1
+  (`track/d-enterprise-resources`, ver `docs/DOCUMENTS_EVIDENCE.md`) y
+  Daily Site Reports/Quality/Safety se resolvió en Task 3
+  (`track/d-site-quality-safety`, `NXR-REQ-0081/0082/0083/0084`): dominio,
+  DB (constraint real de PostgreSQL para PROJECT-scoped obligatorio y para
+  severidad→responsable), service, API y UI real (`DailyReportsPage`/
+  `QualityPage`/`SafetyPage`) completos, ver `docs/PROGRESS.md`. Solo
+  RFI/Submittals (`NXR-REQ-0085`/`0086`) del bloque CONSTRUCTION CONTROL
+  sigue pendiente de integración (tarea separada del mismo plan). Pendiente
+  de revisión/merge del coordinador a `feat/nexora-greenfield` — no se
+  marca `VERIFIED` en `docs/REQUIREMENTS_TRACEABILITY.md` hasta que eso
+  ocurra.
 - `DEFERRED-FINAL-010` — Track D: `FixedAssetsPage` y el formulario de
   bitácora de combustible de `EquipmentPage` fijan `scope: 'GENERAL'` en el
   cliente; el backend soporta completamente activos/bitácoras de
@@ -112,6 +124,19 @@ certificar el 100%.
   Notifications) — no bloquea Documents/Evidence ni los tracks que los
   consuman mientras tanto (Daily Site Reports/Quality/Safety, RFI/
   Submittals).
+- `DEFERRED-FINAL-015` — Track D (Task 3, Site/Quality/Safety): no existe
+  todavía ningún directorio/selector de usuarios en el frontend (ningún
+  track anterior lo construyó — Track A tampoco lo necesitó para
+  `approved_by`/`uploaded_by`, que siempre usan el usuario autenticado
+  actual). `NonConformance`/`CorrectiveAction`/`SafetyObservation`/
+  `SafetyIncident` requieren `responsible_user_id`; `QualityPage.tsx`/
+  `SafetyPage.tsx` lo resuelven con un campo de texto UUID pre-rellenado
+  con el usuario autenticado (editable para asignar a otro usuario si se
+  conoce su UUID de memoria) en vez de un selector real con nombres. No es
+  un mock — el backend valida el UUID real — pero es una UX pobre para
+  asignar tareas a terceros. Se resuelve agregando un endpoint de listado
+  de usuarios por compañía (no existe hoy) y reemplazando el campo de texto
+  por un `Select`/`Combobox` real.
 
 ## Bloqueos externos
 

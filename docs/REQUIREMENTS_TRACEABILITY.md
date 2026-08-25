@@ -15,14 +15,15 @@ placeholder.
 **Estados:** `NOT_STARTED` · `IN_PROGRESS` · `IMPLEMENTED` ·
 `VERIFIED` · `BLOCKED_EXTERNAL`.
 
-Última actualización: plan "track-d-construction-control" task-1
-(Documents + Evidence foundation, `NXR-REQ-0077/0078/0079`), construido en
-`track/d-enterprise-resources` sobre la integración completa de
-Track 1+F+B+C+A+D+E. `Document`/`DocumentVersion`/`Evidence` reales +
-`ProgressRecord.evidence_id` (FK real, ya no texto libre) — ver
-`docs/DOCUMENTS_EVIDENCE.md` y `task-1-report.md`. El resto del bloque
-CONSTRUCTION CONTROL (Daily Site Reports/Quality/Safety/RFI/Submittals,
-NXR-REQ-0081-0086) sigue `NOT_STARTED`, tareas posteriores del mismo plan.
+Última actualización: plan "track-d-construction-control" task-3 (Daily
+Site Reports + Quality + Safety, `NXR-REQ-0081/0082/0083/0084`),
+construido en `track/d-site-quality-safety` sobre task-1 (Documents +
+Evidence foundation, `NXR-REQ-0077/0078/0079`, ya `IMPLEMENTED`).
+`DailySiteReport`/`QualityInspection`/`NonConformance`/`CorrectiveAction`/
+`SafetyObservation`/`SafetyIncident` reales — ver `docs/PROGRESS.md` y
+`task-3-report.md`. Solo RFI/Submittals (`NXR-REQ-0085`/`0086`) del bloque
+CONSTRUCTION CONTROL sigue pendiente de integración (tarea separada del
+mismo plan, en progreso en paralelo).
 
 ## CORE
 
@@ -153,10 +154,10 @@ NXR-REQ-0081-0086) sigue `NOT_STARTED`, tareas posteriores del mismo plan.
 | NXR-REQ-0078 | Document Versioning | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-1): versión anterior SUPERSEDED (nunca borrada/editada), índice único parcial `uq_document_versions_one_active_per_document` garantiza una sola versión ACTIVE por documento incluso bajo escritura concurrente, RED/GREEN evidence real (ver task-1-report.md) |
 | NXR-REQ-0079 | Evidence (PDF/JPEG/PNG/WEBP validado) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-1): `Evidence` real (`app/models/evidence.py`), `evidence_service.upload_evidence` valida MIME allowlist + `max_evidence_mb` ANTES de tocar Azure Blob, `EvidenceStorageNotConfigured` registrado como 503 real `NXR-EVIDENCE-001` (nunca URL fabricada), `ProgressRecord.evidence_ref` migrado a FK real `evidence_id` (mismo patrón que Supplier/Customer) |
 | NXR-REQ-0080 | Vouchers / comprobantes (PDF profesional) | ✅·➖·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: PDF vectorial generado desde AccountingDocument real con ReportLab; endpoint protegido por company; falta UI dedicada |
-| NXR-REQ-0081 | Daily Site Reports | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0082 | Quality (Inspection/Checklist) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0083 | Non-Conformance / Corrective Action | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0084 | Safety (Incident/Observation/Checklist) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0081 | Daily Site Reports | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-3): `DailySiteReport` PROJECT-scoped obligatorio (`project_id NOT NULL` real, mismo criterio que WBSNode/ChangeOrder/ProgressRecord), flujo DRAFT→SUBMITTED→APPROVED/REJECTED, `DailySiteReportPhoto` tabla de unión de adjuntos múltiples (evidence_id validado con `assert_evidence_belongs_to_company`), API `/api/site-reports`, `DailyReportsPage.tsx` real (no placeholder); falta audit trail (sistémico, `DEFERRED-FINAL-014`) y E2E |
+| NXR-REQ-0082 | Quality (Inspection/Checklist) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-3): `QualityInspection` PROJECT-scoped, resultado PENDING/PASS/FAIL, API `/api/quality/inspections`, `QualityPage.tsx` real (pestaña Inspecciones); falta audit trail (`DEFERRED-FINAL-014`) y E2E |
+| NXR-REQ-0083 | Non-Conformance / Corrective Action | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-3): INV-QUALITY-001 real — una `NonConformance` no puede cerrarse (`NXR-QUALITY-002`) sin al menos una `CorrectiveAction` registrada, validado en `quality_service.close_non_conformance`, RED/GREEN evidence real (ver `task-3-report.md`); API `/api/quality/non-conformances` + `/corrective-actions`, `QualityPage.tsx` real (pestaña No conformidades); falta audit trail y E2E |
+| NXR-REQ-0084 | Safety (Incident/Observation/Checklist) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track D (task-3): INV-SAFETY-001 real — severidad HIGH/CRITICAL exige `responsible_user_id`, validado dos veces (service ANTES de `db.add`/`flush` Y `CHECK` real de PostgreSQL `ck_safety_*_high_severity_requires_responsible`, defensa en profundidad), RED/GREEN evidence real; API `/api/safety/observations` + `/api/safety/incidents`, `SafetyPage.tsx` real (`/proyectos/seguridad`, ítem de navegación nuevo); falta audit trail y E2E |
 | NXR-REQ-0085 | RFI | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0086 | Submittals | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 
@@ -260,3 +261,16 @@ línea por línea contra este resumen y se corrigió un desfase de 1 fila
 (NXR-REQ-0033 estaba IMPLEMENTED en la tabla pero faltaba en esta
 enumeración); sigue sujeto a una pasada final
 de verificación end-to-end antes de certificar cualquier `VERIFIED`.
+
+**Nota de honestidad (2026-08-25, Task 3 de
+`track-d-construction-control`):** el tally de arriba (0/69/26/27/2 = 124)
+quedó desactualizado desde antes de esta tarea — no refleja todavía la
+integración de Track D Task 1 (Documents/Evidence, `NXR-REQ-0077/0078/
+0079`, 3 filas NOT_STARTED→IMPLEMENTED) ni de esta Task 3 (Daily Site
+Reports/Quality/Safety, `NXR-REQ-0081/0082/0083/0084`, 4 filas
+NOT_STARTED→IMPLEMENTED, ver filas arriba). Las filas individuales de la
+tabla ya están correctas (fuente de verdad real); este tally agregado
+necesita un recontado línea por línea completo del archivo, que no se hizo
+en esta sesión para no introducir un nuevo desfase bajo presión de tiempo
+— queda como trabajo pendiente explícito para el próximo recuento
+sistémico, no oculto.

@@ -1674,3 +1674,52 @@ Verificación real ejecutada en este checkpoint:
 actividad operativa/inversión/financiamiento persistida), reportes de
 Treasury/Procurement y Earned Value compuesto de Project quedan como
 subproyectos futuros independientes.
+
+## 2026-08-25 — AP wired into the real Approval Inbox (resolves DEFERRED-FINAL-016)
+
+`approval_service.create_request` had zero real production callers since
+Track G built the Approval Inbox: `ap_service.apply_approval_decision` and
+`submittal_service.apply_approval_decision` were registered as `decide()`
+adapters, but nothing ever created the `ApprovalRequest` that would reach
+them — confirmed by grep, not assumption. Picked AP as the candidate
+(more clearly scoped than Submittal, which already has its own
+`respond`/`decide` flow without an assignment concept).
+
+Backend: `ap_service.submit_supplier_invoice_for_approval` moves a DRAFT
+invoice to `REVIEW` and calls `approval_service.create_request(...)` for
+real, behind `POST /api/ap/supplier-invoices/{id}/submit-for-approval`
+(new `ap.supplier_invoice/submit` permission, granted wherever `create`
+already was). The route validates the assigned approver actually holds
+`workflow.approval/decide` and company access before creating the
+request — otherwise it would be a dead-end nobody could ever act on (422
+`NXR-FINANCIAL-001`). Deciding that request through the existing
+`/api/approvals/{id}/decide` now really executes
+`ap_service.apply_approval_decision` — previously reachable only from
+tests calling `approval_service.decide()` directly, never from an actual
+HTTP flow. `approve_supplier_invoice`/`cancel_supplier_invoice` now accept
+both `DRAFT` and `REVIEW` as valid starting states, so the pre-existing
+direct `.../approve` endpoint (no workflow) keeps working unchanged.
+
+Frontend: `AccountsPayablePage.tsx` gains an "Enviar a aprobación" action
+on DRAFT invoices, opening a modal for the approver's user ID (free-text
+UUID — no company user-directory endpoint exists yet, a separately
+documented gap; same honest pattern `QualityPage.tsx` already uses for
+`responsibleUserId`, not a Select faked with invented names).
+
+Verification executed in this checkpoint:
+
+- `cd backend && ./.venv/bin/pytest -q` → 235/235 (+7 tests: real
+  ApprovalRequest creation, decision approves via the real adapter,
+  decision rejects via the real adapter, submitter-cannot-decide-own-
+  request SoD, cannot submit a non-DRAFT invoice, assigned approver
+  without decide permission is rejected, cross-company submit is denied).
+- `./.venv/bin/python -m compileall -q app tests` clean; `alembic heads`
+  → single head `234785d5331f`, no migration (no new table, `REVIEW` was
+  already a value in `SUPPLIER_INVOICE_STATUSES`).
+- `cd frontend && npm run typecheck && npm run lint` clean; `npm test --
+  run` → 79/79 (+1 test); `npm run build` clean, same pre-existing
+  `DEFERRED-FINAL-017` chunk-size warning, unchanged.
+
+`submittal_service` remains unconnected to `create_request` — left as a
+possible future subproject, not silently dropped (see updated
+`DEFERRED-FINAL-016` entry in `docs/DEFERRED.md`).

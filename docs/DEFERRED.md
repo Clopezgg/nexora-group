@@ -156,22 +156,31 @@ certificar el 100%.
   `IntegrityError` de FK genérico o específico en `error_handlers.py`, y
   (c) un endpoint de listado de usuarios por compañía (no existe hoy) para
   reemplazar el campo de texto por un `Select`/`Combobox` real.
-- `DEFERRED-FINAL-016` — Track G (Task 3, Notifications, 2026-08-25):
-  `approval_service.create_request` no tiene todavía ningún llamador real
+- `DEFERRED-FINAL-016` — **RESUELTO (2026-08-25, `NXR-REQ-0023`, sin
+  worktree separado — construido directamente en
+  `feat/nexora-greenfield`).** Track G (Task 3, Notifications, 2026-08-25):
+  `approval_service.create_request` no tenía todavía ningún llamador real
   en producción — confirmado por grep sobre todo `backend/app`: ni
-  `ap_service.py` ni `submittal_service.py` lo invocan, ambos solo
-  registran su adaptador de `decide()` vía `register_decision_adapter`
+  `ap_service.py` ni `submittal_service.py` lo invocaban, ambos solo
+  registraban su adaptador de `decide()` vía `register_decision_adapter`
   (`app/main.py`). El disparo de notificación "assigned_to al crear un
-  ApprovalRequest" (Task 3) está correctamente conectado al único punto
-  real de creación, pero ese punto en sí mismo nunca se ejecuta hoy en un
-  flujo de negocio real — es código muerto arquitectónicamente correcto,
-  no un defecto de Task 3 (su propio brief le pidió verificar contra el
-  código real de Task 2 y conectar el punto real, que es exactamente lo
-  que se hizo). Se resuelve conectando `ap_service`/`submittal_service`
-  (o el track que corresponda) para que llamen `approval_service.
-  create_request(...)` en el punto real donde hoy transicionan
-  directamente a un estado que debería requerir aprobación humana, en vez
-  de mutar su propio estado sin pasar por el Approval Inbox.
+  ApprovalRequest" (Task 3) estaba correctamente conectado al único punto
+  real de creación, pero ese punto en sí mismo nunca se ejecutaba en un
+  flujo de negocio real — código muerto arquitectónicamente correcto, no
+  un defecto de Task 3. Resuelto conectando `ap_service` (candidato más
+  claramente acotado frente a Submittal, que ya tenía su propio flujo
+  `respond`/`decide` sin concepto de asignación): `ap_service.
+  submit_supplier_invoice_for_approval` (DRAFT -> REVIEW) llama
+  `approval_service.create_request(...)` de verdad, vía
+  `POST /api/ap/supplier-invoices/{id}/submit-for-approval`. Decidir esa
+  solicitud desde `/api/approvals/{id}/decide` ahora ejecuta el adaptador
+  `ap_service.apply_approval_decision` por primera vez desde un flujo de
+  negocio real, no solo desde un test que llama `decide()` directamente.
+  `submittal_service` sigue sin conectar — su propio flujo de decisión
+  interno (`respond`/`decide`, sin Approval Inbox) queda como posible
+  subproyecto futuro independiente si se decide que Submittal también
+  debe pasar por el Inbox genérico. Ver `docs/PROGRESS.md` y
+  `docs/REQUIREMENTS_TRACEABILITY.md` (fila `NXR-REQ-0023`).
 
 - `DEFERRED-FINAL-017` — Track H (plan
   `2026-08-25-reports-search-analytics`): hardening menor detectado en las

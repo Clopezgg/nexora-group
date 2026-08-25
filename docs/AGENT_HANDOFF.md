@@ -4,8 +4,8 @@ evidence)
 Repository: Clopezgg/nexora-group
 Canonical branch: feat/nexora-greenfield
 Latest integrated SHA: see `git log -1` on `feat/nexora-greenfield`
-(financial statements slice: commits `0cfd7cb` backend, `4603fa5` frontend,
-docs commit follows this file)
+(financial statements slice: `0cfd7cb`/`4603fa5`/`4b928fd`; AP →
+Approval Inbox slice: `8500050`/`3b804c8`, docs commit follows this file)
 
 ## Canonical state
 
@@ -32,22 +32,34 @@ Integrated deliverables (all on `feat/nexora-greenfield`):
   `/control/reportes`. `NXR-REQ-0093` stays `IN_PROGRESS`: Cash Flow,
   Treasury/Procurement reports, and composed Project/Earned-Value reports
   remain genuinely unbuilt.
+- AP wired into the real Approval Inbox, `DEFERRED-FINAL-016` RESOLVED
+  (`NXR-REQ-0023`, 2026-08-25): see `docs/PROGRESS.md` entry "AP wired
+  into the real Approval Inbox". `ap_service.submit_supplier_invoice_for_
+  approval` (DRAFT -> REVIEW) is the first real caller of
+  `approval_service.create_request` in the whole backend, behind
+  `POST /api/ap/supplier-invoices/{id}/submit-for-approval`; deciding it
+  via `/api/approvals/{id}/decide` now really exercises the
+  `ap_service.apply_approval_decision` adapter. `submittal_service` is
+  still NOT wired to `create_request` — that remains open, see
+  `docs/DEFERRED.md` (`DEFERRED-FINAL-016` entry, updated not deleted) if
+  a future session wants to extend the same pattern there.
 
-Combined verification on 2026-08-25 (financial-statements slice, run from
-this session, real PostgreSQL, real commands — not inferred):
+Combined verification on 2026-08-25 (both slices above, run from this
+session, real PostgreSQL, real commands — not inferred):
 
-- Alembic: one head, `234785d5331f`; no migration added by this slice.
-- Backend: 228/228 pytest (`cd backend && ./.venv/bin/pytest -q`);
+- Alembic: one head, `234785d5331f`; no migration added by either slice.
+- Backend: 235/235 pytest (`cd backend && ./.venv/bin/pytest -q`);
   `python -m compileall -q app tests` clean.
-- Frontend: `npm run typecheck` and `npm run lint` clean; 78/78 Vitest
+- Frontend: `npm run typecheck` and `npm run lint` clean; 79/79 Vitest
   (`npm test -- --run`); `npm run build` clean (PWA/Vite). The existing
   >500 kB chunk warning is unchanged and still tracked in
   `DEFERRED-FINAL-017`.
 - `git diff --check` clean.
-- Traceability tally unchanged at the row-status level (only `NXR-REQ-0093`
-  description updated, still `IN_PROGRESS`): 0 `VERIFIED`, 90
-  `IMPLEMENTED`, 22 `IN_PROGRESS`, 10 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
-  across 124 rows.
+- Traceability tally unchanged at the row-status level (`NXR-REQ-0093` and
+  `NXR-REQ-0023` descriptions updated, statuses unchanged — both were
+  already `IN_PROGRESS`/`IMPLEMENTED`): 0 `VERIFIED`, 90 `IMPLEMENTED`,
+  22 `IN_PROGRESS`, 10 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL` across 124
+  rows.
 
 Housekeeping notes for whoever reads this next:
 
@@ -74,27 +86,31 @@ Housekeeping notes for whoever reads this next:
 
 ## Next priority
 
-Highest-value dependency-free gap at this checkpoint, confirmed against
-the real code (grep, not assumption):
+`DEFERRED-FINAL-016` is now RESOLVED (see above) — do not re-do it or
+re-wire AP again. Highest-value dependency-free gaps at this checkpoint,
+confirmed against the real code (grep, not assumption) as of 2026-08-25:
 
-1. **`DEFERRED-FINAL-016`** — `approval_service.create_request` exists
-   (`backend/app/services/approval_service.py`) but as of this checkpoint
-   still has zero real callers anywhere in `backend/app` (confirmed via
-   `grep -rn "create_request(" app/` excluding its own definition — empty).
-   `ap_service.py` and `submittal_service.py` only register `decide()`
-   adapters; neither calls `create_request` at the point where AP
-   invoices or Submittals transition into a state that should require
-   human approval. Wire one real caller (AP invoice approval-required
-   transition is the more clearly-scoped candidate) through
-   `approval_service.create_request(...)`, TDD, full gates, commit, push.
-2. Continue the explicit audit-instrumentation backlog documented in
-   `docs/AUDIT.md` (domains still missing `AuditLog` instrumentation).
+1. Continue the explicit audit-instrumentation backlog documented in
+   `docs/AUDIT.md` (domains still missing `AuditLog` instrumentation —
+   e.g. AP invoice create/cancel are explicitly called out as
+   uninstrumented in the `NXR-REQ-0023` traceability row).
+2. Optionally extend the same Approval Inbox pattern just built for AP to
+   `submittal_service` (still not wired to `approval_service.
+   create_request`, see `docs/DEFERRED.md` `DEFERRED-FINAL-016` for why it
+   was deliberately left out this round — Submittal already has its own
+   `respond`/`decide` flow without an assignment concept, so this is a
+   real design decision, not a mechanical copy).
 3. Remaining `NXR-REQ-0093` report catalog: Cash Flow (needs a persisted
    operating/investing/financing activity classification — evaluate
    whether that requires a schema decision before committing to a design,
    unlike General Ledger/Balance Sheet/Income Statement which needed
    none), Treasury/Procurement operational reports, and composed
    Project/Earned-Value reports.
+4. The missing company-scoped user-directory endpoint (no `GET /api/.../
+   users?companyId=` exists anywhere) is now a real UX gap in two places
+   (`QualityPage.tsx`'s `responsibleUserId`, the new AP submit-for-
+   approval modal) — both use an honest free-text UUID input instead of a
+   fabricated Select. Worth its own small vertical slice if picked up.
 
 Re-read `docs/MASTER_PLAN.md`, `docs/REQUIREMENTS_TRACEABILITY.md`,
 `docs/DEFERRED.md` and `docs/PRODUCTION_READINESS.md` before picking

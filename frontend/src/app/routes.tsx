@@ -21,6 +21,8 @@ import { ProjectsPage } from '../features/projects/ProjectsPage'
 import { WBSPage } from '../features/projects/WBSPage'
 import { FixedAssetsPage } from '../features/assets/FixedAssetsPage'
 import { EquipmentPage } from '../features/equipment/EquipmentPage'
+import { WorkersPage } from '../features/workforce/WorkersPage'
+import { TimeEntriesPage } from '../features/workforce/TimeEntriesPage'
 import { CustomersPage } from '../features/commercial/CustomersPage'
 import { LeadsPage } from '../features/commercial/LeadsPage'
 import { OpportunitiesPage } from '../features/commercial/OpportunitiesPage'
@@ -29,14 +31,17 @@ import { SalesContractsPage } from '../features/commercial/SalesContractsPage'
 import { navItems } from './navigation'
 
 // Track A (Financial Core), Track B (Project Control), Track C (Supply
-// Chain), Track D (Enterprise Resources -- Assets/Equipment/Maintenance;
-// Workforce/Time y Documents/Site/Quality quedan NOT_STARTED en el
-// frontend) y Track E (Commercial -- Lead/Opportunity/Customer/Quotation/
-// SalesContract; Facturación y Cobros del menú Comercial se resuelven
-// desde las páginas de AR ya existentes en Finanzas -- Track E nunca
-// duplica esa UI, ver docs/ACCOUNTING.md) implementan estas rutas; el
+// Chain), Track D (Enterprise Resources -- Assets/Equipment/Maintenance/
+// Workforce/Time; Documents/Site/Quality queda NOT_STARTED en el frontend,
+// ver DEFERRED-FINAL-009) y Track E (Commercial -- Lead/Opportunity/
+// Customer/Quotation/SalesContract; Facturación y Cobros del menú Comercial
+// se resuelven desde las páginas de AR ya existentes en Finanzas -- Track E
+// nunca duplica esa UI, ver docs/ACCOUNTING.md) implementan estas rutas; el
 // resto de navItems sigue como PlaceholderPage hasta que su track dueño
-// aterrice.
+// aterrice. Workers/TimeEntry viven en las rutas ya reservadas para ellos
+// en navigation.ts (`/recursos/personal`, `/recursos/tiempo`) -- no existe
+// un ítem de navegación `/recursos/mano-de-obra`, así que no se inventa uno
+// nuevo (DEFERRED-FINAL-008).
 const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/finanzas/tesoreria': <TreasuryPage />,
   '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
@@ -53,6 +58,8 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/abastecimiento/inventario': <InventoryPage />,
   '/abastecimiento/almacenes': <WarehousesPage />,
   '/abastecimiento/proveedores': <SuppliersPage />,
+  '/recursos/personal': <WorkersPage />,
+  '/recursos/tiempo': <TimeEntriesPage />,
   '/recursos/equipos': <EquipmentPage />,
   '/recursos/combustible': <EquipmentPage />,
   '/recursos/mantenimiento': <EquipmentPage />,

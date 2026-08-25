@@ -1,134 +1,149 @@
 Agent: Claude Code
 Repository: Clopezgg/nexora-group
 Canonical branch: feat/nexora-greenfield
-Latest integrated SHA: 9d2e32f (docs(audit): record the non-atomic decide+audit-write limitation) — pushed to origin/feat/nexora-greenfield
+Latest integrated SHA: a28b3d9 (merge: integrate Reporting into greenfield mission) — pushed to origin/feat/nexora-greenfield
 
 Current working branch: feat/nexora-greenfield (main worktree /Users/clopezg/nexora-group)
 
 Real Progress:
 
-Four plans are now fully CLOSED (git history is the record; all SDD
-workspaces deleted per the finishing step — do not reopen any of them):
+Four plans are now fully CLOSED (git history is the record; SDD
+workspaces deleted for all of them — do not reopen any):
 `docs/superpowers/plans/2026-08-24-interrupted-tracks-recovery.md`,
 `docs/superpowers/plans/2026-08-25-track-d-construction-control.md`,
 `docs/superpowers/plans/2026-08-25-track-g-workflow-audit.md`.
 
-Track G (Workflow/Approvals/Audit/Notifications, NXR-REQ-0087-0091) is
-DONE — all 4 tasks reviewed, merged, independently verified, pushed:
-- Task 1 — Audit trail foundation (`ba7fa01`). `AuditLog` (append-only,
-  route-layer instrumentation, zero existing service signatures
-  changed). 5 routes instrumented: AP approve/pay, Treasury
-  remittance-create/cash-closing-approve, Procurement PO-approve.
-  `docs/AUDIT.md` honestly lists what's NOT instrumented (Project
-  Control, Enterprise Resources, Commercial, Construction Control, rest
-  of Financial Core).
-- Task 2 — Approval Inbox + Segregation of Duties (`76dbae1`). Extended
-  the real, previously-unused `ApprovalPolicy` skeleton rather than
-  duplicating it. `ApprovalRequest` + per-module decision adapters for
-  AP/Submittal (real callbacks into each domain's own existing
-  service). One Important review finding fixed (decision-value
-  whitelist at both route and service layers); one Important finding
-  ruled and parked (decide()/audit-write non-atomicity — the only clean
-  fix would violate this plan's own "no new params on existing service
-  functions" constraint; same gap already existed unflagged in Task 1;
-  now documented in `docs/AUDIT.md`).
-- Task 3 — Notifications (`0830c07`). Wired to the real
-  `approval_service.create_request`/`decide` call sites. Found and
-  honestly documented that `create_request` has zero production callers
-  yet (`DEFERRED-FINAL-016`) — AP/Submittal only wire `decide()`
-  adapters, so the "notify on assignment" trigger is architecturally
-  correct but currently dead code; the "notify on decision" trigger
-  (which DOES fire, since `decide()` is live) works.
-- Task 4 — combined verification, traceability recount (`ec9e0be`).
-  Corrected a real mistake in the plan itself: it mislabeled
-  NXR-REQ-0093-0096 as "financial/project alerts" — they're actually
-  Reporting/Export/Settings/Integration architecture (verified against
-  the real traceability doc by Task 3's implementer, independently
-  re-confirmed by the controller). 86/124 rows now `IMPLEMENTED` (up
-  from 81), matches the table exactly.
+A fifth plan is IN PROGRESS (nearly done):
+`docs/superpowers/plans/2026-08-25-reports-search-analytics.md`
+(Reports/Search/Analytics, NXR-REQ-0092-0096), spec at
+`docs/superpowers/specs/2026-08-25-reports-search-analytics-design.md`,
+ledger at `.superpowers/sdd/2026-08-25-reports-search-analytics/progress.md`
+(READ THE LEDGER FIRST). Three genuinely independent tasks ran in
+parallel worktrees: Global Search (Task 1), Reporting (Task 2),
+Settings + Integration Architecture (Task 3). Task 4 (combined
+verification) has not started.
 
-Not Started (pick the next highest-dependency-free item — do not
-reinterpret scope from scratch, `docs/MASTER_PLAN.md` +
-`docs/PROGRESS.md` + `CLAUDE.md` are the source of truth per §6 of
-`CLAUDE.md`):
+Completed and merged into feat/nexora-greenfield (each independently
+reviewed with a fix loop where findings existed, then independently
+re-verified by the controller, then pushed):
+- Task 3 — Settings + Integration Architecture (`2de8e57`). Real
+  `PATCH /api/master-data/companies/{id}` for `legal_name`/`fiscal_id`
+  only (schema-level exclusion of `functional_currency`/`code`, not
+  just UI). `docs/INTEGRATION_ARCHITECTURE.md` fact-checked by the
+  reviewer against real code. One ratified judgment call: granted
+  `core.company:update` to Finance Manager (SCOPE_OWN) beyond the
+  brief's literal "same roles as create" instruction — reviewer
+  independently verified this is sound (Finance Manager already holds
+  significant SCOPE_OWN financial writes) and the controller ratified
+  it explicitly.
+- Task 2 — Reporting: Trial Balance + Budget vs Actual + CSV export
+  (`a28b3d9`). Reuses real `treasury_service.account_balance` (plan's
+  own draft wrongly assumed `accounting_service` — implementer
+  corrected this) and `budget_service.compute_summary`, zero parallel
+  calculation. Reviewer independently re-ran the test suite live and
+  verified the debit/credit sign convention against the actual function
+  body. Deliberately scoped to Trial Balance + Budget vs Actual only —
+  Balance Sheet/P&L/Cash Flow/Treasury reports/Procurement
+  reports/Earned Value are explicitly NOT built, honestly `NOT_STARTED`
+  sub-scope of NXR-REQ-0093 (`IN_PROGRESS`, not `IMPLEMENTED`).
 
-- **Reports/Search/Analytics** (the user's named Priority 4,
-  NXR-REQ-0092-0096: Global Search, Reporting, Export, Settings,
-  Integration architecture) — the clear next block per
-  `docs/MASTER_PLAN.md`'s Track G scope and the user's own stated
-  priorities. Needs its own brainstorm/plan before touching code —
-  Global Search alone (cross-entity, company-isolated, paginated) is a
-  real design question, and Financial Statements
-  (`docs/PRODUCTION_READINESS.md` §23) will eventually need real
-  Trial Balance/Balance Sheet/P&L/Cash Flow logic once this block is
-  built.
-- **`DEFERRED-FINAL-016`** — wire `approval_service.create_request`
-  into a real domain flow (AP or Submittal) so the Approval Inbox and
-  its "assigned" notification actually activate in production, not just
-  in tests. Small, well-scoped follow-up.
-- The remaining audit-instrumentation backlog `docs/AUDIT.md` names
-  (Project Control, Enterprise Resources, Commercial, Construction
-  Control domains, rest of Financial Core) — not required to keep
-  NXR-REQ-0090 `IMPLEMENTED` (it's honestly scoped to 5 routes already),
-  needed before any future `VERIFIED` claim on audit completeness.
-- NXR-REQ-0074 (Crews) — still `NOT_STARTED`, out of scope for every
-  plan run this session.
-- `docs/PRODUCTION_READINESS.md` — the full "absolute definition of
-  100%" checklist (backup/restore, disaster recovery, security cert,
-  PROD deployment, etc.), received as a standing order this session.
-  **Not actionable yet** — applies only at feature-freeze (90% real),
-  which hasn't been reached (currently 86/124 `IMPLEMENTED`, 21
-  `IN_PROGRESS`, 15 `NOT_STARTED`). Read it before ever claiming "100%"
-  or "production certified."
+**IN PROGRESS — READ CAREFULLY, DO NOT RE-DISPATCH FROM SCRATCH:**
 
-Deferred: see `docs/DEFERRED.md`. `DEFERRED-FINAL-014` (no audit
-mechanism) is now partially resolved. `DEFERRED-FINAL-016` is new
-(create_request has no production caller). One external blocker:
-`EXTERNAL-BLOCKER-001` (Azure deploy — do not run `az deployment ...
-create` without explicit point-in-time confirmation, `CLAUDE.md`
-§11.1).
+Task 1 (Global Search, NXR-REQ-0092) in worktree
+`/Users/clopezg/nexora-group-trackH-search`, branch `track/h-search`.
+Implementer reported DONE at commit `a226885` (base `e9cc998`, all ten
+named entity types — Project/Supplier/Customer/SupplierInvoice/
+CustomerInvoice/PurchaseOrder/Document/RequestForInformation/
+FixedAsset/Equipment — genuinely wired, company-isolated, capped).
+Review: **Approved with 1 Important finding** — company-isolation test
+only covered `Project`, not the other 9 types. **Fixed**, commit
+`20ec27f` on top of `a226885`: extended to 6/10 entity types chosen to
+cover every structurally distinct query-construction pattern in
+`search_service.py` (not raw entity count), and the implementer proved
+the new test's real value by injecting a dropped-filter bug into
+`SupplierInvoice` and confirming only that case failed. **Scoped
+re-review already confirmed this fix clean** (all findings addressed,
+no new breakage). Full suite 211/211 in that worktree.
 
-Alembic head: `234785d5331f` on `feat/nexora-greenfield` @ `9d2e32f`
-(single head, fresh-DB-upgrade verified by the controller through the
-full 15-revision chain).
+**This has NOT been merged into feat/nexora-greenfield yet.** The
+session hit its usage limit right after the re-review confirmation,
+before the controller-merge step.
 
-Backend tests: 195/195 passing (independently re-run by the
-controller).
+**Resume steps for Task 1:**
+1. In the main worktree (`/Users/clopezg/nexora-group`, already on
+   `feat/nexora-greenfield` @ `a28b3d9`, clean): `git merge --no-ff
+   track/h-search -m "merge: integrate Global Search into greenfield
+   mission"`. Expect additive conflicts in `docs/PROGRESS.md`,
+   `docs/REQUIREMENTS_TRACEABILITY.md` (NXR-REQ-0092 row + the "Última
+   actualización" prose + the Resumen tally), and
+   `frontend/src/app/routes.tsx` (import + route map entry) — same
+   shape as every prior parallel-task merge this session: each side's
+   own real content wins for its own rows/routes/log-entries, nothing
+   is actually contradictory. `main.py`/`permission_repository.py`
+   should auto-merge cleanly (both other tasks' merges already did).
+2. Independently verify from scratch — do not trust any implementer's
+   or reviewer's numbers: `alembic heads` (should stay
+   `234785d5331f`, no migration in this task), full backend `pytest -q`
+   (expect ~211+ depending on what Tasks 2/3 already contributed —
+   count what's actually there, don't assume), `compileall`, frontend
+   `typecheck`/`lint`/`test`/`build`, `git diff --check`.
+3. Update the ledger (`Task 1: complete (commits ..., merged as
+   <sha>, independently verified ...)`), push.
+4. Run Task 4 of this plan (combined verification + traceability
+   recount for NXR-REQ-0092-0096, same method as every prior plan's
+   final task this session — `grep -oP` the real per-row status,
+   compare to the prose Resumen, fix any discrepancy).
+5. Close the plan: collect ledger rulings into a final message, delete
+   `.superpowers/sdd/2026-08-25-reports-search-analytics/`, update this
+   handoff file to point at the next priority.
 
-Frontend tests: 61/61 Vitest passing (independently re-run),
-typecheck/lint/build all clean.
+Not Started (after this plan closes — read `docs/MASTER_PLAN.md` +
+`docs/PROGRESS.md` fresh, don't reinterpret scope from scratch):
+
+- Whatever `docs/MASTER_PLAN.md`/`docs/REQUIREMENTS_TRACEABILITY.md`
+  names as the next highest-dependency-free gap. As of this checkpoint,
+  once this plan closes: NXR-REQ-0093's deferred sub-scope (Balance
+  Sheet/P&L/Cash Flow/Treasury/Procurement reports/Earned Value),
+  `DEFERRED-FINAL-016` (wire `approval_service.create_request` into a
+  real AP/Submittal flow), and the remaining `docs/AUDIT.md`
+  instrumentation backlog are all real, medium-sized next candidates.
+- Per the user's own explicit standing order this session (see the
+  mega-instruction that authorized continuing through Reports/Search/
+  Analytics without pausing): after gaps close and 90% real is reached
+  — feature freeze, deferred burn-down, hardening, full E2E, critical
+  journey, Azure DEV, final certification, merge to main, 100%. **Read
+  `docs/PRODUCTION_READINESS.md` in full before any of that** — it's
+  the actual gate for "100%", not a reference to skim. Not actionable
+  yet (currently far from 90% IN_PROGRESS/NOT_STARTED = 0).
+
+Deferred: see `docs/DEFERRED.md`. Unchanged by this checkpoint. One
+external blocker: `EXTERNAL-BLOCKER-001` (Azure deploy — do not run `az
+deployment ... create` without explicit point-in-time confirmation,
+`CLAUDE.md` §11.1).
+
+Alembic head: `234785d5331f` on `feat/nexora-greenfield` @ `a28b3d9`
+(single head; neither Task 2 nor Task 3 needed a migration; Task 1
+shouldn't either, but confirm on merge).
+
+Backend tests: 203/203 passing on `feat/nexora-greenfield` @ `a28b3d9`
+(independently re-run by the controller). Task 1's worktree reports
+211/211 unmerged.
+
+Frontend tests: 70/70 Vitest passing on `feat/nexora-greenfield` @
+`a28b3d9` (independently re-run), typecheck/lint/build all clean.
 
 Azure status: unchanged — subscription ACTIVE, no resources deployed,
 do not deploy without explicit point-in-time confirmation.
 
-Rulings made on the user's behalf during the Track G plan (from the
-deleted ledger, reproduced here): a dedicated worktree/branch was used
-for this plan despite it being fully sequential (no sibling track to
-isolate from), to preserve the implementer→review→controller-merge gate
-every prior task this session used, rather than letting an implementer
-commit directly to the shared branch; the decide()/audit-write
-non-atomicity finding was ruled parked rather than fixed, since the
-only clean fix would violate this plan's own constraint against new
-parameters on existing domain service functions — now documented as a
-real, known limitation in `docs/AUDIT.md` rather than silently dropped;
-treated the three per-task reviews plus Task 4's own verification as
-sufficient combined-system coverage rather than dispatching a fresh
-whole-branch review over the accumulated multi-task diff.
-
 Immediate next 5 tasks:
-1. Read `docs/MASTER_PLAN.md` and `docs/PROGRESS.md` fresh, then
-   brainstorm + write a plan for Reports/Search/Analytics
-   (NXR-REQ-0092-0096) — the clear next priority.
-2. Consider closing `DEFERRED-FINAL-016` (wire `create_request` into a
-   real AP or Submittal flow) either as part of that plan or as a quick
-   standalone fix first — it's small and well-scoped.
-3. Execute the Reports/Search/Analytics plan with
-   `superpowers:subagent-driven-development`, same proven pattern as
-   every plan this session (implementer → task review → fix loop →
-   controller merge+independent verify+push).
-4. Keep burning down `docs/DEFERRED.md` opportunistically as later
-   tracks touch the same files.
-5. Once IN_PROGRESS/NOT_STARTED approach zero and feature-freeze is
-   genuinely reached, read `docs/PRODUCTION_READINESS.md` in full
-   before any further work — it's the actual gate for "100%", not a
-   reference to skim.
+1. Merge Task 1 (Global Search) per the resume steps above.
+2. Run Task 4 (combined verification + traceability recount).
+3. Close the `reports-search-analytics` plan (rulings, workspace
+   delete, handoff update).
+4. Read `docs/MASTER_PLAN.md`/`docs/PROGRESS.md` fresh and pick the
+   next highest-dependency-free gap — do not reinterpret scope from
+   scratch.
+5. Per the standing order: keep executing without pausing between
+   tracks until genuinely at 90% real or blocked by something only the
+   user can resolve (Azure PROD authorization is the one standing
+   exception, per `CLAUDE.md` §11.1).

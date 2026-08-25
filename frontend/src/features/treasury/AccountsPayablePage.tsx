@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Input,
   LoadingState,
   Modal,
   MoneyInput,
@@ -22,6 +23,7 @@ export function AccountsPayablePage() {
   const queryClient = useQueryClient()
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [openCreate, setOpenCreate] = useState(false)
+  const [submitInvoiceId, setSubmitInvoiceId] = useState<string | null>(null)
 
   const companiesQuery = useQuery({
     queryKey: ['master-data', 'companies'],
@@ -97,13 +99,18 @@ export function AccountsPayablePage() {
       render: (row) => (
         <div className="nx-treasury__actions">
           {row.status === 'DRAFT' ? (
-            <Button
-              variant="secondary"
-              onClick={() => approve.mutate(row.id)}
-              loading={approve.isPending}
-            >
-              Aprobar
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => approve.mutate(row.id)}
+                loading={approve.isPending}
+              >
+                Aprobar
+              </Button>
+              <Button variant="ghost" onClick={() => setSubmitInvoiceId(row.id)}>
+                Enviar a aprobación
+              </Button>
+            </>
           ) : null}
           {['APPROVED', 'SCHEDULED', 'PARTIALLY_PAID'].includes(row.status) &&
           treasuryAccounts.length > 0 ? (
@@ -176,7 +183,72 @@ export function AccountsPayablePage() {
           }
         />
       ) : null}
+
+      {submitInvoiceId ? (
+        <SubmitForApprovalModal
+          invoiceId={submitInvoiceId}
+          onClose={() => setSubmitInvoiceId(null)}
+          onSubmitted={() =>
+            queryClient.invalidateQueries({
+              queryKey: ['ap', 'supplier-invoices', activeCompanyId],
+            })
+          }
+        />
+      ) : null}
     </div>
+  )
+}
+
+/** Ver DEFERRED-FINAL-016 / docs/DEFERRED.md: `approval_service.create_request`
+ * ahora tiene un llamador real -- este modal es ese punto de entrada.
+ * No existe todavía un endpoint de directorio de usuarios por compañía
+ * (gap ya documentado en otra entrada de DEFERRED.md), así que el
+ * aprobador se identifica por UUID en texto libre, mismo patrón que
+ * `responsibleUserId` en QualityPage.tsx -- no un Select simulado con
+ * datos inventados. */
+function SubmitForApprovalModal({
+  invoiceId,
+  onClose,
+  onSubmitted,
+}: {
+  invoiceId: string
+  onClose: () => void
+  onSubmitted: () => void
+}) {
+  const [assignedTo, setAssignedTo] = useState('')
+
+  const mutation = useMutation({
+    mutationFn: () => apService.submitForApproval(invoiceId, assignedTo),
+    onSuccess: () => {
+      onSubmitted()
+      onClose()
+    },
+  })
+
+  return (
+    <Modal open title="Enviar factura a aprobación" onClose={onClose}>
+      <form
+        className="nx-treasury__form"
+        onSubmit={(event) => {
+          event.preventDefault()
+          mutation.mutate()
+        }}
+      >
+        <Input
+          name="assignedTo"
+          label="ID del usuario aprobador (UUID) — debe ser distinto de tu propio usuario"
+          value={assignedTo}
+          onChange={(e) => setAssignedTo(e.target.value)}
+          required
+        />
+        {mutation.isError ? (
+          <p className="nx-field__error">{(mutation.error as Error).message}</p>
+        ) : null}
+        <Button type="submit" loading={mutation.isPending} disabled={!assignedTo}>
+          Enviar
+        </Button>
+      </form>
+    </Modal>
   )
 }
 

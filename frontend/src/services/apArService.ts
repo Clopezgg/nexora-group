@@ -62,6 +62,13 @@ export const apService = {
     normalizeSupplierInvoice(
       await apiFetch<SupplierInvoice>(`/ap/supplier-invoices/${id}/approve`, { method: 'POST' }),
     ),
+  submitForApproval: async (id: string, assignedTo: string) =>
+    normalizeSupplierInvoice(
+      await apiFetch<SupplierInvoice>(`/ap/supplier-invoices/${id}/submit-for-approval`, {
+        method: 'POST',
+        body: JSON.stringify({ assignedTo }),
+      }),
+    ),
   pay: (id: string, payload: Record<string, unknown>, idempotencyKey: string) =>
     apiFetch(`/ap/supplier-invoices/${id}/payments`, {
       method: 'POST',

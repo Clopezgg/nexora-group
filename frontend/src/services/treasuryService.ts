@@ -62,19 +62,22 @@ export const treasuryService = {
         body: JSON.stringify(payload),
       }),
     ),
-  createRemittance: (payload: CreateRemittancePayload) =>
+  createRemittance: (payload: CreateRemittancePayload, idempotencyKey: string) =>
     apiFetch<Remittance>('/treasury/remittances', {
       method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(payload),
     }),
-  createGeneralExpense: (payload: CreateGeneralExpensePayload) =>
+  createGeneralExpense: (payload: CreateGeneralExpensePayload, idempotencyKey: string) =>
     apiFetch<GeneralExpense>('/treasury/general-expenses', {
       method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(payload),
     }),
-  createTransfer: (payload: CreateTransferPayload) =>
+  createTransfer: (payload: CreateTransferPayload, idempotencyKey: string) =>
     apiFetch<TreasuryTransfer>('/treasury/transfers', {
       method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(payload),
     }),
 }

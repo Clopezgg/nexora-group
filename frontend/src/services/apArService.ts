@@ -62,9 +62,10 @@ export const apService = {
     normalizeSupplierInvoice(
       await apiFetch<SupplierInvoice>(`/ap/supplier-invoices/${id}/approve`, { method: 'POST' }),
     ),
-  pay: (id: string, payload: Record<string, unknown>) =>
+  pay: (id: string, payload: Record<string, unknown>, idempotencyKey: string) =>
     apiFetch(`/ap/supplier-invoices/${id}/payments`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(payload),
     }),
 }
@@ -89,9 +90,10 @@ export const arService = {
     normalizeCustomerInvoice(
       await apiFetch<CustomerInvoice>(`/ar/customer-invoices/${id}/approve`, { method: 'POST' }),
     ),
-  collect: (id: string, payload: Record<string, unknown>) =>
+  collect: (id: string, payload: Record<string, unknown>, idempotencyKey: string) =>
     apiFetch(`/ar/customer-invoices/${id}/receipts`, {
       method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(payload),
     }),
 }

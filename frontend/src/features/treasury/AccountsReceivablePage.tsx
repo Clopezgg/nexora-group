@@ -276,14 +276,17 @@ function CollectButton({
 }) {
   const queryClient = useQueryClient()
   const mutation = useMutation({
-    mutationFn: async () => {
-      await arService.collect(invoiceId, {
-        treasuryAccountId,
-        amount: String(remaining),
-        receiptDate: new Date().toISOString().slice(0, 10),
-      })
+    mutationFn: async ({
+      payload,
+      idempotencyKey,
+    }: {
+      payload: Record<string, unknown>
+      idempotencyKey: string
+    }) => {
+      await arService.collect(invoiceId, payload, idempotencyKey)
       return arService.getInvoice(invoiceId)
     },
+    retry: 1,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ar', 'customer-invoices'] })
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
@@ -291,7 +294,20 @@ function CollectButton({
   })
 
   return (
-    <Button variant="ghost" loading={mutation.isPending} onClick={() => mutation.mutate()}>
+    <Button
+      variant="ghost"
+      loading={mutation.isPending}
+      onClick={() =>
+        mutation.mutate({
+          payload: {
+            treasuryAccountId,
+            amount: String(remaining),
+            receiptDate: new Date().toISOString().slice(0, 10),
+          },
+          idempotencyKey: crypto.randomUUID(),
+        })
+      }
+    >
       Cobrar saldo ({remaining.toFixed(2)})
     </Button>
   )

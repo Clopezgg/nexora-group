@@ -14,7 +14,12 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { masterDataService } from '../../services/masterDataService'
-import { treasuryService } from '../../services/treasuryService'
+import {
+  treasuryService,
+  type CreateGeneralExpensePayload,
+  type CreateRemittancePayload,
+  type CreateTransferPayload,
+} from '../../services/treasuryService'
 import type { TreasuryAccount } from '../../types/treasury'
 import './TreasuryPage.css'
 
@@ -222,16 +227,14 @@ function RemittanceModal({
   const [amount, setAmount] = useState<number | null>(null)
 
   const mutation = useMutation({
-    mutationFn: () =>
-      treasuryService.createRemittance({
-        companyId,
-        treasuryAccountId,
-        counterAccountId,
-        sender,
-        currencyCode: 'HNL',
-        originalAmount: String(amount ?? 0),
-        remittanceDate: new Date().toISOString().slice(0, 10),
-      }),
+    mutationFn: ({
+      payload,
+      idempotencyKey,
+    }: {
+      payload: CreateRemittancePayload
+      idempotencyKey: string
+    }) => treasuryService.createRemittance(payload, idempotencyKey),
+    retry: 1,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
       onClose()
@@ -244,7 +247,18 @@ function RemittanceModal({
         className="nx-treasury__form"
         onSubmit={(event) => {
           event.preventDefault()
-          mutation.mutate()
+          mutation.mutate({
+            payload: {
+              companyId,
+              treasuryAccountId,
+              counterAccountId,
+              sender,
+              currencyCode: 'HNL',
+              originalAmount: String(amount ?? 0),
+              remittanceDate: new Date().toISOString().slice(0, 10),
+            },
+            idempotencyKey: crypto.randomUUID(),
+          })
         }}
       >
         <Select
@@ -313,17 +327,14 @@ function GeneralExpenseModal({
   const [amount, setAmount] = useState<number | null>(null)
 
   const mutation = useMutation({
-    mutationFn: () =>
-      treasuryService.createGeneralExpense({
-        companyId,
-        treasuryAccountId,
-        expenseAccountId,
-        category,
-        amount: String(amount ?? 0),
-        currencyCode: 'HNL',
-        expenseDate: new Date().toISOString().slice(0, 10),
-        description,
-      }),
+    mutationFn: ({
+      payload,
+      idempotencyKey,
+    }: {
+      payload: CreateGeneralExpensePayload
+      idempotencyKey: string
+    }) => treasuryService.createGeneralExpense(payload, idempotencyKey),
+    retry: 1,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
       onClose()
@@ -344,7 +355,19 @@ function GeneralExpenseModal({
         className="nx-treasury__form"
         onSubmit={(event) => {
           event.preventDefault()
-          mutation.mutate()
+          mutation.mutate({
+            payload: {
+              companyId,
+              treasuryAccountId,
+              expenseAccountId,
+              category,
+              amount: String(amount ?? 0),
+              currencyCode: 'HNL',
+              expenseDate: new Date().toISOString().slice(0, 10),
+              description,
+            },
+            idempotencyKey: crypto.randomUUID(),
+          })
         }}
       >
         <Select
@@ -418,15 +441,14 @@ function TransferModal({
   const source = treasuryAccounts.find((a) => a.id === sourceId)
 
   const mutation = useMutation({
-    mutationFn: () =>
-      treasuryService.createTransfer({
-        companyId,
-        sourceTreasuryAccountId: sourceId,
-        destinationTreasuryAccountId: destinationId,
-        amount: String(amount ?? 0),
-        currencyCode: source?.currencyCode ?? 'HNL',
-        transferDate: new Date().toISOString().slice(0, 10),
-      }),
+    mutationFn: ({
+      payload,
+      idempotencyKey,
+    }: {
+      payload: CreateTransferPayload
+      idempotencyKey: string
+    }) => treasuryService.createTransfer(payload, idempotencyKey),
+    retry: 1,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
       onClose()
@@ -439,7 +461,17 @@ function TransferModal({
         className="nx-treasury__form"
         onSubmit={(event) => {
           event.preventDefault()
-          mutation.mutate()
+          mutation.mutate({
+            payload: {
+              companyId,
+              sourceTreasuryAccountId: sourceId,
+              destinationTreasuryAccountId: destinationId,
+              amount: String(amount ?? 0),
+              currencyCode: source?.currencyCode ?? 'HNL',
+              transferDate: new Date().toISOString().slice(0, 10),
+            },
+            idempotencyKey: crypto.randomUUID(),
+          })
         }}
       >
         <Select label="Origen" value={sourceId} onChange={(e) => setSourceId(e.target.value)}>

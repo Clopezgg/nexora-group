@@ -276,14 +276,17 @@ function PaySupplierInvoiceButton({
 }) {
   const queryClient = useQueryClient()
   const mutation = useMutation({
-    mutationFn: async () => {
-      await apService.pay(invoiceId, {
-        treasuryAccountId,
-        amount: String(remaining),
-        paymentDate: new Date().toISOString().slice(0, 10),
-      })
+    mutationFn: async ({
+      payload,
+      idempotencyKey,
+    }: {
+      payload: Record<string, unknown>
+      idempotencyKey: string
+    }) => {
+      await apService.pay(invoiceId, payload, idempotencyKey)
       return apService.getInvoice(invoiceId)
     },
+    retry: 1,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ap', 'supplier-invoices'] })
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
@@ -291,7 +294,20 @@ function PaySupplierInvoiceButton({
   })
 
   return (
-    <Button variant="ghost" loading={mutation.isPending} onClick={() => mutation.mutate()}>
+    <Button
+      variant="ghost"
+      loading={mutation.isPending}
+      onClick={() =>
+        mutation.mutate({
+          payload: {
+            treasuryAccountId,
+            amount: String(remaining),
+            paymentDate: new Date().toISOString().slice(0, 10),
+          },
+          idempotencyKey: crypto.randomUUID(),
+        })
+      }
+    >
       Pagar saldo ({remaining.toFixed(2)})
     </Button>
   )

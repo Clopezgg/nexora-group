@@ -63,8 +63,18 @@ certificar el 100%.
   combustible, costo de mantenimiento y costo de mano de obra está
   diferido intencionalmente (solo la depreciación de activos fijos postea
   hoy a través del Posting Engine).
-- `DEFERRED-FINAL-008` — Track D: Workforce/Time todavía no tiene pantalla
-  de frontend (backend/API/RBAC/tests están completos).
+- `DEFERRED-FINAL-008` — **RESUELTO (2026-08-25, Track D Task 2,
+  `track/d-workforce-ui`).** Workforce/Time todavía no tenía pantalla de
+  frontend (backend/API/RBAC/tests ya estaban completos). Ahora existen
+  `WorkersPage` (`/recursos/personal`) y `TimeEntriesPage`
+  (`/recursos/tiempo`): lista/crea trabajadores y registros de tiempo,
+  aprueba/rechaza contra la API real, filtros por proyecto/fecha/estado,
+  y muestra el `labor_cost` server-computed (nunca calculado en el
+  cliente). 4 tests nuevos (`WorkersPage.test.tsx`,
+  `TimeEntriesPage.test.tsx`), RED/GREEN real (ver
+  `docs/PROGRESS.md`). Pendiente de revisión/merge del coordinador a
+  `feat/nexora-greenfield` — no se marca `VERIFIED` en
+  `docs/REQUIREMENTS_TRACEABILITY.md` hasta que eso ocurra.
 - `DEFERRED-FINAL-009` — Track D: el slice Documents/Site/Quality está
   NOT_STARTED (no existe dominio, DB, service, API ni UI todavía).
 - `DEFERRED-FINAL-010` — Track D: `FixedAssetsPage` y el formulario de

@@ -7,6 +7,7 @@ from app.domain.errors import InvalidFinancialReferenceError, InvalidOperationSc
 from app.models.accounting import OPERATION_SCOPES
 from app.models.chart_of_accounts import Account, ChartOfAccount
 from app.models.cost_center import CostCenter
+from app.models.crm import Customer
 from app.models.project import Project
 from app.models.supplier import Supplier
 
@@ -73,3 +74,14 @@ def assert_supplier_belongs_to_company(
             "supplier_id debe pertenecer a la compañía propietaria"
         )
     return supplier
+
+
+def assert_customer_belongs_to_company(
+    db: Session, *, customer_id: uuid.UUID, company_id: uuid.UUID
+) -> Customer:
+    customer = db.get(Customer, customer_id)
+    if customer is None or customer.company_id != company_id:
+        raise InvalidFinancialReferenceError(
+            "customer_id debe pertenecer a la compañía propietaria"
+        )
+    return customer

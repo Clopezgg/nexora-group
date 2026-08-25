@@ -21,6 +21,7 @@ from app.api.routes import (
     health,
     inventory,
     master_data,
+    notifications,
     procurement,
     projects,
     quality,
@@ -115,6 +116,7 @@ def create_app() -> FastAPI:
     # NXR-REQ-0087/0088/0089).
     app.include_router(audit.router, prefix="/api")
     app.include_router(approvals.router, prefix="/api")
+    app.include_router(notifications.router, prefix="/api")
 
     return app
 

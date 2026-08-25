@@ -1,0 +1,111 @@
+.nx-notification-bell {
+  position: relative;
+  display: inline-block;
+}
+
+.nx-notification-bell__trigger-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.nx-notification-bell__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.nx-notification-bell__badge .nx-badge {
+  padding: 0 5px;
+  font-size: 10px;
+  min-width: 16px;
+  text-align: center;
+  display: inline-block;
+}
+
+.nx-notification-bell__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: var(--nx-z-dropdown);
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: var(--nx-white);
+  border: 1px solid var(--nx-gray-200);
+  border-radius: var(--nx-radius-md);
+  box-shadow: var(--nx-shadow-md);
+}
+
+.nx-notification-bell__panel-header {
+  padding: var(--nx-space-3) var(--nx-space-4);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--nx-gray-800);
+  border-bottom: 1px solid var(--nx-gray-200);
+}
+
+.nx-notification-bell__empty {
+  padding: var(--nx-space-4);
+  font-size: 13px;
+  color: var(--nx-gray-600);
+}
+
+.nx-notification-bell__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nx-notification-bell__item {
+  padding: var(--nx-space-3) var(--nx-space-4);
+  border-bottom: 1px solid var(--nx-gray-100);
+}
+
+.nx-notification-bell__item:last-child {
+  border-bottom: none;
+}
+
+.nx-notification-bell__item--unread {
+  background: var(--nx-blue-100);
+}
+
+.nx-notification-bell__item-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--nx-gray-800);
+}
+
+.nx-notification-bell__item-body {
+  font-size: 12px;
+  color: var(--nx-gray-600);
+  margin-top: 2px;
+}
+
+.nx-notification-bell__item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--nx-space-2);
+}
+
+.nx-notification-bell__item-date {
+  font-size: 11px;
+  color: var(--nx-gray-400);
+}
+
+.nx-notification-bell__mark-read {
+  background: none;
+  border: none;
+  color: var(--nx-blue-600);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.nx-notification-bell__mark-read:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

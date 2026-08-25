@@ -48,8 +48,19 @@ alcance de la Ruling de
 un motor de estados genérico/admin-configurable que reemplace las
 transiciones de dominio -- es el conjunto de servicios cross-cutting
 (Approval Inbox + SoD) que los dominios ya construidos usan por
-composición. `NXR-REQ-0091` (Notifications) sigue `NOT_STARTED`,
-responsabilidad de una task posterior del mismo plan.
+composición. Task 3 (mismo plan): `NXR-REQ-0091` (Notifications) ahora
+`IMPLEMENTED` -- `Notification` real, disparada desde
+`approval_service.create_request()`/`decide()` (los mismos call sites
+reales de Task 2, no la capa de ruta -- `decide()` es también un entry
+point de servicio llamado directamente, ver `task-3-report.md`), API
+`GET/POST /api/notifications` con verificación de propiedad directa por
+usuario (sin `assert_company_access`, una notificación no pertenece a una
+compañía), `NotificationBell.tsx` real en el topbar con polling real. Los
+disparadores de alertas financieras/de proyecto nombrados en el brief de
+esa task (presupuesto excedido, factura AP vencida) no tienen un ID de
+requisito propio en esta matriz -- quedan como sub-alcance NOT_STARTED de
+`NXR-REQ-0091` mismo, ver `task-3-report.md` para qué read path
+reutilizaría cada uno.
 
 ## CORE
 
@@ -195,7 +206,7 @@ responsabilidad de una task posterior del mismo plan.
 | NXR-REQ-0088 | Approval Inbox | ✅·✅·✅·✅·✅·✅·✅·✅·⬜ | IMPLEMENTED | Track G (task-2): `ApprovalRequest` real (`app/models/approval_request.py`), migración `773bebddf1a9` sobre head real `e91bb3d86df2`; `create_request`/`decide` en `approval_service.py`, `decide()` nunca muta el dominio directamente -- llama al adaptador de `ap_service.apply_approval_decision`/`submittal_service.apply_approval_decision` (funciones nuevas, ninguna firma existente cambió, RED/GREEN evidence real probando la transición del `SupplierInvoice` real, no solo la fila `ApprovalRequest`); API `GET/POST /api/approvals`, permisos `workflow.approval` read/decide (decide solo Finance Manager/Project Manager/Administrator, read también Auditor); `audit_service.record` en el propio decide de la ApprovalRequest; `ApprovalInboxPage.tsx` real en `/inicio/aprobaciones` (entrada de nav ya reservada, no se inventó `/plataforma/aprobaciones`); falta E2E |
 | NXR-REQ-0089 | Segregation of Duties | ✅·✅·✅·✅·➖·✅·✅·✅·⬜ | IMPLEMENTED | Track G (task-2): `requested_by != decided_by` siempre (422 `NXR-WORKFLOW-001`, `SegregationOfDutiesError`), RED/GREEN evidence real; doble-decisión rechazada (409 `NXR-WORKFLOW-002`, `InvalidApprovalStateError`); `ApprovalPolicy.requires_third_role` exige un `executed_by` distinto de solicitante y aprobador cuando aplica, RED/GREEN evidence real con los dos casos (rechazo y aceptación); sin UI dedicada propia (se expresa como el propio flujo de decide en `ApprovalInboxPage.tsx`); falta E2E |
 | NXR-REQ-0090 | Audit (append-only) | ✅·✅·✅·✅·✅·✅·➖·✅·⬜ | IMPLEMENTED | Track G (task-1): `AuditLog` real (`app/models/audit.py`), append-only (nunca UPDATE/DELETE), migración `e91bb3d86df2` sobre head real `04d3e460a8a7`; `audit_service.record(...)` invocado explícitamente desde la capa de ruta (nunca hook oculto de ORM, nunca cambio de firma de servicio existente); `GET /api/audit` con aislamiento de company real (`assert_company_access`, test cruzado con rol `Finance Manager` porque `Auditor` ya es `SCOPE_ANY`); permiso `audit.log`/`read`; `AuditLogPage.tsx` real en `/control/auditoria` (entrada de nav ya reservada, no se inventó sección nueva). Instrumentado por ahora: AP approve+pay, Treasury cash-closing approve + remittance create, Procurement PO approve (5 rutas, ver `docs/AUDIT.md`) — el resto de dominios (Project Control, Enterprise Resources, Commercial, Construction Control, y el resto de Financial Core) sigue sin instrumentar, backlog honesto en `docs/AUDIT.md`; falta E2E |
-| NXR-REQ-0091 | Notifications | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0091 | Notifications | ✅·✅·✅·✅·✅·✅·➖·✅·⬜ | IMPLEMENTED | Track G (task-3): `Notification` real (`app/models/notification.py`, `recipient_user_id` FK real a `users.id`), migración `234785d5331f` sobre head real `773bebddf1a9`; disparada desde los call sites reales de Task 2 -- `approval_service.create_request()` notifica a `assigned_to` (`type="approval.assigned"`), `approval_service.decide()` notifica a `requested_by` (`type="approval.decided"`), ambos dentro del propio servicio (no la ruta) porque `decide()` es un entry point llamado directamente por otro código además de la ruta HTTP, RED/GREEN evidence real; API `GET/POST /api/notifications` (`unreadOnly`, mark-read) sin `assert_company_access` -- una `Notification` pertenece a un usuario, no a una compañía, la propiedad se verifica directo contra `current_user.id` (403 `NXR-PERM-001` si no coincide, RED/GREEN evidence real incluyendo mutación temporal del guard para confirmar que el test realmente lo cubre); `NotificationBell.tsx` montado en `Topbar.tsx` real (reemplaza el ícono placeholder `disabled` que ya existía), poll real cada 30s vía `refetchInterval`, badge de no-leídas, marcar-como-leída invalida la query (refetch real, no mutación local, test de frontend lo prueba). Columna Audit marcada `➖`: crear/leer una notificación no es en sí un evento de negocio auditable (no es un `AccountingDocument` ni una decisión de dominio), así que no se instrumentó con `audit_service`. Alcance explícitamente no cubierto: los disparadores de alertas financieras/de proyecto nombrados en el brief de esta task (presupuesto excedido, factura AP vencida) -- no tienen ID de requisito propio en esta matriz (`NXR-REQ-0092-0096` ya están asignados a Global Search/Reporting/Export/Settings/Integration, sin relación); quedan NOT_STARTED como sub-alcance de este mismo requisito, ver `task-3-report.md` para el read path que reutilizaría cada uno; falta E2E |
 | NXR-REQ-0092 | Global Search (Cmd/Ctrl+K) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0093 | Reporting (por dominio) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0094 | Export (CSV/XLSX/PDF) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |

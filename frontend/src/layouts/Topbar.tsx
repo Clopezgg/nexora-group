@@ -1,6 +1,7 @@
 import { useAuth } from '../features/auth/auth-context'
 import { useActiveContext } from '../features/context/useActiveContext'
 import { Badge, IconButton, Select, Tooltip } from '../design-system'
+import { NotificationBell } from '../components/NotificationBell'
 
 interface TopbarProps {
   onOpenNav: () => void
@@ -55,9 +56,7 @@ export function Topbar({ onOpenNav }: TopbarProps) {
         <Tooltip label="Aprobaciones — se activará con el motor de workflow (NXR-REQ-0088)">
           <IconButton label="Aprobaciones" icon="📥" disabled />
         </Tooltip>
-        <Tooltip label="Notificaciones — se activará con el centro de notificaciones (NXR-REQ-0091)">
-          <IconButton label="Notificaciones" icon="🔔" disabled />
-        </Tooltip>
+        <NotificationBell />
         <div className="nx-topbar__user">
           <div className="nx-topbar__user-info">
             <span className="nx-topbar__user-name">{user?.fullName ?? user?.email}</span>

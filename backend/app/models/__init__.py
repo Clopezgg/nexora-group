@@ -27,6 +27,7 @@ from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.models.idempotency import IdempotencyRecord
 from app.models.inventory import PhysicalCount, PhysicalCountLine, StockLedgerEntry
 from app.models.item import Item
+from app.models.notification import Notification
 from app.models.number_sequence import NumberSequence
 from app.models.permission import Permission, RolePermission, UserCompanyAccess
 from app.models.procurement import (
@@ -121,6 +122,7 @@ __all__ = [
     "MaintenancePlan",
     "Milestone",
     "NonConformance",
+    "Notification",
     "NumberSequence",
     "Opportunity",
     "Permission",

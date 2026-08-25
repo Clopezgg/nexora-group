@@ -57,6 +57,15 @@ def create_supplier(client, *, company_id: str, legal_name: str = "Proveedor de 
     return response.json()
 
 
+def create_customer(client, *, company_id: str, legal_name: str = "Cliente de prueba") -> dict:
+    response = client.post(
+        "/api/crm/customers",
+        json={"companyId": company_id, "legalName": legal_name},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 def create_treasury_account(
     client, *, company_id: str, gl_account_id: str, name: str = "Banco Principal", kind: str = "BANK"
 ) -> dict:

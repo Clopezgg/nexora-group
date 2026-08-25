@@ -15,7 +15,7 @@ export interface SupplierInvoice {
 
 export interface CustomerInvoice {
   id: string
-  customerName: string
+  customerId: string
   invoiceNumber: string
   scope: string
   currencyCode: string

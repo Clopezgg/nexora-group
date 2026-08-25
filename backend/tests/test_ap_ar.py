@@ -7,6 +7,7 @@ from app.models.project import Project
 from tests.helpers import (
     create_account,
     create_company,
+    create_customer,
     create_supplier,
     create_treasury_account,
     create_user_with_role,
@@ -143,12 +144,13 @@ def test_customer_invoice_lifecycle_draft_to_collected(client):
         client, company_id=company["id"], code="1200", name="Cuentas por cobrar", account_type="ASSET"
     )
     bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+    customer = create_customer(client, company_id=company["id"], legal_name="Inversiones ABC")
 
     invoice = client.post(
         "/api/ar/customer-invoices",
         json={
             "companyId": company["id"],
-            "customerName": "Inversiones ABC",
+            "customerId": customer["id"],
             "invoiceNumber": "CI-001",
             "scope": "GENERAL",
             "revenueAccountId": revenue["id"],
@@ -312,11 +314,12 @@ def test_supplier_and_customer_invoices_can_be_listed_from_database(client):
             "dueDate": "2026-02-10",
         },
     ).json()
+    customer = create_customer(client, company_id=company["id"], legal_name="Cliente persistido")
     customer_invoice = client.post(
         "/api/ar/customer-invoices",
         json={
             "companyId": company["id"],
-            "customerName": "Cliente persistido",
+            "customerId": customer["id"],
             "invoiceNumber": "PERSIST-AR",
             "scope": "GENERAL",
             "revenueAccountId": revenue["id"],
@@ -404,11 +407,12 @@ def test_retrying_receipt_with_same_idempotency_key_does_not_duplicate_posting(
     bank = create_treasury_account(
         client, company_id=company["id"], gl_account_id=bank_gl["id"]
     )
+    customer = create_customer(client, company_id=company["id"], legal_name="Cliente idempotente")
     invoice = client.post(
         "/api/ar/customer-invoices",
         json={
             "companyId": company["id"],
-            "customerName": "Cliente idempotente",
+            "customerId": customer["id"],
             "invoiceNumber": "IDEM-REC",
             "scope": "GENERAL",
             "revenueAccountId": revenue["id"],

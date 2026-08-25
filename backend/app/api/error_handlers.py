@@ -14,6 +14,7 @@ from app.domain.errors import (
     InsufficientStockError,
     InvalidAssetStateError,
     InvalidChangeOrderStateError,
+    InvalidCommercialStateError,
     InvalidFinancialReferenceError,
     InvalidInvoiceStateError,
     InvalidOperationScopeError,
@@ -55,6 +56,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     DepreciationAlreadyPostedError: ("NXR-ASSET-002", 409),
     ImmutableMaintenanceOrderError: ("NXR-EQUIPMENT-001", 409),
     InvalidTimeEntryStateError: ("NXR-WORKFORCE-001", 409),
+    InvalidCommercialStateError: ("NXR-CRM-001", 409),
 }
 
 

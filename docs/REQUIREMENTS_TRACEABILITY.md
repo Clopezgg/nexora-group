@@ -60,7 +60,7 @@ tocar las cuatro áreas superficialmente (ver task-5-report.md).
 | NXR-REQ-0021 | Bank reconciliation | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: statement/lines append-only, matches acumulativos con `FOR UPDATE`; valida company, GL, signo, capacidad/asignación del documento y transiciones; sin UI específica |
 | NXR-REQ-0022 | Fund restrictions | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: restricción etiqueta uso sin transferir propiedad del efectivo al Project; validación company/project |
 | NXR-REQ-0023 | Accounts Payable | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: invoices/accrual/aprobación/pagos parciales, GET persistido por company, UI y pagos idempotentes |
-| NXR-REQ-0024 | Accounts Receivable | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A retiene AR como Financial Core: invoices/receipts, GET persistido, UI e idempotencia. Track E posee el workflow comercial y debe llamar AR, no duplicar receivables |
+| NXR-REQ-0024 | Accounts Receivable | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A retiene AR como Financial Core: invoices/receipts, GET persistido, UI e idempotencia. `CustomerInvoice.customer_id` es ahora FK real a `Customer` (Track E, antes texto libre) — Track E posee el workflow comercial y llama `ar_service.create_customer_invoice` directo, nunca duplica receivables (ver NXR-REQ-0066) |
 | NXR-REQ-0025 | Corrections (posted docs) | 🔶·✅·✅·➖·➖·➖·⬜·✅·➖ | IN_PROGRESS | Mecanismo de reversal cubre el caso general (INV-ACC-002); falta un flujo de "correction" distinto al reversal simple si algún dominio lo necesita — dueño: track que lo requiera |
 | NXR-REQ-0026 | Annulments (reversal, no delete) | ✅·✅·✅·✅·⬜·➖·⬜·✅·⬜ | IMPLEMENTED | `posting_service.reverse_document`, endpoint `POST /api/accounting/journal-entries/{id}/reverse`, documento tipo `ANU`; falta UI |
 | NXR-REQ-0027 | Idempotency (Idempotency-Key) | ✅·✅·✅·✅·➖·➖·⬜·✅·➖ | IMPLEMENTED | Track A consume el header persistido en remesas, transferencias, gastos, cierres, pagos y cobros; UI genera una key por intención y la conserva en variables de retry; posting + operación + resultado se confirman en una transacción |
@@ -122,13 +122,13 @@ tocar las cuatro áreas superficialmente (ver task-5-report.md).
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0061 | Leads | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0062 | Opportunities | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0063 | Customers | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0064 | Sales Quotations | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0065 | Sales Contracts | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0066 | Customer Invoices | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0067 | Collections | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0061 | Leads | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track E: `Lead` (company/contact/source/status), `POST/GET /api/crm/leads`, permiso `crm.lead`, `LeadsPage` (crear + convertir), tests company isolation incluidos |
+| NXR-REQ-0062 | Opportunities | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track E: `Opportunity` se crea SIEMPRE junto al `Customer` al convertir un `Lead` (`crm_service.convert_lead`, nunca manual); `GET /api/crm/opportunities`, permiso `crm.opportunity`, `OpportunitiesPage` (solo lectura, por diseño) |
+| NXR-REQ-0063 | Customers | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track E: entidad `Customer` real (antes texto libre en `CustomerInvoice.customer_name`, ver NXR-REQ-0024); `POST/GET /api/crm/customers`, permiso `crm.customer`, `CustomersPage`. Conversión de lead idempotente verificada (RED/GREEN): convertir el mismo lead dos veces devuelve el mismo `Customer` y crea exactamente una fila |
+| NXR-REQ-0064 | Sales Quotations | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track E: `Quotation` (DRAFT→SENT→ACCEPTED/REJECTED), `customer_id` debe coincidir con el de su `Opportunity` (validado en servicio); `POST/GET/accept /api/crm/quotations`, permiso `crm.quotation`, `QuotationsPage` |
+| NXR-REQ-0065 | Sales Contracts | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track E: solo una `Quotation` ACCEPTED convierte a `SalesContract` (`NXR-CRM-001` si no), preserva amount/company/customer/project tal cual; `scope` (CENTRAL/GENERAL/PROJECT) derivado de `project_id`; `POST /api/crm/quotations/{id}/convert`, `SalesContractsPage`. RED/GREEN real: conversión rechazada antes de ACCEPTED, aceptada después |
+| NXR-REQ-0066 | Customer Invoices (desde Commercial) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track E factura un `SalesContract` llamando DIRECTO a `ar_service.create_customer_invoice` (Track A, `commit=False` para composición atómica con el cambio de estado del contrato) — NUNCA una segunda tabla de receivables. `POST /api/crm/sales-contracts/{id}/bill` crea exactamente una `CustomerInvoice` real y rechaza un segundo intento de facturar el mismo contrato (`NXR-CRM-001`). El motor de AR en sí (invoices/receipts/aprobación) sigue siendo Track A — ver NXR-REQ-0024 |
+| NXR-REQ-0067 | Collections (desde Commercial) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | El cobro de una factura AR generada desde un `SalesContract` usa el mismo `POST /api/ar/customer-invoices/{id}/receipts` de Track A (NXR-REQ-0024) — Track E no duplica esta pieza; verificado que facturar un contrato NO produce ningún movimiento de tesorería hasta que se cobra vía AR |
 
 ## RESOURCES
 
@@ -219,24 +219,29 @@ tocar las cuatro áreas superficialmente (ver task-5-report.md).
 
 ## Resumen
 
-Recontado tras Track B (Project Control), pendiente de integración por el
-coordinador, sobre la base de Track F + Track 1 ya integrados:
+Recontado tras Track E (Commercial), pendiente de integración por el
+coordinador, sobre la base de Track 1+F+B+C+A+D ya integrados:
 
 - **VERIFIED:** 0 / 124 (reservado para cuando el coordinador confirme
   comportamiento end-to-end en `feat/nexora-greenfield` — ningún track se
   autootorga `VERIFIED`)
-- **IMPLEMENTED:** 61 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
+- **IMPLEMENTED:** 69 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
   0010/0011/0012/0013/0014/0015/0026/0027 (13). Track A: NXR-REQ-0017 a
   0024, 0080 y 0111 (10). Track F: NXR-REQ-0097 a 0104 (8). Track B:
-  NXR-REQ-0028/0029/0030/0031/0032/0036/0037/0038/0039 (9). Track C:
+  NXR-REQ-0028/0029/0030/0031/0032/0036/0037/0038/0039 (9). Track B+C:
+  NXR-REQ-0033 — Commitments, atribuido a Project Control pero cubierto
+  por la integración de POs de Track C (1). Track C:
   NXR-REQ-0040/0041/0042/0043/0045/0046/0047/0048/0049/0050/0051/0052/
   0053/0055/0056/0057 (16). Track D: NXR-REQ-0068/0069/0070/0071/0072 —
-  Fixed Assets/Depreciation/Equipment/Fuel log/Maintenance (5).
+  Fixed Assets/Depreciation/Equipment/Fuel log/Maintenance (5). Track E:
+  NXR-REQ-0061/0062/0063/0064/0065/0066/0067 — Leads/Opportunities/
+  Customers/Sales Quotations/Sales Contracts/Customer Invoices (desde
+  Commercial)/Collections (desde Commercial) (7).
 - **IN_PROGRESS:** 26 / 124 (20 previos + 3 de Track C: 0044 Bid
   Comparison, 0059/0060 Contracts/Subcontracts + 3 de Track D: 0073/0075/
   0076 — Employees/Time Entries/Labor Cost, backend+API+tests completos,
   sin pantalla dedicada todavía)
-- **NOT_STARTED:** 35 / 124 (incluye 0054 Returns y 0058 Supplier
+- **NOT_STARTED:** 27 / 124 (incluye 0054 Returns y 0058 Supplier
   Performance de Track C — deuda intencional documentada en
   `docs/PROCUREMENT.md`/`docs/INVENTORY.md`; incluye 0074 Crews y todo el
   bloque CONSTRUCTION CONTROL — Documents/Site/Quality, 0077-0079/0081-
@@ -244,10 +249,13 @@ coordinador, sobre la base de Track F + Track 1 ya integrados:
 - **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue
   real, no por incapacidad técnica)
 
-Suma verificada: 0+61+26+35+2 = 124.
+Suma verificada: 0+69+26+27+2 = 124.
 
 Este resumen se actualiza en cada integración de track. Ver progreso vivo
-en `docs/PROGRESS.md`. Recontado durante la construcción de Track D
-(Enterprise Resources) sobre Track 1+F+B+C+A ya integrados (Task 5 de
-`2026-08-24-interrupted-tracks-recovery`); sigue sujeto a una pasada final
+en `docs/PROGRESS.md`. Recontado en Task 7 (`2026-08-24-interrupted-tracks-recovery`,
+verificación end-to-end del sistema combinado Track 1+F+B+C+A+D+E en
+`feat/nexora-greenfield` @ 07be886) — se recontaron las filas de la tabla
+línea por línea contra este resumen y se corrigió un desfase de 1 fila
+(NXR-REQ-0033 estaba IMPLEMENTED en la tabla pero faltaba en esta
+enumeración); sigue sujeto a una pasada final
 de verificación end-to-end antes de certificar cualquier `VERIFIED`.

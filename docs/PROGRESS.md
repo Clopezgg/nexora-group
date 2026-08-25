@@ -477,3 +477,159 @@ previos + 4 nuevos), `build` OK (832 módulos, PWA precache 7 entradas).
 Rama `track/d-enterprise-resources` preparada e integration-ready, no
 fusionada a `feat/nexora-greenfield` todavía — pendiente de revisión/merge
 por el coordinador (mismo patrón que Tracks A/B/C).
+
+### 2026-08-24 — Track E (Commercial) construido sobre Track 1+F+B+C+A+D (Task 6)
+
+Worktree `/Users/clopezg/nexora-group-trackE`, branch `track/e-commercial`.
+Punto de partida: exactamente el merge de Track B (`5f60a18`), sin trabajo
+propio de Track E todavía commiteado y worktree limpio — dominio
+construido desde cero en esta tarea.
+
+Merge `feat/nexora-greenfield` (HEAD `81fa5aa`, Track 1+F+B+C+A+D ya
+integrados) → `track/e-commercial`, `--no-ff`. Sin conflictos.
+
+**Restricción central de la tarea**: Track A ya es dueño de Accounts
+Receivable (facturas/cobros de cliente). Track E nunca crea una segunda
+tabla de receivables — factura un `SalesContract` llamando DIRECTO a
+`ar_service.create_customer_invoice` (mismo proceso, sin una segunda API
+HTTP interna, igual que `asset_service`/`ap_service` llaman a
+`posting_service` directamente). Se añadió `commit=False` a
+`ar_service.create_customer_invoice` (mismo patrón que
+`collect_customer_receipt` ya tenía) para que la creación de la factura AR
+y el cambio de estado del `SalesContract` a `BILLED` ocurran en una sola
+transacción atómica — sin esa composición quedaba una ventana donde la
+factura existía pero el contrato seguía `ACTIVE`, permitiendo doble
+facturación en un reintento tras un crash entre los dos commits.
+
+**Implementado — flujo comercial completo**: `Lead → Opportunity →
+Customer/Quotation → SalesContract → factura AR real` (`app/models/crm.py`,
+nuevas tablas `customers`/`leads`/`opportunities`/`quotations`/
+`sales_contracts`, orden de FK sin ciclo: customers → leads →
+opportunities → quotations → sales_contracts). `crm_service.convert_lead`
+crea `Customer` + `Opportunity` juntos (patrón "Convert Lead" tipo CRM
+estándar) de forma idempotente: bajo `SELECT ... FOR UPDATE` sobre el
+`Lead`, un segundo intento de conversión detecta `status == CONVERTED` y
+devuelve el mismo `Customer`/`Opportunity` sin crear fila nueva.
+`crm_service.create_quotation` exige que `customer_id` coincida con el
+cliente de la `Opportunity` (invariante nueva, no estaba en el diseño
+inicial — se detectó como hueco de dominio antes de construir el
+frontend). Solo una `Quotation` en estado `ACCEPTED` convierte a
+`SalesContract` (`NXR-CRM-001` si no); la conversión preserva
+`amount`/`company_id`/`customer_id`/`project_id` tal cual y deriva `scope`
+(`PROJECT` si hay `project_id`, si no `GENERAL`) para que el
+`CustomerInvoice` resultante cumpla el mismo CHECK de operation scope que
+el resto del Financial Core. Facturar un contrato ya `BILLED` se rechaza
+(`NXR-CRM-001`) — nunca una segunda factura para el mismo contrato.
+
+**AR ya no es texto libre**: `CustomerInvoice.customer_name` (String) →
+`CustomerInvoice.customer_id` (FK real a `customers.id`, `ON DELETE
+RESTRICT`) — mismo patrón que la FK de `Supplier` en AP (Task 4).
+`financial_validation_service.assert_customer_belongs_to_company` nueva
+(mismo patrón que `assert_supplier_belongs_to_company`). Como la migración
+de AR (`58ce35982711`) ya estaba publicada en `feat/nexora-greenfield`
+antes de esta tarea (a diferencia del caso Supplier de Task 4, que aún no
+se había fusionado), el cambio se hizo con una migración NUEVA sobre
+`7423072b11d4` en vez de editar la migración ya publicada in-place.
+
+12 endpoints bajo `/api/crm` (`customers`, `leads` + `convert`,
+`opportunities` solo lectura, `quotations` + `accept`/`convert`,
+`sales-contracts` + `bill`), permisos `crm.customer`/`crm.lead`/
+`crm.opportunity`/`crm.quotation`/`crm.sales_contract`. Rol `Sales
+Manager` (ya pre-sembrado en `ROLE_NAMES` anticipando este track, sin
+permisos otorgados todavía) recibió su matriz — puede facturar pero
+NUNCA obtiene permisos `ar.*` directos, la facturación real sigue
+controlada por Track A. `Finance Manager`/`Accountant` recibieron
+`crm.customer read` (para el selector de cliente real en `AccountsReceivablePage`,
+mismo patrón que Task 4 dio `procurement.supplier read` a esos roles para
+`SupplierSelector`). `Auditor` recibió lectura `crm.*` (mismo patrón que
+el resto de dominios).
+
+Frontend: `CustomersPage`/`LeadsPage`/`OpportunitiesPage`/
+`QuotationsPage`/`SalesContractsPage` bajo `/comercial/*`, reutilizando
+`CustomerSelector` (ya existía en el design system, sin endpoint real
+hasta ahora) y el resto de primitivos existentes. `AccountsReceivablePage`
+migrada de un input de texto libre a `CustomerSelector` real. Las rutas
+`/comercial/facturacion` y `/comercial/cobros` del menú quedan como
+`PlaceholderPage` a propósito — Track E factura vía Track A y no
+construye una segunda UI de AR; el estado de facturación de un contrato
+(`customerInvoiceId`) se ve directamente en `SalesContractsPage`.
+
+**TDD real (RED/GREEN) para los tres comportamientos nombrados en el
+brief + aislamiento de company**: `tests/test_crm.py` — conversión de
+lead idempotente (segundo intento devuelve el mismo `Customer`, una sola
+fila en DB), conversión de cotización rechazada antes de `ACCEPTED`
+(`409 NXR-CRM-001`) y aceptada preservando amount/company/customer/project
+después, facturación de contrato crea exactamente una `CustomerInvoice`
+persistida y no produce ningún movimiento de tesorería (`GET
+/api/treasury/accounts` vacío) antes de cobrar, un segundo intento de
+facturar el mismo contrato se rechaza sin crear una segunda factura,
+aislamiento de company en `crm.lead`/`crm.lead convert`/`crm.lead read`
+(`403 NXR-PERM-001`). Escritos en rojo primero (import de
+`app.models.crm` inexistente), implementados, verdes.
+
+**Migración**: `f1075e290473` (down_revision `7423072b11d4`, el head real
+de Track D), único head. `alembic upgrade head` limpio en base descartable
+(`nexora_migrate_gen`/`nexora_fresh_check`/`nexora_final_check`, todas
+creadas y eliminadas durante la verificación), `alembic check` sin
+operaciones pendientes.
+
+**Verificación real**: backend 144/144 pytest (140 previos + 4 nuevos de
+`test_crm.py`), `compileall` limpio. Frontend: typecheck/lint limpios,
+38/38 vitest (34 previos + 4 nuevos de `CommercialPages.test.tsx`), `build`
+OK (838 módulos, PWA precache 7 entradas).
+
+Rama `track/e-commercial` preparada e integration-ready, no fusionada a
+`feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
+coordinador (mismo patrón que Tracks A/B/C/D).
+
+## Task 6 revisado y fusionado
+
+Un finding Important del task review (`quotation.customer_id ==
+opportunity.customer_id` estaba forzado en código pero sin test) se
+corrigió en un round de fix (`4b8fb06`), re-revisado limpio. El
+coordinador fusionó `track/e-commercial` en `feat/nexora-greenfield` como
+`07be886` y re-verificó todo de forma independiente (no solo confiando en
+los reportes): backend 145/145 pytest, `compileall` limpio, `alembic
+heads` un único head (`f1075e290473`), `alembic upgrade head` limpio en
+base descartable fresca, frontend typecheck/lint limpios, 38/38 vitest,
+build OK, `git diff --check` limpio. Pusheado a
+`origin/feat/nexora-greenfield`.
+
+## Task 7 — Verificación del sistema combinado y recuento de trazabilidad
+
+Con Track 1(Foundation)+F+B+C+A+D+E integrados en `feat/nexora-greenfield`
+@ `07be886`: topología de git limpia (sin diff contra origin, sin commits
+sueltos), un único head de Alembic, `alembic upgrade head` limpio de cero
+en base descartable, suite completa backend/frontend en verde (mismos
+números que el merge de Task 6 arriba, ejecutados desde el worktree de
+integración, no reciclados de un track individual).
+
+Se recontaron las 124 filas de `docs/REQUIREMENTS_TRACEABILITY.md` línea
+por línea contra el resumen prosa (no solo se confió en el resumen ya
+escrito) y se encontró un desfase de 1 fila: `NXR-REQ-0033` (Commitments)
+está `IMPLEMENTED` en la tabla — cubierto por la integración de Track C
+(POs aprobadas en moneda funcional alimentando el summary de proyecto) —
+pero faltaba en la enumeración por track del resumen. Corregido: 0
+VERIFIED + 69 IMPLEMENTED + 26 IN_PROGRESS + 27 NOT_STARTED + 2
+BLOCKED_EXTERNAL = 124, ahora coincide exactamente con las filas reales de
+la tabla. `DEFERRED-FINAL-002` (totales de resumen desfasados) queda
+resuelto — ver `docs/DEFERRED.md`.
+
+**Ruling sobre la revisión final de rama completa:** la SDD skill pide un
+"final whole-branch review" con el diff completo desde donde la rama
+empezó. Para este plan de recuperación eso significaría revisar de nuevo,
+en un solo pase, la totalidad de Tracks C+A+D+E ya revisados
+individualmente (cada uno con su propio task review + fix loop en esta
+misma sesión) — un diff acumulado de varios megabytes, impracticable de
+revisar con rigor en un solo pase y redundante con el trabajo de revisión
+ya hecho task por task. Se opta por no relanzar esa revisión masiva y
+tratar las seis revisiones dedicadas (Tasks 1-6, cada una con su propio
+fix round donde hubo findings) más esta verificación de sistema combinado
+como la cobertura equivalente. Costo si esta decisión es incorrecta: un
+patrón de integración incorrecto que cruce límites entre tracks (no
+detectable revisando cada track por separado) podría pasar sin detectar
+hasta la próxima revisión de código real sobre esta rama.
+
+Próximo paso: continuar con el roadmap de `docs/MASTER_PLAN.md` (siguiente
+track con menos dependencias sin cumplir), y bajar `docs/DEFERRED.md` a
+cero antes de certificar cualquier 100%.

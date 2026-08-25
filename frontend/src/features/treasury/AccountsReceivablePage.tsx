@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Button,
   Card,
+  CustomerSelector,
   EmptyState,
   LoadingState,
   Modal,
@@ -11,6 +12,7 @@ import {
   Table,
   type TableColumn,
 } from '../../design-system'
+import { crmService } from '../../services/crmService'
 import { masterDataService } from '../../services/masterDataService'
 import { treasuryService } from '../../services/treasuryService'
 import { arService, type CustomerInvoice } from '../../services/apArService'
@@ -43,6 +45,11 @@ export function AccountsReceivablePage() {
     queryFn: () => arService.listInvoices(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
+  const customersQuery = useQuery({
+    queryKey: ['crm', 'customers', activeCompanyId],
+    queryFn: () => crmService.listCustomers(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
 
   const approve = useMutation({
     mutationFn: (id: string) => arService.approveInvoice(id),
@@ -66,10 +73,16 @@ export function AccountsReceivablePage() {
   const receivableAccounts = (accountsQuery.data ?? []).filter((a) => a.accountType === 'ASSET')
   const treasuryAccounts = treasuryAccountsQuery.data ?? []
   const invoices = invoicesQuery.data ?? []
+  const customers = customersQuery.data ?? []
+  const customerNameById = new Map(customers.map((c) => [c.id, c.legalName]))
 
   const columns: TableColumn<CustomerInvoice>[] = [
     { key: 'invoiceNumber', header: 'Factura', render: (row) => row.invoiceNumber },
-    { key: 'customerName', header: 'Cliente', render: (row) => row.customerName },
+    {
+      key: 'customerId',
+      header: 'Cliente',
+      render: (row) => customerNameById.get(row.customerId) ?? row.customerId,
+    },
     {
       key: 'amount',
       header: 'Monto',
@@ -125,7 +138,9 @@ export function AccountsReceivablePage() {
         <Button
           variant="secondary"
           onClick={() => setOpenCreate(true)}
-          disabled={revenueAccounts.length === 0 || receivableAccounts.length === 0}
+          disabled={
+            revenueAccounts.length === 0 || receivableAccounts.length === 0 || customers.length === 0
+          }
         >
           Registrar factura de cliente
         </Button>
@@ -133,6 +148,11 @@ export function AccountsReceivablePage() {
           <p className="nx-field__error">
             Necesitas al menos una cuenta REVENUE y una ASSET (cuentas por cobrar) en el catálogo
             contable.
+          </p>
+        ) : null}
+        {customers.length === 0 ? (
+          <p className="nx-field__error">
+            Necesitas al menos un cliente registrado (Comercial → Clientes).
           </p>
         ) : null}
       </Card>
@@ -149,6 +169,7 @@ export function AccountsReceivablePage() {
           companyId={activeCompanyId}
           revenueAccounts={revenueAccounts}
           receivableAccounts={receivableAccounts}
+          customers={customers}
           onClose={() => setOpenCreate(false)}
           onCreated={() =>
             queryClient.invalidateQueries({
@@ -165,26 +186,30 @@ function CreateCustomerInvoiceModal({
   companyId,
   revenueAccounts,
   receivableAccounts,
+  customers,
   onClose,
   onCreated,
 }: {
   companyId: string
   revenueAccounts: { id: string; name: string }[]
   receivableAccounts: { id: string; name: string }[]
+  customers: { id: string; legalName: string }[]
   onClose: () => void
   onCreated: (invoice: CustomerInvoice) => void
 }) {
-  const [customerName, setCustomerName] = useState('')
+  const [customerId, setCustomerId] = useState<string | null>(null)
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [amount, setAmount] = useState<number | null>(null)
   const [revenueAccountId, setRevenueAccountId] = useState(revenueAccounts[0]?.id ?? '')
   const [receivableAccountId, setReceivableAccountId] = useState(receivableAccounts[0]?.id ?? '')
 
+  const customerOptions = customers.map((c) => ({ id: c.id, label: c.legalName }))
+
   const mutation = useMutation({
     mutationFn: () =>
       arService.createInvoice({
         companyId,
-        customerName,
+        customerId,
         invoiceNumber,
         scope: 'GENERAL',
         revenueAccountId,
@@ -209,15 +234,7 @@ function CreateCustomerInvoiceModal({
           mutation.mutate()
         }}
       >
-        <label className="nx-field">
-          <span className="nx-field__label">Cliente</span>
-          <input
-            className="nx-input"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            required
-          />
-        </label>
+        <CustomerSelector options={customerOptions} value={customerId} onChange={setCustomerId} />
         <label className="nx-field">
           <span className="nx-field__label">Número de factura</span>
           <input
@@ -256,7 +273,7 @@ function CreateCustomerInvoiceModal({
         <Button
           type="submit"
           loading={mutation.isPending}
-          disabled={!amount || !customerName || !invoiceNumber}
+          disabled={!amount || !customerId || !invoiceNumber}
         >
           Registrar
         </Button>

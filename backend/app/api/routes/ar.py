@@ -35,7 +35,7 @@ def create_customer_invoice(
     invoice = ar_service.create_customer_invoice(
         db,
         company_id=payload.company_id,
-        customer_name=payload.customer_name,
+        customer_id=payload.customer_id,
         invoice_number=payload.invoice_number,
         scope=payload.scope,
         project_id=payload.project_id,

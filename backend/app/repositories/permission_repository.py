@@ -111,6 +111,22 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("workforce.time_entry", "create", "Registrar horas trabajadas"),
     ("workforce.time_entry", "read", "Ver horas trabajadas"),
     ("workforce.time_entry", "approve", "Aprobar/rechazar horas trabajadas"),
+    # Track E -- Commercial (orden maestra §72-76). La facturación de un
+    # SalesContract llama al ar_service real de Track A (nunca duplica AR);
+    # por eso "crm.sales_contract" no otorga por sí mismo ningún permiso
+    # ar.* -- el usuario que factura solo necesita el permiso comercial.
+    ("crm.customer", "create", "Crear clientes"),
+    ("crm.customer", "read", "Ver clientes"),
+    ("crm.lead", "create", "Crear leads"),
+    ("crm.lead", "read", "Ver leads"),
+    ("crm.lead", "convert", "Convertir un lead en cliente/oportunidad"),
+    ("crm.opportunity", "read", "Ver oportunidades"),
+    ("crm.quotation", "create", "Crear cotizaciones de venta"),
+    ("crm.quotation", "read", "Ver cotizaciones de venta"),
+    ("crm.quotation", "accept", "Aceptar una cotización de venta"),
+    ("crm.quotation", "convert", "Convertir una cotización aceptada en contrato de venta"),
+    ("crm.sales_contract", "read", "Ver contratos de venta"),
+    ("crm.sales_contract", "bill", "Facturar un contrato de venta (crea factura AR real)"),
 )
 # NOTA: ActiveUIContext (GET/PUT /api/context) NO pasa por este motor de
 # permisos -- es una preferencia personal del usuario autenticado (su
@@ -156,6 +172,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("ap.supplier_payment", "create", SCOPE_OWN),
         ("ap.supplier_payment", "read", SCOPE_OWN),
         ("procurement.supplier", "read", SCOPE_OWN),
+        ("crm.customer", "read", SCOPE_OWN),
         ("ar.customer_invoice", "create", SCOPE_OWN),
         ("ar.customer_invoice", "approve", SCOPE_OWN),
         ("ar.customer_invoice", "read", SCOPE_OWN),
@@ -206,6 +223,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("ap.supplier_invoice", "create", SCOPE_OWN),
         ("ap.supplier_invoice", "read", SCOPE_OWN),
         ("procurement.supplier", "read", SCOPE_OWN),
+        ("crm.customer", "read", SCOPE_OWN),
         ("ar.customer_invoice", "create", SCOPE_OWN),
         ("ar.customer_invoice", "read", SCOPE_OWN),
         ("asset.fixed_asset", "read", SCOPE_OWN),
@@ -253,6 +271,11 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("equipment.maintenance_order", "read", SCOPE_ANY),
         ("workforce.worker", "read", SCOPE_ANY),
         ("workforce.time_entry", "read", SCOPE_ANY),
+        ("crm.customer", "read", SCOPE_ANY),
+        ("crm.lead", "read", SCOPE_ANY),
+        ("crm.opportunity", "read", SCOPE_ANY),
+        ("crm.quotation", "read", SCOPE_ANY),
+        ("crm.sales_contract", "read", SCOPE_ANY),
     ),
     "Viewer": (
         ("core.company", "read", SCOPE_OWN),
@@ -390,6 +413,28 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("workforce.worker", "read", SCOPE_OWN),
         ("workforce.time_entry", "create", SCOPE_OWN),
         ("workforce.time_entry", "read", SCOPE_OWN),
+    ),
+    # Track E -- Commercial. "Sales Manager" es dueño del flujo Lead ->
+    # Opportunity -> Customer/Quotation -> SalesContract; para facturar
+    # necesita ver companies/cuentas contables (selector de cuentas de
+    # ingreso/CxC en el formulario de facturación), pero NUNCA obtiene
+    # permisos ar.* -- la facturación real la sigue controlando Track A.
+    "Sales Manager": (
+        ("core.company", "read", SCOPE_OWN),
+        ("accounting.account", "read", SCOPE_OWN),
+        ("project", "read", SCOPE_OWN),
+        ("crm.customer", "create", SCOPE_OWN),
+        ("crm.customer", "read", SCOPE_OWN),
+        ("crm.lead", "create", SCOPE_OWN),
+        ("crm.lead", "read", SCOPE_OWN),
+        ("crm.lead", "convert", SCOPE_OWN),
+        ("crm.opportunity", "read", SCOPE_OWN),
+        ("crm.quotation", "create", SCOPE_OWN),
+        ("crm.quotation", "read", SCOPE_OWN),
+        ("crm.quotation", "accept", SCOPE_OWN),
+        ("crm.quotation", "convert", SCOPE_OWN),
+        ("crm.sales_contract", "read", SCOPE_OWN),
+        ("crm.sales_contract", "bill", SCOPE_OWN),
     ),
 }
 

@@ -11,25 +11,26 @@ from app.domain.errors import (
     OverpaymentError,
 )
 from app.models.ar import CustomerInvoice, CustomerReceipt
+from app.models.crm import Customer
 from app.models.treasury import TreasuryAccount
 from app.services import posting_service
 from app.services.financial_validation_service import (
     assert_account_belongs_to_company,
+    assert_customer_belongs_to_company,
     assert_operation_scope,
     assert_project_belongs_to_company,
 )
 from app.services.posting_service import JournalLineInput
 
-"""Accounts Receivable (orden maestra §36). Deuda intencional:
-`customer_name` es texto libre hasta que Track E (Commercial) aterrice la
-entidad `Customer` real -- ver docs/ACCOUNTING.md."""
+"""Accounts Receivable (orden maestra §36). `customer_id` referencia la
+entidad real `Customer` (Track E - Commercial, ver app/models/crm.py)."""
 
 
 def create_customer_invoice(
     db: Session,
     *,
     company_id: uuid.UUID,
-    customer_name: str,
+    customer_id: uuid.UUID,
     invoice_number: str,
     scope: str,
     project_id: uuid.UUID | None,
@@ -40,6 +41,7 @@ def create_customer_invoice(
     invoice_date: date,
     due_date: date,
     description: str | None,
+    commit: bool = True,
 ) -> CustomerInvoice:
     if amount <= 0:
         raise OverpaymentError("La factura requiere amount > 0")
@@ -57,9 +59,10 @@ def create_customer_invoice(
         field_name="receivable_account_id",
     )
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
+    assert_customer_belongs_to_company(db, customer_id=customer_id, company_id=company_id)
     invoice = CustomerInvoice(
         company_id=company_id,
-        customer_name=customer_name,
+        customer_id=customer_id,
         invoice_number=invoice_number,
         scope=scope,
         project_id=project_id,
@@ -73,8 +76,11 @@ def create_customer_invoice(
         status="DRAFT",
     )
     db.add(invoice)
-    db.commit()
-    db.refresh(invoice)
+    if commit:
+        db.commit()
+        db.refresh(invoice)
+    else:
+        db.flush()
     return invoice
 
 
@@ -89,6 +95,9 @@ def approve_customer_invoice(db: Session, *, invoice_id: uuid.UUID) -> CustomerI
             f"Solo se puede aprobar una factura DRAFT (estado actual: {invoice.status})"
         )
 
+    customer = db.get(Customer, invoice.customer_id)
+    customer_name = customer.legal_name if customer is not None else str(invoice.customer_id)
+
     document = posting_service.post_manual(
         db,
         company_id=invoice.company_id,
@@ -101,15 +110,15 @@ def approve_customer_invoice(db: Session, *, invoice_id: uuid.UUID) -> CustomerI
                 account_id=invoice.receivable_account_id,
                 debit_amount=invoice.amount,
                 project_id=invoice.project_id,
-                description=f"Factura {invoice.invoice_number} a {invoice.customer_name}",
+                description=f"Factura {invoice.invoice_number} a {customer_name}",
             ),
             JournalLineInput(
                 account_id=invoice.revenue_account_id,
                 credit_amount=invoice.amount,
-                description=f"Factura {invoice.invoice_number} a {invoice.customer_name}",
+                description=f"Factura {invoice.invoice_number} a {customer_name}",
             ),
         ],
-        description=f"Factura {invoice.invoice_number} a {invoice.customer_name}",
+        description=f"Factura {invoice.invoice_number} a {customer_name}",
         source_type="customer_invoice",
         source_id=invoice.id,
         commit=False,
@@ -159,6 +168,9 @@ def collect_customer_receipt(
             "treasury_account_id debe usar la moneda de la factura"
         )
 
+    customer = db.get(Customer, invoice.customer_id)
+    customer_name = customer.legal_name if customer is not None else str(invoice.customer_id)
+
     document = posting_service.post_manual(
         db,
         company_id=invoice.company_id,
@@ -178,7 +190,7 @@ def collect_customer_receipt(
                 description=f"Cobro factura {invoice.invoice_number}",
             ),
         ],
-        description=f"Cobro a {invoice.customer_name} - factura {invoice.invoice_number}",
+        description=f"Cobro a {customer_name} - factura {invoice.invoice_number}",
         source_type="customer_invoice",
         source_id=invoice.id,
         commit=False,

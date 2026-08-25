@@ -9,9 +9,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
-# Accounts Receivable (orden maestra §36). Misma deuda intencional que AP:
-# `customer_name` en texto libre hasta que Track E (Commercial) aterrice la
-# entidad real `Customer` -- ver docs/ACCOUNTING.md.
+# Accounts Receivable (orden maestra §36). `customer_id` es una FK real a
+# `Customer` (Track E - Commercial, ver app/models/crm.py); la deuda
+# intencional de texto libre documentada anteriormente en docs/ACCOUNTING.md
+# quedo resuelta al integrar Track E.
 CUSTOMER_INVOICE_STATUSES = (
     "DRAFT",
     "APPROVED",
@@ -39,7 +40,9 @@ class CustomerInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
     )
-    customer_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    customer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False
+    )
     invoice_number: Mapped[str] = mapped_column(String(64), nullable=False)
     scope: Mapped[str] = mapped_column(String(16), nullable=False)
     project_id: Mapped[uuid.UUID | None] = mapped_column(

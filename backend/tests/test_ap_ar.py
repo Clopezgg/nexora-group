@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from app.models.accounting import AccountingDocument
 from app.models.ap import SupplierPayment
@@ -582,3 +583,203 @@ def test_paying_supplier_invoice_creates_audit_log_entry(client, db_session):
     assert len(rows) == 1
     assert rows[0].action == "ap.supplier_payment.create"
     assert rows[0].after["amount"] == "100.00"
+
+
+def _create_draft_invoice(client, *, company_id: str, expense_id: str, payable_id: str, supplier_id: str, number: str) -> dict:
+    response = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company_id,
+            "supplierId": supplier_id,
+            "invoiceNumber": number,
+            "scope": "GENERAL",
+            "expenseAccountId": expense_id,
+            "payableAccountId": payable_id,
+            "currencyCode": "HNL",
+            "amount": "500.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _create_finance_manager(db_session, *, company_id: str, email: str):
+    user = create_user_with_role(db_session, email=email, role_name="Finance Manager")
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_id))
+    db_session.commit()
+    return user
+
+
+def test_submitting_supplier_invoice_creates_a_real_approval_request(client, db_session):
+    """DEFERRED-FINAL-016: `approval_service.create_request` must have a
+    real production caller -- submitting an AP invoice for approval is
+    that caller. This moves the invoice DRAFT -> REVIEW and the resulting
+    ApprovalRequest must show up in the assigned approver's real inbox."""
+    login_admin(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
+    approver = _create_finance_manager(db_session, company_id=company["id"], email="approver-1@nexora.group")
+    invoice = _create_draft_invoice(
+        client, company_id=company["id"], expense_id=expense["id"], payable_id=payable["id"],
+        supplier_id=supplier["id"], number="SUB-001",
+    )
+
+    response = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/submit-for-approval",
+        json={"assignedTo": str(approver.id)},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "REVIEW"
+
+    login_as(client, email="approver-1@nexora.group")
+    inbox = client.get(f"/api/approvals?companyId={company['id']}")
+    assert inbox.status_code == 200, inbox.text
+    entries = [row for row in inbox.json() if row["entityId"] == invoice["id"]]
+    assert len(entries) == 1
+    assert entries[0]["entityType"] == "ap.supplier_invoice"
+    assert entries[0]["module"] == "ap"
+    assert entries[0]["status"] == "PENDING"
+    assert Decimal(entries[0]["amount"]) == Decimal("500.00")
+
+
+def test_deciding_the_approval_request_approves_the_invoice_via_the_real_adapter(client, db_session):
+    """Exercises the previously-dead `ap_service.apply_approval_decision`
+    adapter for real: the decision made through the Approval Inbox must
+    actually post the accrual and move the invoice to APPROVED."""
+    login_admin(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
+    approver = _create_finance_manager(db_session, company_id=company["id"], email="approver-2@nexora.group")
+    invoice = _create_draft_invoice(
+        client, company_id=company["id"], expense_id=expense["id"], payable_id=payable["id"],
+        supplier_id=supplier["id"], number="SUB-002",
+    )
+    client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/submit-for-approval",
+        json={"assignedTo": str(approver.id)},
+    )
+
+    login_as(client, email="approver-2@nexora.group")
+    inbox = client.get(f"/api/approvals?companyId={company['id']}").json()
+    request_id = next(row["id"] for row in inbox if row["entityId"] == invoice["id"])
+
+    decision = client.post(f"/api/approvals/{request_id}/decide", json={"decision": "APPROVED"})
+    assert decision.status_code == 200, decision.text
+
+    updated = client.get(f"/api/ap/supplier-invoices/{invoice['id']}")
+    assert updated.status_code == 200, updated.text
+    body = updated.json()
+    assert body["status"] == "APPROVED"
+    assert body["accrualDocumentId"] is not None
+
+
+def test_deciding_the_approval_request_rejects_the_invoice_via_the_real_adapter(client, db_session):
+    login_admin(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
+    approver = _create_finance_manager(db_session, company_id=company["id"], email="approver-3@nexora.group")
+    invoice = _create_draft_invoice(
+        client, company_id=company["id"], expense_id=expense["id"], payable_id=payable["id"],
+        supplier_id=supplier["id"], number="SUB-003",
+    )
+    client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/submit-for-approval",
+        json={"assignedTo": str(approver.id)},
+    )
+
+    login_as(client, email="approver-3@nexora.group")
+    inbox = client.get(f"/api/approvals?companyId={company['id']}").json()
+    request_id = next(row["id"] for row in inbox if row["entityId"] == invoice["id"])
+
+    decision = client.post(f"/api/approvals/{request_id}/decide", json={"decision": "REJECTED"})
+    assert decision.status_code == 200, decision.text
+
+    updated = client.get(f"/api/ap/supplier-invoices/{invoice['id']}").json()
+    assert updated["status"] == "CANCELLED"
+
+
+def test_submitter_cannot_decide_their_own_invoice_approval(client, db_session):
+    """INV-SOD-001 / NXR-WORKFLOW-001: the same user cannot both submit and
+    decide -- the submitter here is the bootstrap Administrator, who also
+    holds `workflow.approval decide`, so the guard must be the service-level
+    SegregationOfDutiesError, not merely a missing-permission 403."""
+    login_admin(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
+    invoice = _create_draft_invoice(
+        client, company_id=company["id"], expense_id=expense["id"], payable_id=payable["id"],
+        supplier_id=supplier["id"], number="SUB-004",
+    )
+    from app.models.user import User
+    from sqlalchemy import select as sa_select
+    from tests.conftest import BOOTSTRAP_ADMIN_EMAIL
+
+    admin = db_session.execute(sa_select(User).where(User.email == BOOTSTRAP_ADMIN_EMAIL)).scalar_one()
+
+    submit = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/submit-for-approval",
+        json={"assignedTo": str(admin.id)},
+    )
+    assert submit.status_code == 422, submit.text
+    assert submit.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_cannot_submit_an_invoice_that_is_not_draft(client, db_session):
+    login_admin(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
+    approver = _create_finance_manager(db_session, company_id=company["id"], email="approver-5@nexora.group")
+    invoice = _create_draft_invoice(
+        client, company_id=company["id"], expense_id=expense["id"], payable_id=payable["id"],
+        supplier_id=supplier["id"], number="SUB-005",
+    )
+    client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+
+    response = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/submit-for-approval",
+        json={"assignedTo": str(approver.id)},
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "NXR-AP-001"
+
+
+def test_submit_rejects_an_approver_without_decide_permission(client, db_session):
+    """An approver who cannot decide (no `workflow.approval decide`) would
+    make the ApprovalRequest a dead end nobody can ever act on."""
+    login_admin(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
+    accountant = create_user_with_role(db_session, email="not-an-approver@nexora.group", role_name="Accountant")
+    db_session.add(UserCompanyAccess(user_id=accountant.id, company_id=company["id"]))
+    db_session.commit()
+    invoice = _create_draft_invoice(
+        client, company_id=company["id"], expense_id=expense["id"], payable_id=payable["id"],
+        supplier_id=supplier["id"], number="SUB-006",
+    )
+
+    response = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/submit-for-approval",
+        json={"assignedTo": str(accountant.id)},
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_submit_for_approval_never_crosses_company(client, db_session):
+    login_admin(client)
+    company_a, _bank, expense, payable, supplier = _setup_ap(client)
+    company_b = create_company(client, name="Aprobación B")
+    invoice = _create_draft_invoice(
+        client, company_id=company_a["id"], expense_id=expense["id"], payable_id=payable["id"],
+        supplier_id=supplier["id"], number="SUB-007",
+    )
+    approver_b = _create_finance_manager(db_session, company_id=company_b["id"], email="approver-b@nexora.group")
+
+    user = create_user_with_role(db_session, email="finance-sub@nexora.group", role_name="Finance Manager")
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_b["id"]))
+    db_session.commit()
+    login_as(client, email="finance-sub@nexora.group")
+
+    response = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/submit-for-approval",
+        json={"assignedTo": str(approver_b.id)},
+    )
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "NXR-PERM-001"

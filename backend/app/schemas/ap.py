@@ -25,6 +25,11 @@ class SupplierInvoiceCreateRequest(CamelModel):
     description: str | None = None
 
 
+class SupplierInvoiceSubmitRequest(CamelModel):
+    assigned_to: uuid.UUID
+    priority: str = "NORMAL"
+
+
 class SupplierInvoiceResponse(CamelModel):
     id: uuid.UUID
     company_id: uuid.UUID

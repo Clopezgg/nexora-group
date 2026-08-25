@@ -5,14 +5,21 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.domain.errors import InvalidFinancialReferenceError
 from app.schemas.ap import (
     SupplierInvoiceCreateRequest,
     SupplierInvoiceResponse,
+    SupplierInvoiceSubmitRequest,
     SupplierPaymentCreateRequest,
     SupplierPaymentResponse,
 )
 from app.services import ap_service, audit_service, idempotency_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    assert_company_access,
+    require_permission,
+    user_has_company_access,
+    user_has_permission,
+)
 
 router = APIRouter(prefix="/ap", tags=["accounts-payable"])
 
@@ -87,6 +94,56 @@ def list_supplier_invoices(
         SupplierInvoiceResponse.model_validate(invoice, from_attributes=True)
         for invoice in ap_service.list_supplier_invoices(db, company_id=company_id)
     ]
+
+
+@router.post(
+    "/supplier-invoices/{invoice_id}/submit-for-approval", response_model=SupplierInvoiceResponse
+)
+def submit_supplier_invoice_for_approval(
+    invoice_id: uuid.UUID,
+    payload: SupplierInvoiceSubmitRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("ap.supplier_invoice", "submit")),
+    correlation_id: str = Depends(get_correlation_id),
+) -> SupplierInvoiceResponse:
+    invoice = _resolve_invoice(db, invoice_id)
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="ap.supplier_invoice",
+        action="submit",
+        company_id=invoice.company_id,
+    )
+    if not user_has_permission(
+        db, user_id=payload.assigned_to, resource="workflow.approval", action="decide"
+    ) or not user_has_company_access(
+        db, user_id=payload.assigned_to, company_id=invoice.company_id
+    ):
+        raise InvalidFinancialReferenceError(
+            "assignedTo debe ser un usuario con permiso para decidir aprobaciones en esta compañía"
+        )
+    before_status = invoice.status
+    invoice = ap_service.submit_supplier_invoice_for_approval(
+        db,
+        invoice_id=invoice_id,
+        requested_by=user.id,
+        assigned_to=payload.assigned_to,
+        priority=payload.priority,
+    )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="ap.supplier_invoice.submit",
+        entity_type="ap.supplier_invoice",
+        entity_id=invoice.id,
+        company_id=invoice.company_id,
+        project_id=invoice.project_id,
+        before={"status": before_status},
+        after={"status": invoice.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    return SupplierInvoiceResponse.model_validate(invoice, from_attributes=True)
 
 
 @router.post("/supplier-invoices/{invoice_id}/approve", response_model=SupplierInvoiceResponse)

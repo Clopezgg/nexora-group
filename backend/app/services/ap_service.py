@@ -13,7 +13,7 @@ from app.domain.errors import (
 from app.models.ap import SupplierInvoice, SupplierPayment
 from app.models.supplier import Supplier
 from app.models.treasury import TreasuryAccount
-from app.services import posting_service
+from app.services import approval_service, posting_service
 from app.services.financial_validation_service import (
     assert_account_belongs_to_company,
     assert_cost_center_belongs_to_company,
@@ -88,9 +88,20 @@ def create_supplier_invoice(
     return invoice
 
 
-def approve_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierInvoice:
-    """DRAFT -> APPROVED. Contabiliza el accrual: Debit gasto, Credit
-    cuentas por pagar (orden maestra §34)."""
+def submit_supplier_invoice_for_approval(
+    db: Session,
+    *,
+    invoice_id: uuid.UUID,
+    requested_by: uuid.UUID,
+    assigned_to: uuid.UUID,
+    priority: str = "NORMAL",
+) -> SupplierInvoice:
+    """DRAFT -> REVIEW. Crea una ApprovalRequest real (Approval Inbox,
+    Track G) en vez de dejar que la factura mute su propio estado sin
+    pasar por segregación de funciones -- resuelve DEFERRED-FINAL-016.
+    `approval_service.decide()` es quien finalmente llama
+    `apply_approval_decision` (adaptador ya registrado en `main.py`) para
+    aprobar/rechazar de verdad."""
     invoice = db.execute(
         select(SupplierInvoice).where(SupplierInvoice.id == invoice_id).with_for_update()
     ).scalar_one_or_none()
@@ -98,7 +109,42 @@ def approve_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierI
         raise ValueError(f"SupplierInvoice {invoice_id} no existe")
     if invoice.status != "DRAFT":
         raise InvalidInvoiceStateError(
-            f"Solo se puede aprobar una factura DRAFT (estado actual: {invoice.status})"
+            f"Solo se puede enviar a aprobación una factura DRAFT (estado actual: {invoice.status})"
+        )
+    invoice.status = "REVIEW"
+    db.flush()
+    approval_service.create_request(
+        db,
+        policy_id=None,
+        entity_type="ap.supplier_invoice",
+        entity_id=invoice.id,
+        company_id=invoice.company_id,
+        requested_by=requested_by,
+        module="ap",
+        assigned_to=assigned_to,
+        priority=priority,
+        amount=invoice.amount + invoice.tax_amount,
+        project_id=invoice.project_id,
+    )
+    db.commit()
+    db.refresh(invoice)
+    return invoice
+
+
+def approve_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierInvoice:
+    """DRAFT o REVIEW -> APPROVED. Contabiliza el accrual: Debit gasto,
+    Credit cuentas por pagar (orden maestra §34). DRAFT sigue siendo un
+    estado válido de entrada para permitir la aprobación directa cuando no
+    se pasó por el Approval Inbox (`submit_supplier_invoice_for_approval`);
+    REVIEW es el estado real tras esa submission."""
+    invoice = db.execute(
+        select(SupplierInvoice).where(SupplierInvoice.id == invoice_id).with_for_update()
+    ).scalar_one_or_none()
+    if invoice is None:
+        raise ValueError(f"SupplierInvoice {invoice_id} no existe")
+    if invoice.status not in ("DRAFT", "REVIEW"):
+        raise InvalidInvoiceStateError(
+            f"Solo se puede aprobar una factura DRAFT o REVIEW (estado actual: {invoice.status})"
         )
 
     supplier = db.get(Supplier, invoice.supplier_id)
@@ -143,9 +189,9 @@ def cancel_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierIn
     invoice = db.get(SupplierInvoice, invoice_id)
     if invoice is None:
         raise ValueError(f"SupplierInvoice {invoice_id} no existe")
-    if invoice.status != "DRAFT":
+    if invoice.status not in ("DRAFT", "REVIEW"):
         raise InvalidInvoiceStateError(
-            "Solo se puede cancelar una factura DRAFT; una factura aprobada requiere "
+            "Solo se puede cancelar una factura DRAFT o REVIEW; una factura aprobada requiere "
             "reversal contable, no cancelación directa"
         )
     invoice.status = "CANCELLED"

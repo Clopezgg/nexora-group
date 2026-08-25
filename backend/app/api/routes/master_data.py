@@ -12,6 +12,8 @@ from app.schemas.master_data import (
     CompanyResponse,
     CompanyUpdateRequest,
 )
+from app.schemas.tax import TaxCodeCreateRequest, TaxCodeResponse
+from app.services import tax_service
 from app.services.permission_service import (
     assert_company_access,
     list_user_company_ids,
@@ -115,3 +117,35 @@ def create_account(
     db.commit()
     db.refresh(account)
     return AccountResponse.model_validate(account, from_attributes=True)
+
+
+@router.get("/tax-codes", response_model=list[TaxCodeResponse])
+def list_tax_codes(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("tax.tax_code", "read")),
+) -> list[TaxCodeResponse]:
+    assert_company_access(
+        db, user_id=user.id, resource="tax.tax_code", action="read", company_id=company_id
+    )
+    tax_codes = tax_service.list_tax_codes(db, company_id=company_id)
+    return [TaxCodeResponse.model_validate(tc, from_attributes=True) for tc in tax_codes]
+
+
+@router.post("/tax-codes", response_model=TaxCodeResponse, status_code=201)
+def create_tax_code(
+    payload: TaxCodeCreateRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("tax.tax_code", "create")),
+) -> TaxCodeResponse:
+    assert_company_access(
+        db, user_id=user.id, resource="tax.tax_code", action="create", company_id=payload.company_id
+    )
+    tax_code = tax_service.create_tax_code(
+        db,
+        company_id=payload.company_id,
+        code=payload.code,
+        name=payload.name,
+        rate_percent=payload.rate_percent,
+    )
+    return TaxCodeResponse.model_validate(tax_code, from_attributes=True)

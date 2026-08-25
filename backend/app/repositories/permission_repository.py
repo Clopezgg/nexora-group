@@ -18,6 +18,9 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("accounting.journal_entry", "reverse", "Revertir asientos contables"),
     ("accounting.account", "create", "Crear cuentas del catálogo contable"),
     ("accounting.account", "read", "Ver el catálogo contable"),
+    # NXR-REQ-0006, Tax architecture.
+    ("tax.tax_code", "create", "Crear códigos de impuesto"),
+    ("tax.tax_code", "read", "Ver códigos de impuesto"),
     # Track A - Financial Core (Treasury/AP/AR, orden maestra §26-36).
     ("treasury.account", "create", "Crear cuentas de tesorería"),
     ("treasury.account", "read", "Ver cuentas de tesorería"),
@@ -217,6 +220,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("accounting.journal_entry", "reverse", SCOPE_OWN),
         ("accounting.account", "create", SCOPE_OWN),
         ("accounting.account", "read", SCOPE_OWN),
+        ("tax.tax_code", "create", SCOPE_OWN),
+        ("tax.tax_code", "read", SCOPE_OWN),
         ("treasury.account", "create", SCOPE_OWN),
         ("treasury.account", "read", SCOPE_OWN),
         ("treasury.remittance", "create", SCOPE_OWN),
@@ -318,6 +323,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("core.company", "read", SCOPE_ANY),
         ("accounting.journal_entry", "read", SCOPE_ANY),
         ("accounting.account", "read", SCOPE_ANY),
+        ("tax.tax_code", "read", SCOPE_ANY),
         ("treasury.account", "read", SCOPE_ANY),
         ("treasury.remittance", "read", SCOPE_ANY),
         ("treasury.general_expense", "read", SCOPE_ANY),

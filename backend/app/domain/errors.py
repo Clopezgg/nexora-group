@@ -195,3 +195,9 @@ class InvalidApprovalDecisionError(Exception):
 class CrewMembershipError(Exception):
     """Se intentó agregar un Worker que ya es miembro de la Crew, o quitar
     uno que no lo es."""
+
+
+# NXR-REQ-0006, Tax architecture.
+class TaxCodeExistsError(Exception):
+    """Ya existe un TaxCode con ese `code` en esta company
+    (uq_tax_codes_company_code)."""

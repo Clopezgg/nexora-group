@@ -37,6 +37,7 @@ from app.domain.errors import (
     OverpaymentError,
     ProcurementCurrencyMismatchError,
     SegregationOfDutiesError,
+    TaxCodeExistsError,
     UnbalancedJournalEntryError,
     UnsupportedEvidenceMimeTypeError,
 )
@@ -72,6 +73,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     ImmutableMaintenanceOrderError: ("NXR-EQUIPMENT-001", 409),
     InvalidTimeEntryStateError: ("NXR-WORKFORCE-001", 409),
     CrewMembershipError: ("NXR-WORKFORCE-002", 409),
+    TaxCodeExistsError: ("NXR-TAX-001", 409),
     InvalidCommercialStateError: ("NXR-CRM-001", 409),
     UnsupportedEvidenceMimeTypeError: ("NXR-EVIDENCE-002", 422),
     EvidenceTooLargeError: ("NXR-EVIDENCE-003", 422),

@@ -12,6 +12,14 @@ class CompanyCreateRequest(CamelModel):
     fiscal_id: str | None = None
 
 
+class CompanyUpdateRequest(CamelModel):
+    """Solo legal_name/fiscal_id son editables desde Settings -- code y
+    functional_currency_code son inmutables post-creación (CLAUDE.md)."""
+
+    legal_name: str | None = None
+    fiscal_id: str | None = None
+
+
 class CompanyResponse(CamelModel):
     id: uuid.UUID
     name: str

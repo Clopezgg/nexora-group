@@ -5,6 +5,11 @@ export const masterDataService = {
   listCompanies: () => apiFetch<Company[]>('/master-data/companies'),
   createCompany: (payload: { name: string; functionalCurrencyCode: string }) =>
     apiFetch<Company>('/master-data/companies', { method: 'POST', body: JSON.stringify(payload) }),
+  updateCompany: (companyId: string, payload: Partial<{ legalName: string; fiscalId: string }>) =>
+    apiFetch<Company>(`/master-data/companies/${companyId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
   listAccounts: (companyId: string) =>
     apiFetch<Account[]>(`/master-data/accounts?companyId=${companyId}`),
   createAccount: (payload: {

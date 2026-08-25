@@ -1347,3 +1347,88 @@ Integration architecture (`NXR-REQ-0092`-`0096`, Prioridad 4 del
 usuario). `DEFERRED-FINAL-014` (audit log) parcialmente resuelto,
 `DEFERRED-FINAL-016` nuevo (`create_request` sin llamador real). Próximo:
 continuar con Reports/Search/Analytics per `docs/MASTER_PLAN.md`.
+
+## Plan `2026-08-25-reports-search-analytics`, Task 3 (Settings + Integration Architecture)
+
+Worktree `track/h-settings`, branch `track/h-settings` desde
+`feat/nexora-greenfield` @ `e9cc998`. Cierra `NXR-REQ-0095` (Settings) y
+`NXR-REQ-0096` (Integration architecture).
+
+**Settings (NXR-REQ-0095):** verificado contra el modelo real de
+`Company` (`app/models/company.py`) antes de escribir nada -- el campo
+real es `functional_currency_code`, no `functional_currency` como el
+brief del plan lo nombraba de memoria. `PATCH /api/master-data/companies/
+{id}` nuevo (mismo patrón de dependencia/permiso/response que
+`create_company`), `CompanyUpdateRequest`/`company_repository.
+update_company` -- solo `legal_name`/`fiscal_id` aceptados, `code` y
+`functional_currency_code` nunca se tocan (inmutables post-creación,
+CLAUDE.md). Permiso nuevo `core.company:update`: agregado a
+`_BASE_PERMISSIONS` (Administrator lo hereda automáticamente vía
+`SCOPE_ANY`) y otorgado explícitamente a Finance Manager con `SCOPE_OWN`
+-- era el único rol con lectura de `core.company` a nivel `OWN` que
+plausiblemente administra datos legales/fiscales de la compañía, y sin
+un rol `SCOPE_OWN` real el test de aislamiento de company (INV-COMP-001)
+no podría escribirse honestamente (Administrator siempre tiene
+`SCOPE_ANY`, nunca lo bloquea `assert_company_access`). RED/GREEN real
+en `backend/tests/test_master_data.py` (archivo nuevo -- no existía
+ninguno con ese nombre; `create_company`/`login_admin` ya vivían en
+`tests/helpers.py`): update persiste legal_name/fiscal_id, la moneda
+funcional nunca cambia, y un usuario Finance Manager sin
+`UserCompanyAccess` a la company B recibe 403 (`NXR-PERM-001`) mientras
+que el mismo usuario sí puede actualizar la company A a la que sí tiene
+acceso.
+
+Frontend: `/control/configuracion` ya existía como entrada de nav
+reservada ("Configuración") en `navigation.ts` -- verificado antes de
+tocar nada, mismo criterio que cada task previa de este plan; solo hacía
+falta implementar la ruta (antes resolvía a `PlaceholderPage`).
+`masterDataService.ts` ya existía (no se creó `settingsService.ts`
+nuevo) -- se le agregó `updateCompany`. `CompanySettingsPage.tsx`:
+selector de compañía (`CompanySelector`), código/moneda funcional
+solo-lectura, formulario editable de razón social/identificación fiscal.
+Estado del form sincronizado sin `useEffect` (ningún feature de este
+codebase usa `useEffect` para esto; ademas `eslint-plugin-react-hooks`
+rechaza `setState` síncrono dentro de un efecto) -- se usa el patrón
+oficial de React de ajustar estado durante el render quando cambia la
+compañía seleccionada, y el valor mostrado tras guardar se toma
+directamente de la respuesta real de la mutación (`onSuccess`), no del
+texto que el usuario tecleó. `CompanySettingsPage.test.tsx` prueba el
+round-trip real: el "servidor" mock canonicaliza `legalName` a mayúsculas
+al recibir el PATCH, y el test verifica que la UI termina mostrando ese
+valor canonicalizado -- si la página solo reflejara estado local optimista
+en vez de releer la API real, el test fallaría. RED confirmado
+manualmente (revirtiendo el wiring de la ruta en `routes.tsx`, ambos
+tests fallan porque la página cae a `PlaceholderPage`) antes de restaurar
+GREEN.
+
+**Integration Architecture (NXR-REQ-0096):** documentación pura, sin
+código de adaptador nuevo, por la scope ruling del plan (la fila de la
+matriz ya marcaba FE/E2E `➖` desde antes de este task). `docs/
+INTEGRATION_ARCHITECTURE.md` documenta, contra el código real: la API
+REST existente (autenticada por sesión, aislada por company, todo
+dominio ya construido la expone igual a un frontend que a un integrador
+externo), `AuditLog` (`GET /api/audit`, `app/models/audit.py`, Track G
+Task 1) como feed de eventos consultable por poll -- con la limitación
+honesta de que la cobertura de instrumentación sigue parcial (solo
+`ap.py`/`approvals.py`/`procurement.py`/`treasury.py` llaman a
+`audit_service.record` hoy, `master_data.py` no), y `Notification`
+(`app/models/notification.py`, Track G Task 3) como superficie de
+eventos por usuario. Nombra honestamente lo que NO existe hoy (verificado
+por grep contra el código, no supuesto): sin mecanismo de webhook/push,
+sin autenticación de servicio distinta a la cookie de sesión de usuario
+(no hay API key, no hay client_credentials, no hay service account), sin
+rate limiting, sin versión de contrato de API (`/api/v1/`).
+
+Verificación: backend 198/198 pytest (195 previos + 3 nuevos en
+`test_master_data.py`), `compileall` limpio. Frontend: `tsc -b`
+limpio, `eslint .` limpio (incluyendo el fix del patrón de sincronización
+de estado descrito arriba), 63/63 vitest (61 previos + 2 nuevos en
+`CompanySettingsPage.test.tsx`), `npm run build` OK (863 módulos, mismo
+warning preexistente de chunk >500kB sin relación con este task).
+
+Worktree `track/h-settings` preparado, no fusionado a
+`feat/nexora-greenfield` todavía -- pendiente de revisión/merge por el
+coordinador. Corre en paralelo con las otras dos tasks de este mismo plan
+(Global Search, Reporting) en worktrees separados; comparten solo los
+registros centrales (`main.py`, `permission_repository.py`), sin
+dependencia de archivo entre las tres.

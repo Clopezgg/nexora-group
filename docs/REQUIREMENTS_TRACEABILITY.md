@@ -210,8 +210,8 @@ reutilizaría cada uno.
 | NXR-REQ-0092 | Global Search (Cmd/Ctrl+K) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0093 | Reporting (por dominio) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0094 | Export (CSV/XLSX/PDF) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0095 | Settings | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0096 | Integration architecture (SAP/AI adapters) | ⬜⬜⬜⬜➖⬜⬜⬜➖ | NOT_STARTED | — |
+| NXR-REQ-0095 | Settings | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track H (task-3): perfil real de `Company` editable -- solo `legal_name`/`fiscal_id` (código y `functional_currency_code` de solo lectura, inmutables post-creación por CLAUDE.md); `PATCH /api/master-data/companies/{id}` (`app/api/routes/master_data.py`), `CompanyUpdateRequest`/`company_repository.update_company`, permiso nuevo `core.company:update` (otorgado a Administrator vía `_BASE_PERMISSIONS` y a Finance Manager con `SCOPE_OWN`), aislamiento de company probado (RED/GREEN real, `test_master_data.py`); `CompanySettingsPage.tsx` en `/control/configuracion` (entrada de nav ya reservada, "Configuración", no se inventó sección nueva), round-trip real contra la API probado en frontend (`CompanySettingsPage.test.tsx`, valor canonicalizado por el "servidor" para probar que la UI lee la respuesta real, no solo estado local). Audit marcado `⬜` honesto: como `create_company`, `update_company` todavía no llama a `audit_service.record` (mismo backlog de `docs/AUDIT.md`); falta E2E |
+| NXR-REQ-0096 | Integration architecture (SAP/AI adapters) | ⬜⬜⬜⬜➖⬜⬜⬜➖ | IMPLEMENTED | Track H (task-3): entregable de documentación, no código nuevo -- por diseño del plan (`docs/superpowers/specs/2026-08-25-reports-search-analytics-design.md`), la matriz ya marcaba FE/E2E `➖` desde antes de este task. `docs/INTEGRATION_ARCHITECTURE.md` documenta el extension surface real: la API REST existente (autenticada, aislada por company, todo dominio ya construido), `AuditLog` (`GET /api/audit`, filtrable por `entityType`/`entityId`) como feed de eventos consultable por poll, `Notification` como superficie de eventos por usuario; nombra honestamente lo que NO existe (sin webhook/push, sin API key/service-account distinto del login de usuario, sin rate limiting, cobertura parcial de `AuditLog`, sin versión de contrato de API) como groundwork futuro. Marcadores Dom/DB/BE/API/Perm/Audit/Test quedan `⬜` a propósito -- no se construyó ningún adaptador/endpoint/auth nuevo, tal como exige el scope ruling del plan |
 
 ## EXPERIENCE
 
@@ -267,32 +267,34 @@ integrados. Recontado línea por línea contra la tabla real:
 - **VERIFIED:** 0 / 124 (reservado para cuando el coordinador confirme
   comportamiento end-to-end en `feat/nexora-greenfield` — ningún track se
   autootorga `VERIFIED`)
-- **IMPLEMENTED:** 86 / 124 — los 81 previos (ver historial de este
-  archivo) más 5 nuevos de este plan: NXR-REQ-0087/0088/0089 (Workflow
-  engine — alcance de servicios cross-cutting, no motor de estados
-  genérico, ver la Ruling del spec —/Approval Inbox/Segregation of
-  Duties, Track G Task 2), NXR-REQ-0090 (Audit, Track G Task 1 — 5 rutas
-  instrumentadas, backlog honesto en `docs/AUDIT.md`), NXR-REQ-0091
-  (Notifications, Track G Task 3).
+- **IMPLEMENTED:** 88 / 124 — los 81 previos (ver historial de este
+  archivo) más 5 de `track-g-workflow-audit`: NXR-REQ-0087/0088/0089
+  (Workflow engine — alcance de servicios cross-cutting, no motor de
+  estados genérico, ver la Ruling del spec —/Approval Inbox/Segregation
+  of Duties, Track G Task 2), NXR-REQ-0090 (Audit, Track G Task 1 — 5
+  rutas instrumentadas, backlog honesto en `docs/AUDIT.md`), NXR-REQ-0091
+  (Notifications, Track G Task 3), más 2 de
+  `2026-08-25-reports-search-analytics` Task 3 (Track H): NXR-REQ-0095
+  (Settings — perfil real de `Company` editable) y NXR-REQ-0096
+  (Integration architecture — entregable de documentación,
+  `docs/INTEGRATION_ARCHITECTURE.md`).
 - **IN_PROGRESS:** 21 / 124 — NXR-REQ-0001/0006/0008/0009/0025/0044/
   0059/0060/0105/0106/0107/0108/0110/0114/0115/0116/0117/0118/0119/0120/
   0121.
-- **NOT_STARTED:** 15 / 124 — NXR-REQ-0016/0034/0035/0054/0058/0074/
-  0092/0093/0094/0095/0096/0109/0112/0113/0122. 0054 Returns y 0058
-  Supplier Performance (Track C) son deuda intencional documentada en
+- **NOT_STARTED:** 13 / 124 — NXR-REQ-0016/0034/0035/0054/0058/0074/
+  0092/0093/0094/0109/0112/0113/0122. 0054 Returns y 0058 Supplier
+  Performance (Track C) son deuda intencional documentada en
   `docs/PROCUREMENT.md`/`docs/INVENTORY.md`. 0074 Crews sigue fuera del
   alcance de todos los planes ejecutados hasta ahora. NXR-REQ-0092
-  (Global Search), 0093 (Reporting), 0094 (Export), 0095 (Settings),
-  0096 (Integration architecture) son la Prioridad 4 siguiente del
-  usuario — el plan `track-g-workflow-audit` originalmente los rotuló
-  como "alertas financieras/de proyecto" por error; Task 3 corrigió esa
-  confusión contra la tabla real (ver ledger del plan) — no existen
-  filas de alerta financiera separadas, esas cinco son sus verdaderos
-  requisitos.
+  (Global Search), 0093 (Reporting), 0094 (Export) siguen NOT_STARTED —
+  Prioridad 4 del usuario, en construcción en paralelo por otras tasks
+  del plan `2026-08-25-reports-search-analytics`; 0095 (Settings) y 0096
+  (Integration architecture) ya se movieron a IMPLEMENTED arriba (Task 3
+  de ese mismo plan).
 - **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue
   real, no por incapacidad técnica)
 
-Suma verificada: 0+86+21+15+2 = 124.
+Suma verificada: 0+88+21+13+2 = 124.
 
 Este resumen se actualiza en cada integración de track. Ver progreso vivo
 en `docs/PROGRESS.md`. Recontado previamente en Task 7 (`2026-08-24-interrupted-tracks-recovery`,

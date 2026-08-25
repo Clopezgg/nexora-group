@@ -228,3 +228,35 @@ def list_customer_invoices(db: Session, *, company_id: uuid.UUID) -> list[Custom
             .order_by(CustomerInvoice.created_at.desc())
         ).scalars()
     )
+
+
+def apply_invoice_reversal(db: Session, *, invoice_id: uuid.UUID, document_type_code: str) -> None:
+    """Adaptador para posting_service.register_reversal_hook (NXR-REQ-0025,
+    Corrections) -- mismo criterio que ap_service.apply_accrual_reversal.
+    Revertir el asiento de una factura (document_type_code "CIN") sin
+    sincronizar su status dejaría la factura APPROVED apuntando a un
+    AccountingDocument ya REVERSED, pero todavía cobrable. El source_type
+    "customer_invoice" también cubre el recibo ("REC"); revertir un
+    recibo no está soportado todavía (reduciría amount_collected, reabriría
+    la factura) y se rechaza explícitamente."""
+    if document_type_code == "REC":
+        raise InvalidInvoiceStateError(
+            "Revertir el recibo de una factura no está soportado todavía; "
+            "revierta solo el asiento de una factura sin cobros registrados"
+        )
+    if document_type_code != "CIN":
+        return
+    invoice = db.execute(
+        select(CustomerInvoice).where(CustomerInvoice.id == invoice_id).with_for_update()
+    ).scalar_one_or_none()
+    if invoice is None:
+        raise ValueError(f"CustomerInvoice {invoice_id} no existe")
+    if invoice.amount_collected > 0:
+        raise InvalidInvoiceStateError(
+            "No se puede revertir el asiento de una factura con cobros registrados"
+        )
+    if invoice.status != "APPROVED":
+        raise InvalidInvoiceStateError(
+            f"No se puede revertir el asiento de una factura en estado {invoice.status}"
+        )
+    invoice.status = "CANCELLED"

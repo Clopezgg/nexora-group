@@ -363,3 +363,147 @@ def test_reversing_journal_entry_creates_audit_log_entry(client, db_session):
     assert rows[0].before["status"] == "POSTED"
     assert rows[0].after["status"] == "REVERSED"
     assert rows[0].after["reversalDocumentId"] == reversal.json()["id"]
+
+
+def _create_ap_setup(client):
+    company = create_company(client)
+    expense = create_account(client, company_id=company["id"], code="5100", name="Gastos", account_type="EXPENSE")
+    payable = create_account(
+        client, company_id=company["id"], code="2100", name="Cuentas por pagar", account_type="LIABILITY"
+    )
+    from tests.helpers import create_supplier
+
+    supplier = create_supplier(client, company_id=company["id"])
+    return company, expense, payable, supplier
+
+
+def test_reversing_an_ap_accrual_cancels_the_invoice(client):
+    """NXR-REQ-0025 (Corrections): revertir el accrual de una factura vía
+    el endpoint genérico de reversal debe sincronizar el status de la
+    factura -- de lo contrario queda APPROVED (pagable) apuntando a un
+    documento contable ya REVERSED."""
+    login_admin(client)
+    company, expense, payable, supplier = _create_ap_setup(client)
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "COR-001",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "200.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    ).json()
+    approved = client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve").json()
+    assert approved["status"] == "APPROVED"
+
+    reversal = client.post(
+        f"/api/accounting/journal-entries/{approved['accrualDocumentId']}/reverse",
+        json={"reason": "Factura registrada por error"},
+    )
+    assert reversal.status_code == 200, reversal.text
+
+    updated = client.get(f"/api/ap/supplier-invoices/{invoice['id']}").json()
+    assert updated["status"] == "CANCELLED"
+
+
+def test_reversing_a_paid_ap_accrual_is_rejected(client):
+    """No se puede revertir el accrual de una factura que ya tiene pagos
+    -- el dinero ya salió, revertir el accrual sin más dejaría el pago
+    huérfano de su origen contable."""
+    login_admin(client)
+    company, expense, payable, supplier = _create_ap_setup(client)
+    bank_gl = create_account(client, company_id=company["id"], code="1100", name="Bancos", account_type="ASSET")
+    contributions = create_account(
+        client, company_id=company["id"], code="3100", name="Aportes", account_type="EQUITY"
+    )
+    from tests.helpers import create_treasury_account
+
+    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+    client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank["id"],
+            "counterAccountId": contributions["id"],
+            "sender": "Fondeo",
+            "currencyCode": "HNL",
+            "originalAmount": "10000.00",
+            "remittanceDate": "2026-01-01",
+        },
+    )
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "COR-002",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "100.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    ).json()
+    approved = client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve").json()
+    client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/payments",
+        json={"treasuryAccountId": bank["id"], "amount": "100.00", "paymentDate": "2026-01-20"},
+    )
+
+    response = client.post(
+        f"/api/accounting/journal-entries/{approved['accrualDocumentId']}/reverse",
+        json={"reason": "Intento inválido"},
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "NXR-AP-001"
+
+    unchanged = client.get(f"/api/ap/supplier-invoices/{invoice['id']}").json()
+    assert unchanged["status"] == "PAID"
+
+
+def test_reversing_an_ar_invoice_cancels_it(client):
+    login_admin(client)
+    company = create_company(client)
+    revenue = create_account(
+        client, company_id=company["id"], code="4100", name="Ingresos", account_type="REVENUE"
+    )
+    receivable = create_account(
+        client, company_id=company["id"], code="1200", name="Cuentas por cobrar", account_type="ASSET"
+    )
+    from tests.helpers import create_customer
+
+    customer = create_customer(client, company_id=company["id"], legal_name="Cliente reversal")
+    invoice = client.post(
+        "/api/ar/customer-invoices",
+        json={
+            "companyId": company["id"],
+            "customerId": customer["id"],
+            "invoiceNumber": "COR-AR-001",
+            "scope": "GENERAL",
+            "revenueAccountId": revenue["id"],
+            "receivableAccountId": receivable["id"],
+            "currencyCode": "HNL",
+            "amount": "500.00",
+            "invoiceDate": "2026-01-05",
+            "dueDate": "2026-02-05",
+        },
+    ).json()
+    approved = client.post(f"/api/ar/customer-invoices/{invoice['id']}/approve").json()
+    assert approved["status"] == "APPROVED"
+
+    reversal = client.post(
+        f"/api/accounting/journal-entries/{approved['accountingDocumentId']}/reverse",
+        json={"reason": "Factura duplicada"},
+    )
+    assert reversal.status_code == 200, reversal.text
+
+    updated = client.get(f"/api/ar/customer-invoices/{invoice['id']}").json()
+    assert updated["status"] == "CANCELLED"

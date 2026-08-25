@@ -311,3 +311,36 @@ def list_supplier_invoices(db: Session, *, company_id: uuid.UUID) -> list[Suppli
             .order_by(SupplierInvoice.created_at.desc())
         ).scalars()
     )
+
+
+def apply_accrual_reversal(db: Session, *, invoice_id: uuid.UUID, document_type_code: str) -> None:
+    """Adaptador para posting_service.register_reversal_hook (NXR-REQ-0025,
+    Corrections). Revertir el accrual de una factura (document_type_code
+    "SIN") sin sincronizar su status dejaría la factura APPROVED
+    apuntando a un AccountingDocument ya REVERSED -- pagable de nuevo
+    pese a que el GL ya no refleja el gasto. El source_type
+    "supplier_invoice" también cubre el pago ("PAY"); ese caso todavía no
+    tiene un flujo de reversión propio (reducir amount_paid, reabrir la
+    factura) y se rechaza explícitamente en vez de dejar un estado a
+    medias -- ver docs/DEFERRED.md."""
+    if document_type_code == "PAY":
+        raise InvalidInvoiceStateError(
+            "Revertir el pago de una factura no está soportado todavía; "
+            "revierta solo el accrual de una factura sin pagos registrados"
+        )
+    if document_type_code != "SIN":
+        return
+    invoice = db.execute(
+        select(SupplierInvoice).where(SupplierInvoice.id == invoice_id).with_for_update()
+    ).scalar_one_or_none()
+    if invoice is None:
+        raise ValueError(f"SupplierInvoice {invoice_id} no existe")
+    if invoice.amount_paid > 0:
+        raise InvalidInvoiceStateError(
+            "No se puede revertir el accrual de una factura con pagos registrados"
+        )
+    if invoice.status != "APPROVED":
+        raise InvalidInvoiceStateError(
+            f"No se puede revertir el accrual de una factura en estado {invoice.status}"
+        )
+    invoice.status = "CANCELLED"

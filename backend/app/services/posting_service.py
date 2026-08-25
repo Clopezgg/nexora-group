@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -38,6 +39,26 @@ dominio contable (doble partida, OperationScope, período fiscal abierto,
 inmutabilidad), numerar el documento y persistirlo -- nunca decide qué
 cuentas usar para un caso de negocio que no conoce.
 """
+
+# NXR-REQ-0025 (Corrections). Reversal genérico corrige el GL, pero si el
+# AccountingDocument original tiene un AccountingSourceLink (AP accrual,
+# AR invoice, ...) el dominio dueño se desincroniza silenciosamente: una
+# SupplierInvoice queda APPROVED apuntando a un accrual ya REVERSED, y
+# sigue siendo pagable pese a que el GL ya no refleja el gasto. Mismo
+# patrón que approval_service.register_decision_adapter: el dominio se
+# registra a sí mismo, este servicio nunca conoce el modelo de dominio.
+# El hook recibe (db, source_id, document_type_code) -- el mismo
+# source_type puede cubrir más de un document_type_code (p.ej. AP usa
+# "supplier_invoice" tanto para el accrual "SIN" como para el pago "PAY"),
+# así que el hook debe inspeccionar document_type_code y decidir si
+# aplica o si debe rechazar la reversión (lanzando) para no dejar un
+# estado a medias.
+ReversalHook = Callable[[Session, uuid.UUID, str], None]
+_REVERSAL_HOOKS: dict[str, ReversalHook] = {}
+
+
+def register_reversal_hook(source_type: str, hook: ReversalHook) -> None:
+    _REVERSAL_HOOKS[source_type] = hook
 
 
 @dataclass
@@ -227,6 +248,14 @@ def reverse_document(
         raise ImmutableDocumentError(
             f"Solo se puede revertir un documento POSTED (estado actual: {original.status})"
         )
+
+    link = db.execute(
+        select(AccountingSourceLink).where(AccountingSourceLink.accounting_document_id == original.id)
+    ).scalar_one_or_none()
+    if link is not None:
+        hook = _REVERSAL_HOOKS.get(link.source_type)
+        if hook is not None:
+            hook(db, link.source_id, original.document_type_code)
 
     original_lines = db.execute(
         select(JournalLine).where(JournalLine.accounting_document_id == original.id)

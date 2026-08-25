@@ -70,7 +70,20 @@ def create_app() -> FastAPI:
 
     register_error_handlers(app)
 
-    from app.services import ap_service, approval_service, submittal_service
+    from app.services import ap_service, approval_service, ar_service, posting_service, submittal_service
+
+    posting_service.register_reversal_hook(
+        "supplier_invoice",
+        lambda db, source_id, document_type_code: ap_service.apply_accrual_reversal(
+            db, invoice_id=source_id, document_type_code=document_type_code
+        ),
+    )
+    posting_service.register_reversal_hook(
+        "customer_invoice",
+        lambda db, source_id, document_type_code: ar_service.apply_invoice_reversal(
+            db, invoice_id=source_id, document_type_code=document_type_code
+        ),
+    )
 
     approval_service.register_decision_adapter(
         "ap.supplier_invoice",

@@ -153,3 +153,98 @@ def test_company_access_blocks_cross_company_time_entry_approval(client, db_sess
     persisted = client.get(f"/api/workforce/time-entries?companyId={company_b['id']}").json()[0]
     assert persisted["status"] == "SUBMITTED"
     assert persisted["laborCost"] is None
+
+
+def _create_project(client, *, company_id: str, name: str = "Torre Cuadrillas") -> dict:
+    response = client.post(
+        "/api/projects",
+        json={"companyId": company_id, "name": name, "code": "CRW-001", "currencyCode": "HNL"},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_creating_a_crew_and_adding_members(client):
+    """NXR-REQ-0074: `movement_type`-style minimal scope, mismo criterio
+    que `Worker` ("cubre lo mínimo... no un módulo de RRHH completo")."""
+    login_admin(client)
+    company = create_company(client)
+    project = _create_project(client, company_id=company["id"])
+    worker_a = _create_worker(client, company_id=company["id"], name="Carlos López")
+    worker_b = _create_worker(client, company_id=company["id"], name="Ana Martínez")
+
+    crew = client.post(
+        "/api/workforce/crews",
+        json={"companyId": company["id"], "name": "Cuadrilla Estructuras", "projectId": project["id"]},
+    )
+    assert crew.status_code == 201, crew.text
+    crew_body = crew.json()
+    assert crew_body["name"] == "Cuadrilla Estructuras"
+    assert crew_body["projectId"] == project["id"]
+    assert crew_body["status"] == "ACTIVE"
+
+    added_a = client.post(
+        f"/api/workforce/crews/{crew_body['id']}/members", json={"workerId": worker_a["id"]}
+    )
+    assert added_a.status_code == 201, added_a.text
+    added_b = client.post(
+        f"/api/workforce/crews/{crew_body['id']}/members", json={"workerId": worker_b["id"]}
+    )
+    assert added_b.status_code == 201, added_b.text
+
+    detail = client.get(f"/api/workforce/crews/{crew_body['id']}")
+    assert detail.status_code == 200, detail.text
+    member_names = {m["fullName"] for m in detail.json()["members"]}
+    assert member_names == {"Carlos López", "Ana Martínez"}
+
+    listed = client.get(f"/api/workforce/crews?companyId={company['id']}").json()
+    assert [c["id"] for c in listed] == [crew_body["id"]]
+
+
+def test_cannot_add_the_same_worker_to_a_crew_twice(client):
+    login_admin(client)
+    company = create_company(client)
+    worker = _create_worker(client, company_id=company["id"])
+    crew = client.post(
+        "/api/workforce/crews", json={"companyId": company["id"], "name": "Cuadrilla Única"}
+    ).json()
+
+    first = client.post(f"/api/workforce/crews/{crew['id']}/members", json={"workerId": worker["id"]})
+    assert first.status_code == 201, first.text
+
+    second = client.post(f"/api/workforce/crews/{crew['id']}/members", json={"workerId": worker["id"]})
+    assert second.status_code == 409, second.text
+    assert second.json()["error"]["code"] == "NXR-WORKFORCE-002"
+
+
+def test_removing_a_crew_member(client):
+    login_admin(client)
+    company = create_company(client)
+    worker = _create_worker(client, company_id=company["id"])
+    crew = client.post(
+        "/api/workforce/crews", json={"companyId": company["id"], "name": "Cuadrilla Temporal"}
+    ).json()
+    client.post(f"/api/workforce/crews/{crew['id']}/members", json={"workerId": worker["id"]})
+
+    removed = client.delete(f"/api/workforce/crews/{crew['id']}/members/{worker['id']}")
+    assert removed.status_code == 204, removed.text
+
+    detail = client.get(f"/api/workforce/crews/{crew['id']}").json()
+    assert detail["members"] == []
+
+
+def test_crew_never_returns_another_companys_data(client, db_session):
+    login_admin(client)
+    company_a = create_company(client, name="Cuadrillas A")
+    company_b = create_company(client, name="Cuadrillas B")
+
+    user = create_user_with_role(
+        db_session, email="equipment-crew@nexora.group", role_name="Equipment Manager"
+    )
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_b["id"]))
+    db_session.commit()
+    login_as(client, email="equipment-crew@nexora.group")
+
+    response = client.get(f"/api/workforce/crews?companyId={company_a['id']}")
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "NXR-PERM-001"

@@ -52,3 +52,31 @@ class TimeEntryResponse(CamelModel):
     labor_cost: Decimal | None
     approved_by_id: uuid.UUID | None
     approved_at: datetime | None
+
+
+class CrewCreateRequest(CamelModel):
+    company_id: uuid.UUID
+    name: str
+    project_id: uuid.UUID | None = None
+
+
+class CrewResponse(CamelModel):
+    id: uuid.UUID
+    company_id: uuid.UUID
+    project_id: uuid.UUID | None
+    name: str
+    status: str
+
+
+class CrewMemberAddRequest(CamelModel):
+    worker_id: uuid.UUID
+
+
+class CrewMemberResponse(CamelModel):
+    id: uuid.UUID
+    crew_id: uuid.UUID
+    worker_id: uuid.UUID
+
+
+class CrewWithMembersResponse(CrewResponse):
+    members: list[WorkerResponse]

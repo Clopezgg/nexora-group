@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from app.domain.errors import (
     BudgetBaselineExistsError,
     BudgetCurrencyMismatchError,
+    CrewMembershipError,
     DepreciationAlreadyPostedError,
     EvidenceTooLargeError,
     FiscalPeriodClosedError,
@@ -70,6 +71,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     DepreciationAlreadyPostedError: ("NXR-ASSET-002", 409),
     ImmutableMaintenanceOrderError: ("NXR-EQUIPMENT-001", 409),
     InvalidTimeEntryStateError: ("NXR-WORKFORCE-001", 409),
+    CrewMembershipError: ("NXR-WORKFORCE-002", 409),
     InvalidCommercialStateError: ("NXR-CRM-001", 409),
     UnsupportedEvidenceMimeTypeError: ("NXR-EVIDENCE-002", 422),
     EvidenceTooLargeError: ("NXR-EVIDENCE-003", 422),

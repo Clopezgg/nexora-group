@@ -113,6 +113,9 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("workforce.time_entry", "create", "Registrar horas trabajadas"),
     ("workforce.time_entry", "read", "Ver horas trabajadas"),
     ("workforce.time_entry", "approve", "Aprobar/rechazar horas trabajadas"),
+    ("workforce.crew", "create", "Crear cuadrillas"),
+    ("workforce.crew", "read", "Ver cuadrillas"),
+    ("workforce.crew", "manage_members", "Agregar/quitar miembros de una cuadrilla"),
     # Track E -- Commercial (orden maestra §72-76). La facturación de un
     # SalesContract llama al ar_service real de Track A (nunca duplica AR);
     # por eso "crm.sales_contract" no otorga por sí mismo ningún permiso
@@ -352,6 +355,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("equipment.maintenance_plan", "read", SCOPE_ANY),
         ("equipment.maintenance_order", "read", SCOPE_ANY),
         ("workforce.worker", "read", SCOPE_ANY),
+        ("workforce.crew", "read", SCOPE_ANY),
         ("workforce.time_entry", "read", SCOPE_ANY),
         ("crm.customer", "read", SCOPE_ANY),
         ("crm.lead", "read", SCOPE_ANY),
@@ -559,6 +563,9 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("equipment.maintenance_order", "update", SCOPE_OWN),
         ("workforce.worker", "create", SCOPE_OWN),
         ("workforce.worker", "read", SCOPE_OWN),
+        ("workforce.crew", "create", SCOPE_OWN),
+        ("workforce.crew", "read", SCOPE_OWN),
+        ("workforce.crew", "manage_members", SCOPE_OWN),
         ("search.global", "read", SCOPE_OWN),
     ),
     # "Operations User": personal de campo/site que registra combustible,
@@ -572,6 +579,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("equipment.maintenance_order", "create", SCOPE_OWN),
         ("equipment.maintenance_order", "read", SCOPE_OWN),
         ("workforce.worker", "read", SCOPE_OWN),
+        ("workforce.crew", "read", SCOPE_OWN),
         ("workforce.time_entry", "create", SCOPE_OWN),
         ("workforce.time_entry", "read", SCOPE_OWN),
         ("search.global", "read", SCOPE_OWN),

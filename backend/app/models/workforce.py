@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -76,3 +76,37 @@ class TimeEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Crew(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """NXR-REQ-0074. Grupo nombrado de `Worker` opcionalmente asignado a un
+    proyecto -- mismo patrón que `Warehouse.project_id` (nullable, sin el
+    motor de OperationScope, que es exclusivo de documentos financieros/
+    administrativos, CLAUDE.md §7). Sin alcance de scheduling/rotación de
+    miembros por fecha -- membresía simple (`CrewMember`), mismo criterio
+    minimalista que `Worker` ya usa ("cubre lo mínimo que TimeEntry
+    necesita, no un módulo de RRHH completo")."""
+
+    __tablename__ = "crews"
+    __table_args__ = (UniqueConstraint("company_id", "name", name="uq_crews_company_name"),)
+
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="RESTRICT"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ACTIVE")
+
+
+class CrewMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "crew_members"
+    __table_args__ = (UniqueConstraint("crew_id", "worker_id", name="uq_crew_members_crew_worker"),)
+
+    crew_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("crews.id", ondelete="CASCADE"), nullable=False
+    )
+    worker_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workers.id", ondelete="RESTRICT"), nullable=False
+    )

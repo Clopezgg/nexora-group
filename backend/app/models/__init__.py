@@ -72,7 +72,7 @@ from app.models.user_context import UserContext
 from app.models.user_role import UserRole
 from app.models.warehouse import Warehouse
 from app.models.wbs import WBSNode
-from app.models.workforce import TimeEntry, Worker
+from app.models.workforce import Crew, CrewMember, TimeEntry, Worker
 
 __all__ = [
     "Account",
@@ -92,6 +92,8 @@ __all__ = [
     "Company",
     "CorrectiveAction",
     "CostCenter",
+    "Crew",
+    "CrewMember",
     "Currency",
     "Customer",
     "CustomerInvoice",

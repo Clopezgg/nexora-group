@@ -4,8 +4,8 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.domain.errors import InvalidTimeEntryStateError
-from app.models.workforce import TimeEntry, Worker
+from app.domain.errors import CrewMembershipError, InvalidTimeEntryStateError
+from app.models.workforce import Crew, CrewMember, TimeEntry, Worker
 from app.repositories import workforce_repository
 from app.services.financial_validation_service import (
     assert_operation_scope,
@@ -122,3 +122,46 @@ def reject_time_entry(db: Session, *, time_entry_id: uuid.UUID, approved_by_id: 
     db.commit()
     db.refresh(entry)
     return entry
+
+
+def create_crew(
+    db: Session, *, company_id: uuid.UUID, name: str, project_id: uuid.UUID | None = None
+) -> Crew:
+    assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
+    crew = workforce_repository.create_crew(
+        db, company_id=company_id, project_id=project_id, name=name
+    )
+    db.commit()
+    db.refresh(crew)
+    return crew
+
+
+def list_crews(db: Session, *, company_id: uuid.UUID) -> list[Crew]:
+    return workforce_repository.list_crews(db, company_id=company_id)
+
+
+def list_crew_members(db: Session, *, crew_id: uuid.UUID) -> list[Worker]:
+    return workforce_repository.list_crew_members(db, crew_id=crew_id)
+
+
+def add_crew_member(db: Session, *, crew_id: uuid.UUID, worker_id: uuid.UUID) -> CrewMember:
+    crew = workforce_repository.get_crew(db, crew_id)
+    if crew is None:
+        raise ValueError(f"Crew {crew_id} no existe")
+    worker = workforce_repository.get_worker(db, worker_id)
+    if worker is None or worker.company_id != crew.company_id:
+        raise ValueError(f"Worker {worker_id} no existe en la company de la cuadrilla")
+    if workforce_repository.get_crew_member(db, crew_id=crew_id, worker_id=worker_id) is not None:
+        raise CrewMembershipError("Este trabajador ya es miembro de la cuadrilla")
+    member = workforce_repository.add_crew_member(db, crew_id=crew_id, worker_id=worker_id)
+    db.commit()
+    db.refresh(member)
+    return member
+
+
+def remove_crew_member(db: Session, *, crew_id: uuid.UUID, worker_id: uuid.UUID) -> None:
+    member = workforce_repository.get_crew_member(db, crew_id=crew_id, worker_id=worker_id)
+    if member is None:
+        raise CrewMembershipError("Este trabajador no es miembro de la cuadrilla")
+    workforce_repository.remove_crew_member(db, member)
+    db.commit()

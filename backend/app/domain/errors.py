@@ -189,3 +189,9 @@ class InvalidApprovalDecisionError(Exception):
     real de la entidad de dominio (p.ej. un adaptador que solo maneja
     APPROVED/REJECTED haciendo no-op silencioso sobre un valor
     desconocido)."""
+
+
+# NXR-REQ-0074, Crews.
+class CrewMembershipError(Exception):
+    """Se intentó agregar un Worker que ya es miembro de la Crew, o quitar
+    uno que no lo es."""

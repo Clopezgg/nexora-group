@@ -4,7 +4,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.models.equipment import FuelLog
-from tests.helpers import create_company, login_admin
+from app.models.permission import UserCompanyAccess
+from tests.helpers import create_company, create_user_with_role, login_admin, login_as
 
 
 def _create_project(client, *, company_id: str, name: str = "Torre Nexora III") -> dict:
@@ -160,3 +161,37 @@ def test_maintenance_order_creation_sets_equipment_under_maintenance(client):
     )
     refreshed = client.get(f"/api/equipment/{equipment['id']}")
     assert refreshed.json()["status"] == "UNDER_MAINTENANCE"
+
+
+def test_company_access_blocks_cross_company_maintenance_order_update(client, db_session):
+    """A company-A Equipment Manager cannot patch a MaintenanceOrder owned
+    (via its Equipment) by company B (INV-COMP-001) -- same shared
+    `assert_company_access` every other track's resources use."""
+    login_admin(client)
+    company_b = create_company(client, name="Constructora B")
+    equipment_b = _create_equipment(client, company_id=company_b["id"], name="Grúa B")
+    order_b = client.post(
+        f"/api/equipment/{equipment_b['id']}/maintenance-orders",
+        json={"orderType": "CORRECTIVE", "openedAt": "2026-01-10", "description": "Original"},
+    ).json()
+
+    company_a = create_company(client, name="Constructora A")
+    equipment_manager_a = create_user_with_role(
+        db_session, email="equipment-a@nexora.group", role_name="Equipment Manager"
+    )
+    db_session.add(UserCompanyAccess(user_id=equipment_manager_a.id, company_id=company_a["id"]))
+    db_session.commit()
+
+    login_as(client, email="equipment-a@nexora.group")
+    response = client.patch(
+        f"/api/equipment/maintenance-orders/{order_b['id']}",
+        json={"partsCost": "999.00", "description": "intento de fraude"},
+    )
+
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+    login_admin(client)
+    persisted = client.get(f"/api/equipment/{equipment_b['id']}/maintenance-orders").json()[0]
+    assert persisted["partsCost"] == "0.00"
+    assert persisted["description"] == "Original"

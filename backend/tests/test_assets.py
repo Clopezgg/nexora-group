@@ -4,9 +4,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.models.accounting import AccountingDocument, JournalLine
+from app.models.accounting import AccountingDocument
 from app.models.asset import FixedAsset
-from tests.helpers import create_account, create_company, login_admin
+from app.models.permission import UserCompanyAccess
+from tests.helpers import create_account, create_company, create_user_with_role, login_admin, login_as
 
 
 def _setup_asset_company(client):
@@ -177,3 +178,53 @@ def test_fixed_asset_operation_scope_requires_project_id_for_project_scope(clien
     )
     assert response.status_code == 422, response.text
     assert response.json()["error"]["code"] == "NXR-ACCOUNTING-002"
+
+
+def test_depreciation_entry_rejects_period_end_before_period_start(client):
+    """Coordinator review finding #2: un periodEnd anterior a periodStart
+    debe surgir como un 422 limpio de Pydantic, nunca como el 500 sin
+    manejar del `IntegrityError` real de `ck_depreciation_entries_period_valid`."""
+    login_admin(client)
+    company, expense, accumulated = _setup_asset_company(client)
+    asset = _create_asset(client, company=company, expense=expense, accumulated=accumulated)
+
+    response = client.post(
+        f"/api/assets/{asset['id']}/depreciation-entries",
+        json={"periodStart": "2026-01-31", "periodEnd": "2026-01-01"},
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.status_code != 500
+    body = response.json()
+    # FastAPI's default Pydantic validation error shape (not our custom
+    # NXR-* envelope, since this never reaches a domain service/exception
+    # handler -- rejected at the request-schema boundary).
+    assert "detail" in body
+    assert any("periodEnd" in str(error) for error in body["detail"])
+
+    # No DepreciationEntry/DEP posting was created from the rejected request.
+    entries = client.get(f"/api/assets/{asset['id']}/depreciation-entries")
+    assert entries.status_code == 200
+    assert entries.json() == []
+
+
+def test_company_access_blocks_cross_company_asset(client, db_session):
+    """A company-A Finance Manager cannot read a FixedAsset owned by
+    company B (INV-COMP-001) -- same shared `assert_company_access` every
+    other track's resources use."""
+    login_admin(client)
+    company_b, expense_b, accumulated_b = _setup_asset_company(client)
+    asset_b = _create_asset(client, company=company_b, expense=expense_b, accumulated=accumulated_b)
+
+    company_a = create_company(client, name="Constructora A")
+    finance_a = create_user_with_role(
+        db_session, email="finance-a-assets@nexora.group", role_name="Finance Manager"
+    )
+    db_session.add(UserCompanyAccess(user_id=finance_a.id, company_id=company_a["id"]))
+    db_session.commit()
+
+    login_as(client, email="finance-a-assets@nexora.group")
+    response = client.get(f"/api/assets/{asset_b['id']}")
+
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "NXR-PERM-001"

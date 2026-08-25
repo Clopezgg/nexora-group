@@ -3,7 +3,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.schemas.base import CamelModel
 
@@ -54,6 +54,16 @@ class DepreciationEntryCreateRequest(CamelModel):
     period_start: date
     period_end: date
     post: bool = True
+
+    @model_validator(mode="after")
+    def period_end_not_before_period_start(self) -> "DepreciationEntryCreateRequest":
+        """Rechaza el request con un 422 limpio antes de llegar a
+        `ck_depreciation_entries_period_valid` -- un `period_end` anterior a
+        `period_start` no debe surgir como un IntegrityError de PostgreSQL
+        sin manejar."""
+        if self.period_end < self.period_start:
+            raise ValueError("periodEnd no puede ser anterior a periodStart")
+        return self
 
 
 class DepreciationEntryResponse(CamelModel):

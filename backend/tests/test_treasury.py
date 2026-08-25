@@ -1,3 +1,7 @@
+import pytest
+from sqlalchemy.exc import IntegrityError
+
+from app.models.treasury import TreasuryAccount
 from tests.helpers import create_account, create_company, create_treasury_account, login_admin
 
 
@@ -285,3 +289,60 @@ def test_two_companies_can_use_their_own_document_number_sequence(client):
 
     assert first.status_code == 201, first.text
     assert second.status_code == 201, second.text
+
+
+def test_treasury_account_rejects_duplicate_gl_mapping_at_api(client):
+    login_admin(client)
+    company = create_company(client)
+    bank_gl = create_account(
+        client,
+        company_id=company["id"],
+        code="1100",
+        name="Single Treasury GL",
+        account_type="ASSET",
+    )
+    create_treasury_account(
+        client, company_id=company["id"], gl_account_id=bank_gl["id"]
+    )
+
+    duplicate = client.post(
+        "/api/treasury/accounts",
+        json={
+            "companyId": company["id"],
+            "name": "Duplicate balance view",
+            "kind": "BANK",
+            "currencyCode": "HNL",
+            "glAccountId": bank_gl["id"],
+        },
+    )
+
+    assert duplicate.status_code == 422, duplicate.text
+    assert duplicate.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_database_rejects_duplicate_treasury_gl_mapping(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    bank_gl = create_account(
+        client,
+        company_id=company["id"],
+        code="1100",
+        name="Unique Treasury GL",
+        account_type="ASSET",
+    )
+    create_treasury_account(
+        client, company_id=company["id"], gl_account_id=bank_gl["id"]
+    )
+    db_session.add(
+        TreasuryAccount(
+            company_id=company["id"],
+            name="Direct duplicate",
+            kind="CASH",
+            currency_code="HNL",
+            gl_account_id=bank_gl["id"],
+        )
+    )
+
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()

@@ -20,6 +20,7 @@ TREASURY_ACCOUNT_STATUSES = ("ACTIVE", "CLOSED")
 class TreasuryAccount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "treasury_accounts"
     __table_args__ = (
+        UniqueConstraint("gl_account_id", name="uq_treasury_accounts_gl_account"),
         CheckConstraint("kind IN ('BANK','CASH','OTHER')", name="ck_treasury_accounts_kind"),
         CheckConstraint("status IN ('ACTIVE','CLOSED')", name="ck_treasury_accounts_status"),
     )

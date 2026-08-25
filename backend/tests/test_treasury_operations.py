@@ -40,6 +40,26 @@ def _setup(client):
     return company, cash, diff_account, contributions, funding["accountingDocumentId"]
 
 
+def _create_statement_line(client, cash, *, amount: str, description: str = "Movimiento"):
+    statement_id = client.post(
+        "/api/treasury/bank-statements",
+        json={
+            "treasuryAccountId": cash["id"],
+            "statementDate": "2026-01-31",
+            "openingBalance": "0.00",
+            "closingBalance": amount,
+        },
+    ).json()["id"]
+    return client.post(
+        f"/api/treasury/bank-statements/{statement_id}/lines",
+        json={
+            "lineDate": "2026-01-02",
+            "description": description,
+            "amount": amount,
+        },
+    ).json()
+
+
 def test_cash_closing_with_shortage_posts_adjustment_and_reduces_balance(client):
     """Orden maestra §33: cash closing con diferencia negativa (faltante)."""
     login_admin(client)
@@ -346,3 +366,102 @@ def test_nested_reconciliation_resource_from_other_company_is_denied(client, db_
 
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_reconciliation_rejects_same_company_document_without_treasury_gl(client, db_session):
+    login_admin(client)
+    company, cash, diff_account, contributions, _funding_doc = _setup(client)
+    unrelated_document = client.post(
+        "/api/accounting/journal-entries",
+        json={
+            "companyId": company["id"],
+            "scope": "GENERAL",
+            "currencyCode": "HNL",
+            "lines": [
+                {"accountId": diff_account["id"], "debitAmount": "50.00"},
+                {"accountId": contributions["id"], "creditAmount": "50.00"},
+            ],
+        },
+    ).json()["id"]
+    line = _create_statement_line(client, cash, amount="50.00")
+
+    response = client.post(
+        f"/api/treasury/bank-statement-lines/{line['id']}/match",
+        json={"accountingDocumentId": unrelated_document, "matchedAmount": "50.00"},
+    )
+
+    assert response.status_code == 422, response.text
+    assert db_session.query(ReconciliationMatch).count() == 0
+
+
+def test_reconciliation_rejects_document_treasury_gl_with_wrong_sign(client, db_session):
+    login_admin(client)
+    _company, cash, _diff, _contributions, funding_doc = _setup(client)
+    line = _create_statement_line(client, cash, amount="-100.00")
+
+    response = client.post(
+        f"/api/treasury/bank-statement-lines/{line['id']}/match",
+        json={"accountingDocumentId": funding_doc, "matchedAmount": "100.00"},
+    )
+
+    assert response.status_code == 422, response.text
+    assert db_session.query(ReconciliationMatch).count() == 0
+
+
+def test_reconciliation_blocks_document_overallocation_across_statement_lines(
+    client, db_session
+):
+    login_admin(client)
+    _company, cash, _diff, _contributions, funding_doc = _setup(client)
+    first_line = _create_statement_line(client, cash, amount="600.00", description="Part one")
+    second_line = _create_statement_line(client, cash, amount="500.00", description="Part two")
+    first = client.post(
+        f"/api/treasury/bank-statement-lines/{first_line['id']}/match",
+        json={"accountingDocumentId": funding_doc, "matchedAmount": "600.00"},
+    )
+
+    second = client.post(
+        f"/api/treasury/bank-statement-lines/{second_line['id']}/match",
+        json={"accountingDocumentId": funding_doc, "matchedAmount": "500.00"},
+    )
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 422, second.text
+    assert db_session.query(ReconciliationMatch).count() == 1
+
+
+def test_reconciliation_rejects_matching_an_excluded_line(client, db_session):
+    login_admin(client)
+    _company, cash, _diff, _contributions, funding_doc = _setup(client)
+    line = _create_statement_line(client, cash, amount="50.00")
+    excluded = client.post(
+        f"/api/treasury/bank-statement-lines/{line['id']}/exclude"
+    )
+    assert excluded.status_code == 200, excluded.text
+
+    response = client.post(
+        f"/api/treasury/bank-statement-lines/{line['id']}/match",
+        json={"accountingDocumentId": funding_doc, "matchedAmount": "50.00"},
+    )
+
+    assert response.status_code == 422, response.text
+    assert db_session.query(ReconciliationMatch).count() == 0
+
+
+def test_reconciliation_rejects_excluding_a_line_with_match_history(client, db_session):
+    login_admin(client)
+    _company, cash, _diff, _contributions, funding_doc = _setup(client)
+    line = _create_statement_line(client, cash, amount="100.00")
+    partial = client.post(
+        f"/api/treasury/bank-statement-lines/{line['id']}/match",
+        json={"accountingDocumentId": funding_doc, "matchedAmount": "40.00"},
+    )
+    assert partial.status_code == 200, partial.text
+
+    response = client.post(
+        f"/api/treasury/bank-statement-lines/{line['id']}/exclude"
+    )
+
+    assert response.status_code == 422, response.text
+    assert db_session.query(ReconciliationMatch).count() == 1
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"

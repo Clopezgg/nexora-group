@@ -21,6 +21,11 @@ from app.models.accounting import (
 )
 from app.models.fiscal import FiscalPeriod
 from app.services import numbering_service
+from app.services.financial_validation_service import (
+    assert_account_belongs_to_company,
+    assert_cost_center_belongs_to_company,
+    assert_project_belongs_to_company,
+)
 
 """Posting Engine central (orden maestra §22, CLAUDE.md §8).
 
@@ -92,6 +97,31 @@ def _assert_fiscal_period_open(db: Session, *, company_id: uuid.UUID, as_of: dat
         )
 
 
+def _validate_financial_references(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    document_project_id: uuid.UUID | None,
+    lines: list[JournalLineInput],
+) -> None:
+    assert_project_belongs_to_company(
+        db, project_id=document_project_id, company_id=company_id
+    )
+    for line in lines:
+        assert_account_belongs_to_company(
+            db,
+            account_id=line.account_id,
+            company_id=company_id,
+            field_name="lines.account_id",
+        )
+        assert_project_belongs_to_company(
+            db, project_id=line.project_id, company_id=company_id
+        )
+        assert_cost_center_belongs_to_company(
+            db, cost_center_id=line.cost_center_id, company_id=company_id
+        )
+
+
 def post_manual(
     db: Session,
     *,
@@ -115,6 +145,12 @@ def post_manual(
     caller; este servicio no captura esas excepciones)."""
     _validate_scope(scope, project_id)
     _validate_balance(lines)
+    _validate_financial_references(
+        db,
+        company_id=company_id,
+        document_project_id=project_id,
+        lines=lines,
+    )
     _assert_fiscal_period_open(db, company_id=company_id, as_of=datetime.now(timezone.utc).date())
 
     document_number = numbering_service.next_document_number(

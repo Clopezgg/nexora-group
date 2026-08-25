@@ -68,6 +68,13 @@ def create_treasury_account(
         company_id=company_id,
         field_name="gl_account_id",
     )
+    existing_mapping = db.execute(
+        select(TreasuryAccount.id).where(TreasuryAccount.gl_account_id == gl_account_id)
+    ).scalar_one_or_none()
+    if existing_mapping is not None:
+        raise InvalidFinancialReferenceError(
+            "gl_account_id ya está asignada a otra cuenta de tesorería"
+        )
     account = TreasuryAccount(
         company_id=company_id,
         name=name,
@@ -510,14 +517,66 @@ def match_reconciliation_line(
     ).scalar_one_or_none()
     if line is None:
         raise ValueError(f"BankStatementLine {bank_statement_line_id} no existe")
+    if line.status not in ("UNMATCHED", "PARTIAL"):
+        raise InvalidFinancialReferenceError(
+            f"Una línea {line.status} no admite nuevos matches"
+        )
     statement = db.get(BankStatement, line.bank_statement_id)
     treasury_account = db.get(TreasuryAccount, statement.treasury_account_id)
-    document = db.get(AccountingDocument, accounting_document_id)
+    document = db.execute(
+        select(AccountingDocument)
+        .where(AccountingDocument.id == accounting_document_id)
+        .with_for_update()
+    ).scalar_one_or_none()
     if document is None:
         raise InvalidFinancialReferenceError("accounting_document_id no existe")
     if document.company_id != treasury_account.company_id:
         raise InvalidFinancialReferenceError(
             "El documento contable debe pertenecer a la compañía del estado bancario"
+        )
+    document_side = (
+        JournalLine.debit_amount if line.amount > 0 else JournalLine.credit_amount
+    )
+    document_capacity = Decimal(
+        db.execute(
+            select(func.coalesce(func.sum(document_side), 0)).where(
+                JournalLine.accounting_document_id == accounting_document_id,
+                JournalLine.account_id == treasury_account.gl_account_id,
+            )
+        ).scalar_one()
+    )
+    if document_capacity <= 0:
+        direction = "débito" if line.amount > 0 else "crédito"
+        raise InvalidFinancialReferenceError(
+            "El documento no contiene un movimiento de "
+            f"{direction} en la cuenta GL de tesorería conciliada"
+        )
+    same_direction = (
+        BankStatementLine.amount > 0
+        if line.amount > 0
+        else BankStatementLine.amount < 0
+    )
+    document_already_allocated = Decimal(
+        db.execute(
+            select(func.coalesce(func.sum(ReconciliationMatch.matched_amount), 0))
+            .join(
+                BankStatementLine,
+                ReconciliationMatch.bank_statement_line_id == BankStatementLine.id,
+            )
+            .join(
+                BankStatement,
+                BankStatementLine.bank_statement_id == BankStatement.id,
+            )
+            .where(
+                ReconciliationMatch.accounting_document_id == accounting_document_id,
+                BankStatement.treasury_account_id == treasury_account.id,
+                same_direction,
+            )
+        ).scalar_one()
+    )
+    if document_already_allocated + matched_amount > document_capacity:
+        raise InvalidFinancialReferenceError(
+            "La asignación acumulada excede el movimiento disponible del documento"
         )
     already_matched = db.execute(
         select(func.coalesce(func.sum(ReconciliationMatch.matched_amount), 0)).where(
@@ -553,6 +612,15 @@ def exclude_reconciliation_line(db: Session, *, bank_statement_line_id: uuid.UUI
     ).scalar_one_or_none()
     if line is None:
         raise ValueError(f"BankStatementLine {bank_statement_line_id} no existe")
+    match_count = db.execute(
+        select(func.count(ReconciliationMatch.id)).where(
+            ReconciliationMatch.bank_statement_line_id == bank_statement_line_id
+        )
+    ).scalar_one()
+    if line.status != "UNMATCHED" or match_count:
+        raise InvalidFinancialReferenceError(
+            "Solo una línea UNMATCHED sin historial de conciliación puede excluirse"
+        )
     line.status = "EXCLUDED"
     db.commit()
     db.refresh(line)

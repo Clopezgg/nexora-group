@@ -1,3 +1,5 @@
+import uuid
+
 from app.models.accounting import AccountingDocument
 from app.models.ap import SupplierPayment
 from app.models.ar import CustomerReceipt
@@ -506,3 +508,77 @@ def test_supplier_invoice_rejects_supplier_from_other_company(client):
 
     assert response.status_code == 422, response.text
     assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_approving_supplier_invoice_creates_audit_log_entry(client, db_session):
+    login_admin(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "A-AUD-1",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "100.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    ).json()
+
+    client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+
+    from app.models.audit import AuditLog
+    from sqlalchemy import select
+
+    rows = db_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "ap.supplier_invoice",
+            AuditLog.entity_id == uuid.UUID(invoice["id"]),
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].action == "ap.supplier_invoice.approve"
+    assert rows[0].after["status"] == "APPROVED"
+
+
+def test_paying_supplier_invoice_creates_audit_log_entry(client, db_session):
+    login_admin(client)
+    company, bank, expense, payable, supplier = _setup_ap(client)
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "A-AUD-2",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "100.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    ).json()
+    client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+
+    payment = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/payments",
+        json={"treasuryAccountId": bank["id"], "amount": "100.00", "paymentDate": "2026-01-20"},
+    ).json()
+
+    from app.models.audit import AuditLog
+    from sqlalchemy import select
+
+    rows = db_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "ap.supplier_payment",
+            AuditLog.entity_id == uuid.UUID(payment["id"]),
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].action == "ap.supplier_payment.create"
+    assert rows[0].after["amount"] == "100.00"

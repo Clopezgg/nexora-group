@@ -286,54 +286,26 @@ todavía).
 
 ## Resumen
 
-Recontado en Task 4 del plan `2026-08-25-track-g-workflow-audit` (Tasks
-1-3 — Audit trail, Approval Inbox + Segregation of Duties,
-Notifications — todas fusionadas a `feat/nexora-greenfield` @ `d996b44`),
-sobre la base de Track 1+F+B+C+A+D+E + Construction Control ya
-integrados. Recontado línea por línea contra la tabla real:
+Recontado fila por fila en Task 4 del plan
+`2026-08-25-reports-search-analytics`, después de integrar Global Search,
+Trial Balance + Budget vs Actual + CSV, Settings e Integration Architecture
+en `feat/nexora-greenfield` @ `a62fc71`:
 
-- **VERIFIED:** 0 / 124 (reservado para cuando el coordinador confirme
-  comportamiento end-to-end en `feat/nexora-greenfield` — ningún track se
-  autootorga `VERIFIED`)
-- **IMPLEMENTED:** 88 / 124 — los 81 previos (ver historial de este
-  archivo) más 5 de `track-g-workflow-audit`: NXR-REQ-0087/0088/0089
-  (Workflow engine — alcance de servicios cross-cutting, no motor de
-  estados genérico, ver la Ruling del spec —/Approval Inbox/Segregation
-  of Duties, Track G Task 2), NXR-REQ-0090 (Audit, Track G Task 1 — 5
-  rutas instrumentadas, backlog honesto en `docs/AUDIT.md`), NXR-REQ-0091
-  (Notifications, Track G Task 3), más 2 de
-  `2026-08-25-reports-search-analytics` Task 3 (Track H): NXR-REQ-0095
-  (Settings — perfil real de `Company` editable) y NXR-REQ-0096
-  (Integration architecture — entregable de documentación,
-  `docs/INTEGRATION_ARCHITECTURE.md`).
-- **IN_PROGRESS:** 21 / 124 — NXR-REQ-0001/0006/0008/0009/0025/0044/
-  0059/0060/0105/0106/0107/0108/0110/0114/0115/0116/0117/0118/0119/0120/
-  0121.
-- **NOT_STARTED:** 13 / 124 — NXR-REQ-0016/0034/0035/0054/0058/0074/
-  0092/0093/0094/0109/0112/0113/0122. 0054 Returns y 0058 Supplier
-  Performance (Track C) son deuda intencional documentada en
-  `docs/PROCUREMENT.md`/`docs/INVENTORY.md`. 0074 Crews sigue fuera del
-  alcance de todos los planes ejecutados hasta ahora. NXR-REQ-0092
-  (Global Search), 0093 (Reporting), 0094 (Export) siguen NOT_STARTED —
-  Prioridad 4 del usuario, en construcción en paralelo por otras tasks
-  del plan `2026-08-25-reports-search-analytics`; 0095 (Settings) y 0096
-  (Integration architecture) ya se movieron a IMPLEMENTED arriba (Task 3
-  de ese mismo plan).
-- **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue
-  real, no por incapacidad técnica)
+- **VERIFIED:** 0 / 124. Se reserva para evidencia E2E real; ningún track se
+  autootorga este estado.
+- **IMPLEMENTED:** 90 / 124. Incluye `NXR-REQ-0092` (Global Search),
+  `NXR-REQ-0094` (exportación CSV), `NXR-REQ-0095` (Settings de Company) y
+  `NXR-REQ-0096` (arquitectura de integración).
+- **IN_PROGRESS:** 22 / 124 — NXR-REQ-0001/0006/0008/0009/0025/0044/
+  0059/0060/0093/0105/0106/0107/0108/0110/0114/0115/0116/0117/0118/
+  0119/0120/0121. Reporting (`0093`) contiene Trial Balance y Budget vs
+  Actual reales, pero todavía no cubre todo el sub-alcance documentado.
+- **NOT_STARTED:** 10 / 124 — NXR-REQ-0016/0034/0035/0054/0058/0074/
+  0109/0112/0113/0122.
+- **BLOCKED_EXTERNAL:** 2 / 124 — NXR-REQ-0123/0124, ambos dependientes del
+  despliegue Azure real sujeto a `CLAUDE.md` §11.1.
 
-Suma verificada: 0+88+21+13+2 = 124.
-
-Este resumen se actualiza en cada integración de track. Ver progreso vivo
-en `docs/PROGRESS.md`. Recontado previamente en Task 7 (`2026-08-24-interrupted-tracks-recovery`,
-verificación end-to-end del sistema combinado Track 1+F+B+C+A+D+E en
-`feat/nexora-greenfield` @ 07be886) — se recontaron las filas de la tabla
-línea por línea contra este resumen y se corrigió un desfase de 1 fila
-(NXR-REQ-0033 estaba IMPLEMENTED en la tabla pero faltaba en esta
-enumeración); sigue sujeto a una pasada final
-de verificación end-to-end antes de certificar cualquier `VERIFIED`.
-
-La nota de honestidad que Task 3 dejó aquí (tally desactualizado
-pendiente de recontar) fue resuelta por el recontado de Task 5 de arriba
-— el tally ahora coincide exactamente con las filas reales de la tabla
-(0+81+21+20+2 = 124).
+Suma verificada contra las 124 filas reales: 0+90+22+10+2 = 124. El sistema
+combinado pasó 219 pruebas backend sobre PostgreSQL, `compileall`, typecheck,
+lint, 72 pruebas frontend y build; esto valida la integración, pero no
+sustituye el E2E requerido para mover filas a `VERIFIED`.

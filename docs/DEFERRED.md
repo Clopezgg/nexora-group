@@ -173,6 +173,19 @@ certificar el 100%.
   directamente a un estado que debería requerir aprobación humana, en vez
   de mutar su propio estado sin pasar por el Approval Inbox.
 
+- `DEFERRED-FINAL-017` — Track H (plan
+  `2026-08-25-reports-search-analytics`): hardening menor detectado en las
+  revisiones finales. El PATCH de Company resuelve un ID inexistente con un
+  `ValueError` sin handler antes del chequeo de acceso (respuesta 500 y
+  superficie menor de enumeración) y repite un `db.get()` ya hecho por la
+  ruta. Trial Balance ejecuta una consulta de balance por cuenta (N+1;
+  correcto funcionalmente, pendiente de optimizar a agregado si crece el
+  plan de cuentas). El tipo de fila CSV usa un index-signature workaround
+  cosmético. El build frontend sigue avisando que el chunk principal supera
+  500 kB y necesita code splitting antes de la certificación de performance.
+  Ninguno altera los resultados verificados de este plan, pero todos deben
+  revisarse durante FINAL HARDENING.
+
 ## Bloqueos externos
 
 - `EXTERNAL-BLOCKER-001` — Los recursos de Azure (PostgreSQL Flexible

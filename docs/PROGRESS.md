@@ -1601,3 +1601,26 @@ coordinador. Corre en paralelo con Tasks 2 (Reporting) y 3
 propio worktree; sin dependencia de archivo compartida salvo `main.py`/
 `permission_repository.py`, que el controlador resuelve de forma
 aditiva al fusionar.
+
+## 2026-08-25 — Reports/Search/Analytics cerrado (Task 4)
+
+Tasks 1-3 quedaron integradas en `feat/nexora-greenfield` @ `a62fc71`:
+Global Search (`NXR-REQ-0092`), Trial Balance + Budget vs Actual + CSV
+(`NXR-REQ-0093/0094`) y Settings + Integration Architecture
+(`NXR-REQ-0095/0096`). La nota anterior que aún describe las ramas como
+pendientes se conserva como registro histórico; este bloque es el estado
+canónico posterior al merge.
+
+Verificación independiente desde la integración: un único head de Alembic
+`234785d5331f` y cero migraciones nuevas en este plan; 219/219 pruebas
+backend sobre PostgreSQL real; `python -m compileall -q app tests` limpio;
+frontend typecheck y lint limpios; 72/72 Vitest; build Vite/PWA correcto;
+`git diff --check` limpio. El primer intento de pytest dentro del sandbox
+falló en setup porque éste bloqueó TCP a PostgreSQL local; la repetición con
+acceso permitido ejecutó la suite real completa y pasó.
+
+Recuento exacto de las 124 filas de trazabilidad: 0 `VERIFIED`, 90
+`IMPLEMENTED`, 22 `IN_PROGRESS`, 10 `NOT_STARTED`, 2
+`BLOCKED_EXTERNAL`. `NXR-REQ-0093` permanece honestamente `IN_PROGRESS`
+por sus reportes diferidos; no se infló a `IMPLEMENTED` ni se otorgó ningún
+`VERIFIED` sin E2E.

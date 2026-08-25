@@ -136,6 +136,33 @@ def test_only_accepted_quotation_converts_and_conversion_preserves_amount_compan
     assert contract["status"] == "ACTIVE"
 
 
+def test_quotation_customer_must_match_opportunity_customer(client):
+    login_admin(client)
+    company = create_company(client)
+
+    lead_a = _create_lead(client, company_id=company["id"], name="Constructora Prospecto A")
+    converted_a = _convert_lead(client, lead_a["id"])
+    opportunity_a = converted_a["opportunity"]
+
+    lead_b = _create_lead(client, company_id=company["id"], name="Constructora Prospecto B")
+    converted_b = _convert_lead(client, lead_b["id"])
+    customer_b = converted_b["customer"]
+
+    mismatched = client.post(
+        "/api/crm/quotations",
+        json={
+            "companyId": company["id"],
+            "opportunityId": opportunity_a["id"],
+            "customerId": customer_b["id"],
+            "quotationNumber": "COT-MISMATCH-001",
+            "currencyCode": "HNL",
+            "amount": "10000.00",
+        },
+    )
+    assert mismatched.status_code == 409, mismatched.text
+    assert mismatched.json()["error"]["code"] == "NXR-CRM-001"
+
+
 def test_billing_sales_contract_creates_exactly_one_ar_invoice_and_no_treasury_movement(client, db_session):
     login_admin(client)
     company = create_company(client)

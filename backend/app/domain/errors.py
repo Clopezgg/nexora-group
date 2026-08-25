@@ -124,3 +124,16 @@ class EvidenceTooLargeError(Exception):
 class InvalidDocumentStateError(Exception):
     """Transición de estado inválida sobre Document/DocumentVersion (p.ej.
     subir una nueva versión sobre un Document ARCHIVED)."""
+
+
+# Track D -- Construction Control: RFI / Submittals (orden maestra §80,
+# NXR-REQ-0085/0086).
+class InvalidRfiStateError(Exception):
+    """Transición de estado inválida sobre un RequestForInformation (p.ej.
+    responder un RFI que ya no está OPEN, o cerrar uno ya CLOSED)."""
+
+
+class InvalidSubmittalStateError(Exception):
+    """Transición de estado inválida sobre un Submittal (p.ej. aprobar/
+    rechazar sin una respuesta de revisor previamente registrada, o decidir
+    sobre un Submittal que ya tiene una decisión final)."""

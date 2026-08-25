@@ -777,3 +777,105 @@ entradas).
 Rama `track/d-enterprise-resources` preparada e integration-ready, no
 fusionada a `feat/nexora-greenfield` todavía — pendiente de revisión/merge
 por el coordinador (mismo patrón que todos los tracks anteriores).
+
+### 2026-08-25 — Track D (Construction Control) — RFI + Submittals (Task 4)
+
+Mismo plan (`docs/superpowers/sdd/2026-08-25-track-d-construction-control/`),
+continuando sobre la fundación de Documents/Evidence (Task 1, ya fusionada
+a `feat/nexora-greenfield` en `9eba0ac`). Worktree
+`/Users/clopezg/nexora-group-trackD-rfi`, branch `track/d-rfi-submittals`,
+ramificada directamente de ese head — nada que fusionar al empezar. Task 3
+(Daily Site Reports/Quality/Safety) avanzó en paralelo en un worktree
+distinto desde el mismo punto de rama; no comparte archivos de dominio con
+esta tarea por diseño (ver su propio report).
+
+**Implementado (`NXR-REQ-0085`/`0086`, IMPLEMENTED):**
+
+- `RequestForInformation` (`app/models/rfi.py`): `project_id` requerido,
+  `wbs_node_id` opcional, `subject`/`question`/`response`/`responsible`,
+  ciclo de vida `OPEN`→`ANSWERED`→`CLOSED` (`InvalidRfiStateError`,
+  `NXR-RFI-001`, 409 — responder un RFI que no está `OPEN` o cerrar uno ya
+  `CLOSED` se rechaza). `number` se genera con el `numbering_service`
+  **ya existente** (el mismo que usan AP/AR/Procurement,
+  `document_type_code="RFI"` nuevo en `DOCUMENT_TYPE_SEEDS`) — no se
+  inventó una segunda estrategia de numeración. El unique constraint real
+  es `(company_id, number)`, no solo `number`: dos companies distintas
+  pueden emitir cada una su propio primer "RFI-2026-000001" el mismo año
+  sin colisión (numeración company-scoped, RED/GREEN evidence real: se
+  probó temporalmente con `UniqueConstraint("number")` global y el segundo
+  insert falló con `IntegrityError`, confirmando que el test detecta la
+  regresión).
+- `Submittal` (`app/models/submittal.py`): `revision` (int, default 1),
+  `project_id` requerido, `wbs_node_id` opcional, referencia **opcional**
+  a Track C `supplier_id`/`contract_id` (`SupplierContract`, nuevo helper
+  `assert_supplier_contract_belongs_to_company` en
+  `financial_validation_service.py`, mismo patrón nullable-aware que
+  `assert_project_belongs_to_company`), `evidence_id` (adjunto único,
+  contrato de `docs/DOCUMENTS_EVIDENCE.md`). `number` vía
+  `numbering_service` (`document_type_code="SUB"`), mismo patrón
+  company-scoped que RFI. Flujo de revisión de **dos pasos**:
+  `POST /submittals/{id}/response` registra `reviewer_response` (status
+  pasa a `UNDER_REVIEW`); solo entonces `POST /submittals/{id}/decision`
+  permite `APPROVED`/`REJECTED`. Decidir sin una respuesta ya registrada,
+  o sobre un Submittal con decisión final ya tomada, se rechaza con
+  `InvalidSubmittalStateError`/`NXR-SUBMITTAL-001` (409) — RED/GREEN
+  evidence real: se quitó temporalmente el guard de
+  `submittal.reviewer_response is None` en `decide_submittal` y el test
+  confirmó que el Submittal quedaba `APPROVED` sin respuesta (bug real
+  detectado), luego se restauró el guard y el test volvió a verde.
+- API: `/api/rfis` (create/list/get/respond/close) y `/api/submittals`
+  (create/list/get/response/decision), ambos en archivos de ruta propios
+  (`app/api/routes/rfi.py`, `app/api/routes/submittals.py`) — no anidados
+  bajo `projects.py`, para no competir por el mismo archivo que Task 3 en
+  el merge. Permisos nuevos `construction.rfi`
+  (`create`/`read`/`respond`/`close`) y `construction.submittal`
+  (`create`/`read`/`review`/`decide`), otorgados a
+  Administrator (ANY)/Project Manager (OWN, dueño operativo — mismo rol
+  que ya posee `document.document`)/Project Controller/Auditor/Viewer
+  (solo lectura, OWN/ANY según el rol) siguiendo la matriz existente.
+- Frontend: `RfiPage.tsx` y `SubmittalsPage.tsx` reales (no
+  `PlaceholderPage`) — crear/responder/cerrar RFI; crear/registrar
+  respuesta/aprobar/rechazar Submittal (el botón Aprobar/Rechazar queda
+  deshabilitado en el cliente hasta que hay `reviewerResponse`, más allá
+  del rechazo real del servidor). El único ítem de navegación ya existente
+  `/proyectos/rfi-submittals` (definido en `navigation.ts` desde antes de
+  este task, no se tocó ese archivo para no competir con Task 3) monta
+  ambas páginas como tabs reales vía un componente compuesto nuevo
+  (`RfiSubmittalsPage.tsx`, requerido aparte por la regla
+  `react-refresh/only-export-components` de ESLint). Ambas páginas reutilizan
+  `RequiresActiveProject` (ActiveUIContext) igual que Progress/ChangeOrders.
+- `financial_validation_service.py`: nuevo helper
+  `assert_supplier_contract_belongs_to_company` (nullable-aware).
+- `domain/errors.py`/`error_handlers.py`: `InvalidRfiStateError`
+  (`NXR-RFI-001`, 409) e `InvalidSubmittalStateError`
+  (`NXR-SUBMITTAL-001`, 409) nuevos.
+
+**TDD real**: los 3 comportamientos de aceptación del brief
+(`test_rfi_number_sequence_is_company_scoped`,
+`test_submittal_requires_response_before_approval`,
+`test_company_access_blocks_cross_company_rfi`) se verificaron con
+evidencia RED real — se rompió deliberadamente cada guard (unique
+constraint global en vez de company-scoped; guard de respuesta quitado de
+`decide_submittal`; `assert_company_access` quitado de `GET /rfis/{id}`),
+se confirmó que el test correspondiente fallaba por la razón correcta, y
+se restauró el código para volver a verde. Detalle completo en
+`task-4-report.md`. 5 tests adicionales cubren ciclo de vida completo de
+RFI, referencia opcional Supplier/Contract de Submittal, y rechazo de
+Contract cross-compañía.
+
+**Verificación real**: `alembic revision --autogenerate` contra una base
+descartable en el head real (`eaf5b6c0d061`) detectó exactamente el diff
+esperado (2 tablas nuevas), single head (`f66768a419c3`), `alembic upgrade
+head` limpio en una base completamente fresca (cadena completa desde
+`create_initial_schema`) y round-trip upgrade→downgrade→upgrade sin
+errores. Backend: 162/162 pytest (154 previos + 8 nuevos de
+`test_rfi.py`/`test_submittals.py`), `compileall` limpio. Frontend:
+typecheck/lint limpios, 46/46 vitest (44 previos + 2 nuevos de
+`RfiSubmittalsPage.test.tsx`), `build` OK.
+
+Rama `track/d-rfi-submittals` preparada e integration-ready, no fusionada a
+`feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
+coordinador (mismo patrón que todos los tracks anteriores). Nota: este
+worktree no traía `frontend/node_modules` (a diferencia del venv de Python,
+compartido entre worktrees) — se corrió `npm ci` localmente antes de los
+gates de frontend.

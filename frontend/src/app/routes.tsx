@@ -24,6 +24,7 @@ import { EquipmentPage } from '../features/equipment/EquipmentPage'
 import { WorkersPage } from '../features/workforce/WorkersPage'
 import { TimeEntriesPage } from '../features/workforce/TimeEntriesPage'
 import { DocumentsPage } from '../features/documents/DocumentsPage'
+import { RfiSubmittalsPage } from '../features/rfi/RfiSubmittalsPage'
 import { CustomersPage } from '../features/commercial/CustomersPage'
 import { LeadsPage } from '../features/commercial/LeadsPage'
 import { OpportunitiesPage } from '../features/commercial/OpportunitiesPage'
@@ -33,9 +34,11 @@ import { navItems } from './navigation'
 
 // Track A (Financial Core), Track B (Project Control), Track C (Supply
 // Chain), Track D (Enterprise Resources -- Assets/Equipment/Maintenance/
-// Workforce/Time; Documents/Evidence también implementado, ver
-// docs/DOCUMENTS_EVIDENCE.md; Daily Site Reports/Quality/Safety/RFI/
-// Submittals quedan NOT_STARTED en el frontend, ver DEFERRED-FINAL-009) y
+// Workforce/Time; Documents/Evidence y RFI/Submittals también
+// implementados, ver docs/DOCUMENTS_EVIDENCE.md y
+// docs/REQUIREMENTS_TRACEABILITY.md NXR-REQ-0085/0086; Daily Site
+// Reports/Quality/Safety quedan NOT_STARTED en el frontend, ver
+// DEFERRED-FINAL-009 -- tarea separada del mismo plan) y
 // Track E (Commercial -- Lead/Opportunity/Customer/Quotation/
 // SalesContract; Facturación y Cobros del menú Comercial se resuelven
 // desde las páginas de AR ya existentes en Finanzas -- Track E nunca
@@ -55,6 +58,7 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/proyectos/presupuestos': <BudgetPage />,
   '/proyectos/ordenes-de-cambio': <ChangeOrdersPage />,
   '/proyectos/avances': <ProgressPage />,
+  '/proyectos/rfi-submittals': <RfiSubmittalsPage />,
   '/abastecimiento/solicitudes': <RequisitionsPage />,
   '/abastecimiento/ordenes-de-compra': <PurchaseOrdersPage />,
   '/abastecimiento/recepciones': <GoodsReceiptsPage />,

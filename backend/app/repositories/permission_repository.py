@@ -134,6 +134,16 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("document.document", "version", "Subir una nueva versión de un documento"),
     ("document.evidence", "create", "Subir evidencia (foto/archivo) a Azure Blob"),
     ("document.evidence", "read", "Ver metadata de evidencia subida"),
+    # Track D -- Construction Control: RFI / Submittals (orden maestra §80,
+    # NXR-REQ-0085/0086).
+    ("construction.rfi", "create", "Crear RFI (Request For Information)"),
+    ("construction.rfi", "read", "Ver RFI"),
+    ("construction.rfi", "respond", "Registrar la respuesta de un RFI"),
+    ("construction.rfi", "close", "Cerrar un RFI"),
+    ("construction.submittal", "create", "Crear Submittal"),
+    ("construction.submittal", "read", "Ver Submittals"),
+    ("construction.submittal", "review", "Registrar la respuesta de revisión de un Submittal"),
+    ("construction.submittal", "decide", "Aprobar/rechazar un Submittal ya revisado"),
 )
 # NOTA: ActiveUIContext (GET/PUT /api/context) NO pasa por este motor de
 # permisos -- es una preferencia personal del usuario autenticado (su
@@ -285,6 +295,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("crm.sales_contract", "read", SCOPE_ANY),
         ("document.document", "read", SCOPE_ANY),
         ("document.evidence", "read", SCOPE_ANY),
+        ("construction.rfi", "read", SCOPE_ANY),
+        ("construction.submittal", "read", SCOPE_ANY),
     ),
     "Viewer": (
         ("core.company", "read", SCOPE_OWN),
@@ -302,6 +314,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("project.progress", "read", SCOPE_OWN),
         ("document.document", "read", SCOPE_OWN),
         ("document.evidence", "read", SCOPE_OWN),
+        ("construction.rfi", "read", SCOPE_OWN),
+        ("construction.submittal", "read", SCOPE_OWN),
     ),
     "Project Manager": (
         ("core.company", "read", SCOPE_ANY),
@@ -326,6 +340,14 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("document.document", "version", SCOPE_OWN),
         ("document.evidence", "create", SCOPE_OWN),
         ("document.evidence", "read", SCOPE_OWN),
+        ("construction.rfi", "create", SCOPE_OWN),
+        ("construction.rfi", "read", SCOPE_OWN),
+        ("construction.rfi", "respond", SCOPE_OWN),
+        ("construction.rfi", "close", SCOPE_OWN),
+        ("construction.submittal", "create", SCOPE_OWN),
+        ("construction.submittal", "read", SCOPE_OWN),
+        ("construction.submittal", "review", SCOPE_OWN),
+        ("construction.submittal", "decide", SCOPE_OWN),
     ),
     "Project Controller": (
         ("core.company", "read", SCOPE_ANY),
@@ -341,6 +363,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("workforce.time_entry", "read", SCOPE_OWN),
         ("document.document", "read", SCOPE_OWN),
         ("document.evidence", "read", SCOPE_OWN),
+        ("construction.rfi", "read", SCOPE_OWN),
+        ("construction.submittal", "read", SCOPE_OWN),
     ),
     "Procurement Manager": (
         ("core.company", "read", SCOPE_OWN),

@@ -1,5 +1,7 @@
 import uuid
 
+import pytest
+
 from app.repositories import evidence_repository, user_repository
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL
 from tests.helpers import create_account, create_company, create_customer, create_supplier, login_admin
@@ -260,4 +262,147 @@ def test_search_never_returns_another_companys_results(client, db_session):
 
     response = client.get(f"/api/search?companyId={company_b['id']}&q=Alpha")
     assert response.status_code == 200
+    assert response.json() == []
+
+
+# Company-isolation coverage beyond Project (code-review follow-up): all
+# ten blocks in search_service.search() share the identical
+# `Model.company_id == company_id` shape, but that's exactly the kind of
+# thing a copy-paste error (e.g. filtering by a *joined* company_id, or
+# dropping the filter) slips through in one specific block while every
+# other test still passes. Project alone only proves the *simplest*
+# shape (a model with no FK to another company-scoped entity). These
+# five cases add the other two structurally distinct shapes actually
+# used in search_service.py:
+#   - plain company-scoped, no FK dependency: Supplier, Customer
+#     (same shape as Project, but two more independent instances of it)
+#   - company-scoped AND has a FK to *another* company-scoped entity
+#     (Supplier/Customer) that a mistake could accidentally filter by
+#     instead: SupplierInvoice (supplier_id), PurchaseOrder (supplier_id)
+#   - company-scoped AND has a required FK to Project (another
+#     company-scoped entity): RequestForInformation (project_id)
+# This is 6/10 total (with the Project test above) -- not exhaustive,
+# but every distinct query-construction pattern in search_service.py is
+# now covered by at least one isolation case, which is what actually
+# bounds the residual risk here (not the raw entity count).
+
+
+def _isolated_supplier(client, company_id: str) -> tuple[str, str]:
+    create_supplier(client, company_id=company_id, legal_name="IsoOnly Proveedor Uno")
+    return "IsoOnly", "supplier"
+
+
+def _isolated_customer(client, company_id: str) -> tuple[str, str]:
+    create_customer(client, company_id=company_id, legal_name="IsoOnly Cliente Uno")
+    return "IsoOnly", "customer"
+
+
+def _isolated_supplier_invoice(client, company_id: str) -> tuple[str, str]:
+    supplier = create_supplier(client, company_id=company_id)
+    expense, payable = _setup_ap_accounts(client, company_id=company_id)
+    client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company_id,
+            "supplierId": supplier["id"],
+            "invoiceNumber": "ISOONLY-INV-001",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "100.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    )
+    return "ISOONLY-INV", "supplier_invoice"
+
+
+def _isolated_purchase_order(client, company_id: str) -> tuple[str, str]:
+    supplier = create_supplier(client, company_id=company_id)
+    item = client.post(
+        "/api/inventory/items",
+        json={
+            "companyId": company_id,
+            "sku": "ISOONLY-SKU",
+            "name": "Cemento aislado",
+            "itemType": "MATERIAL",
+            "uom": "SACO",
+        },
+    ).json()
+    client.post(
+        "/api/procurement/purchase-orders",
+        json={
+            "companyId": company_id,
+            "supplierId": supplier["id"],
+            "currencyCode": "HNL",
+            "lines": [
+                {
+                    "itemId": item["id"],
+                    "description": "Cemento tipo I",
+                    "quantity": "10.0000",
+                    "unitPrice": "10.0000",
+                }
+            ],
+        },
+    )
+    # po_number is a real generated sequence value, not a literal we
+    # control -- the isolation assertion below checks for zero results
+    # from company_b instead of matching a fixed substring (see caller).
+    return "", "purchase_order"
+
+
+def _isolated_rfi(client, company_id: str) -> tuple[str, str]:
+    project = client.post(
+        "/api/projects", json={"companyId": company_id, "name": "Proyecto IsoOnly RFI"}
+    ).json()
+    client.post(
+        "/api/rfis",
+        json={
+            "companyId": company_id,
+            "projectId": project["id"],
+            "subject": "IsoOnly Detalle de anclaje",
+            "question": "¿Detalle de anclaje?",
+        },
+    )
+    return "IsoOnly", "rfi"
+
+
+_ISOLATION_CASES = [
+    ("supplier", _isolated_supplier),
+    ("customer", _isolated_customer),
+    ("supplier_invoice", _isolated_supplier_invoice),
+    ("purchase_order", _isolated_purchase_order),
+    ("rfi", _isolated_rfi),
+]
+
+
+@pytest.mark.parametrize(
+    "expected_entity_type, create_in_company", _ISOLATION_CASES, ids=[c[0] for c in _ISOLATION_CASES]
+)
+def test_search_isolation_across_representative_entity_types(
+    client, expected_entity_type, create_in_company
+):
+    """Company A gets a real row of this entity type; company B searches
+    for it and must never see it -- proves INV-COMP-001 holds for each
+    structurally distinct query shape in search_service.py, not just the
+    one Project happens to use."""
+    login_admin(client)
+    company_a = create_company(client, name=f"Iso A {expected_entity_type}")
+    company_b = create_company(client, name=f"Iso B {expected_entity_type}")
+
+    query_fragment, entity_type = create_in_company(client, company_a["id"])
+    assert entity_type == expected_entity_type
+
+    if entity_type == "purchase_order":
+        # No stable literal substring to search for (po_number is
+        # sequence-generated) -- assert the whole company_b search for a
+        # generic term returns zero purchase_order rows instead.
+        response = client.get(f"/api/search?companyId={company_b['id']}&q=PO-")
+        assert response.status_code == 200, response.text
+        assert not any(r["entityType"] == "purchase_order" for r in response.json())
+        return
+
+    response = client.get(f"/api/search?companyId={company_b['id']}&q={query_fragment}")
+    assert response.status_code == 200, response.text
     assert response.json() == []

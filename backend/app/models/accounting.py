@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,6 +31,9 @@ class AccountingDocument(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "OR (scope = 'PROJECT' AND project_id IS NOT NULL)",
             name="ck_accounting_documents_operation_scope",
         ),
+        UniqueConstraint(
+            "company_id", "document_number", name="uq_accounting_documents_company_document_number"
+        ),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -39,7 +42,7 @@ class AccountingDocument(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     document_type_code: Mapped[str] = mapped_column(
         String(16), ForeignKey("document_types.code"), nullable=False
     )
-    document_number: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    document_number: Mapped[str] = mapped_column(String(32), nullable=False)
     scope: Mapped[str] = mapped_column(String(16), nullable=False)
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="RESTRICT"), nullable=True

@@ -231,4 +231,4 @@ def test_service_entry_records_progress(client):
         },
     )
     assert entry.status_code == 201, entry.text
-    assert entry.json()["entryNumber"].startswith("SIN-")
+    assert entry.json()["entryNumber"].startswith("SEN-")

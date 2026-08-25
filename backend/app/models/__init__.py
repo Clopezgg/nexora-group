@@ -5,7 +5,9 @@ from app.models.accounting import (
     PostingRule,
     TaxLine,
 )
+from app.models.ap import SupplierInvoice, SupplierPayment
 from app.models.approval_policy import ApprovalPolicy
+from app.models.ar import CustomerInvoice, CustomerReceipt
 from app.models.budget import Budget, BudgetLine
 from app.models.business_unit import BusinessUnit
 from app.models.change_order import ChangeOrder
@@ -41,6 +43,17 @@ from app.models.role import Role
 from app.models.session import Session
 from app.models.supplier import Supplier, SupplierContract
 from app.models.tax import TaxCode
+from app.models.treasury import (
+    BankStatement,
+    BankStatementLine,
+    CashClosing,
+    FundRestriction,
+    GeneralExpense,
+    ReconciliationMatch,
+    Remittance,
+    TreasuryAccount,
+    TreasuryTransfer,
+)
 from app.models.user import User
 from app.models.user_context import UserContext
 from app.models.user_role import UserRole
@@ -52,19 +65,26 @@ __all__ = [
     "AccountingDocument",
     "AccountingSourceLink",
     "ApprovalPolicy",
+    "BankStatement",
+    "BankStatementLine",
     "Budget",
     "BudgetLine",
     "BusinessUnit",
+    "CashClosing",
     "ChangeOrder",
     "ChartOfAccount",
     "Company",
     "CostCenter",
     "Currency",
+    "CustomerInvoice",
+    "CustomerReceipt",
     "DocumentType",
     "EconomicCategory",
     "ExchangeRate",
     "FiscalPeriod",
     "FiscalYear",
+    "FundRestriction",
+    "GeneralExpense",
     "GoodsReceipt",
     "GoodsReceiptLine",
     "IdempotencyRecord",
@@ -82,6 +102,8 @@ __all__ = [
     "PurchaseOrderLine",
     "PurchaseRequisition",
     "PurchaseRequisitionLine",
+    "ReconciliationMatch",
+    "Remittance",
     "RequestForQuotation",
     "RfqSupplier",
     "Role",
@@ -91,12 +113,16 @@ __all__ = [
     "StockLedgerEntry",
     "Supplier",
     "SupplierContract",
+    "SupplierInvoice",
+    "SupplierPayment",
     "SupplierQuotation",
     "SupplierQuotationLine",
     "Task",
     "TaxCode",
     "TaxLine",
     "ThreeWayMatchResult",
+    "TreasuryAccount",
+    "TreasuryTransfer",
     "User",
     "UserCompanyAccess",
     "UserContext",

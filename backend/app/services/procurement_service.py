@@ -325,7 +325,7 @@ def record_service_entry(
     order = procurement_repository.get_purchase_order(db, purchase_order_id)
     if order is None:
         raise ValueError(f"PurchaseOrder {purchase_order_id} no existe")
-    number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="SIN")
+    number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="SEN")
     entry = procurement_repository.create_service_entry(
         db,
         company_id=company_id,

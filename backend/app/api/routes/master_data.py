@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -55,7 +55,7 @@ def create_company(
 
 @router.get("/accounts", response_model=list[AccountResponse])
 def list_accounts(
-    company_id: uuid.UUID,
+    company_id: uuid.UUID = Query(alias="companyId"),
     db: Session = Depends(get_db),
     user=Depends(require_permission("accounting.account", "read")),
 ) -> list[AccountResponse]:

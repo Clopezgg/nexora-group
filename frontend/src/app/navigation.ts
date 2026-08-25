@@ -44,6 +44,7 @@ export const navGroups: NavGroup[] = [
       { path: '/proyectos/ordenes-de-cambio', label: 'Órdenes de cambio', icon: '🔀' },
       { path: '/proyectos/diario-de-obra', label: 'Diario de obra', icon: '📔' },
       { path: '/proyectos/calidad', label: 'Calidad', icon: '🛡️' },
+      { path: '/proyectos/seguridad', label: 'Seguridad', icon: '🦺' },
       { path: '/proyectos/rfi-submittals', label: 'RFI / Submittals', icon: '📝' },
     ],
   },

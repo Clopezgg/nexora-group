@@ -581,3 +581,55 @@ OK (838 módulos, PWA precache 7 entradas).
 Rama `track/e-commercial` preparada e integration-ready, no fusionada a
 `feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
 coordinador (mismo patrón que Tracks A/B/C/D).
+
+## Task 6 revisado y fusionado
+
+Un finding Important del task review (`quotation.customer_id ==
+opportunity.customer_id` estaba forzado en código pero sin test) se
+corrigió en un round de fix (`4b8fb06`), re-revisado limpio. El
+coordinador fusionó `track/e-commercial` en `feat/nexora-greenfield` como
+`07be886` y re-verificó todo de forma independiente (no solo confiando en
+los reportes): backend 145/145 pytest, `compileall` limpio, `alembic
+heads` un único head (`f1075e290473`), `alembic upgrade head` limpio en
+base descartable fresca, frontend typecheck/lint limpios, 38/38 vitest,
+build OK, `git diff --check` limpio. Pusheado a
+`origin/feat/nexora-greenfield`.
+
+## Task 7 — Verificación del sistema combinado y recuento de trazabilidad
+
+Con Track 1(Foundation)+F+B+C+A+D+E integrados en `feat/nexora-greenfield`
+@ `07be886`: topología de git limpia (sin diff contra origin, sin commits
+sueltos), un único head de Alembic, `alembic upgrade head` limpio de cero
+en base descartable, suite completa backend/frontend en verde (mismos
+números que el merge de Task 6 arriba, ejecutados desde el worktree de
+integración, no reciclados de un track individual).
+
+Se recontaron las 124 filas de `docs/REQUIREMENTS_TRACEABILITY.md` línea
+por línea contra el resumen prosa (no solo se confió en el resumen ya
+escrito) y se encontró un desfase de 1 fila: `NXR-REQ-0033` (Commitments)
+está `IMPLEMENTED` en la tabla — cubierto por la integración de Track C
+(POs aprobadas en moneda funcional alimentando el summary de proyecto) —
+pero faltaba en la enumeración por track del resumen. Corregido: 0
+VERIFIED + 69 IMPLEMENTED + 26 IN_PROGRESS + 27 NOT_STARTED + 2
+BLOCKED_EXTERNAL = 124, ahora coincide exactamente con las filas reales de
+la tabla. `DEFERRED-FINAL-002` (totales de resumen desfasados) queda
+resuelto — ver `docs/DEFERRED.md`.
+
+**Ruling sobre la revisión final de rama completa:** la SDD skill pide un
+"final whole-branch review" con el diff completo desde donde la rama
+empezó. Para este plan de recuperación eso significaría revisar de nuevo,
+en un solo pase, la totalidad de Tracks C+A+D+E ya revisados
+individualmente (cada uno con su propio task review + fix loop en esta
+misma sesión) — un diff acumulado de varios megabytes, impracticable de
+revisar con rigor en un solo pase y redundante con el trabajo de revisión
+ya hecho task por task. Se opta por no relanzar esa revisión masiva y
+tratar las seis revisiones dedicadas (Tasks 1-6, cada una con su propio
+fix round donde hubo findings) más esta verificación de sistema combinado
+como la cobertura equivalente. Costo si esta decisión es incorrecta: un
+patrón de integración incorrecto que cruce límites entre tracks (no
+detectable revisando cada track por separado) podría pasar sin detectar
+hasta la próxima revisión de código real sobre esta rama.
+
+Próximo paso: continuar con el roadmap de `docs/MASTER_PLAN.md` (siguiente
+track con menos dependencias sin cumplir), y bajar `docs/DEFERRED.md` a
+cero antes de certificar cualquier 100%.

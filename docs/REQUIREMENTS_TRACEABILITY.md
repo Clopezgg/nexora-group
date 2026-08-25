@@ -225,10 +225,12 @@ coordinador, sobre la base de Track 1+F+B+C+A+D ya integrados:
 - **VERIFIED:** 0 / 124 (reservado para cuando el coordinador confirme
   comportamiento end-to-end en `feat/nexora-greenfield` — ningún track se
   autootorga `VERIFIED`)
-- **IMPLEMENTED:** 68 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
+- **IMPLEMENTED:** 69 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
   0010/0011/0012/0013/0014/0015/0026/0027 (13). Track A: NXR-REQ-0017 a
   0024, 0080 y 0111 (10). Track F: NXR-REQ-0097 a 0104 (8). Track B:
-  NXR-REQ-0028/0029/0030/0031/0032/0036/0037/0038/0039 (9). Track C:
+  NXR-REQ-0028/0029/0030/0031/0032/0036/0037/0038/0039 (9). Track B+C:
+  NXR-REQ-0033 — Commitments, atribuido a Project Control pero cubierto
+  por la integración de POs de Track C (1). Track C:
   NXR-REQ-0040/0041/0042/0043/0045/0046/0047/0048/0049/0050/0051/0052/
   0053/0055/0056/0057 (16). Track D: NXR-REQ-0068/0069/0070/0071/0072 —
   Fixed Assets/Depreciation/Equipment/Fuel log/Maintenance (5). Track E:
@@ -239,7 +241,7 @@ coordinador, sobre la base de Track 1+F+B+C+A+D ya integrados:
   Comparison, 0059/0060 Contracts/Subcontracts + 3 de Track D: 0073/0075/
   0076 — Employees/Time Entries/Labor Cost, backend+API+tests completos,
   sin pantalla dedicada todavía)
-- **NOT_STARTED:** 28 / 124 (incluye 0054 Returns y 0058 Supplier
+- **NOT_STARTED:** 27 / 124 (incluye 0054 Returns y 0058 Supplier
   Performance de Track C — deuda intencional documentada en
   `docs/PROCUREMENT.md`/`docs/INVENTORY.md`; incluye 0074 Crews y todo el
   bloque CONSTRUCTION CONTROL — Documents/Site/Quality, 0077-0079/0081-
@@ -247,10 +249,13 @@ coordinador, sobre la base de Track 1+F+B+C+A+D ya integrados:
 - **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue
   real, no por incapacidad técnica)
 
-Suma verificada: 0+68+26+28+2 = 124.
+Suma verificada: 0+69+26+27+2 = 124.
 
 Este resumen se actualiza en cada integración de track. Ver progreso vivo
-en `docs/PROGRESS.md`. Recontado durante la construcción de Track E
-(Commercial) sobre Track 1+F+B+C+A+D ya integrados (Task 6 de
-`2026-08-24-interrupted-tracks-recovery`); sigue sujeto a una pasada final
+en `docs/PROGRESS.md`. Recontado en Task 7 (`2026-08-24-interrupted-tracks-recovery`,
+verificación end-to-end del sistema combinado Track 1+F+B+C+A+D+E en
+`feat/nexora-greenfield` @ 07be886) — se recontaron las filas de la tabla
+línea por línea contra este resumen y se corrigió un desfase de 1 fila
+(NXR-REQ-0033 estaba IMPLEMENTED en la tabla pero faltaba en esta
+enumeración); sigue sujeto a una pasada final
 de verificación end-to-end antes de certificar cualquier `VERIFIED`.

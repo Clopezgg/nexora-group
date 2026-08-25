@@ -38,10 +38,14 @@ certificar el 100%.
 - `DEFERRED-FINAL-001` — Las páginas de mutación de Track C
   (procurement/inventory) todavía no muestran feedback de error de la API
   al usuario; falta un patrón compartido de error de mutación en la UI.
-- `DEFERRED-FINAL-002` — Los totales resumen de
-  `docs/REQUIREMENTS_TRACEABILITY.md` quedan desfasados después de cada
-  merge de track; deben recontarse en la integración final de
-  documentación (no en cada merge individual).
+- ~~`DEFERRED-FINAL-002`~~ — RESUELTO en Task 7 (2026-08-25): se recontaron
+  las 124 filas de `docs/REQUIREMENTS_TRACEABILITY.md` línea por línea
+  contra el resumen prosa y se corrigió un desfase de 1 fila (NXR-REQ-0033
+  estaba IMPLEMENTED en la tabla pero faltaba en la enumeración del
+  resumen). El resumen ahora coincide exactamente con la tabla: 0 VERIFIED
+  + 69 IMPLEMENTED + 26 IN_PROGRESS + 27 NOT_STARTED + 2 BLOCKED_EXTERNAL
+  = 124. Sigue aplicando el recontado en cada integración de track a
+  futuro.
 - `DEFERRED-FINAL-003` — `docs/BUDGET_CONTROLLING.md` documenta un endpoint
   de historial de presupuesto que la API no expone realmente; corregir la
   doc o agregar la ruta.

@@ -1783,3 +1783,36 @@ tests/BudgetPage.test.tsx` unaffected (2/2, still stub-driven).
 Traceability tally after this reconciliation: 0 `VERIFIED`, 92
 `IMPLEMENTED` (+2), 23 `IN_PROGRESS` (+1), 7 `NOT_STARTED` (-3), 2
 `BLOCKED_EXTERNAL` — still 124 rows total.
+
+## 2026-08-25 — Inventory Returns (closes NXR-REQ-0054)
+
+Continuing down the genuinely `NOT_STARTED` list: `movement_type="RETURN"`
+already existed on `StockLedgerEntry` as documented intentional debt in
+`docs/INVENTORY.md`, with no service function or endpoint. Added
+`inventory_service.return_to_supplier`, mirroring `issue_to_project`/
+`transfer_stock` exactly (same moving-average cost, same `INV-INV-001`
+insufficient-stock guard via the shared `_issue` helper) with its own
+`movement_type="RETURN"` and `source_type="supplier_return"`/
+`source_id=supplier_id` so it's distinguishable from a real project
+consumption in the ledger. `POST /api/inventory/stock/return-to-supplier`
+validates the supplier belongs to the company
+(`assert_supplier_belongs_to_company`, same helper AP/Procurement already
+use). `StockLedgerEntryResponse` now also exposes `sourceType`/`sourceId`/
+`notes` (previously omitted for every movement type, not just Returns).
+
+Traceability: `NXR-REQ-0054` reconciled to `IMPLEMENTED`, matching its
+already-`IMPLEMENTED` siblings `NXR-REQ-0051/0052/0053` (Stock Ledger/
+Transfers/Project Issues) exactly on FE/`Perm`/Audit/E2E — none of those
+raw stock-movement capabilities have a dedicated UI screen, a
+company-isolation-specific test, or audit instrumentation yet either; this
+is a real, pre-existing, intentional convention in this row set, not a
+gap introduced by this change.
+
+Verification: `cd backend && ./.venv/bin/pytest -q` → 243/243 (+3 tests:
+real return reduces stock and tags the supplier, insufficient stock
+rejected, cross-company supplier rejected); `compileall` clean; single
+Alembic head `234785d5331f`, no migration.
+
+Traceability tally: 0 `VERIFIED`, 93 `IMPLEMENTED` (+1), 23
+`IN_PROGRESS`, 6 `NOT_STARTED` (-1), 2 `BLOCKED_EXTERNAL` — 124 rows
+total.

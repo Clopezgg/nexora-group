@@ -93,13 +93,25 @@ certificar el 100%.
   entregaran el FK real (Supplier en Task 4, Customer en Task 6). Vigilar
   si queda algún otro track que todavía deba su FK real a una referencia
   basada en texto.
-- `DEFERRED-FINAL-013` — Track E (pendiente de revisión al momento de este
-  checkpoint): la nueva migración de Alembic hace `customer_invoices.customer_id`
-  `NOT NULL` sin ruta de backfill. El implementador reporta que no existe
-  data real todavía, así que hoy es seguro, pero el task reviewer debe
-  confirmar que esto se hizo como una migración incremental NUEVA encima de
-  la revisión `58ce35982711` ya mergeada/pusheada, y no como una edición de
-  esa revisión ya publicada, antes de aceptar el Task 6.
+- `DEFERRED-FINAL-013` — Track E: la migración de Alembic hace
+  `customer_invoices.customer_id` `NOT NULL` sin ruta de backfill.
+  Verificado por el task reviewer (Task 6, 2026-08-24): es una migración
+  incremental nueva (`f1075e290473`) encima de la revisión ya publicada
+  `58ce35982711`, no una edición de esa revisión. Seguro hoy porque no
+  existe data real todavía en ningún ambiente; sigue abierto como
+  recordatorio de que un ambiente sembrado con datos antes de un backfill
+  explícito requeriría uno.
+- `DEFERRED-FINAL-014` — No existe ningún mecanismo real de audit log en
+  el codebase todavía (ni `AuditLog` ni repositorio equivalente) —
+  confirmado sistémico, no específico de un track: `INV-AUD-001` en
+  `docs/ACCOUNTING.md` ya está `IN_PROGRESS`/dueño Track G. Surgió
+  explícitamente durante el review de Track D construction-control Task 1
+  (Documents/Evidence, 2026-08-25): cada mutación de Document/Evidence
+  queda sin rastro de auditoría, igual que el resto del sistema hoy.
+  Prioridad para cuando se construya Track G (Workflow/Approvals/Audit/
+  Notifications) — no bloquea Documents/Evidence ni los tracks que los
+  consuman mientras tanto (Daily Site Reports/Quality/Safety, RFI/
+  Submittals).
 
 ## Bloqueos externos
 

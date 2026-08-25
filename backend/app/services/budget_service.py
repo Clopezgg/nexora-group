@@ -12,6 +12,7 @@ from app.domain.errors import (
 from app.models.budget import Budget, BudgetLine
 from app.models.company import Company
 from app.repositories import (
+    ap_repository,
     budget_repository,
     procurement_repository,
     project_control_repository,
@@ -178,8 +179,12 @@ def compute_summary(db: Session, *, project_id: uuid.UUID) -> BudgetSummary:
     committed = procurement_repository.project_commitment_total(
         db, company_id=project.company_id, project_id=project_id
     )
-    accrued = Decimal("0")
-    paid = Decimal("0")
+    accrued = ap_repository.project_accrued_total(
+        db, company_id=project.company_id, project_id=project_id
+    )
+    paid = ap_repository.project_paid_total(
+        db, company_id=project.company_id, project_id=project_id
+    )
     available = authorized - committed - accrued
     return BudgetSummary(
         authorized=authorized, committed=committed, accrued=accrued, paid=paid, available=available

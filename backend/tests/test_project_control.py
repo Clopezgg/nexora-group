@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.models.budget import Budget
 from app.models.procurement import PurchaseOrder
 from app.models.project import Project
-from tests.helpers import create_company, login_admin
+from tests.helpers import create_account, create_company, create_treasury_account, login_admin
 
 # Forbidden substrings for a money/balance column on Project -- INV-TRE-002:
 # Project jamás posee efectivo. Ver docs/PROJECTS_WBS.md.
@@ -186,6 +186,159 @@ def test_budget_summary_uses_only_approved_project_purchase_orders_as_commitment
     assert Decimal(body["accrued"]) == Decimal("0")
     assert Decimal(body["paid"]) == Decimal("0")
     assert Decimal(body["available"]) == Decimal("874.50")
+
+
+def test_budget_summary_includes_real_ap_accrued_and_paid_amounts(client, db_session):
+    """NXR-REQ-0034/0035: accrued/paid were hardcoded Decimal("0") in
+    budget_service.compute_summary -- real financial data can never be
+    hardcoded (CLAUDE.md). A PROJECT-scoped AP invoice must feed both
+    figures once it is actually approved (accrual posted) and paid."""
+    login_admin(client)
+    company = create_company(client)
+    project = _create_project(client, company_id=company["id"])
+    supplier = _create_supplier(client, company_id=company["id"])
+    client.post(
+        f"/api/projects/{project['id']}/budgets/baseline",
+        json={"currencyCode": "HNL", "lines": [{"authorizedAmount": "1000.00"}]},
+    )
+    bank_gl = create_account(client, company_id=company["id"], code="1100", name="Bancos", account_type="ASSET")
+    expense = create_account(
+        client, company_id=company["id"], code="5200", name="Materiales", account_type="EXPENSE"
+    )
+    payable = create_account(
+        client, company_id=company["id"], code="2100", name="Cuentas por pagar", account_type="LIABILITY"
+    )
+    contributions = create_account(
+        client, company_id=company["id"], code="3100", name="Aportes", account_type="EQUITY"
+    )
+    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+    client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank["id"],
+            "counterAccountId": contributions["id"],
+            "sender": "Fondeo inicial",
+            "currencyCode": "HNL",
+            "originalAmount": "100000.00",
+            "remittanceDate": "2026-01-01",
+        },
+    )
+
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "PRJ-AP-1",
+            "scope": "PROJECT",
+            "projectId": project["id"],
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "200.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    ).json()
+
+    summary_before_approval = client.get(f"/api/projects/{project['id']}/budgets/summary").json()
+    assert Decimal(summary_before_approval["accrued"]) == Decimal("0")
+
+    client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+    client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/payments",
+        json={"treasuryAccountId": bank["id"], "amount": "80.00", "paymentDate": "2026-01-20"},
+    )
+
+    summary = client.get(f"/api/projects/{project['id']}/budgets/summary")
+    assert summary.status_code == 200, summary.text
+    body = summary.json()
+    assert Decimal(body["accrued"]) == Decimal("200.00")
+    assert Decimal(body["paid"]) == Decimal("80.00")
+    assert Decimal(body["available"]) == Decimal("800.00")
+
+
+def test_budget_summary_excludes_a_draft_ap_invoice_from_accrued(client, db_session):
+    """A DRAFT invoice never posted its accrual -- it must not inflate the
+    project's accrued figure."""
+    login_admin(client)
+    company = create_company(client)
+    project = _create_project(client, company_id=company["id"])
+    supplier = _create_supplier(client, company_id=company["id"])
+    client.post(
+        f"/api/projects/{project['id']}/budgets/baseline",
+        json={"currencyCode": "HNL", "lines": [{"authorizedAmount": "1000.00"}]},
+    )
+    expense = create_account(
+        client, company_id=company["id"], code="5300", name="Materiales", account_type="EXPENSE"
+    )
+    payable = create_account(
+        client, company_id=company["id"], code="2200", name="Cuentas por pagar", account_type="LIABILITY"
+    )
+    client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "PRJ-AP-2",
+            "scope": "PROJECT",
+            "projectId": project["id"],
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "500.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    )
+
+    summary = client.get(f"/api/projects/{project['id']}/budgets/summary")
+
+    assert summary.status_code == 200, summary.text
+    body = summary.json()
+    assert Decimal(body["accrued"]) == Decimal("0")
+    assert Decimal(body["paid"]) == Decimal("0")
+    assert Decimal(body["available"]) == Decimal("1000.00")
+
+
+def test_budget_summary_rejects_a_non_functional_currency_ap_accrual(client, db_session):
+    login_admin(client)
+    company = create_company(client, currency="HNL")
+    project = _create_project(client, company_id=company["id"])
+    supplier = _create_supplier(client, company_id=company["id"])
+    client.post(
+        f"/api/projects/{project['id']}/budgets/baseline",
+        json={"currencyCode": "HNL", "lines": [{"authorizedAmount": "1000.00"}]},
+    )
+    expense = create_account(
+        client, company_id=company["id"], code="5400", name="Materiales", account_type="EXPENSE"
+    )
+    payable = create_account(
+        client, company_id=company["id"], code="2300", name="Cuentas por pagar", account_type="LIABILITY"
+    )
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "PRJ-AP-3",
+            "scope": "PROJECT",
+            "projectId": project["id"],
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "USD",
+            "amount": "50.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    ).json()
+    client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+
+    summary = client.get(f"/api/projects/{project['id']}/budgets/summary")
+
+    assert summary.status_code == 409, summary.text
+    assert summary.json()["error"]["code"] == "NXR-BUDGET-002"
 
 
 def test_project_purchase_order_approval_rejects_non_functional_currency(client, db_session):

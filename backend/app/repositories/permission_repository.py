@@ -163,6 +163,9 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("safety.incident", "create", "Registrar incidentes de seguridad"),
     ("safety.incident", "read", "Ver incidentes de seguridad"),
     ("safety.incident", "close", "Cerrar incidentes de seguridad"),
+    # Track G -- Platform: Audit trail (orden maestra §90, NXR-REQ-0090,
+    # docs/AUDIT.md).
+    ("audit.log", "read", "Ver bitácora de auditoría"),
 )
 # NOTA: ActiveUIContext (GET/PUT /api/context) NO pasa por este motor de
 # permisos -- es una preferencia personal del usuario autenticado (su
@@ -219,6 +222,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("asset.fixed_asset", "update", SCOPE_OWN),
         ("asset.depreciation", "create", SCOPE_OWN),
         ("asset.depreciation", "read", SCOPE_OWN),
+        ("audit.log", "read", SCOPE_OWN),
     ),
     "Treasury Manager": (
         ("core.company", "read", SCOPE_ANY),
@@ -322,6 +326,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("quality.corrective_action", "read", SCOPE_ANY),
         ("safety.observation", "read", SCOPE_ANY),
         ("safety.incident", "read", SCOPE_ANY),
+        ("audit.log", "read", SCOPE_ANY),
     ),
     "Viewer": (
         ("core.company", "read", SCOPE_OWN),

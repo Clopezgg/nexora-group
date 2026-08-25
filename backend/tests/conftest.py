@@ -1,6 +1,18 @@
 import os
+import re
 
-os.environ["DATABASE_URL"] = "postgresql+psycopg://nexora@localhost:5432/nexora_tracke_test"
+# Isolate the test database per git worktree: running pytest concurrently in
+# multiple worktrees (e.g. several tracks under active development at once)
+# against one shared hardcoded database corrupts each other's schema mid-run
+# (one worktree's Base.metadata doesn't know about another's tables, so
+# drop_all/create_all races produce spurious FK/DependentObjectsStillExist
+# errors that look like real test failures but aren't).
+_worktree_slug = re.sub(
+    r"[^a-z0-9]+", "_", os.path.basename(os.path.dirname(os.getcwd())).lower()
+).strip("_") or "default"
+os.environ["DATABASE_URL"] = (
+    f"postgresql+psycopg://nexora@localhost:5432/nexora_test_{_worktree_slug}"
+)
 os.environ["BOOTSTRAP_ADMIN_EMAIL"] = "admin@nexora.group"
 os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "NexoraAdmin123!"
 os.environ["FRONTEND_URL"] = "http://localhost:5173"

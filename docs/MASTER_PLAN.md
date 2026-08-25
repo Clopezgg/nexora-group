@@ -87,7 +87,12 @@ un track a la vez.
    `DEFERRED-FINAL-*`.
 6. Hardening completo → Bicep/Azure real (con la confirmación puntual de
    despliegue pactada en `CLAUDE.md` §11) → certificación de producción →
-   cleanup → entrega.
+   cleanup → entrega. **La definición completa y no negociable de "100%"
+   (backup/restore probado, disaster recovery, rollback, seguridad,
+   concurrencia, performance, observability, PROD deployment,
+   traceability en cero pendientes, etc.) vive en
+   `docs/PRODUCTION_READINESS.md` — no se declara 100% ni "production
+   certified" sin cumplir ese checklist completo.**
 
 ## Excepciones vigentes (ver `CLAUDE.md` §11)
 

@@ -1743,3 +1743,43 @@ Remaining audit backlog (Project Control, Enterprise Resources,
 Commercial, Construction Control, and Transfers/General Expenses/Fund
 Restrictions/Bank Reconciliation within Financial Core) is unchanged and
 still honestly listed in `docs/AUDIT.md`.
+
+## 2026-08-25 — Real AP accrued/paid in Budget vs Actual (closes NXR-REQ-0034/0035)
+
+While reconciling `docs/REQUIREMENTS_TRACEABILITY.md` against the real
+code (per the "CANDADO FINAL" order — no row can stay stale), found
+`budget_service.compute_summary` hardcoding `accrued = Decimal("0")` and
+`paid = Decimal("0")` — a real financial figure presented as data, which
+`CLAUDE.md` explicitly forbids ("Ninguna cifra financiera se hardcodea").
+This matched exactly why `NXR-REQ-0034`/`NXR-REQ-0035` were tracked
+`NOT_STARTED`.
+
+Added `app/repositories/ap_repository.py` (`project_accrued_total`/
+`project_paid_total`), mirroring `procurement_repository.
+project_commitment_total`'s existing pattern: grouped by currency, raises
+`BudgetCurrencyMismatchError` (`NXR-BUDGET-002`, 409) on a foreign-currency
+invoice since this codebase has no FX policy authority yet. Accrued sums
+`amount+tax_amount` for invoices whose accrual has actually posted
+(`APPROVED` and beyond — never `DRAFT`/`REVIEW`/`CANCELLED`); paid sums
+`SupplierInvoice.amount_paid`, already maintained per invoice by
+`ap_service.pay_supplier_invoice`. `GET /api/projects/{id}/budgets/summary`
+and `BudgetPage.tsx` needed zero changes — the contract already had both
+fields, they were just fed a lie.
+
+Also reconciled a second stale row while auditing this area:
+`NXR-REQ-0016` ("Financial statements: TB, GL, BS, P&L, Cash Flow") had
+been sitting at `NOT_STARTED` under a phantom "Track G" owner, when the
+same scope (Trial Balance/General Ledger/Balance Sheet/Income Statement)
+was actually built under `NXR-REQ-0093` earlier this session. Moved to
+`IN_PROGRESS` pointing at the `NXR-REQ-0093` evidence; only Cash Flow
+remains genuinely unbuilt there.
+
+Verification: `cd backend && ./.venv/bin/pytest -q` → 240/240 (+3 tests:
+real accrual+payment end to end, DRAFT invoice excluded, cross-currency
+accrual rejected); `compileall` clean; single Alembic head
+`234785d5331f`, no migration (no schema change). `npm test -- --run
+tests/BudgetPage.test.tsx` unaffected (2/2, still stub-driven).
+
+Traceability tally after this reconciliation: 0 `VERIFIED`, 92
+`IMPLEMENTED` (+2), 23 `IN_PROGRESS` (+1), 7 `NOT_STARTED` (-3), 2
+`BLOCKED_EXTERNAL` — still 124 rows total.

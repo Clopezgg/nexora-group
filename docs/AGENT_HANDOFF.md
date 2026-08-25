@@ -6,7 +6,14 @@ Canonical branch: feat/nexora-greenfield
 Latest integrated SHA: see `git log -1` on `feat/nexora-greenfield`
 (financial statements slice: `0cfd7cb`/`4603fa5`/`4b928fd`; AP →
 Approval Inbox slice: `8500050`/`3b804c8`/`49b7409`; GL audit
-instrumentation: `adff21c`, docs commit follows this file)
+instrumentation: `adff21c`/`97e2d33`; real AP accrued/paid in Budget vs
+Actual: `0db6ecf`, docs commit follows this file)
+
+**This session is now operating under the user's "CANDADO FINAL" order**:
+no partial/rounded completion claims, `main` stays locked until every
+single gate in that order is independently verified green — not just
+"mostly green" or "no obvious regressions". Re-read that order's exact
+gate list before ever considering a merge to `main`.
 
 ## Canonical state
 
@@ -56,11 +63,24 @@ session, real PostgreSQL, real commands — not inferred):
   >500 kB chunk warning is unchanged and still tracked in
   `DEFERRED-FINAL-017`.
 - `git diff --check` clean.
-- Traceability tally unchanged at the row-status level (`NXR-REQ-0093` and
-  `NXR-REQ-0023` descriptions updated, statuses unchanged — both were
-  already `IN_PROGRESS`/`IMPLEMENTED`): 0 `VERIFIED`, 90 `IMPLEMENTED`,
-  22 `IN_PROGRESS`, 10 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL` across 124
-  rows.
+- General Ledger audit instrumentation (`accounting.journal_entry.create`/
+  `.reverse`, commit `adff21c`): closes that line in `docs/AUDIT.md`'s
+  backlog. 237/237 backend tests at that point.
+- Real AP accrued/paid in Budget vs Actual (commit `0db6ecf`, closes
+  `NXR-REQ-0034`/`NXR-REQ-0035`): `budget_service.compute_summary` was
+  hardcoding `accrued`/`paid` to `Decimal("0")` — a real financial figure
+  presented as data, forbidden by `CLAUDE.md`. Now real, via
+  `ap_repository.project_accrued_total`/`project_paid_total`. Also
+  reconciled a stale `NXR-REQ-0016` row (was `NOT_STARTED` under a
+  phantom owner; the same scope was actually built under `NXR-REQ-0093`
+  — moved to `IN_PROGRESS`, only Cash Flow remains there). 240/240
+  backend tests.
+- Traceability tally after all of the above: 0 `VERIFIED`, 92
+  `IMPLEMENTED`, 23 `IN_PROGRESS`, 7 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
+  across 124 rows. **This is still far from 100\% by the CANDADO FINAL
+  definition** — 30 rows are not yet `IMPLEMENTED`, and zero rows are
+  `VERIFIED` (VERIFIED requires E2E/independent verification per row,
+  which hasn't started). Do not round this up.
 
 Housekeeping notes for whoever reads this next:
 
@@ -87,39 +107,51 @@ Housekeeping notes for whoever reads this next:
 
 ## Next priority
 
-`DEFERRED-FINAL-016` is now RESOLVED (see above) — do not re-do it or
-re-wire AP again. The General Ledger (manual entries/reversal) audit gap
-is also RESOLVED (`accounting.journal_entry.create`/`.reverse`, commit
-`adff21c`) — do not re-instrument it. Highest-value dependency-free gaps
-at this checkpoint, confirmed against the real code (grep, not
-assumption) as of 2026-08-25:
+RESOLVED this session — do not re-do any of these: `DEFERRED-FINAL-016`
+(AP → Approval Inbox), General Ledger audit instrumentation, real AP
+accrued/paid in Budget vs Actual (`NXR-REQ-0034`/`0035`), the
+`NXR-REQ-0016` traceability reconciliation.
 
-1. Continue the explicit audit-instrumentation backlog documented in
-   `docs/AUDIT.md` — still open: Project Control (WBS/Budgets/Change
-   Orders/Progress), Enterprise Resources (Fixed Assets/Equipment/
-   Workforce), Commercial (CRM/AR), Construction Control (Documents/RFI/
-   Submittals/Daily Reports/Quality/Safety), and within Financial Core:
-   Transfers/General Expenses/Fund Restrictions/Bank Reconciliation. Also
-   AP invoice create/cancel specifically (called out in the
-   `NXR-REQ-0023` traceability row) — only approve/pay/submit are
-   instrumented on AP so far.
-2. Optionally extend the same Approval Inbox pattern just built for AP to
-   `submittal_service` (still not wired to `approval_service.
-   create_request`, see `docs/DEFERRED.md` `DEFERRED-FINAL-016` for why it
-   was deliberately left out this round — Submittal already has its own
-   `respond`/`decide` flow without an assignment concept, so this is a
-   real design decision, not a mechanical copy).
-3. Remaining `NXR-REQ-0093` report catalog: Cash Flow (needs a persisted
-   operating/investing/financing activity classification — evaluate
-   whether that requires a schema decision before committing to a design,
-   unlike General Ledger/Balance Sheet/Income Statement which needed
-   none), Treasury/Procurement operational reports, and composed
-   Project/Earned-Value reports.
-4. The missing company-scoped user-directory endpoint (no `GET /api/.../
-   users?companyId=` exists anywhere) is now a real UX gap in two places
-   (`QualityPage.tsx`'s `responsibleUserId`, the new AP submit-for-
-   approval modal) — both use an honest free-text UUID input instead of a
-   fabricated Select. Worth its own small vertical slice if picked up.
+The 7 rows genuinely `NOT_STARTED` as of this checkpoint (verify with
+`grep -oE '\| NOT_STARTED \|' docs/REQUIREMENTS_TRACEABILITY.md` combined
+with the row names before trusting this list — it will drift):
+
+1. `NXR-REQ-0054` Returns — `movement_type="RETURN"` already exists in
+   the inventory model (DB ✅), no service function or endpoint yet.
+   Smallest-scoped genuine gap on this list; good next pick.
+2. `NXR-REQ-0074` Crews — nothing built (`⬜` across the board).
+3. `NXR-REQ-0058` Supplier Performance — deliberately deferred (not
+   enough real PO/GR volume to compute honest metrics without fabricating
+   them); re-evaluate only if that premise has changed.
+4. `NXR-REQ-0109` Backup/Restore, `NXR-REQ-0112` E2E (Playwright),
+   `NXR-REQ-0113` Critical User Journey — these are 90–100%
+   feature-freeze-phase items per `CLAUDE.md` §10's own "Build Width
+   First" philosophy. With 30/124 rows still not `IMPLEMENTED`, this
+   project is not at 90% width yet — prioritize closing more
+   `NOT_STARTED`/`IN_PROGRESS` rows before these, unless the user
+   explicitly asks to jump ahead.
+5. `NXR-REQ-0122` OIDC deployment — blocked on GitHub federated
+   credentials configuration; likely an `EXTERNAL-BLOCKER`, confirm before
+   attempting.
+
+Then continue the audit-instrumentation backlog in `docs/AUDIT.md` (still
+open: Project Control, Enterprise Resources, Commercial, Construction
+Control, and Transfers/General Expenses/Fund Restrictions/Bank
+Reconciliation within Financial Core; also AP invoice create/cancel
+specifically). Also worth a scan: this session found TWO real bugs
+(hardcoded `Decimal("0")` financial figures, a stale traceability row)
+just by reading code adjacent to what it was already touching — a
+deliberate pass over the 23 `IN_PROGRESS` rows' descriptions against the
+real code, looking for the same class of issue, is likely to surface
+more before jumping to E2E/hardening.
+
+Lower priority / optional: extend the Approval Inbox pattern to
+`submittal_service` (deliberately left out — Submittal has its own
+`respond`/`decide` flow without an assignment concept, so this is a real
+design decision, not a mechanical copy); the missing company-scoped
+user-directory endpoint (two UI spots now use an honest free-text UUID
+input instead: `QualityPage.tsx`'s `responsibleUserId`, the AP
+submit-for-approval modal).
 
 Re-read `docs/MASTER_PLAN.md`, `docs/REQUIREMENTS_TRACEABILITY.md`,
 `docs/DEFERRED.md` and `docs/PRODUCTION_READINESS.md` before picking

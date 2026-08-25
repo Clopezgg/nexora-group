@@ -46,19 +46,19 @@ placeholder.
 |---|---|---|---|---|
 | NXR-REQ-0013 | General Ledger | ✅·✅·✅·✅·⬜·➖·⬜·✅·⬜ | IMPLEMENTED | Track 1: `AccountingDocument`/`JournalLine`, API `/api/accounting/journal-entries` (crear/leer/revertir); falta pantalla de consulta GL (Track F) y reportes (Track G) |
 | NXR-REQ-0014 | Double-entry (debit=credit invariant) | ✅·✅·✅·➖·➖·➖·➖·✅·➖ | IMPLEMENTED | INV-ACC-001 con test real, ver docs/ACCOUNTING.md |
-| NXR-REQ-0015 | Posting engine (PostingRule/PostingService) | ✅·✅·✅·➖·➖·➖·➖·✅·➖ | IMPLEMENTED | `posting_service.post_manual`/`reverse_document`, `PostingRule` (modelo, sin resolver automático todavía — ver docs/ACCOUNTING.md); contrato documentado para que otros tracks lo consuman |
+| NXR-REQ-0015 | Posting engine (PostingRule/PostingService) | ✅·✅·✅·➖·➖·➖·➖·✅·➖ | IMPLEMENTED | `posting_service.post_manual`/`reverse_document`, `PostingRule` (modelo, sin resolver automático todavía — ver docs/ACCOUNTING.md); valida centralmente que Project, cuentas y dimensiones pertenezcan a la company |
 | NXR-REQ-0016 | Financial statements (TB, GL, BS, P&L, Cash Flow) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track G (Reporting), sobre los datos que ya deja el GL de este track |
-| NXR-REQ-0017 | Treasury (accounts, position) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: cuentas BANK/CASH/OTHER, posición derivada del GL, API y pantalla reales; ownership por company en cada recurso |
+| NXR-REQ-0017 | Treasury (accounts, position) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: cuentas BANK/CASH/OTHER, posición derivada del GL, API y pantalla reales; ownership por company y relación TreasuryAccount↔GL uno-a-uno |
 | NXR-REQ-0018 | Remittances (scope=CENTRAL) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: remesa CENTRAL cash-in, posting atómico e idempotente y formulario Treasury |
 | NXR-REQ-0019 | Transfers (bank/cash) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: transferencia entre activos de Treasury, sin Revenue/Expense, idempotente; FX entre cuentas diferido explícitamente |
 | NXR-REQ-0020 | Cash (closing, position) | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: cierre de caja DRAFT→APPROVED con ajuste atómico/idempotente; sin pantalla específica de cierres |
-| NXR-REQ-0021 | Bank reconciliation | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: statement/lines append-only, matches acumulativos con `FOR UPDATE`, rechazo de overmatch y documento extranjero; sin UI específica |
+| NXR-REQ-0021 | Bank reconciliation | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: statement/lines append-only, matches acumulativos con `FOR UPDATE`; valida company, GL, signo, capacidad/asignación del documento y transiciones; sin UI específica |
 | NXR-REQ-0022 | Fund restrictions | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: restricción etiqueta uso sin transferir propiedad del efectivo al Project; validación company/project |
 | NXR-REQ-0023 | Accounts Payable | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: invoices/accrual/aprobación/pagos parciales, GET persistido por company, UI y pagos idempotentes |
 | NXR-REQ-0024 | Accounts Receivable | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A retiene AR como Financial Core: invoices/receipts, GET persistido, UI e idempotencia. Track E posee el workflow comercial y debe llamar AR, no duplicar receivables |
 | NXR-REQ-0025 | Corrections (posted docs) | 🔶·✅·✅·➖·➖·➖·⬜·✅·➖ | IN_PROGRESS | Mecanismo de reversal cubre el caso general (INV-ACC-002); falta un flujo de "correction" distinto al reversal simple si algún dominio lo necesita — dueño: track que lo requiera |
 | NXR-REQ-0026 | Annulments (reversal, no delete) | ✅·✅·✅·✅·⬜·➖·⬜·✅·⬜ | IMPLEMENTED | `posting_service.reverse_document`, endpoint `POST /api/accounting/journal-entries/{id}/reverse`, documento tipo `ANU`; falta UI |
-| NXR-REQ-0027 | Idempotency (Idempotency-Key) | ✅·✅·✅·✅·➖·➖·⬜·✅·➖ | IMPLEMENTED | Track A consume el header persistido explícitamente en remesas, transferencias, gastos generales, aprobación de cierres, pagos y cobros; posting + operación + resultado se confirman en una transacción |
+| NXR-REQ-0027 | Idempotency (Idempotency-Key) | ✅·✅·✅·✅·➖·➖·⬜·✅·➖ | IMPLEMENTED | Track A consume el header persistido en remesas, transferencias, gastos, cierres, pagos y cobros; UI genera una key por intención y la conserva en variables de retry; posting + operación + resultado se confirman en una transacción |
 
 ## PROJECT CONTROL
 
@@ -191,7 +191,7 @@ placeholder.
 | NXR-REQ-0107 | Security (CSRF/rate-limit/lockout/headers) | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | Argon2id + HttpOnly + Secure-en-prod; falta el resto de §121 |
 | NXR-REQ-0108 | Observability | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | App Insights opcional wired; falta logging estructurado con correlation_id |
 | NXR-REQ-0109 | Backup / Restore | ⬜⬜⬜⬜➖⬜➖⬜➖ | NOT_STARTED | — |
-| NXR-REQ-0110 | Unit tests | ➖➖✅➖✅➖➖✅➖ | IN_PROGRESS | Track A: suite combinada 70 backend + 19 frontend; crecerá con los tracks restantes |
+| NXR-REQ-0110 | Unit tests | ➖➖✅➖✅➖➖✅➖ | IN_PROGRESS | Track A: suite combinada 81 backend + 24 frontend; crecerá con los tracks restantes |
 | NXR-REQ-0111 | Integration tests (PostgreSQL) | ➖➖✅➖➖➖➖✅➖ | IMPLEMENTED | Track A: pruebas reales contra PostgreSQL para lifecycle, aislamiento, constraints, postings, idempotencia y conciliación |
 | NXR-REQ-0112 | E2E (Playwright) | ➖➖➖➖➖➖➖➖⬜ | NOT_STARTED | — |
 | NXR-REQ-0113 | Critical User Journey | ➖➖➖➖➖➖➖➖⬜ | NOT_STARTED | — |

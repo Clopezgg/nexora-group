@@ -199,8 +199,18 @@ reales:
   workflow comercial y consumirá AR sin duplicarlo.
 - La numeración contable se corrigió a unicidad `(company_id,
   document_number)`, compatible con secuencias por compañía.
+- Corrección 1/5: el Posting Engine central valida compañía para Project del
+  documento y cuenta/Project/CostCenter de cada línea antes de persistir.
+- Cada cuenta GL solo puede respaldar una TreasuryAccount, evitando duplicar
+  el mismo saldo al presentar la posición de efectivo.
+- Conciliación exige cuenta GL, signo y capacidad disponible del documento,
+  serializa asignaciones entre líneas y restringe MATCH/EXCLUDED a estados
+  válidos.
+- Las cinco mutaciones monetarias de UI envían un UUID idempotente estable en
+  sus variables de mutación, reutilizado por los reintentos de transporte.
 - Migración `58ce35982711`: fresh-install completo hasta head, 43 tablas y
   constraints críticos inspeccionados en PostgreSQL temporal.
-- Evidencia de rama: backend combinado 70 tests, frontend 19 tests,
+- Migraciones hasta `a91c7d4e2f36`: fresh-install y `alembic check` sin drift.
+- Evidencia de rama: backend combinado 81 tests, frontend 24 tests,
   typecheck/lint/build y Alembic gates ejecutados. Las filas se marcan
   `IMPLEMENTED`, nunca `VERIFIED`, hasta integración coordinada/E2E.

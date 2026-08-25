@@ -37,6 +37,9 @@ Qué garantiza el servicio (y qué NO hace):
 - Valida doble partida (`INV-ACC-001`), `OperationScope` (`INV-OPS-*`) y
   período fiscal abierto (`INV-ACC-003`) **antes** de tocar la base de
   datos. Si algo falla, no se persiste nada.
+- Valida que el Project del documento y cada cuenta, Project y CostCenter
+  de sus líneas pertenezcan a la misma compañía; ningún caller puede omitir
+  este aislamiento.
 - Numera el documento vía `NumberSequence` (concurrency-safe, `SELECT ...
   FOR UPDATE`, nunca `MAX()+1`).
 - Por defecto persiste y hace `commit()`. Los dominios que necesitan

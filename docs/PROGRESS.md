@@ -633,3 +633,61 @@ hasta la próxima revisión de código real sobre esta rama.
 Próximo paso: continuar con el roadmap de `docs/MASTER_PLAN.md` (siguiente
 track con menos dependencias sin cumplir), y bajar `docs/DEFERRED.md` a
 cero antes de certificar cualquier 100%.
+
+### 2026-08-25 — Track D, Task 2: Workforce/Time frontend (cierra DEFERRED-FINAL-008)
+
+Rama `track/d-workforce-ui` (worktree aislado `nexora-group-trackD-wf`,
+ramificada de `feat/nexora-greenfield` @ `147b33a`, no tocó `backend/`).
+El backend de Workforce/Time (`Worker`/`TimeEntry`, SUBMITTED→APPROVED/
+REJECTED, `labor_cost` server-computed) ya estaba mergeado y probado en un
+track anterior sin pantalla — esta tarea construye únicamente esa
+pantalla, leyendo el contrato real (`backend/app/api/routes/workforce.py`,
+`app/schemas/workforce.py`, `app/services/workforce_service.py`) en vez de
+adivinar nombres de campo.
+
+- **`WorkersPage`** (`/recursos/personal`): lista/crea `Worker` contra
+  `GET/POST /api/workforce/workers`. Misma forma que `FixedAssetsPage`
+  (Card + Table + Modal + React Hook state, TanStack Query).
+- **`TimeEntriesPage`** (`/recursos/tiempo`): lista/crea `TimeEntry`
+  (`GET/POST /api/workforce/time-entries`), aprueba/rechaza
+  (`POST .../approve`, `POST .../reject`) con horas aprobadas editables
+  por fila antes de confirmar. Filtros por proyecto/fecha/estado
+  (client-side sobre el listado ya cargado de la company — el backend
+  solo filtra por `companyId`, no expone filtros server-side todavía).
+  `StatCard` con el total de `labor_cost` aprobado del filtro actual —
+  siempre el valor devuelto por el backend, nunca recalculado en el
+  cliente.
+- Las rutas usan los ítems de navegación que ya existían en
+  `navigation.ts` (`/recursos/personal`, `/recursos/tiempo`) en vez de
+  inventar `/recursos/mano-de-obra` (mencionado en el brief pero
+  inexistente en el menú real) — ver nota en `routes.tsx`.
+- `workforceService.ts` + `types/workforce.ts` nuevos, mismo patrón que
+  `assetService.ts`/`types/asset.ts` (Decimal del backend viaja como
+  string, ej. `"1004.00"`, nunca `number`, para no perder precisión).
+
+**TDD real**: `WorkersPage.test.tsx` y `TimeEntriesPage.test.tsx`
+escritos contra el comportamiento nombrado en el brief. Confirmado RED
+moviendo temporalmente `src/features/workforce/` fuera del árbol y
+revirtiendo `routes.tsx` a placeholders: 4/4 tests fallan contra el
+código real. Restaurada la implementación → GREEN, 4/4 pasan. Durante el
+ciclo se encontró y corrigió un bug real del propio test (el stub de
+`fetch` devolvía la misma referencia de array mutada en vez de un payload
+nuevo por llamada como haría un backend real vía JSON, lo que rompía el
+`useMemo` de filtrado en el segundo render) — corregido para que el mock
+imite un round-trip HTTP real.
+
+**Verificación real**: frontend typecheck limpio, `eslint .` limpio,
+15/15 archivos de test / 42/42 tests vitest (38 previos + 4 nuevos: 2
+`WorkersPage` + 2 `TimeEntriesPage`, incluye el caso nombrado en el brief:
+reload real, aprobar, `labor_cost` server-computed 125.50×8=1004.00
+mostrado en la tabla), `npm run build` OK (841 módulos, PWA precache 7
+entradas). No se tocó ningún archivo bajo `backend/`.
+
+`NXR-REQ-0073` (Employees), `NXR-REQ-0075` (Time Entries) y
+`NXR-REQ-0076` (Labor Cost) pasan de `IN_PROGRESS` a `IMPLEMENTED` en
+`docs/REQUIREMENTS_TRACEABILITY.md` (columna FE ⬜→✅) — no `VERIFIED`:
+falta E2E. `DEFERRED-FINAL-008` queda resuelto — ver `docs/DEFERRED.md`.
+
+Rama `track/d-workforce-ui` preparada e integration-ready, no fusionada a
+`feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
+coordinador (mismo patrón que Tracks A/B/C/D/E anteriores).

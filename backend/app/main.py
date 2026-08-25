@@ -28,6 +28,7 @@ from app.api.routes import (
     reports,
     rfi,
     safety,
+    search,
     site_reports,
     submittals,
     suppliers,
@@ -123,6 +124,8 @@ def create_app() -> FastAPI:
     # docs/superpowers/specs/2026-08-25-reports-search-analytics-design.md
     # for what is deliberately out of scope in this phase.
     app.include_router(reports.router, prefix="/api")
+    # Track H - Reports/Search/Analytics (NXR-REQ-0092).
+    app.include_router(search.router, prefix="/api")
 
     return app
 

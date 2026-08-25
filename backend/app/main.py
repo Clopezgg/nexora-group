@@ -9,6 +9,7 @@ from app.api.routes import (
     ap,
     ar,
     assets,
+    audit,
     auth,
     context,
     crm,
@@ -94,6 +95,8 @@ def create_app() -> FastAPI:
     app.include_router(site_reports.router, prefix="/api")
     app.include_router(quality.router, prefix="/api")
     app.include_router(safety.router, prefix="/api")
+    # Track G - Platform (Audit trail, NXR-REQ-0090).
+    app.include_router(audit.router, prefix="/api")
 
     return app
 

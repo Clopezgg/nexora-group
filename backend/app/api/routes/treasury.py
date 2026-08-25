@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, 
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id, get_db
+from app.api.deps_correlation import get_correlation_id
 from app.domain.errors import InvalidFinancialReferenceError
 from app.models.accounting import AccountingDocument
 from app.models.treasury import BankStatementLine, FundRestriction, TreasuryAccount
@@ -26,7 +27,7 @@ from app.schemas.treasury import (
     TreasuryTransferCreateRequest,
     TreasuryTransferResponse,
 )
-from app.services import idempotency_service, treasury_service, voucher_service
+from app.services import audit_service, idempotency_service, treasury_service, voucher_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/treasury", tags=["treasury"])
@@ -112,6 +113,7 @@ def create_remittance(
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.remittance", "create")),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> RemittanceResponse:
     assert_company_access(
         db, user_id=user.id, resource="treasury.remittance", action="create", company_id=payload.company_id
@@ -143,6 +145,17 @@ def create_remittance(
             notes=payload.notes,
             commit=outcome is None,
         )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="treasury.remittance.create",
+            entity_type="treasury.remittance",
+            entity_id=remittance.id,
+            company_id=remittance.company_id,
+            before=None,
+            after={"baseAmount": str(remittance.base_amount), "sender": remittance.sender},
+            correlation_id=correlation_id,
+        )
         response = RemittanceResponse.model_validate(remittance, from_attributes=True)
         if outcome is not None:
             idempotency_service.complete(
@@ -152,7 +165,7 @@ def create_remittance(
                 entity_type="Remittance",
                 entity_id=remittance.id,
             )
-            db.commit()
+        db.commit()
         return response
     except Exception:
         db.rollback()
@@ -294,6 +307,7 @@ def approve_cash_closing(
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.cash_closing", "approve")),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> CashClosingResponse:
     existing_closing = treasury_service.get_cash_closing(
         db, cash_closing_id=cash_closing_id
@@ -308,6 +322,7 @@ def approve_cash_closing(
     assert_company_access(
         db, user_id=user.id, resource="treasury.cash_closing", action="approve", company_id=company_id
     )
+    before_status = existing_closing.status
     outcome = None
     request_payload = {
         "cashClosingId": str(cash_closing_id),
@@ -332,6 +347,17 @@ def approve_cash_closing(
             company_id=company_id,
             commit=outcome is None,
         )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="treasury.cash_closing.approve",
+            entity_type="treasury.cash_closing",
+            entity_id=closing.id,
+            company_id=company_id,
+            before={"status": before_status},
+            after={"status": closing.status},
+            correlation_id=correlation_id,
+        )
         response = CashClosingResponse.model_validate(closing, from_attributes=True)
         if outcome is not None:
             idempotency_service.complete(
@@ -341,7 +367,7 @@ def approve_cash_closing(
                 entity_type="CashClosing",
                 entity_id=closing.id,
             )
-            db.commit()
+        db.commit()
         return response
     except Exception:
         db.rollback()

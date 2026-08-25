@@ -29,7 +29,14 @@ Reports + Quality + Safety, `NXR-REQ-0081/0082/0083/0084`) construido en
 `NonConformance`/`CorrectiveAction`/`SafetyObservation`/`SafetyIncident`
 reales — ver `docs/PROGRESS.md` y `task-3-report.md`. El bloque
 CONSTRUCTION CONTROL completo (`NXR-REQ-0077-0086`) está ahora
-`IMPLEMENTED`; ninguna fila se marca `VERIFIED` todavía.
+`IMPLEMENTED`; ninguna fila se marca `VERIFIED` todavía. Plan
+"track-g-workflow-audit", Task 1 (Audit trail foundation, `NXR-REQ-0090`)
+construido en `track/g-workflow-audit`: `AuditLog` real, append-only,
+instrumentando AP approve/pay, Treasury cash-closing approve + remittance
+create, y Procurement PO approve — ver `docs/AUDIT.md` y `task-1-report.md`
+para el backlog honesto de dominios que faltan. `NXR-REQ-0087/0088/0089/0091`
+(Workflow engine/Approval Inbox/SoD/Notifications) siguen `NOT_STARTED`,
+son responsabilidad de tasks posteriores del mismo plan.
 
 ## CORE
 
@@ -62,12 +69,12 @@ CONSTRUCTION CONTROL completo (`NXR-REQ-0077-0086`) está ahora
 | NXR-REQ-0015 | Posting engine (PostingRule/PostingService) | ✅·✅·✅·➖·➖·➖·➖·✅·➖ | IMPLEMENTED | `posting_service.post_manual`/`reverse_document`, `PostingRule` (modelo, sin resolver automático todavía — ver docs/ACCOUNTING.md); valida centralmente que Project, cuentas y dimensiones pertenezcan a la company |
 | NXR-REQ-0016 | Financial statements (TB, GL, BS, P&L, Cash Flow) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track G (Reporting), sobre los datos que ya deja el GL de este track |
 | NXR-REQ-0017 | Treasury (accounts, position) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: cuentas BANK/CASH/OTHER, posición derivada del GL, API y pantalla reales; ownership por company y relación TreasuryAccount↔GL uno-a-uno |
-| NXR-REQ-0018 | Remittances (scope=CENTRAL) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: remesa CENTRAL cash-in, posting atómico e idempotente y formulario Treasury |
+| NXR-REQ-0018 | Remittances (scope=CENTRAL) | ✅·✅·✅·✅·✅·✅·✅·✅·⬜ | IMPLEMENTED | Track A: remesa CENTRAL cash-in, posting atómico e idempotente y formulario Treasury. Track G (task-1): `treasury.remittance.create` audit log real (única mutación de esta entidad, ver `docs/AUDIT.md`) |
 | NXR-REQ-0019 | Transfers (bank/cash) | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: transferencia entre activos de Treasury, sin Revenue/Expense, idempotente; FX entre cuentas diferido explícitamente |
-| NXR-REQ-0020 | Cash (closing, position) | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: cierre de caja DRAFT→APPROVED con ajuste atómico/idempotente; sin pantalla específica de cierres |
+| NXR-REQ-0020 | Cash (closing, position) | ✅·✅·✅·✅·⬜·✅·🔶·✅·⬜ | IMPLEMENTED | Track A: cierre de caja DRAFT→APPROVED con ajuste atómico/idempotente; sin pantalla específica de cierres. Track G (task-1): `treasury.cash_closing.approve` audit log real; `create_cash_closing` todavía sin instrumentar (ver `docs/AUDIT.md`) |
 | NXR-REQ-0021 | Bank reconciliation | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: statement/lines append-only, matches acumulativos con `FOR UPDATE`; valida company, GL, signo, capacidad/asignación del documento y transiciones; sin UI específica |
 | NXR-REQ-0022 | Fund restrictions | ✅·✅·✅·✅·⬜·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: restricción etiqueta uso sin transferir propiedad del efectivo al Project; validación company/project |
-| NXR-REQ-0023 | Accounts Payable | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A: invoices/accrual/aprobación/pagos parciales, GET persistido por company, UI y pagos idempotentes |
+| NXR-REQ-0023 | Accounts Payable | ✅·✅·✅·✅·✅·✅·🔶·✅·⬜ | IMPLEMENTED | Track A: invoices/accrual/aprobación/pagos parciales, GET persistido por company, UI y pagos idempotentes. Track G (task-1): `ap.supplier_invoice.approve` + `ap.supplier_payment.create` audit log real; create/cancel de factura todavía sin instrumentar (ver `docs/AUDIT.md`) |
 | NXR-REQ-0024 | Accounts Receivable | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Track A retiene AR como Financial Core: invoices/receipts, GET persistido, UI e idempotencia. `CustomerInvoice.customer_id` es ahora FK real a `Customer` (Track E, antes texto libre) — Track E posee el workflow comercial y llama `ar_service.create_customer_invoice` directo, nunca duplica receivables (ver NXR-REQ-0066) |
 | NXR-REQ-0025 | Corrections (posted docs) | 🔶·✅·✅·➖·➖·➖·⬜·✅·➖ | IN_PROGRESS | Mecanismo de reversal cubre el caso general (INV-ACC-002); falta un flujo de "correction" distinto al reversal simple si algún dominio lo necesita — dueño: track que lo requiera |
 | NXR-REQ-0026 | Annulments (reversal, no delete) | ✅·✅·✅·✅·⬜·➖·⬜·✅·⬜ | IMPLEMENTED | `posting_service.reverse_document`, endpoint `POST /api/accounting/journal-entries/{id}/reverse`, documento tipo `ANU`; falta UI |
@@ -99,7 +106,7 @@ CONSTRUCTION CONTROL completo (`NXR-REQ-0077-0086`) está ahora
 | NXR-REQ-0042 | RFQ | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `RequestForQuotation`+`RfqSupplier` (multi-supplier), numeración `RFQ-YYYY-NNNNNN`; sin pantalla dedicada (backend-only, como se acordó en el alcance) |
 | NXR-REQ-0043 | Supplier Quotations | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `SupplierQuotation`+líneas, `quotation_total()`; sin pantalla dedicada |
 | NXR-REQ-0044 | Bid Comparison | 🔶·➖·✅·✅·⬜·⬜·⬜·⬜·⬜ | IN_PROGRESS | `quotation_total()` por cotización permite comparar manualmente; no hay endpoint agregado de comparación ni pantalla — ver `docs/PROCUREMENT.md` pendiente |
-| NXR-REQ-0045 | Purchase Order | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Lifecycle completo `DRAFT→APPROVED→SENT→PARTIALLY_RECEIVED/RECEIVED`; PO de proyecto rechaza moneda no funcional (`NXR-PROCUREMENT-002`); UI, numeración y tests reales |
+| NXR-REQ-0045 | Purchase Order | ✅·✅·✅·✅·✅·⬜·🔶·✅·⬜ | IMPLEMENTED | Lifecycle completo `DRAFT→APPROVED→SENT→PARTIALLY_RECEIVED/RECEIVED`; PO de proyecto rechaza moneda no funcional (`NXR-PROCUREMENT-002`); UI, numeración y tests reales. Track G (task-1): `procurement.purchase_order.approve` audit log real; create/send todavía sin instrumentar (ver `docs/AUDIT.md`) |
 | NXR-REQ-0046 | Goods Receipt | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Recepción parcial y completa, actualiza `quantity_received` + status de PO + Stock Ledger real, `GoodsReceiptsPage`, test de sobre-recepción rechazada |
 | NXR-REQ-0047 | Service Entry | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `ServiceEntry` con período/avance/valor aceptado, numeración `SEN-YYYY-NNNNNN`; sin pantalla dedicada (no estaba en el alcance de frontend acordado) |
 | NXR-REQ-0048 | Three-Way Match | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `run_three_way_match` (INV-PROC-001): diferencias fuera de tolerancia nunca se descartan, siempre quedan en `exceptions`; test MATCHED y EXCEPTION reales |
@@ -174,7 +181,7 @@ CONSTRUCTION CONTROL completo (`NXR-REQ-0077-0086`) está ahora
 | NXR-REQ-0087 | Workflow engine central | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0088 | Approval Inbox | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0089 | Segregation of Duties | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0090 | Audit (append-only) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0090 | Audit (append-only) | ✅·✅·✅·✅·✅·✅·➖·✅·⬜ | IMPLEMENTED | Track G (task-1): `AuditLog` real (`app/models/audit.py`), append-only (nunca UPDATE/DELETE), migración `e91bb3d86df2` sobre head real `04d3e460a8a7`; `audit_service.record(...)` invocado explícitamente desde la capa de ruta (nunca hook oculto de ORM, nunca cambio de firma de servicio existente); `GET /api/audit` con aislamiento de company real (`assert_company_access`, test cruzado con rol `Finance Manager` porque `Auditor` ya es `SCOPE_ANY`); permiso `audit.log`/`read`; `AuditLogPage.tsx` real en `/control/auditoria` (entrada de nav ya reservada, no se inventó sección nueva). Instrumentado por ahora: AP approve+pay, Treasury cash-closing approve + remittance create, Procurement PO approve (5 rutas, ver `docs/AUDIT.md`) — el resto de dominios (Project Control, Enterprise Resources, Commercial, Construction Control, y el resto de Financial Core) sigue sin instrumentar, backlog honesto en `docs/AUDIT.md`; falta E2E |
 | NXR-REQ-0091 | Notifications | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0092 | Global Search (Cmd/Ctrl+K) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
 | NXR-REQ-0093 | Reporting (por dominio) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |

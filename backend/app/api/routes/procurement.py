@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.repositories import procurement_repository
 from app.schemas.procurement import (
     GoodsReceiptCreateRequest,
@@ -25,7 +26,7 @@ from app.schemas.procurement import (
     ThreeWayMatchRequest,
     ThreeWayMatchResponse,
 )
-from app.services import procurement_service
+from app.services import audit_service, procurement_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/procurement", tags=["procurement"])
@@ -247,6 +248,7 @@ def approve_purchase_order(
     po_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.purchase_order", "approve")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     order = procurement_repository.get_purchase_order(db, po_id)
     if order is None:
@@ -260,7 +262,21 @@ def approve_purchase_order(
         action="approve",
         company_id=order.company_id,
     )
+    before_status = order.status
     order = procurement_service.approve_purchase_order(db, purchase_order_id=po_id)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.purchase_order.approve",
+        entity_type="procurement.purchase_order",
+        entity_id=order.id,
+        company_id=order.company_id,
+        project_id=order.project_id,
+        before={"status": before_status},
+        after={"status": order.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _purchase_order_response(db, order)
 
 

@@ -1044,3 +1044,69 @@ CONSTRUCTION CONTROL (`NXR-REQ-0077`-`0086`) y el frontend de Workforce/
 Time (`NXR-REQ-0073/0075/0076`) están ahora `IMPLEMENTED`. Próximo:
 continuar con el roadmap de `docs/MASTER_PLAN.md` (Track G — Workflow/
 Approvals/Audit/Notifications, luego Reports/Search/Analytics).
+
+## Track G, Task 1 — Audit trail foundation (`NXR-REQ-0090`)
+
+Resuelve `DEFERRED-FINAL-014` (no existía ningún mecanismo de audit log en
+el sistema). Construido en `track/g-workflow-audit`, worktree
+`nexora-group-trackG`, rama nueva desde el head de
+`feat/nexora-greenfield` (`bb1fe85`).
+
+`AuditLog` real (`app/models/audit.py`), tabla `audit_logs`, append-only
+por diseño (ningún servicio/ruta nuevo hace `UPDATE`/`DELETE` sobre una
+fila ya insertada). Migración `e91bb3d86df2` (`down_revision` = head real
+verificado con `alembic heads` antes de generar, `04d3e460a8a7`), solo
+crea `audit_logs`, sin drift de otras tablas. `audit_service.record(...)`
+y `audit_repository` siguiendo el patrón exacto del brief.
+`app/api/deps_correlation.py` (`get_correlation_id`, header
+`X-Correlation-Id` o `uuid4()` nuevo por request) — reutilizable por
+Task 2/3 del mismo plan. `GET /api/audit` con `assert_company_access` real
+(`INV-COMP-001`), permiso `audit.log`/`read` (`Administrator`/`Auditor`
+`SCOPE_ANY`, `Finance Manager` `SCOPE_OWN`).
+
+**Ruling del plan respetada al pie de la letra**: cero cambios de firma en
+funciones de servicio existentes (`ap_service.approve_supplier_invoice`,
+`treasury_service.approve_cash_closing`,
+`procurement_service.approve_purchase_order` quedaron intactas); el audit
+call vive siempre en la capa de ruta, justo después de la llamada de
+servicio que ya tenía éxito, mismo patrón que `assert_company_access`.
+
+Instrumentado (5 rutas reales, TDD RED/GREEN en cada una — ver
+`docs/AUDIT.md` para la tabla completa): `ap.py:approve_supplier_invoice`,
+`ap.py:pay_supplier_invoice`, `treasury.py:approve_cash_closing`,
+`treasury.py:create_remittance`, `procurement.py:approve_purchase_order`.
+
+**Desviación deliberada respecto al brief original, verificada contra el
+código real**: el brief mencionaba una ruta "remittance-approval" en
+Treasury — no existe (`Remittance` no tiene columna `status` ni ningún
+paso posterior a su creación, verificado en `app/models/treasury.py` y
+`app/api/routes/treasury.py`). Se instrumentó `create_remittance` en su
+lugar, que es la única mutación real de esa entidad — documentado
+explícitamente en `docs/AUDIT.md` para que no se lea como un olvido.
+
+El resto de dominios (Project Control, Enterprise Resources, Commercial,
+Construction Control, y el resto de Financial Core — creación de facturas
+AP, transfers, general expenses, fund restrictions, bank reconciliation)
+sigue sin instrumentar — backlog honesto documentado en `docs/AUDIT.md`,
+no implicado como hecho.
+
+Frontend: `AuditLogPage.tsx` real en `/control/auditoria` — la entrada de
+navegación "Auditoría" ya existía reservada en `navigation.ts` bajo
+"Control" (no se inventó una sección "Plataforma" nueva, a diferencia de
+lo que el brief original sugería sin haber verificado el archivo real
+primero). Filtro por tipo de entidad (texto libre) y rango de fechas
+(client-side). `auditService.ts`/`types/audit.ts` siguiendo el patrón real
+de `documentService.ts` (objeto con métodos, no funciones sueltas
+exportadas — el brief tenía un ejemplo distinto, se siguió la convención
+real del repo).
+
+Verificación: backend 182/182 pytest (175 previos + 7 nuevos: 2 en
+`test_audit.py`, 2 en `test_ap_ar.py`, 2 en `test_treasury_operations.py`,
+1 en `test_procurement_flow.py`), `compileall` limpio, un único head de
+Alembic. Frontend: typecheck limpio, `eslint .` limpio, 57/57 vitest (55
+previos + 2 nuevos), `npm run build` OK (857 módulos, mismo warning
+preexistente de chunk >500kB).
+
+Rama `track/g-workflow-audit` preparada e integration-ready, no fusionada
+a `feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
+coordinador (mismo patrón que todos los tracks anteriores).

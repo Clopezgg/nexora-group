@@ -1,4 +1,9 @@
+import uuid
+
+from sqlalchemy import select
+
 from app.models.accounting import AccountingDocument
+from app.models.audit import AuditLog
 from app.models.treasury import GeneralExpense, ReconciliationMatch
 from app.models.permission import UserCompanyAccess
 from tests.helpers import (
@@ -465,3 +470,75 @@ def test_reconciliation_rejects_excluding_a_line_with_match_history(client, db_s
     assert response.status_code == 422, response.text
     assert db_session.query(ReconciliationMatch).count() == 1
     assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_approving_cash_closing_creates_audit_log_entry(client, db_session):
+    login_admin(client)
+    company, cash, diff_account, _contributions, _funding_doc = _setup(client)
+    closing = client.post(
+        "/api/treasury/cash-closings",
+        json={
+            "treasuryAccountId": cash["id"],
+            "closingDate": "2026-01-31",
+            "openingAmount": "1000.00",
+            "expectedAmount": "1000.00",
+            "countedAmount": "980.00",
+        },
+    ).json()
+
+    approved = client.post(
+        f"/api/treasury/cash-closings/{closing['id']}/approve?companyId={company['id']}",
+        json={"differenceAccountId": diff_account["id"]},
+    )
+    assert approved.status_code == 200, approved.text
+
+    rows = db_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "treasury.cash_closing",
+            AuditLog.entity_id == uuid.UUID(closing["id"]),
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].action == "treasury.cash_closing.approve"
+    assert rows[0].after["status"] == "APPROVED"
+
+
+def test_registering_remittance_creates_audit_log_entry(client, db_session):
+    """Remittances have no separate approval step in this codebase (no
+    status field, verified against app/models/treasury.py) -- so the
+    auditable mutation for this entity is its creation, not an
+    "approval" route that does not exist. See docs/AUDIT.md."""
+    login_admin(client)
+    company = create_company(client)
+    cash_gl = create_account(
+        client, company_id=company["id"], code="1110", name="Caja", account_type="ASSET"
+    )
+    contributions = create_account(
+        client, company_id=company["id"], code="3100", name="Aportes", account_type="EQUITY"
+    )
+    cash = create_treasury_account(
+        client, company_id=company["id"], gl_account_id=cash_gl["id"], name="Caja Central", kind="CASH"
+    )
+
+    remittance = client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": cash["id"],
+            "counterAccountId": contributions["id"],
+            "sender": "Fondeo inicial",
+            "currencyCode": "HNL",
+            "originalAmount": "500.00",
+            "remittanceDate": "2026-01-01",
+        },
+    ).json()
+
+    rows = db_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "treasury.remittance",
+            AuditLog.entity_id == uuid.UUID(remittance["id"]),
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].action == "treasury.remittance.create"
+    assert rows[0].after["baseAmount"] == "500.00"

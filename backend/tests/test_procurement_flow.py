@@ -1,3 +1,8 @@
+import uuid
+
+from sqlalchemy import select
+
+from app.models.audit import AuditLog
 from tests.helpers import create_account, create_company, login_admin
 
 
@@ -232,3 +237,35 @@ def test_service_entry_records_progress(client):
     )
     assert entry.status_code == 201, entry.text
     assert entry.json()["entryNumber"].startswith("SEN-")
+
+
+def test_approving_purchase_order_creates_audit_log_entry(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    supplier = _create_supplier(client, company_id=company["id"])
+    item = _create_item(client, company_id=company["id"])
+
+    order = client.post(
+        "/api/procurement/purchase-orders",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "currencyCode": "HNL",
+            "lines": [
+                {"itemId": item["id"], "description": "Cemento tipo I", "quantity": "10.0000", "unitPrice": "10.0000"}
+            ],
+        },
+    ).json()
+
+    approved = client.post(f"/api/procurement/purchase-orders/{order['id']}/approve")
+    assert approved.status_code == 200, approved.text
+
+    rows = db_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "procurement.purchase_order",
+            AuditLog.entity_id == uuid.UUID(order["id"]),
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].action == "procurement.purchase_order.approve"
+    assert rows[0].after["status"] == "APPROVED"

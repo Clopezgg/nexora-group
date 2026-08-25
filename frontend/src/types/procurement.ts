@@ -10,6 +10,23 @@ export interface Supplier {
   classification: string | null
 }
 
+export interface SupplierContract {
+  id: string
+  companyId: string
+  supplierId: string
+  projectId: string | null
+  contractNumber: string
+  scopeDescription: string | null
+  value: string
+  currencyCode: string
+  startDate: string
+  endDate: string | null
+  advancePercentage: string
+  retentionPercentage: string
+  paymentTerms: string | null
+  status: string
+}
+
 export interface RequisitionLine {
   id: string
   itemId: string | null

@@ -1,11 +1,31 @@
 import { apiFetch } from './httpClient'
-import type { GoodsReceipt, PurchaseOrder, Requisition, Supplier } from '../types/procurement'
+import type { GoodsReceipt, PurchaseOrder, Requisition, Supplier, SupplierContract } from '../types/procurement'
 
 export const procurementService = {
   listSuppliers: (companyId: string) =>
     apiFetch<Supplier[]>(`/procurement/suppliers?company_id=${companyId}`),
   createSupplier: (payload: { companyId: string; legalName: string; tradeName?: string; taxId?: string }) =>
     apiFetch<Supplier>('/procurement/suppliers', { method: 'POST', body: JSON.stringify(payload) }),
+
+  listContracts: (companyId: string) =>
+    apiFetch<SupplierContract[]>(`/procurement/suppliers/contracts?company_id=${companyId}`),
+  createContract: (payload: {
+    companyId: string
+    supplierId: string
+    projectId?: string
+    contractNumber: string
+    value: string
+    currencyCode: string
+    startDate: string
+    endDate?: string
+    advancePercentage?: string
+    retentionPercentage?: string
+    scopeDescription?: string
+  }) =>
+    apiFetch<SupplierContract>('/procurement/suppliers/contracts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   listRequisitions: (companyId: string) =>
     apiFetch<Requisition[]>(`/procurement/requisitions?company_id=${companyId}`),

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -11,7 +11,12 @@ from app.schemas.master_data import (
     CompanyCreateRequest,
     CompanyResponse,
 )
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    assert_company_access,
+    list_user_company_ids,
+    require_permission,
+    user_has_any_company_scope,
+)
 
 router = APIRouter(prefix="/master-data", tags=["master-data"])
 
@@ -19,9 +24,12 @@ router = APIRouter(prefix="/master-data", tags=["master-data"])
 @router.get("/companies", response_model=list[CompanyResponse])
 def list_companies(
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("core.company", "read")),
+    user=Depends(require_permission("core.company", "read")),
 ) -> list[CompanyResponse]:
-    companies = company_repository.list_companies(db)
+    company_ids = None
+    if not user_has_any_company_scope(db, user_id=user.id, resource="core.company", action="read"):
+        company_ids = list_user_company_ids(db, user_id=user.id)
+    companies = company_repository.list_companies(db, company_ids=company_ids)
     return [CompanyResponse.model_validate(company, from_attributes=True) for company in companies]
 
 
@@ -47,7 +55,7 @@ def create_company(
 
 @router.get("/accounts", response_model=list[AccountResponse])
 def list_accounts(
-    company_id: uuid.UUID,
+    company_id: uuid.UUID = Query(alias="companyId"),
     db: Session = Depends(get_db),
     user=Depends(require_permission("accounting.account", "read")),
 ) -> list[AccountResponse]:

@@ -5,7 +5,10 @@
 - `Budget.version = BASELINE`: se crea **una sola vez** por proyecto
   (`budget_service.create_baseline`, rechaza un segundo intento con
   `BudgetBaselineExistsError` / `NXR-BUDGET-001`). Sus `BudgetLine` nunca se
-  editan ni eliminan.
+  editan ni eliminan. Hasta que exista una política FX autoritativa, su
+  `currency_code` debe coincidir con `Company.functional_currency_code`; se
+  rechaza antes de persistir con `NXR-BUDGET-002` si difiere o falta la
+  moneda funcional.
 - `Budget.version = REVISED`: se crea automáticamente cuando una
   `ChangeOrder` en estado `SUBMITTED` se aprueba
   (`budget_service.approve_change_order`). Copia las líneas del budget
@@ -26,23 +29,30 @@ no existe esa necesidad real, así que no se construyó especulativamente.
 | Métrica | Fuente real hoy | Fuente cuando aterricen los tracks dueños |
 |---|---|---|
 | `AUTHORIZED` | `SUM(BudgetLine.authorized_amount)` del budget activo | (ya es real) |
-| `COMMITTED` | `0` (stub honesto) | Track C (Procurement) — Purchase Orders aprobadas y no facturadas |
+| `COMMITTED` | Suma de Purchase Orders aprobadas del proyecto en la moneda funcional de su company (Track C) | (ya es real) |
 | `ACCRUED` | `0` (stub honesto) | Track A (AP) — Supplier Invoices no pagadas |
 | `PAID` | `0` (stub honesto) | Track A (AP) — pagos ejecutados |
 | `AVAILABLE` | `AUTHORIZED - COMMITTED - ACCRUED` | mismo cálculo, con datos reales |
 
-**Contrato para el coordinador al integrar Track A/C**: `budget_service.
-compute_summary` es el ÚNICO lugar que calcula estos números — cuando las
-tablas de AP/Procurement existan, sustituir las líneas marcadas
-`# Stubs honestos` por queries reales contra esas tablas, sin cambiar la
-forma de `BudgetSummary` (así ningún consumidor de la API se rompe).
+`budget_service.compute_summary` es el ÚNICO lugar que calcula estos
+números. Track C se integra mediante `procurement_repository.
+project_commitment_total(db, company_id, project_id)`; cuando aterrice
+AP/Track A, ACCRUED y PAID deben conectarse a sus fuentes reales sin cambiar
+la forma de `BudgetSummary`. Sin una política FX autoritativa, una PO de proyecto en una
+moneda distinta de `Company.functional_currency_code` se rechaza al aprobar
+y también durante la agregación defensiva, limitada al proyecto solicitado
+(`NXR-PROCUREMENT-002`); nunca se convierte, omite, resta como si fuera
+moneda funcional ni bloquea el summary de otro proyecto.
 
 ## Forecast (`GET /api/projects/{id}/forecast`)
 
 `BAC = AUTHORIZED`. `PV`/`EV` se derivan del `ProgressRecord` más reciente
 (`planned_percent`/`actual_percent` × BAC) — es una simplificación honesta
 porque todavía no existe un motor de scheduling con distribución de $ por
-fecha. `AC = ACCRUED + PAID` (0 hasta Track A). `CPI/SPI/ETC/EAC/VAC` son
+fecha. `AC` es el costo de emisiones de inventario posteadas al proyecto,
+obtenido de `inventory_repository.project_actuals_by_project`; no se
+reclasifica ese consumo como `ACCRUED`, `PAID` ni efectivo.
+`CPI/SPI/ETC/EAC/VAC` son
 `None` cuando no son calculables (p.ej. sin `ProgressRecord`, o `AC=0` para
 `CPI`) — **nunca 0 falso ni valor inventado**, ver orden maestra §42 y
 `tests/test_project_control.py::test_forecast_without_progress_returns_none_not_fake_values`.

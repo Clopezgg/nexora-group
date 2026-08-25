@@ -1,3 +1,6 @@
+from app.models.accounting import AccountingDocument
+from app.models.cost_center import CostCenter
+from app.models.project import Project
 from tests.helpers import create_account, create_company, login_admin
 
 
@@ -10,6 +13,16 @@ def _setup_company_and_accounts(client):
         client, company_id=company["id"], code="2000", name="Cuentas por pagar", account_type="LIABILITY"
     )
     return company, debit_account, credit_account
+
+
+def _assert_financial_reference_rejected(client, db_session, payload):
+    documents_before = db_session.query(AccountingDocument).count()
+
+    response = client.post("/api/accounting/journal-entries", json=payload)
+
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+    assert db_session.query(AccountingDocument).count() == documents_before
 
 
 def test_balanced_journal_entry_is_posted_and_numbered(client):
@@ -167,3 +180,110 @@ def test_reverse_of_already_reversed_document_is_rejected(client):
     )
     assert second_reverse.status_code == 409
     assert second_reverse.json()["error"]["code"] == "NXR-ACCOUNTING-004"
+
+
+def test_journal_rejects_document_project_from_another_company(client, db_session):
+    login_admin(client)
+    company_a, debit_a, credit_a = _setup_company_and_accounts(client)
+    company_b = create_company(client, name="Foreign project company")
+    project_b = Project(company_id=company_b["id"], name="Foreign project")
+    db_session.add(project_b)
+    db_session.commit()
+
+    _assert_financial_reference_rejected(
+        client,
+        db_session,
+        {
+            "companyId": company_a["id"],
+            "scope": "PROJECT",
+            "projectId": str(project_b.id),
+            "currencyCode": "HNL",
+            "lines": [
+                {"accountId": debit_a["id"], "debitAmount": "10.00"},
+                {"accountId": credit_a["id"], "creditAmount": "10.00"},
+            ],
+        },
+    )
+
+
+def test_journal_rejects_line_account_from_another_company(client, db_session):
+    login_admin(client)
+    company_a, _debit_a, credit_a = _setup_company_and_accounts(client)
+    company_b = create_company(client, name="Foreign account company")
+    debit_b = create_account(
+        client,
+        company_id=company_b["id"],
+        code="1000",
+        name="Foreign cash",
+        account_type="ASSET",
+    )
+
+    _assert_financial_reference_rejected(
+        client,
+        db_session,
+        {
+            "companyId": company_a["id"],
+            "scope": "GENERAL",
+            "currencyCode": "HNL",
+            "lines": [
+                {"accountId": debit_b["id"], "debitAmount": "10.00"},
+                {"accountId": credit_a["id"], "creditAmount": "10.00"},
+            ],
+        },
+    )
+
+
+def test_journal_rejects_line_project_from_another_company(client, db_session):
+    login_admin(client)
+    company_a, debit_a, credit_a = _setup_company_and_accounts(client)
+    company_b = create_company(client, name="Foreign line project company")
+    project_b = Project(company_id=company_b["id"], name="Foreign line project")
+    db_session.add(project_b)
+    db_session.commit()
+
+    _assert_financial_reference_rejected(
+        client,
+        db_session,
+        {
+            "companyId": company_a["id"],
+            "scope": "GENERAL",
+            "currencyCode": "HNL",
+            "lines": [
+                {
+                    "accountId": debit_a["id"],
+                    "debitAmount": "10.00",
+                    "projectId": str(project_b.id),
+                },
+                {"accountId": credit_a["id"], "creditAmount": "10.00"},
+            ],
+        },
+    )
+
+
+def test_journal_rejects_line_cost_center_from_another_company(client, db_session):
+    login_admin(client)
+    company_a, debit_a, credit_a = _setup_company_and_accounts(client)
+    company_b = create_company(client, name="Foreign cost center company")
+    cost_center_b = CostCenter(
+        company_id=company_b["id"], code="FOREIGN", name="Foreign cost center"
+    )
+    db_session.add(cost_center_b)
+    db_session.commit()
+
+    _assert_financial_reference_rejected(
+        client,
+        db_session,
+        {
+            "companyId": company_a["id"],
+            "scope": "GENERAL",
+            "currencyCode": "HNL",
+            "lines": [
+                {
+                    "accountId": debit_a["id"],
+                    "debitAmount": "10.00",
+                    "costCenterId": str(cost_center_b.id),
+                },
+                {"accountId": credit_a["id"], "creditAmount": "10.00"},
+            ],
+        },
+    )

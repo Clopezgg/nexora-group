@@ -76,6 +76,15 @@ class StockTransferRequest(CamelModel):
     quantity: Decimal
 
 
+class StockReturnToSupplierRequest(CamelModel):
+    company_id: uuid.UUID
+    item_id: uuid.UUID
+    warehouse_id: uuid.UUID
+    supplier_id: uuid.UUID
+    quantity: Decimal
+    notes: str | None = None
+
+
 class StockLedgerEntryResponse(CamelModel):
     id: uuid.UUID
     item_id: uuid.UUID
@@ -86,6 +95,9 @@ class StockLedgerEntryResponse(CamelModel):
     resulting_qty_on_hand: Decimal
     resulting_avg_cost: Decimal
     project_id: uuid.UUID | None
+    source_type: str | None
+    source_id: uuid.UUID | None
+    notes: str | None
 
 
 class PhysicalCountLineRequest(CamelModel):

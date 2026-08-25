@@ -16,11 +16,13 @@ from app.schemas.inventory import (
     StockLedgerEntryResponse,
     StockPositionResponse,
     StockReceiveRequest,
+    StockReturnToSupplierRequest,
     StockTransferRequest,
     WarehouseCreateRequest,
     WarehouseResponse,
 )
 from app.services import inventory_service
+from app.services.financial_validation_service import assert_supplier_belongs_to_company
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -231,6 +233,36 @@ def transfer_stock(
         StockLedgerEntryResponse.model_validate(outgoing, from_attributes=True),
         StockLedgerEntryResponse.model_validate(incoming, from_attributes=True),
     ]
+
+
+@router.post("/stock/return-to-supplier", response_model=StockLedgerEntryResponse, status_code=201)
+def return_to_supplier(
+    payload: StockReturnToSupplierRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("inventory.stock", "move")),
+):
+    assert_company_access(
+        db, user_id=user.id, resource="inventory.stock", action="move", company_id=payload.company_id
+    )
+    _assert_stock_resources_belong_to_company(
+        db,
+        company_id=payload.company_id,
+        item_id=payload.item_id,
+        warehouse_ids=(payload.warehouse_id,),
+    )
+    assert_supplier_belongs_to_company(
+        db, supplier_id=payload.supplier_id, company_id=payload.company_id
+    )
+    entry = inventory_service.return_to_supplier(
+        db,
+        company_id=payload.company_id,
+        item_id=payload.item_id,
+        warehouse_id=payload.warehouse_id,
+        supplier_id=payload.supplier_id,
+        quantity=payload.quantity,
+        notes=payload.notes,
+    )
+    return StockLedgerEntryResponse.model_validate(entry, from_attributes=True)
 
 
 @router.post("/physical-counts", response_model=PhysicalCountResponse, status_code=201)

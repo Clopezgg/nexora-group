@@ -8,7 +8,7 @@ from app.models.inventory import StockLedgerEntry
 from app.models.permission import UserCompanyAccess
 from app.repositories import inventory_repository
 from app.services import inventory_service
-from tests.helpers import create_company, create_user_with_role, login_admin, login_as
+from tests.helpers import create_company, create_supplier, create_user_with_role, login_admin, login_as
 
 
 def _setup(client):
@@ -366,3 +366,93 @@ def test_physical_count_creates_adjustment_for_variance(client):
         "/api/inventory/stock/position", params={"item_id": item["id"], "warehouse_id": warehouse["id"]}
     ).json()
     assert float(position["quantityOnHand"]) == 47.0
+
+
+def test_return_to_supplier_reduces_stock_and_tags_the_supplier(client):
+    """NXR-REQ-0054: RETURN existía como movement_type sin service function
+    ni endpoint (docs/INVENTORY.md deuda intencional)."""
+    login_admin(client)
+    company, item, warehouse = _setup(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    client.post(
+        "/api/inventory/stock/receive",
+        json={"companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
+              "quantity": "100.0000", "unitCost": "10.0000"},
+    )
+
+    returned = client.post(
+        "/api/inventory/stock/return-to-supplier",
+        json={
+            "companyId": company["id"],
+            "itemId": item["id"],
+            "warehouseId": warehouse["id"],
+            "supplierId": supplier["id"],
+            "quantity": "15.0000",
+            "notes": "Material defectuoso",
+        },
+    )
+
+    assert returned.status_code == 201, returned.text
+    body = returned.json()
+    assert body["movementType"] == "RETURN"
+    assert float(body["resultingQtyOnHand"]) == 85.0
+    assert float(body["unitCost"]) == 10.0
+    assert body["sourceType"] == "supplier_return"
+    assert body["sourceId"] == supplier["id"]
+    assert body["notes"] == "Material defectuoso"
+
+    position = client.get(
+        "/api/inventory/stock/position", params={"item_id": item["id"], "warehouse_id": warehouse["id"]}
+    ).json()
+    assert float(position["quantityOnHand"]) == 85.0
+
+
+def test_return_to_supplier_more_than_available_is_rejected(client):
+    login_admin(client)
+    company, item, warehouse = _setup(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    client.post(
+        "/api/inventory/stock/receive",
+        json={"companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
+              "quantity": "10.0000", "unitCost": "5.0000"},
+    )
+
+    response = client.post(
+        "/api/inventory/stock/return-to-supplier",
+        json={
+            "companyId": company["id"],
+            "itemId": item["id"],
+            "warehouseId": warehouse["id"],
+            "supplierId": supplier["id"],
+            "quantity": "999.0000",
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "NXR-INVENTORY-001"
+
+
+def test_return_to_supplier_rejects_a_supplier_from_another_company(client, db_session):
+    login_admin(client)
+    company, item, warehouse = _setup(client)
+    company_b = create_company(client, name="Devoluciones B")
+    foreign_supplier = create_supplier(client, company_id=company_b["id"], legal_name="Proveedor ajeno")
+    client.post(
+        "/api/inventory/stock/receive",
+        json={"companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
+              "quantity": "10.0000", "unitCost": "5.0000"},
+    )
+
+    response = client.post(
+        "/api/inventory/stock/return-to-supplier",
+        json={
+            "companyId": company["id"],
+            "itemId": item["id"],
+            "warehouseId": warehouse["id"],
+            "supplierId": foreign_supplier["id"],
+            "quantity": "1.0000",
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"

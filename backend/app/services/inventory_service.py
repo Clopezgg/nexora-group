@@ -157,6 +157,39 @@ def issue_to_project(
     return entry
 
 
+def return_to_supplier(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    item_id: uuid.UUID,
+    warehouse_id: uuid.UUID,
+    supplier_id: uuid.UUID,
+    quantity: Decimal,
+    notes: str | None = None,
+) -> StockLedgerEntry:
+    """RETURN (devolución a proveedor, docs/INVENTORY.md deuda intencional
+    ahora resuelta): reduce stock exactamente igual que un ISSUE -- mismo
+    costo promedio vigente, mismo guard INV-INV-001 de stock insuficiente
+    -- pero con su propio `movement_type` y `source_type="supplier_return"`
+    apuntando al proveedor, para que nunca se confunda con un consumo real
+    de proyecto en el ledger."""
+    entry = _issue(
+        db,
+        company_id=company_id,
+        item_id=item_id,
+        warehouse_id=warehouse_id,
+        quantity=quantity,
+        movement_type="RETURN",
+        project_id=None,
+        source_type="supplier_return",
+        source_id=supplier_id,
+        notes=notes,
+    )
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
 def transfer_stock(
     db: Session,
     *,

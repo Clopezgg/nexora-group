@@ -1313,3 +1313,37 @@ vencidas — ninguno de los dos se tocó en este task.
 Rama `track/g-workflow-audit` preparada e integration-ready con Task 1 +
 Task 2 + Task 3, no fusionada a `feat/nexora-greenfield` todavía —
 pendiente de revisión/merge por el coordinador.
+
+## Tasks 1-3 revisadas y fusionadas; Task 4 — verificación combinada
+
+Task 1 (Audit): review clean, fusionada como `ba7fa01`. Task 2
+(Approval Inbox + SoD): review con 2 findings Important — uno corregido
+en un fix round (`decision` sin validar, ahora `Literal` + whitelist en
+ambas capas), uno adjudicado y aparcado por el coordinador (decide() no
+atómico con el audit write — el único fix limpio violaría la restricción
+del propio plan de no tocar firmas de servicios existentes; el mismo gap
+ya existía sin marcar en las 5 rutas de Task 1) — fusionada como
+`76dbae1`. Task 3 (Notifications): review clean, con un gap real mismo
+identificado (`approval_service.create_request` sin ningún llamador de
+producción todavía — Task 2 nunca lo conecta desde AP/Submittal, así que
+la notificación "assigned_to al crear" es arquitectónicamente correcta
+pero código muerto hoy; documentado como `DEFERRED-FINAL-016`, no
+defecto de Task 3) — fusionada como `0830c07`.
+
+Con las tres tareas fusionadas, Task 4 (verificación del sistema
+combinado): topología de git limpia, un único head de Alembic
+(`234785d5331f`), `alembic upgrade head` limpio de cero en base
+descartable (cadena completa de 15 revisiones), backend 195/195 pytest,
+`compileall` limpio, frontend typecheck/lint limpios, 61/61 vitest,
+build OK. Recontadas las 124 filas de `docs/REQUIREMENTS_TRACEABILITY.md`
+línea por línea: 0 VERIFIED + 86 IMPLEMENTED (+5 sobre el corte anterior:
+NXR-REQ-0087/0088/0089/0090/0091) + 21 IN_PROGRESS + 15 NOT_STARTED + 2
+BLOCKED_EXTERNAL = 124, coincide exactamente con la tabla.
+
+Plan `2026-08-25-track-g-workflow-audit` completo. Bloque PLATFORM
+parcialmente `IMPLEMENTED` (Workflow/Approvals/SoD/Audit/Notifications);
+sigue `NOT_STARTED` Global Search, Reporting, Export, Settings,
+Integration architecture (`NXR-REQ-0092`-`0096`, Prioridad 4 del
+usuario). `DEFERRED-FINAL-014` (audit log) parcialmente resuelto,
+`DEFERRED-FINAL-016` nuevo (`create_request` sin llamador real). Próximo:
+continuar con Reports/Search/Analytics per `docs/MASTER_PLAN.md`.

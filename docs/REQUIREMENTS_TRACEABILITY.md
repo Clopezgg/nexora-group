@@ -258,40 +258,41 @@ reutilizaría cada uno.
 
 ## Resumen
 
-Recontado en Task 5 del plan `2026-08-25-track-d-construction-control`
-(Tasks 1-4 — Documents/Evidence, Workforce/Time UI, Daily Site Reports/
-Quality/Safety, RFI/Submittals — todas fusionadas a
-`feat/nexora-greenfield` @ `20445a5`), sobre la base de Track
-1+F+B+C+A+D+E ya integrados. Recontado línea por línea contra la tabla
-real (no contra el resumen anterior):
+Recontado en Task 4 del plan `2026-08-25-track-g-workflow-audit` (Tasks
+1-3 — Audit trail, Approval Inbox + Segregation of Duties,
+Notifications — todas fusionadas a `feat/nexora-greenfield` @ `d996b44`),
+sobre la base de Track 1+F+B+C+A+D+E + Construction Control ya
+integrados. Recontado línea por línea contra la tabla real:
 
 - **VERIFIED:** 0 / 124 (reservado para cuando el coordinador confirme
   comportamiento end-to-end en `feat/nexora-greenfield` — ningún track se
   autootorga `VERIFIED`)
-- **IMPLEMENTED:** 81 / 124 — los 69 previos (Track 1/A/F/B/B+C/C/D/E, ver
-  historial de este archivo) más 12 nuevos de este plan: Task 2 —
-  NXR-REQ-0073/0075/0076 (Employees/Time Entries/Labor Cost, ya
-  `IN_PROGRESS` con backend+API+tests; ahora con `WorkersPage`/
-  `TimeEntriesPage` reales, cierra `DEFERRED-FINAL-008`). Task 1 —
-  NXR-REQ-0077/0078/0079 (Documents/Document Versioning/Evidence,
-  `docs/DOCUMENTS_EVIDENCE.md`). Task 3 — NXR-REQ-0081/0082/0083/0084
-  (Daily Site Reports/Quality/Non-Conformance-Corrective-Action/Safety).
-  Task 4 — NXR-REQ-0085/0086 (RFI/Submittals).
+- **IMPLEMENTED:** 86 / 124 — los 81 previos (ver historial de este
+  archivo) más 5 nuevos de este plan: NXR-REQ-0087/0088/0089 (Workflow
+  engine — alcance de servicios cross-cutting, no motor de estados
+  genérico, ver la Ruling del spec —/Approval Inbox/Segregation of
+  Duties, Track G Task 2), NXR-REQ-0090 (Audit, Track G Task 1 — 5 rutas
+  instrumentadas, backlog honesto en `docs/AUDIT.md`), NXR-REQ-0091
+  (Notifications, Track G Task 3).
 - **IN_PROGRESS:** 21 / 124 — NXR-REQ-0001/0006/0008/0009/0025/0044/
   0059/0060/0105/0106/0107/0108/0110/0114/0115/0116/0117/0118/0119/0120/
   0121.
-- **NOT_STARTED:** 20 / 124 — NXR-REQ-0016/0034/0035/0054/0058/0074/
-  0087/0088/0089/0090/0091/0092/0093/0094/0095/0096/0109/0112/0113/0122.
-  0054 Returns y 0058 Supplier Performance (Track C) son deuda intencional
-  documentada en `docs/PROCUREMENT.md`/`docs/INVENTORY.md`. 0074 Crews no
-  se tocó en este plan (fuera de su alcance nombrado). El bloque PLATFORM
-  (0087-0096, Workflow engine/Approval Inbox/Audit/Notifications/Search/
-  Reporting) es la Prioridad 3-4 siguiente, todavía sin empezar — incluye
-  el gap de audit log system-wide ya documentado en `DEFERRED-FINAL-014`.
+- **NOT_STARTED:** 15 / 124 — NXR-REQ-0016/0034/0035/0054/0058/0074/
+  0092/0093/0094/0095/0096/0109/0112/0113/0122. 0054 Returns y 0058
+  Supplier Performance (Track C) son deuda intencional documentada en
+  `docs/PROCUREMENT.md`/`docs/INVENTORY.md`. 0074 Crews sigue fuera del
+  alcance de todos los planes ejecutados hasta ahora. NXR-REQ-0092
+  (Global Search), 0093 (Reporting), 0094 (Export), 0095 (Settings),
+  0096 (Integration architecture) son la Prioridad 4 siguiente del
+  usuario — el plan `track-g-workflow-audit` originalmente los rotuló
+  como "alertas financieras/de proyecto" por error; Task 3 corrigió esa
+  confusión contra la tabla real (ver ledger del plan) — no existen
+  filas de alerta financiera separadas, esas cinco son sus verdaderos
+  requisitos.
 - **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue
   real, no por incapacidad técnica)
 
-Suma verificada: 0+81+21+20+2 = 124.
+Suma verificada: 0+86+21+15+2 = 124.
 
 Este resumen se actualiza en cada integración de track. Ver progreso vivo
 en `docs/PROGRESS.md`. Recontado previamente en Task 7 (`2026-08-24-interrupted-tracks-recovery`,

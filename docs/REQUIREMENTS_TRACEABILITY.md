@@ -64,54 +64,54 @@ placeholder.
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0028 | Projects | 🔶·🔶·🔶·🔶·🔶·⬜·⬜·⬜·⬜ | IN_PROGRESS | tabla + CRUD mínimo del bootstrap, falta modelo completo (§37) |
-| NXR-REQ-0029 | WBS (jerárquico) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0030 | Planning (tasks/milestones/deps) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0031 | Budgets | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0032 | Budget versions (baseline/revised) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0033 | Commitments | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0034 | Accruals | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0035 | Payments (project attribution) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0036 | Forecast (BAC/PV/EV/AC/CPI/SPI/ETC/EAC/VAC) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0037 | Earned Value | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0038 | Change Orders | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0039 | Progress (ProgressRecord) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0028 | Projects | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Track B: modelo completo (§37), `GET/POST /api/projects`, `ProjectsPage` real (crea compañía/proyecto), test `test_project_has_no_money_column` (INV-TRE-002) |
+| NXR-REQ-0029 | WBS (jerárquico) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `WBSNode` con parent/level, `WBSPage` real, test de jerarquía 2 niveles |
+| NXR-REQ-0030 | Planning (tasks/milestones/deps) | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `Task`/`Milestone` + API; sin pantalla dedicada todavía (`/proyectos/planeacion` sigue en EmptyState del bootstrap) |
+| NXR-REQ-0031 | Budgets | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `Budget`/`BudgetLine`, `budget_service.compute_summary`, `BudgetPage` con AUTHORIZED/COMMITTED/ACCRUED/PAID/AVAILABLE reales |
+| NXR-REQ-0032 | Budget versions (baseline/revised) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | BASELINE inmutable (`NXR-BUDGET-001` si se repite) y obligado a moneda funcional (`NXR-BUDGET-002` antes de persistir); REVISED generado por ChangeOrder aprobada, historial preservado |
+| NXR-REQ-0033 | Commitments | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Track C integrado: POs aprobadas en moneda funcional alimentan el summary del proyecto solicitado; draft, moneda incompatible y aislamiento entre proyectos cubiertos por integración |
+| NXR-REQ-0034 | Accruals | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A (AP) — mismo contrato de integración |
+| NXR-REQ-0035 | Payments (project attribution) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Dueño: Track A (AP) |
+| NXR-REQ-0036 | Forecast (BAC/PV/EV/AC/CPI/SPI/ETC/EAC/VAC) | ✅·➖·✅·✅·✅·➖·➖·✅·⬜ | IMPLEMENTED | `forecast_service.compute_forecast`; valores no calculables devuelven `null` real, nunca 0 falso — test dedicado |
+| NXR-REQ-0037 | Earned Value | ✅·➖·✅·✅·✅·➖·➖·✅·⬜ | IMPLEMENTED | PV/EV derivados del `ProgressRecord` más reciente contra BAC — simplificación documentada en docs/BUDGET_CONTROLLING.md |
+| NXR-REQ-0038 | Change Orders | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Lifecycle DRAFT→SUBMITTED→APPROVED real, `ChangeOrdersPage`, test de transición inválida (`NXR-PROJECT-001`) |
+| NXR-REQ-0039 | Progress (ProgressRecord) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `ProgressRecord` (planned%/actual%/evidence_ref libre), `ProgressPage`, alimenta Forecast |
 
 ## PROCUREMENT
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0040 | Purchase Requisition | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0041 | Approval workflow (PR) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0042 | RFQ | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0043 | Supplier Quotations | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0044 | Bid Comparison | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0045 | Purchase Order | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0046 | Goods Receipt | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0047 | Service Entry | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0048 | Three-Way Match | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0040 | Purchase Requisition | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Track C: `PurchaseRequisition`+líneas, `RequisitionsPage`, numeración `PR-YYYY-NNNNNN`; falta permiso granular por prioridad/monto |
+| NXR-REQ-0041 | Approval workflow (PR) | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `approve_requisition` (SUBMITTED→APPROVED), botón "Aprobar" en UI, test de doble-aprobación rechazada (`NXR-PROCUREMENT-001`) |
+| NXR-REQ-0042 | RFQ | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `RequestForQuotation`+`RfqSupplier` (multi-supplier), numeración `RFQ-YYYY-NNNNNN`; sin pantalla dedicada (backend-only, como se acordó en el alcance) |
+| NXR-REQ-0043 | Supplier Quotations | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `SupplierQuotation`+líneas, `quotation_total()`; sin pantalla dedicada |
+| NXR-REQ-0044 | Bid Comparison | 🔶·➖·✅·✅·⬜·⬜·⬜·⬜·⬜ | IN_PROGRESS | `quotation_total()` por cotización permite comparar manualmente; no hay endpoint agregado de comparación ni pantalla — ver `docs/PROCUREMENT.md` pendiente |
+| NXR-REQ-0045 | Purchase Order | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Lifecycle completo `DRAFT→APPROVED→SENT→PARTIALLY_RECEIVED/RECEIVED`; PO de proyecto rechaza moneda no funcional (`NXR-PROCUREMENT-002`); UI, numeración y tests reales |
+| NXR-REQ-0046 | Goods Receipt | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Recepción parcial y completa, actualiza `quantity_received` + status de PO + Stock Ledger real, `GoodsReceiptsPage`, test de sobre-recepción rechazada |
+| NXR-REQ-0047 | Service Entry | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `ServiceEntry` con período/avance/valor aceptado, numeración `SIN-YYYY-NNNNNN`; sin pantalla dedicada (no estaba en el alcance de frontend acordado) |
+| NXR-REQ-0048 | Three-Way Match | ✅·✅·✅·✅·⬜·⬜·⬜·✅·⬜ | IMPLEMENTED | `run_three_way_match` (INV-PROC-001): diferencias fuera de tolerancia nunca se descartan, siempre quedan en `exceptions`; test MATCHED y EXCEPTION reales |
 
 ## SUPPLY CHAIN
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0049 | Items | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0050 | Warehouses | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0051 | Stock Ledger (append-only) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0052 | Inventory Transfers | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0053 | Project Issues | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0054 | Returns | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0055 | Physical Counts | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0056 | Valuation (moving average) | ⬜⬜⬜⬜➖⬜⬜⬜➖ | NOT_STARTED | — |
+| NXR-REQ-0049 | Items | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `Item` (SKU único por company, tipo, UOM), `InventoryPage` real |
+| NXR-REQ-0050 | Warehouses | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `Warehouse` (company + project opcional), `WarehousesPage` real |
+| NXR-REQ-0051 | Stock Ledger (append-only) | ✅·✅·✅·✅·➖·⬜·⬜·✅·➖ | IMPLEMENTED | `StockLedgerEntry`, nunca UPDATE/DELETE, moving average real, test de doble receipt calculando promedio correcto |
+| NXR-REQ-0052 | Inventory Transfers | ✅·✅·✅·✅·➖·⬜·⬜·✅·➖ | IMPLEMENTED | `transfer_stock` (par RECEIPT/TRANSFER atómico), test real de movimiento entre almacenes |
+| NXR-REQ-0053 | Project Issues | ✅·✅·✅·✅·➖·⬜·⬜·✅·➖ | IMPLEMENTED | `issue_to_project` (INV-INV-002), test real de reducción de stock con `project_id`; posting contable del consumo queda documentado como contrato pendiente en `docs/INVENTORY.md` |
+| NXR-REQ-0054 | Returns | 🔶·✅·⬜·⬜·⬜·⬜·⬜·⬜·➖ | NOT_STARTED | `movement_type="RETURN"` existe en el modelo, sin service function ni endpoint dedicado — documentado como deuda intencional en `docs/INVENTORY.md` |
+| NXR-REQ-0055 | Physical Counts | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | `PhysicalCount`+líneas, `apply_physical_count` genera ADJUSTMENT real por variance, test end-to-end (crear conteo → aprobar → verificar posición) |
+| NXR-REQ-0056 | Valuation (moving average) | ✅·✅·✅·➖·➖·➖·➖·✅·➖ | IMPLEMENTED | Fórmula de costo promedio ponderado en `inventory_service`, test con dos recepciones a costos distintos verificando el promedio exacto |
 
 ## SUPPLIERS / CONTRACTS
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0057 | Supplier Master | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0058 | Supplier Performance | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0059 | Supplier Contracts | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
-| NXR-REQ-0060 | Subcontracts | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | — |
+| NXR-REQ-0057 | Supplier Master | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Track C: `Supplier` (legal_name/trade_name/tax_id/banking_details JSONB, distinto de `TreasuryAccount`), `SuppliersPage` real |
+| NXR-REQ-0058 | Supplier Performance | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Sin datos históricos suficientes todavía para calcular métricas reales (delivery/quality/price variance) sin fabricarlas — deferred hasta tener volumen de PO/GR real |
+| NXR-REQ-0059 | Supplier Contracts | ✅·✅·✅·✅·⬜·⬜·⬜·⬜·⬜ | IN_PROGRESS | `SupplierContract` (value/currency/advance/retention %), repositorio + endpoint create/list; sin pantalla ni test dedicado todavía |
+| NXR-REQ-0060 | Subcontracts | 🔶·✅·✅·✅·⬜·⬜·⬜·⬜·⬜ | IN_PROGRESS | Mismo modelo `SupplierContract` cubre subcontratos (no hay campo distintivo `is_subcontract` — se distingue por convención de scope_description hoy; formalizar si se necesita reporting separado) |
 
 ## COMMERCIAL
 
@@ -214,21 +214,30 @@ placeholder.
 
 ## Resumen
 
-Recontado por el coordinador directamente sobre la tabla combinada
-(Track F + Track 1 integrados) el 2026-08-24:
+Recontado tras Track B (Project Control), pendiente de integración por el
+coordinador, sobre la base de Track F + Track 1 ya integrados:
 
 - **VERIFIED:** 0 / 124 (reservado para cuando el coordinador confirme
   comportamiento end-to-end en `feat/nexora-greenfield` — ningún track se
   autootorga `VERIFIED`)
-- **IMPLEMENTED:** 31 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
-  0010/0011/0012/0013/0014/0015/0026/0027. Track A: NXR-REQ-0017 a
-  0024, 0080 y 0111. Track F: NXR-REQ-0097 a 0104.
-- **IN_PROGRESS:** 20 / 124
-- **NOT_STARTED:** 71 / 124
+- **IMPLEMENTED:** 56 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
+  0010/0011/0012/0013/0014/0015/0026/0027 (13). Track A: NXR-REQ-0017 a
+  0024, 0080 y 0111 (10). Track F: NXR-REQ-0097 a 0104 (8). Track B:
+  NXR-REQ-0028/0029/0030/0031/0032/0036/0037/0038/0039 (9). Track C:
+  NXR-REQ-0040/0041/0042/0043/0045/0046/0047/0048/0049/0050/0051/0052/
+  0053/0055/0056/0057 (16).
+- **IN_PROGRESS:** 23 / 124 (20 previos + 3 de Track C: 0044 Bid
+  Comparison, 0059/0060 Contracts/Subcontracts)
+- **NOT_STARTED:** 43 / 124 (incluye 0054 Returns y 0058 Supplier
+  Performance de Track C — deuda intencional documentada en
+  `docs/PROCUREMENT.md`/`docs/INVENTORY.md`)
 - **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue
   real, no por incapacidad técnica)
 
-Suma verificada: 31+20+71+2 = 124.
+Suma verificada: 0+56+23+43+2 = 124.
 
 Este resumen se actualiza en cada integración de track. Ver progreso vivo
-en `docs/PROGRESS.md`.
+en `docs/PROGRESS.md`. Recontado durante la integración de Track A sobre
+B+C (Task 4 de `2026-08-24-interrupted-tracks-recovery`); sigue sujeto a
+una pasada final de verificación end-to-end antes de certificar cualquier
+`VERIFIED`.

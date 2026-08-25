@@ -214,3 +214,134 @@ reales:
 - Evidencia de rama: backend combinado 81 tests, frontend 24 tests,
   typecheck/lint/build y Alembic gates ejecutados. Las filas se marcan
   `IMPLEMENTED`, nunca `VERIFIED`, hasta integración coordinada/E2E.
+
+### 2026-08-24 — Track C (Supply Chain) construido, pendiente de integrar
+
+Construido en `~/nexora-group-trackC`, rama `track/c-supply-chain`
+(worktree aislado). Evidencia real:
+
+- **Suppliers / base contractual**: `Supplier` (legal_name/trade_name/
+  tax_id/banking_details JSONB — explícitamente distinto de
+  `TreasuryAccount`) y `SupplierContract` (value/currency/advance/retention
+  %). Supplier Master es parte de Track C; Contracts/Subcontracts siguen
+  `IN_PROGRESS` hasta tener pruebas dedicadas, UI y distinción formal para
+  reporting de subcontratos.
+- **Procurement end-to-end**: `PurchaseRequisition`→`RequestForQuotation`
+  (multi-supplier)→`SupplierQuotation`→`PurchaseOrder`
+  (`DRAFT→APPROVED→SENT→PARTIALLY_RECEIVED/RECEIVED`)→`GoodsReceipt`
+  (recepción parcial y completa, actualiza `quantity_received` y dispara
+  `inventory_service.receive_stock`)→`ServiceEntry`. Numeración real vía
+  `numbering_service` (`PR`, `RFQ`, `PO`, `GR`, `SIN`).
+- **Three-Way Match (INV-PROC-001)**: `run_three_way_match` compara PO vs
+  recepción vs factura de proveedor (referencia libre, la factura real la
+  construye Track A en paralelo); las diferencias fuera de tolerancia
+  quedan en `exceptions`, **nunca se descartan silenciosamente** — el
+  registro se persiste tanto en MATCHED como en EXCEPTION.
+- **Inventory**: `Item`/`Warehouse`/`StockLedgerEntry` (append-only,
+  moving average real), `receive_stock`/`issue_to_project`
+  (INV-INV-002)/`transfer_stock`/`apply_physical_count`. `InsufficientStockError`
+  (INV-INV-001) bloquea cualquier emisión que dejaría stock negativo.
+- **Frontend**: `SuppliersPage`, `RequisitionsPage`, `PurchaseOrdersPage`
+  (con aprobar/enviar), `GoodsReceiptsPage` (selecciona PO pendiente →
+  registra recepción real), `InventoryPage`, `WarehousesPage` — reusan el
+  design system de Track F, sin datos fabricados (EmptyState honesto
+  cuando no hay compañía configurada).
+
+**Verificación real ejecutada**: backend 48/48 pytest (35 preexistentes +
+13 de procurement/inventory, incluidos los agregados documentales para
+Commitments/actuals y el aislamiento por compañía en el recurso PO) contra
+una base PostgreSQL aislada
+(`nexora_trackc`/`nexora_trackc_test`, para no pisar el schema de Track
+A/B/1 corriendo en paralelo sobre el mismo servidor Postgres local — nota
+dejada en `tests/conftest.py` para que el coordinador vuelva a
+`nexora_test` al integrar), `alembic revision --autogenerate` detectó las
+18 tablas nuevas sin conflictos, `alembic upgrade head` limpio.
+Frontend: `typecheck`/`lint` limpios, `vitest` 17/17 (15 preexistentes +
+2 nuevos de `SuppliersPage`), `build` OK.
+
+**Bugs reales encontrados y corregidos durante la propia verificación**:
+1. Primer intento de migración corrió contra la base compartida
+   `nexora_dev` (usada también por el coordinador) — se revirtió
+   (`alembic downgrade`) antes de continuar, para no contaminar el
+   estado que el coordinador usa para integrar Track 1/F.
+2. El endpoint `GET /inventory/stock/position` usa query params en
+   snake_case (`item_id`/`warehouse_id`, mismo patrón que
+   `master_data.list_accounts` de Track 1) — los primeros tests fallaron
+   por usar camelCase; corregido en los tests, no en el endpoint (para
+   mantener consistencia con el precedente ya establecido).
+3. Los tests de recepción de mercadería fallaban porque el helper de test
+   no aprobaba/enviaba la PO antes de recibir (el servicio correctamente
+   rechaza recepciones sobre una PO `DRAFT`) — corregido el helper, no el
+   servicio.
+
+**Desviaciones documentadas** (ver `docs/PROCUREMENT.md` /
+`docs/INVENTORY.md` para el detalle completo): Bid Comparison sin
+endpoint agregado ni pantalla dedicada (NXR-REQ-0044 queda
+`IN_PROGRESS`); Supplier Performance sin implementar por falta de datos
+históricos reales que no serían fabricados (NXR-REQ-0058 `NOT_STARTED`);
+`RETURN` como movement_type existe en el modelo pero sin service function
+(NXR-REQ-0054 `NOT_STARTED`); RFQ/Quotation/Comparison/Contracts sin
+pantalla de frontend (fuera del alcance de UI acordado para este track,
+con Contracts/Subcontracts explícitamente `IN_PROGRESS`).
+
+Filas actualizadas en `docs/REQUIREMENTS_TRACEABILITY.md`: NXR-REQ-0040 a
+0060 (Procurement + Supply Chain + Suppliers/Contracts). Ningún
+`VERIFIED` auto-otorgado.
+
+Commits de backend ya preservados en `track/c-supply-chain`: `6e92a87`
+(`feat(procurement): implement requisition-to-receipt supply chain flow`) y
+`9b5cb1f` (`test(procurement): certify INV-PROC-001 and
+INV-INV-001/002 with real tests`). La recuperación de UI/docs queda en un
+commit local explícito para que el coordinador la integre; este registro no
+afirma publicación remota.
+
+### 2026-08-24 — Track B (Project Control) construido, pendiente de integración
+
+Rama `track/b-project-control` (worktree `~/nexora-group-trackB`, DB de
+prueba propia `nexora_trackb` para no interferir con Track A corriendo en
+paralelo sobre `nexora_dev`). Evidencia real:
+
+- **Backend**: `Project` completado (§37, sin ninguna columna de saldo —
+  INV-TRE-002 con test de introspección del esquema), `WBSNode` jerárquico
+  (parent/level), `Task`/`Milestone` (planning), `Budget`/`BudgetLine` con
+  versionado real (BASELINE inmutable — `NXR-BUDGET-001` si se intenta
+  crear dos veces; REVISED generado automáticamente al aprobar una
+  `ChangeOrder`, historial preservado, nunca se borra), `ChangeOrder`
+  (lifecycle DRAFT→SUBMITTED→APPROVED real, `NXR-PROJECT-001` si se
+  aprueba sin pasar por SUBMITTED), `ProgressRecord`. `budget_service.
+  compute_summary` (AUTHORIZED real, COMMITTED/ACCRUED/PAID en 0 honesto
+  con el contrato de integración para Track A/C documentado) y
+  `forecast_service.compute_forecast` (BAC/PV/EV/AC/CPI/SPI/ETC/EAC/VAC —
+  valores no calculables son `null` real, nunca 0 inventado, con test
+  dedicado). 14 endpoints nuevos bajo `/api/projects`, permisos nuevos
+  (`project`, `project.wbs`, `project.planning`, `project.budget`,
+  `project.change_order`, `project.progress`) otorgados a Administrator/
+  Project Manager/Project Controller/Auditor/Viewer.
+- **Frontend**: `ProjectsPage` (crea compañía si no existe ninguna, crea/
+  lista proyectos, marca "proyecto activo" vía `ActiveUIContext` — el
+  mismo mecanismo de Fase 0/1, sin inventar un segundo concepto de
+  "proyecto actual"), `WBSPage`, `BudgetPage` (summary + forecast, crea
+  BASELINE), `ChangeOrdersPage` (crear/enviar/aprobar), `ProgressPage`.
+  Rutas reales conectadas en `routes.tsx` para `/proyectos`,
+  `/proyectos/wbs`, `/proyectos/presupuestos`, `/proyectos/ordenes-de-cambio`,
+  `/proyectos/avances` (el resto de rutas del sidebar sigue en
+  `PlaceholderPage`, incluida `/proyectos/planeacion` — Task/Milestone
+  tienen API real pero no pantalla dedicada todavía).
+- **Verificación real**: backend 46/46 pytest (35 previos + 11 nuevos),
+  `alembic upgrade head` limpio + fresh-install desde cero verificado (37
+  tablas). Frontend: typecheck/lint limpios, `vitest` 19/19 (15 previos +
+  4 nuevos, incluye un test que prueba que el forecast muestra `null`
+  honesto en vez de 0 falso sin datos de avance), `build` OK.
+- **Desviaciones documentadas**: `ChangeOrder.budget_change_amount` es un
+  monto agregado, no un desglose línea por línea (documentado en
+  docs/BUDGET_CONTROLLING.md); PV/EV se derivan del `ProgressRecord` más
+  reciente por falta de un motor de scheduling con distribución de $ por
+  fecha (misma razón, documentado); `Project.customer_ref` es texto libre
+  hasta que Track E aterrice `Customer` real.
+
+Filas actualizadas en `docs/REQUIREMENTS_TRACEABILITY.md`: NXR-REQ-0028,
+0029, 0030, 0031, 0032, 0036, 0037, 0038, 0039 → `IMPLEMENTED`. NXR-REQ-
+0033/0034/0035 (Commitments/Accruals/Payments) siguen `NOT_STARTED` —
+dueño Track A/C, contrato de integración ya documentado en
+docs/BUDGET_CONTROLLING.md para que no tengan que rediseñar nada al
+aterrizar.

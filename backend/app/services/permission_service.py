@@ -60,6 +60,16 @@ def _has_any_scope_grant(db: Session, *, user_id: uuid.UUID, resource: str, acti
     return db.execute(stmt).first() is not None
 
 
+def user_has_any_company_scope(db: Session, *, user_id: uuid.UUID, resource: str, action: str) -> bool:
+    """Whether a permission grants visibility to every company."""
+    return _has_any_scope_grant(db, user_id=user_id, resource=resource, action=action)
+
+
+def list_user_company_ids(db: Session, *, user_id: uuid.UUID) -> list[uuid.UUID]:
+    stmt = select(UserCompanyAccess.company_id).where(UserCompanyAccess.user_id == user_id)
+    return list(db.execute(stmt).scalars())
+
+
 def assert_company_access(
     db: Session, *, user_id: uuid.UUID, resource: str, action: str, company_id: uuid.UUID
 ) -> None:

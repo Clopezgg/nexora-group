@@ -7,8 +7,11 @@ from app.models.chart_of_accounts import ChartOfAccount
 from app.models.company import Company
 
 
-def list_companies(db: Session) -> list[Company]:
-    return list(db.execute(select(Company).order_by(Company.name)).scalars())
+def list_companies(db: Session, *, company_ids: list[uuid.UUID] | None = None) -> list[Company]:
+    stmt = select(Company).order_by(Company.name)
+    if company_ids is not None:
+        stmt = stmt.where(Company.id.in_(company_ids))
+    return list(db.execute(stmt).scalars())
 
 
 def get_by_id(db: Session, company_id: uuid.UUID) -> Company | None:

@@ -9,12 +9,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
-# Accounts Payable (orden maestra §34-35). Deuda intencional documentada en
-# docs/ACCOUNTING.md: todavía no existe la entidad real `Supplier` (la
-# construye Track C - Suppliers/Contracts), así que este track referencia
-# el proveedor por nombre/tax-id libres (`supplier_name`/`supplier_tax_id`)
-# en vez de una FK. Cuando Track C aterrice, estos campos deben migrarse a
-# `supplier_id` FK real -- no quedarse en texto libre para siempre.
+# Accounts Payable (orden maestra §34-35). `supplier_id` es una FK real a
+# `Supplier` (Track C - Suppliers/Contracts, ver app/models/supplier.py);
+# la deuda intencional de texto libre documentada anteriormente en
+# docs/ACCOUNTING.md quedó resuelta al integrar Track C.
 SUPPLIER_INVOICE_STATUSES = (
     "DRAFT",
     "REVIEW",
@@ -46,8 +44,9 @@ class SupplierInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
     )
-    supplier_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    supplier_tax_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    supplier_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="RESTRICT"), nullable=False
+    )
     invoice_number: Mapped[str] = mapped_column(String(64), nullable=False)
     scope: Mapped[str] = mapped_column(String(16), nullable=False)
     project_id: Mapped[uuid.UUID | None] = mapped_column(

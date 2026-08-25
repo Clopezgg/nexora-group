@@ -11,6 +11,7 @@ from app.domain.errors import (
     OverpaymentError,
 )
 from app.models.ap import SupplierInvoice, SupplierPayment
+from app.models.supplier import Supplier
 from app.models.treasury import TreasuryAccount
 from app.services import posting_service
 from app.services.financial_validation_service import (
@@ -18,20 +19,19 @@ from app.services.financial_validation_service import (
     assert_cost_center_belongs_to_company,
     assert_operation_scope,
     assert_project_belongs_to_company,
+    assert_supplier_belongs_to_company,
 )
 from app.services.posting_service import JournalLineInput
 
-"""Accounts Payable (orden maestra §34-35). Deuda intencional: `supplier_*`
-son texto libre hasta que Track C (Suppliers/Contracts) aterrice la
-entidad `Supplier` real -- ver docs/ACCOUNTING.md."""
+"""Accounts Payable (orden maestra §34-35). `supplier_id` referencia la
+entidad real `Supplier` (Track C - Suppliers/Contracts)."""
 
 
 def create_supplier_invoice(
     db: Session,
     *,
     company_id: uuid.UUID,
-    supplier_name: str,
-    supplier_tax_id: str | None,
+    supplier_id: uuid.UUID,
     invoice_number: str,
     scope: str,
     project_id: uuid.UUID | None,
@@ -64,10 +64,10 @@ def create_supplier_invoice(
     assert_cost_center_belongs_to_company(
         db, cost_center_id=cost_center_id, company_id=company_id
     )
+    assert_supplier_belongs_to_company(db, supplier_id=supplier_id, company_id=company_id)
     invoice = SupplierInvoice(
         company_id=company_id,
-        supplier_name=supplier_name,
-        supplier_tax_id=supplier_tax_id,
+        supplier_id=supplier_id,
         invoice_number=invoice_number,
         scope=scope,
         project_id=project_id,
@@ -101,6 +101,9 @@ def approve_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierI
             f"Solo se puede aprobar una factura DRAFT (estado actual: {invoice.status})"
         )
 
+    supplier = db.get(Supplier, invoice.supplier_id)
+    supplier_name = supplier.legal_name if supplier is not None else str(invoice.supplier_id)
+
     total = invoice.amount + invoice.tax_amount
     document = posting_service.post_manual(
         db,
@@ -115,15 +118,15 @@ def approve_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierI
                 debit_amount=total,
                 project_id=invoice.project_id,
                 cost_center_id=invoice.cost_center_id,
-                description=f"Factura {invoice.invoice_number} de {invoice.supplier_name}",
+                description=f"Factura {invoice.invoice_number} de {supplier_name}",
             ),
             JournalLineInput(
                 account_id=invoice.payable_account_id,
                 credit_amount=total,
-                description=f"Factura {invoice.invoice_number} de {invoice.supplier_name}",
+                description=f"Factura {invoice.invoice_number} de {supplier_name}",
             ),
         ],
-        description=f"Accrual factura {invoice.invoice_number} ({invoice.supplier_name})",
+        description=f"Accrual factura {invoice.invoice_number} ({supplier_name})",
         source_type="supplier_invoice",
         source_id=invoice.id,
         commit=False,
@@ -191,6 +194,9 @@ def pay_supplier_invoice(
             "treasury_account_id debe usar la moneda de la factura"
         )
 
+    supplier = db.get(Supplier, invoice.supplier_id)
+    supplier_name = supplier.legal_name if supplier is not None else str(invoice.supplier_id)
+
     document = posting_service.post_manual(
         db,
         company_id=invoice.company_id,
@@ -210,7 +216,7 @@ def pay_supplier_invoice(
                 description=f"Pago factura {invoice.invoice_number}",
             ),
         ],
-        description=f"Pago a {invoice.supplier_name} - factura {invoice.invoice_number}",
+        description=f"Pago a {supplier_name} - factura {invoice.invoice_number}",
         source_type="supplier_invoice",
         source_id=invoice.id,
         commit=False,

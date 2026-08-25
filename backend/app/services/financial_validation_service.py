@@ -8,6 +8,7 @@ from app.models.accounting import OPERATION_SCOPES
 from app.models.chart_of_accounts import Account, ChartOfAccount
 from app.models.cost_center import CostCenter
 from app.models.project import Project
+from app.models.supplier import Supplier
 
 
 def assert_operation_scope(scope: str, project_id: uuid.UUID | None) -> None:
@@ -61,3 +62,14 @@ def assert_cost_center_belongs_to_company(
             "cost_center_id debe pertenecer a la compañía propietaria"
         )
     return cost_center
+
+
+def assert_supplier_belongs_to_company(
+    db: Session, *, supplier_id: uuid.UUID, company_id: uuid.UUID
+) -> Supplier:
+    supplier = db.get(Supplier, supplier_id)
+    if supplier is None or supplier.company_id != company_id:
+        raise InvalidFinancialReferenceError(
+            "supplier_id debe pertenecer a la compañía propietaria"
+        )
+    return supplier

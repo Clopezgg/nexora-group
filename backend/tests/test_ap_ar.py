@@ -7,6 +7,7 @@ from app.models.project import Project
 from tests.helpers import (
     create_account,
     create_company,
+    create_supplier,
     create_treasury_account,
     create_user_with_role,
     login_admin,
@@ -27,6 +28,7 @@ def _setup_ap(client):
         client, company_id=company["id"], code="3100", name="Aportes", account_type="EQUITY"
     )
     bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+    supplier = create_supplier(client, company_id=company["id"])
     client.post(
         "/api/treasury/remittances",
         json={
@@ -39,19 +41,19 @@ def _setup_ap(client):
             "remittanceDate": "2026-01-01",
         },
     )
-    return company, bank, expense, payable
+    return company, bank, expense, payable, supplier
 
 
 def test_supplier_invoice_full_lifecycle_draft_to_paid(client):
     """Orden maestra §34: DRAFT -> APPROVED -> PARTIALLY_PAID -> PAID."""
     login_admin(client)
-    company, bank, expense, payable = _setup_ap(client)
+    company, bank, expense, payable, supplier = _setup_ap(client)
 
     created = client.post(
         "/api/ap/supplier-invoices",
         json={
             "companyId": company["id"],
-            "supplierName": "Cemento HN S.A.",
+            "supplierId": supplier["id"],
             "invoiceNumber": "F-001",
             "scope": "GENERAL",
             "expenseAccountId": expense["id"],
@@ -66,6 +68,7 @@ def test_supplier_invoice_full_lifecycle_draft_to_paid(client):
     assert created.status_code == 201, created.text
     invoice = created.json()
     assert invoice["status"] == "DRAFT"
+    assert invoice["supplierId"] == supplier["id"]
 
     approved = client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
     assert approved.status_code == 200, approved.text
@@ -102,12 +105,12 @@ def test_supplier_invoice_full_lifecycle_draft_to_paid(client):
 def test_supplier_payment_exceeding_balance_is_rejected(client):
     """Orden maestra §34: nunca se debe poder sobrepagar una factura."""
     login_admin(client)
-    company, bank, expense, payable = _setup_ap(client)
+    company, bank, expense, payable, supplier = _setup_ap(client)
     invoice = client.post(
         "/api/ap/supplier-invoices",
         json={
             "companyId": company["id"],
-            "supplierName": "Aceros del Valle",
+            "supplierId": supplier["id"],
             "invoiceNumber": "F-002",
             "scope": "GENERAL",
             "expenseAccountId": expense["id"],
@@ -178,13 +181,13 @@ def test_customer_invoice_lifecycle_draft_to_collected(client):
 
 def test_ap_resource_from_other_company_is_denied(client, db_session):
     login_admin(client)
-    company_a, _bank, expense, payable = _setup_ap(client)
+    company_a, _bank, expense, payable, supplier = _setup_ap(client)
     company_b = create_company(client, name="Constructora B")
     invoice = client.post(
         "/api/ap/supplier-invoices",
         json={
             "companyId": company_a["id"],
-            "supplierName": "Proveedor A",
+            "supplierId": supplier["id"],
             "invoiceNumber": "A-SEC-1",
             "scope": "GENERAL",
             "expenseAccountId": expense["id"],
@@ -211,7 +214,7 @@ def test_ap_resource_from_other_company_is_denied(client, db_session):
 
 def test_payment_account_company_must_match_invoice_company(client, db_session):
     login_admin(client)
-    company_a, _bank_a, expense, payable = _setup_ap(client)
+    company_a, _bank_a, expense, payable, supplier = _setup_ap(client)
     company_b = create_company(client, name="Constructora con banco ajeno")
     bank_gl_b = create_account(
         client,
@@ -227,7 +230,7 @@ def test_payment_account_company_must_match_invoice_company(client, db_session):
         "/api/ap/supplier-invoices",
         json={
             "companyId": company_a["id"],
-            "supplierName": "Proveedor A",
+            "supplierId": supplier["id"],
             "invoiceNumber": "A-COMP-1",
             "scope": "GENERAL",
             "expenseAccountId": expense["id"],
@@ -257,13 +260,13 @@ def test_payment_account_company_must_match_invoice_company(client, db_session):
 
 def test_zero_and_negative_invoice_amounts_are_rejected_by_api(client):
     login_admin(client)
-    company, _bank, expense, payable = _setup_ap(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
     for index, amount in enumerate(("0", "-1"), start=1):
         response = client.post(
             "/api/ap/supplier-invoices",
             json={
                 "companyId": company["id"],
-                "supplierName": "Proveedor inválido",
+                "supplierId": supplier["id"],
                 "invoiceNumber": f"BAD-{index}",
                 "scope": "GENERAL",
                 "expenseAccountId": expense["id"],
@@ -279,7 +282,7 @@ def test_zero_and_negative_invoice_amounts_are_rejected_by_api(client):
 
 def test_supplier_and_customer_invoices_can_be_listed_from_database(client):
     login_admin(client)
-    company, _bank, expense, payable = _setup_ap(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
     revenue = create_account(
         client,
         company_id=company["id"],
@@ -298,7 +301,7 @@ def test_supplier_and_customer_invoices_can_be_listed_from_database(client):
         "/api/ap/supplier-invoices",
         json={
             "companyId": company["id"],
-            "supplierName": "Proveedor persistido",
+            "supplierId": supplier["id"],
             "invoiceNumber": "PERSIST-AP",
             "scope": "GENERAL",
             "expenseAccountId": expense["id"],
@@ -342,12 +345,12 @@ def test_retrying_payment_with_same_idempotency_key_does_not_duplicate_posting(
     client, db_session
 ):
     login_admin(client)
-    company, bank, expense, payable = _setup_ap(client)
+    company, bank, expense, payable, supplier = _setup_ap(client)
     invoice = client.post(
         "/api/ap/supplier-invoices",
         json={
             "companyId": company["id"],
-            "supplierName": "Proveedor idempotente",
+            "supplierId": supplier["id"],
             "invoiceNumber": "IDEM-PAY",
             "scope": "GENERAL",
             "expenseAccountId": expense["id"],
@@ -444,7 +447,7 @@ def test_retrying_receipt_with_same_idempotency_key_does_not_duplicate_posting(
 
 def test_supplier_invoice_project_and_cost_center_must_match_company(client, db_session):
     login_admin(client)
-    company_a, _bank, expense, payable = _setup_ap(client)
+    company_a, _bank, expense, payable, supplier = _setup_ap(client)
     company_b = create_company(client, name="Compañía de dimensiones ajenas")
     project_b = Project(company_id=company_b["id"], name="Proyecto B")
     cost_center_b = CostCenter(company_id=company_b["id"], code="CC-B", name="Centro B")
@@ -455,7 +458,7 @@ def test_supplier_invoice_project_and_cost_center_must_match_company(client, db_
         "/api/ap/supplier-invoices",
         json={
             "companyId": company_a["id"],
-            "supplierName": "Proveedor dimensional",
+            "supplierId": supplier["id"],
             "invoiceNumber": "DIM-1",
             "scope": "PROJECT",
             "projectId": str(project_b.id),
@@ -470,3 +473,32 @@ def test_supplier_invoice_project_and_cost_center_must_match_company(client, db_
     )
 
     assert response.status_code == 422, response.text
+
+
+def test_supplier_invoice_rejects_supplier_from_other_company(client):
+    """Track A+C integration: `supplier_id` es una FK real a `Supplier`
+    (Track C) -- debe validarse contra la company propietaria igual que
+    cualquier otra FK financiera (INV-COMP-001)."""
+    login_admin(client)
+    company_a, _bank, expense, payable, _supplier_a = _setup_ap(client)
+    company_b = create_company(client, name="Compañía de proveedor ajeno")
+    supplier_b = create_supplier(client, company_id=company_b["id"], legal_name="Proveedor B")
+
+    response = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company_a["id"],
+            "supplierId": supplier_b["id"],
+            "invoiceNumber": "SUP-DIM-1",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "100.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"

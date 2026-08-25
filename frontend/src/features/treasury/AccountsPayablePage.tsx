@@ -8,10 +8,12 @@ import {
   Modal,
   MoneyInput,
   Select,
+  SupplierSelector,
   Table,
   type TableColumn,
 } from '../../design-system'
 import { masterDataService } from '../../services/masterDataService'
+import { procurementService } from '../../services/procurementService'
 import { treasuryService } from '../../services/treasuryService'
 import { apService, type SupplierInvoice } from '../../services/apArService'
 import './TreasuryPage.css'
@@ -43,6 +45,11 @@ export function AccountsPayablePage() {
     queryFn: () => apService.listInvoices(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
+  const suppliersQuery = useQuery({
+    queryKey: ['procurement', 'suppliers', activeCompanyId],
+    queryFn: () => procurementService.listSuppliers(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
 
   const approve = useMutation({
     mutationFn: (id: string) => apService.approveInvoice(id),
@@ -67,10 +74,16 @@ export function AccountsPayablePage() {
   const payableAccounts = (accountsQuery.data ?? []).filter((a) => a.accountType === 'LIABILITY')
   const treasuryAccounts = treasuryAccountsQuery.data ?? []
   const invoices = invoicesQuery.data ?? []
+  const suppliers = suppliersQuery.data ?? []
+  const supplierNameById = new Map(suppliers.map((s) => [s.id, s.legalName]))
 
   const columns: TableColumn<SupplierInvoice>[] = [
     { key: 'invoiceNumber', header: 'Factura', render: (row) => row.invoiceNumber },
-    { key: 'supplierName', header: 'Proveedor', render: (row) => row.supplierName },
+    {
+      key: 'supplierId',
+      header: 'Proveedor',
+      render: (row) => supplierNameById.get(row.supplierId) ?? row.supplierId,
+    },
     {
       key: 'amount',
       header: 'Monto',
@@ -126,13 +139,18 @@ export function AccountsPayablePage() {
         <Button
           variant="secondary"
           onClick={() => setOpenCreate(true)}
-          disabled={expenseAccounts.length === 0 || payableAccounts.length === 0}
+          disabled={expenseAccounts.length === 0 || payableAccounts.length === 0 || suppliers.length === 0}
         >
           Registrar factura de proveedor
         </Button>
         {expenseAccounts.length === 0 || payableAccounts.length === 0 ? (
           <p className="nx-field__error">
             Necesitas al menos una cuenta EXPENSE y una LIABILITY en el catálogo contable.
+          </p>
+        ) : null}
+        {suppliers.length === 0 ? (
+          <p className="nx-field__error">
+            Necesitas al menos un proveedor registrado (Abastecimiento → Proveedores).
           </p>
         ) : null}
       </Card>
@@ -149,6 +167,7 @@ export function AccountsPayablePage() {
           companyId={activeCompanyId}
           expenseAccounts={expenseAccounts}
           payableAccounts={payableAccounts}
+          suppliers={suppliers}
           onClose={() => setOpenCreate(false)}
           onCreated={() =>
             queryClient.invalidateQueries({
@@ -165,26 +184,30 @@ function CreateSupplierInvoiceModal({
   companyId,
   expenseAccounts,
   payableAccounts,
+  suppliers,
   onClose,
   onCreated,
 }: {
   companyId: string
   expenseAccounts: { id: string; name: string }[]
   payableAccounts: { id: string; name: string }[]
+  suppliers: { id: string; legalName: string }[]
   onClose: () => void
   onCreated: (invoice: SupplierInvoice) => void
 }) {
-  const [supplierName, setSupplierName] = useState('')
+  const [supplierId, setSupplierId] = useState<string | null>(null)
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [amount, setAmount] = useState<number | null>(null)
   const [expenseAccountId, setExpenseAccountId] = useState(expenseAccounts[0]?.id ?? '')
   const [payableAccountId, setPayableAccountId] = useState(payableAccounts[0]?.id ?? '')
 
+  const supplierOptions = suppliers.map((s) => ({ id: s.id, label: s.legalName }))
+
   const mutation = useMutation({
     mutationFn: () =>
       apService.createInvoice({
         companyId,
-        supplierName,
+        supplierId,
         invoiceNumber,
         scope: 'GENERAL',
         expenseAccountId,
@@ -209,15 +232,7 @@ function CreateSupplierInvoiceModal({
           mutation.mutate()
         }}
       >
-        <label className="nx-field">
-          <span className="nx-field__label">Proveedor</span>
-          <input
-            className="nx-input"
-            value={supplierName}
-            onChange={(e) => setSupplierName(e.target.value)}
-            required
-          />
-        </label>
+        <SupplierSelector options={supplierOptions} value={supplierId} onChange={setSupplierId} />
         <label className="nx-field">
           <span className="nx-field__label">Número de factura</span>
           <input
@@ -256,7 +271,7 @@ function CreateSupplierInvoiceModal({
         <Button
           type="submit"
           loading={mutation.isPending}
-          disabled={!amount || !supplierName || !invoiceNumber}
+          disabled={!amount || !supplierId || !invoiceNumber}
         >
           Registrar
         </Button>

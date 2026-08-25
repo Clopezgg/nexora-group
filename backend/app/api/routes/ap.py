@@ -35,8 +35,7 @@ def create_supplier_invoice(
     invoice = ap_service.create_supplier_invoice(
         db,
         company_id=payload.company_id,
-        supplier_name=payload.supplier_name,
-        supplier_tax_id=payload.supplier_tax_id,
+        supplier_id=payload.supplier_id,
         invoice_number=payload.invoice_number,
         scope=payload.scope,
         project_id=payload.project_id,

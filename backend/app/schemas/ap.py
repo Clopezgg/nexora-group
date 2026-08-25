@@ -10,8 +10,7 @@ from app.schemas.base import CamelModel
 
 class SupplierInvoiceCreateRequest(CamelModel):
     company_id: uuid.UUID
-    supplier_name: str
-    supplier_tax_id: str | None = None
+    supplier_id: uuid.UUID
     invoice_number: str
     scope: Literal["CENTRAL", "GENERAL", "PROJECT"]
     project_id: uuid.UUID | None = None
@@ -29,7 +28,7 @@ class SupplierInvoiceCreateRequest(CamelModel):
 class SupplierInvoiceResponse(CamelModel):
     id: uuid.UUID
     company_id: uuid.UUID
-    supplier_name: str
+    supplier_id: uuid.UUID
     invoice_number: str
     scope: str
     project_id: uuid.UUID | None

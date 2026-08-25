@@ -2,7 +2,7 @@ import { apiFetch } from './httpClient'
 
 export interface SupplierInvoice {
   id: string
-  supplierName: string
+  supplierId: string
   invoiceNumber: string
   scope: string
   currencyCode: string

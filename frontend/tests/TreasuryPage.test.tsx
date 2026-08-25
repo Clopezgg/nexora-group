@@ -105,7 +105,7 @@ describe('TreasuryPage', () => {
       endpoint: '/ap/supplier-invoices?companyId=c1',
       invoice: {
         id: 'ap1',
-        supplierName: 'Proveedor persistido',
+        supplierId: 's1',
         invoiceNumber: 'AP-DB-1',
         scope: 'GENERAL',
         currencyCode: 'HNL',
@@ -150,6 +150,19 @@ describe('TreasuryPage', () => {
         ],
         '/master-data/accounts': [],
         '/treasury/accounts': [],
+        '/procurement/suppliers': [
+          {
+            id: 's1',
+            companyId: 'c1',
+            legalName: 'Proveedor persistido',
+            tradeName: null,
+            taxId: null,
+            email: null,
+            phone: null,
+            status: 'ACTIVE',
+            classification: null,
+          },
+        ],
         [endpoint]: [invoice],
       })
 

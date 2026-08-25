@@ -1,7 +1,7 @@
 """add treasury ap ar financial core
 
 Revision ID: 58ce35982711
-Revises: c622defc2308
+Revises: 8bf7c353d327
 Create Date: 2026-08-24 12:37:59.398814
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '58ce35982711'
-down_revision: Union[str, None] = 'c622defc2308'
+down_revision: Union[str, None] = '8bf7c353d327'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -62,8 +62,7 @@ def upgrade() -> None:
     )
     op.create_table('supplier_invoices',
     sa.Column('company_id', sa.UUID(), nullable=False),
-    sa.Column('supplier_name', sa.String(length=255), nullable=False),
-    sa.Column('supplier_tax_id', sa.String(length=64), nullable=True),
+    sa.Column('supplier_id', sa.UUID(), nullable=False),
     sa.Column('invoice_number', sa.String(length=64), nullable=False),
     sa.Column('scope', sa.String(length=16), nullable=False),
     sa.Column('project_id', sa.UUID(), nullable=True),
@@ -89,6 +88,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['expense_account_id'], ['accounts.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['payable_account_id'], ['accounts.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ondelete='RESTRICT'),
+    sa.ForeignKeyConstraint(['supplier_id'], ['suppliers.id'], ondelete='RESTRICT'),
     sa.CheckConstraint('amount > 0', name='ck_supplier_invoices_amount_positive'),
     sa.CheckConstraint('tax_amount >= 0', name='ck_supplier_invoices_tax_non_negative'),
     sa.CheckConstraint('amount_paid >= 0 AND amount_paid <= amount + tax_amount', name='ck_supplier_invoices_paid_within_total'),

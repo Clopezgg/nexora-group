@@ -7,6 +7,18 @@ export interface Worker {
   active: boolean
 }
 
+export interface Crew {
+  id: string
+  companyId: string
+  projectId: string | null
+  name: string
+  status: string
+}
+
+export interface CrewWithMembers extends Crew {
+  members: Worker[]
+}
+
 export type TimeEntryStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED'
 
 export interface TimeEntry {

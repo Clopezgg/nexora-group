@@ -1,5 +1,5 @@
 import { apiFetch } from './httpClient'
-import type { TimeEntry, Worker } from '../types/workforce'
+import type { Crew, CrewWithMembers, TimeEntry, Worker } from '../types/workforce'
 
 export const workforceService = {
   listWorkers: (companyId: string) => apiFetch<Worker[]>(`/workforce/workers?companyId=${companyId}`),
@@ -9,6 +9,18 @@ export const workforceService = {
     roleTitle?: string
     standardHourlyRate: string
   }) => apiFetch<Worker>('/workforce/workers', { method: 'POST', body: JSON.stringify(payload) }),
+
+  listCrews: (companyId: string) => apiFetch<Crew[]>(`/workforce/crews?companyId=${companyId}`),
+  createCrew: (payload: { companyId: string; name: string; projectId?: string }) =>
+    apiFetch<Crew>('/workforce/crews', { method: 'POST', body: JSON.stringify(payload) }),
+  getCrew: (crewId: string) => apiFetch<CrewWithMembers>(`/workforce/crews/${crewId}`),
+  addCrewMember: (crewId: string, workerId: string) =>
+    apiFetch(`/workforce/crews/${crewId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ workerId }),
+    }),
+  removeCrewMember: (crewId: string, workerId: string) =>
+    apiFetch(`/workforce/crews/${crewId}/members/${workerId}`, { method: 'DELETE' }),
 
   listTimeEntries: (companyId: string) =>
     apiFetch<TimeEntry[]>(`/workforce/time-entries?companyId=${companyId}`),

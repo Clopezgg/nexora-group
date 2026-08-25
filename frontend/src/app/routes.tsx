@@ -22,6 +22,7 @@ import { WBSPage } from '../features/projects/WBSPage'
 import { FixedAssetsPage } from '../features/assets/FixedAssetsPage'
 import { EquipmentPage } from '../features/equipment/EquipmentPage'
 import { WorkersPage } from '../features/workforce/WorkersPage'
+import { CrewsPage } from '../features/workforce/CrewsPage'
 import { TimeEntriesPage } from '../features/workforce/TimeEntriesPage'
 import { DocumentsPage } from '../features/documents/DocumentsPage'
 import { AuditLogPage } from '../features/audit/AuditLogPage'
@@ -88,6 +89,7 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/abastecimiento/almacenes': <WarehousesPage />,
   '/abastecimiento/proveedores': <SuppliersPage />,
   '/recursos/personal': <WorkersPage />,
+  '/recursos/cuadrillas': <CrewsPage />,
   '/recursos/tiempo': <TimeEntriesPage />,
   '/recursos/equipos': <EquipmentPage />,
   '/recursos/combustible': <EquipmentPage />,

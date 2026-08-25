@@ -121,3 +121,19 @@ def decide_submittal(
     db.commit()
     db.refresh(submittal)
     return submittal
+
+
+def apply_approval_decision(
+    db: Session, *, submittal_id: uuid.UUID, decision: str, decided_by: uuid.UUID
+) -> None:
+    """Adaptador para Approval Inbox (Track G, `approval_service.decide()`)
+    -- entry point nuevo, no toca la firma ni el comportamiento existente
+    de `decide_submittal`. A diferencia del adaptador de AP,
+    `decided_by` es un parámetro obligatorio aquí porque `decide_submittal`
+    lo registra en la propia fila de Submittal (`Submittal.decided_by`);
+    `approval_service.decide()` siempre lo pasa como el aprobador real de
+    la ApprovalRequest. Si el Submittal todavía no tiene una respuesta de
+    revisor registrada, `decide_submittal` rechaza con
+    `InvalidSubmittalStateError` -- ese precondition es del dominio, no se
+    relaja aquí solo porque la decisión llega vía Approval Inbox."""
+    decide_submittal(db, submittal_id=submittal_id, decision=decision, decided_by=decided_by)

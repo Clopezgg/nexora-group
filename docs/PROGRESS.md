@@ -1110,3 +1110,103 @@ preexistente de chunk >500kB).
 Rama `track/g-workflow-audit` preparada e integration-ready, no fusionada
 a `feat/nexora-greenfield` todavía — pendiente de revisión/merge por el
 coordinador (mismo patrón que todos los tracks anteriores).
+
+## Track G, Task 2 — Approval Inbox + Segregation of Duties (`NXR-REQ-0087/0088/0089`)
+
+Construido en la misma rama `track/g-workflow-audit`/worktree
+`nexora-group-trackG`, sobre el head real de Task 1 ya fusionado
+(`e91bb3d86df2`, confirmado con `alembic heads` antes de generar la
+migración de esta task).
+
+**Ruling del plan respetada al pie de la letra**: Track G no construye un
+motor de estados genérico que reemplace las transiciones de dominio ya
+probadas — ver Ruling en
+`docs/superpowers/specs/2026-08-25-track-g-workflow-audit-design.md`.
+`ApprovalPolicy` (esqueleto reservado desde Foundation, `app/models/approval_policy.py`,
+verificado sin ninguna FK ni servicio apuntándole) se **extendió**, no se
+duplicó: se agregaron `entity_type`/`requires_third_role`. `ApprovalRequest`
+(`app/models/approval_request.py`) es la entidad genérica nueva; migración
+`773bebddf1a9` (`down_revision` = `e91bb3d86df2`, verificado real, no
+asumido) crea `approval_requests` y agrega las dos columnas a
+`approval_policies` en la misma revisión.
+
+`approval_service.py`: `create_request()`/`decide()`. `decide()` nunca
+muta el estado de un dominio directamente — resuelve un adaptador
+registrado por `entity_type` (`register_decision_adapter`, diccionario
+explícito en el propio servicio, sin mecanismo de plugin dinámico, mismo
+estilo del resto del repo) y le delega la transición real. Segregación de
+Funciones (`INV-WORKFLOW-001`) enforced centralmente: `requested_by ==
+decided_by` → `SegregationOfDutiesError`/422 `NXR-WORKFLOW-001`; decidir
+una `ApprovalRequest` que ya no está `PENDING` → `InvalidApprovalStateError`/409
+`NXR-WORKFLOW-002` (doble-decisión bloqueada); cuando la `ApprovalPolicy`
+resuelta tiene `requires_third_role=True`, el `executed_by` (quien más
+tarde ejecuta la acción aprobada) también debe ser distinto de solicitante
+y aprobador. Los cuatro casos tienen test RED/GREEN real en
+`tests/test_approvals.py`.
+
+**Adaptadores AP/Submittal — desviación deliberada, verificada contra el
+código real antes de escribir**: el brief daba `apply_approval_decision(db,
+*, submittal_id, decision)` sin `decided_by`, calcado del de AP. Se leyó
+`submittal_service.py` primero (instrucción explícita del brief) y
+`decide_submittal(db, *, submittal_id, decision, decided_by)` **exige**
+`decided_by` (lo graba en `Submittal.decided_by`) y además rechaza decidir
+sin una `reviewer_response` ya registrada (`InvalidSubmittalStateError` —
+precondición propia del dominio, no relajada por venir vía Approval
+Inbox). Como el registro de adaptadores (`_DECISION_ADAPTERS`) se define
+enteramente dentro de este task, se amplió el contrato uniforme del
+adaptador a `(db, entity_id, decision, decided_by)` para los tres
+parámetros de negocio siempre disponibles en `decide()` — el adaptador de
+AP simplemente ignora el cuarto parámetro (`SupplierInvoice` no lo
+necesita), el de Submittal sí lo usa. Ambas funciones (`ap_service.apply_approval_decision`,
+`submittal_service.apply_approval_decision`) son **entry points nuevos**;
+`approve_supplier_invoice`/`cancel_supplier_invoice`/`decide_submittal` no
+cambiaron de firma ni de comportamiento. Registro real en
+`main.py::create_app()`, después de `register_error_handlers(app)`.
+
+Test end-to-end real (no solo la fila `ApprovalRequest`):
+`test_deciding_ap_approval_request_transitions_the_real_invoice` crea una
+`SupplierInvoice` real vía la API, crea una `ApprovalRequest` apuntando a
+ella, decide `APPROVED`, y verifica `SupplierInvoice.status == "APPROVED"`
+releído de la base de datos — prueba que el adaptador realmente ejecutó
+`approve_supplier_invoice` (con su posting contable real), no solo que la
+`ApprovalRequest` cambió de estado.
+
+API: `GET/POST /api/approvals` (`app/api/routes/approvals.py`). El código
+del brief para el `GET` tenía un bug real detectado al correr el test de
+aislamiento de company: `company_id: uuid.UUID` sin `Query(alias="companyId")`
+— FastAPI esperaba `company_id` literal en el querystring, no `companyId`
+(inconsistente con el propio `audit.py:list_audit_logs`, que sí usa el
+alias). Corregido a `Query(alias="companyId")`/`Query(default=None)`,
+mismo patrón de `audit.py`. `POST /{id}/decide` registra su propio
+`AuditLog` (antes/después del `status` de la `ApprovalRequest`) vía
+`audit_service.record` de Task 1, reutilizando `get_correlation_id`.
+
+Permisos `workflow.approval` (`read`/`decide`) — `decide` otorgado solo a
+roles que plausiblemente deciden AP/Submittal (`Finance Manager`,
+`Project Manager`, `Administrator` vía `SCOPE_ANY`); `read` más amplio,
+incluye también `Auditor` (`SCOPE_ANY`, mismo criterio que `audit.log`).
+Test real de que un rol con solo `read` (`Auditor`) recibe 403
+`NXR-PERM-001` al intentar `decide`.
+
+Frontend: `ApprovalInboxPage.tsx` real en `/inicio/aprobaciones` — esa ruta
+ya existía **reservada** en `navigation.ts` ("Aprobaciones" bajo el grupo
+Inicio); el brief sugería inventar `/plataforma/aprobaciones` sin haber
+verificado el archivo real primero, se implementó la ruta ya reservada en
+su lugar (mismo criterio que Task 1 usó para `/control/auditoria`).
+Filtros por módulo/prioridad, aprobar/rechazar con comentario opcional por
+fila, invalidación de query tras decidir. `approvalService.ts`/`types/approval.ts`
+siguiendo el patrón real de `auditService.ts`/`types/audit.ts` (objeto con
+métodos). Test real (`ApprovalInboxPage.test.tsx`) que hace click en
+"Aprobar" contra un mock de la API real y confirma que la fila deja de
+mostrar los controles de decisión tras el refetch (prueba que la página
+usa la respuesta real de la API, no una mutación optimista local).
+
+Verificación: backend 189/189 pytest (182 previos + 7 nuevos en
+`test_approvals.py`), `alembic upgrade head` limpio, un único head de
+Alembic (`773bebddf1a9`). Frontend: typecheck limpio, `eslint .` limpio,
+59/59 vitest (57 previos + 2 nuevos), `npm run build` OK (859 módulos,
+mismo warning preexistente de chunk >500kB, sin relación con este task).
+
+Rama `track/g-workflow-audit` preparada e integration-ready con Task 1 +
+Task 2, no fusionada a `feat/nexora-greenfield` todavía — pendiente de
+revisión/merge por el coordinador.

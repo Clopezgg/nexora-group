@@ -7,6 +7,7 @@ from app.models.accounting import (
 )
 from app.models.ap import SupplierInvoice, SupplierPayment
 from app.models.approval_policy import ApprovalPolicy
+from app.models.approval_request import ApprovalRequest
 from app.models.audit import AuditLog
 from app.models.ar import CustomerInvoice, CustomerReceipt
 from app.models.asset import DepreciationEntry, FixedAsset
@@ -77,6 +78,7 @@ __all__ = [
     "AccountingDocument",
     "AccountingSourceLink",
     "ApprovalPolicy",
+    "ApprovalRequest",
     "AuditLog",
     "BankStatement",
     "BankStatementLine",

@@ -242,6 +242,17 @@ def pay_supplier_invoice(
     return payment
 
 
+def apply_approval_decision(db: Session, *, invoice_id: uuid.UUID, decision: str) -> None:
+    """Adaptador para Approval Inbox (Track G, `approval_service.decide()`)
+    -- entry point nuevo, no toca la firma ni el comportamiento existente
+    de `approve_supplier_invoice`/`cancel_supplier_invoice`. Delega en
+    ellas: la transición real sigue viviendo únicamente ahí."""
+    if decision == "APPROVED":
+        approve_supplier_invoice(db, invoice_id=invoice_id)
+    elif decision == "REJECTED":
+        cancel_supplier_invoice(db, invoice_id=invoice_id)
+
+
 def get_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierInvoice | None:
     return db.get(SupplierInvoice, invoice_id)
 

@@ -25,6 +25,7 @@ import { WorkersPage } from '../features/workforce/WorkersPage'
 import { TimeEntriesPage } from '../features/workforce/TimeEntriesPage'
 import { DocumentsPage } from '../features/documents/DocumentsPage'
 import { AuditLogPage } from '../features/audit/AuditLogPage'
+import { ApprovalInboxPage } from '../features/approvals/ApprovalInboxPage'
 import { RfiSubmittalsPage } from '../features/rfi/RfiSubmittalsPage'
 import { DailyReportsPage } from '../features/site/DailyReportsPage'
 import { QualityPage } from '../features/quality/QualityPage'
@@ -54,7 +55,10 @@ import { navItems } from './navigation'
 // RFI/Submittals usó para `/proyectos/rfi-submittals`. `/control/auditoria`
 // (Track G, NXR-REQ-0090) ya existía como entrada reservada en
 // navigation.ts ("Auditoría") -- no se inventó una sección Plataforma
-// nueva, se implementó la ruta ya reservada.
+// nueva, se implementó la ruta ya reservada. `/inicio/aprobaciones` (Track
+// G, NXR-REQ-0088, Approval Inbox) mismo criterio: ya existía como entrada
+// reservada ("Aprobaciones" bajo el grupo Inicio) en navigation.ts -- no se
+// inventó `/plataforma/aprobaciones` ni ninguna otra ruta nueva.
 const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/finanzas/tesoreria': <TreasuryPage />,
   '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
@@ -79,6 +83,7 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/recursos/mantenimiento': <EquipmentPage />,
   '/control/documentos': <DocumentsPage />,
   '/control/auditoria': <AuditLogPage />,
+  '/inicio/aprobaciones': <ApprovalInboxPage />,
   '/proyectos/diario-de-obra': <DailyReportsPage />,
   '/proyectos/calidad': <QualityPage />,
   '/proyectos/seguridad': <SafetyPage />,

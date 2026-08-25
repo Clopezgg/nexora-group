@@ -161,6 +161,17 @@ pasaría igual.
 | Treasury | `treasury.remittance.create` | `POST /api/treasury/remittances` |
 | Procurement | `procurement.purchase_order.approve` | `POST /api/procurement/purchase-orders/{id}/approve` |
 
+## Dominios instrumentados (Task 2)
+
+| Dominio | Acción | Ruta |
+|---------|--------|------|
+| Platform / Approval Inbox | `workflow.approval.decide` | `POST /api/approvals/{id}/decide` |
+
+Esta fila audita la propia `ApprovalRequest` (antes/después de su
+`status`), no la entidad de dominio que decide (`SupplierInvoice`,
+`Submittal`, etc.) — esas siguen su propio backlog de instrumentación de
+abajo hasta que un task dedicado las cubra explícitamente.
+
 **Desviación deliberada respecto al plan original**: el plan original
 mencionaba instrumentar "la ruta de aprobación de remesas" (remittance-
 approval) en Treasury. Verificado contra `app/models/treasury.py` y

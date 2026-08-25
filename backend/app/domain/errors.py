@@ -166,3 +166,26 @@ class InvalidSafetyRecordError(Exception):
 class InvalidSafetyStateError(Exception):
     """Transición de estado inválida de SafetyObservation/SafetyIncident
     (p.ej. volver a cerrar un registro ya CLOSED)."""
+
+
+# Track G -- Platform: Approval Inbox / Segregation of Duties (orden
+# maestra §87-89, NXR-REQ-0087/0088/0089).
+class SegregationOfDutiesError(Exception):
+    """INV-WORKFLOW-001: requested_by == decided_by, o el tercer rol
+    exigido por la ApprovalPolicy no fue distinto de solicitante y
+    aprobador, al decidir un ApprovalRequest."""
+
+
+class InvalidApprovalStateError(Exception):
+    """Se intentó decidir un ApprovalRequest que ya no está PENDING
+    (doble decisión)."""
+
+
+class InvalidApprovalDecisionError(Exception):
+    """`decision` fuera del whitelist {"APPROVED", "REJECTED"} pasado a
+    `approval_service.decide()` -- se rechaza ANTES de persistir nada
+    sobre el ApprovalRequest ni de llamar al adaptador del dominio, para
+    que `ApprovalRequest.status` nunca quede desincronizado del estado
+    real de la entidad de dominio (p.ej. un adaptador que solo maneja
+    APPROVED/REJECTED haciendo no-op silencioso sobre un valor
+    desconocido)."""

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.repositories import equipment_repository
 from app.schemas.equipment import (
     EquipmentCreateRequest,
     EquipmentResponse,
@@ -30,8 +31,6 @@ def _resolve_equipment(db: Session, equipment_id: uuid.UUID):
 
 
 def _resolve_order_equipment(db: Session, order_id: uuid.UUID):
-    from app.repositories import equipment_repository
-
     order = equipment_repository.get_maintenance_order(db, order_id)
     if order is None:
         raise ValueError(f"MaintenanceOrder {order_id} no existe")

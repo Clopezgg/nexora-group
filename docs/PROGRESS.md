@@ -1942,3 +1942,53 @@ Traceability tally: 0 `VERIFIED`, 97 `IMPLEMENTED` (+1), 20
 total. `NXR-REQ-0042`/`0043` stayed `IMPLEMENTED` but their evidence was
 enriched (their "backend-only" framing is now stale — they have a real
 screen).
+
+## 2026-08-25 — Systematic company-isolation audit: 6 more real gaps found and fixed
+
+The RFQ/Quotation read leak found while building Bid Comparison was
+serious enough (cross-tenant, not just a write-path gap) to warrant a
+dedicated pass rather than trusting it was the only one. Ran a full
+read-only audit of every route handler in `backend/app/api/routes/*.py`
+for the same defect shape: an entity-id-in-path route that fetches an
+entity and returns/mutates data derived from it without calling
+`assert_company_access` against that entity's `company_id`. Six more
+confirmed, all fixed with the same pattern already established elsewhere
+in this codebase (resolve entity → 404 if missing → `assert_company_access`
+using the entity's real `company_id` → proceed):
+
+- `POST /procurement/requisitions/{id}/approve` — zero check. Any user
+  with `procurement.requisition/approve` in their own company could
+  approve another company's purchase requisition.
+- `GET /procurement/goods-receipts?purchase_order_id=` — zero check
+  (`_user` dependency was even unused). Real cross-tenant **read** leak:
+  receipt lines/quantities/warehouse for any company's PO, given its id.
+- `POST /procurement/three-way-match` — zero check. Could run and persist
+  a three-way match against another company's PO/invoice data.
+- `POST /inventory/physical-counts/{id}/approve` — zero check. Any user
+  with `inventory.physical_count/approve` in their own company could
+  approve another company's physical count, generating real stock
+  `ADJUSTMENT` ledger entries against that company's inventory.
+- `create_goods_receipt`/`create_service_entry` — a latent bug, not a
+  leak: `if order is not None: assert_company_access(...)` then an
+  *unconditional* read of `order.company_id` two lines later. An unknown
+  `purchase_order_id` skipped the check (nothing to check against) and
+  then crashed with an unhandled `AttributeError` → 500, instead of a
+  clean 404. Fixed to raise 404 before the check.
+- `GET /dashboard/summary` — `active_projects` counted `ACTIVE` projects
+  across **every company on the platform**, regardless of who was asking.
+  Every authenticated user saw a platform-wide number, not their own.
+  Fixed: scoped to the requesting user's own companies
+  (`permission_service.list_user_company_ids`) unless their role holds
+  `project`/`read` with `company_scope=ANY` (Administrator, Auditor), in
+  which case the platform-wide count is the correct real answer for them.
+
+6 new tests, one per fix. Verification: `cd backend && ./.venv/bin/pytest
+-q` → 264/264; `compileall` clean; `alembic check` → no drift (no schema
+change). No frontend changes needed for the route fixes (contracts
+unchanged, just an added authorization/404 check); the dashboard fix is
+purely a backend query-scoping change transparent to the frontend.
+
+Traceability: no row changed `IMPLEMENTED`/`IN_PROGRESS` status — these
+were quality/security fixes inside already-`IMPLEMENTED` rows
+(`NXR-REQ-0040`, `0046`, `0048`, `0051`), evidence notes added to each.
+Tally unchanged at 97/20/5/2/0.

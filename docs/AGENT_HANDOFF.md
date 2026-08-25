@@ -114,9 +114,22 @@ session, real PostgreSQL, real commands — not inferred):
   now the one screen that makes RFQ/Quotations visible — they were
   deliberately backend-only before. 258/258 backend, 89/89 frontend
   tests.
+- Systematic company-isolation route audit (commit `83ca9f0`): fixed 6
+  more `INV-COMP-001` gaps — 2 mutation routes with zero
+  `assert_company_access` (requisition approve, physical-count approve),
+  1 real cross-tenant **read leak** (goods-receipts listing by PO id,
+  zero check), 1 more zero-check mutation (three-way-match), 1 latent
+  500-instead-of-404 bug (order-not-found skipped the check via `if
+  order is not None:` then unconditionally read `order.company_id`
+  anyway), and 1 platform-wide dashboard leak (`active_projects` counted
+  every company's active projects for every authenticated user,
+  regardless of access). 264/264 backend tests. **This audit already
+  covered every route file — do not repeat it from scratch.**
 - Traceability tally after all of the above: 0 `VERIFIED`, 97
   `IMPLEMENTED`, 20 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
-  across 124 rows. **This is still far from 100\% by the CANDADO FINAL
+  across 124 rows (unchanged by the audit fixes — those were
+  quality/security fixes inside already-`IMPLEMENTED` rows, not new
+  capability). **This is still far from 100\% by the CANDADO FINAL
   definition** — 25 rows are not yet `IMPLEMENTED`, and zero rows are
   `VERIFIED` (VERIFIED requires E2E/independent verification per row,
   which hasn't started). Do not round this up.
@@ -155,7 +168,16 @@ Crews (`Crew`/`CrewMember`, commits `b8ee232`/`7c7cda3`),
 `NXR-REQ-0059`/`0060` Supplier Contracts/Subcontracts + the
 `SupplierContract` company-isolation fix (commits `a1cdb47`/`53908a3`),
 `NXR-REQ-0044` Bid Comparison + the RFQ/Quotation pipeline
-company-isolation fixes (commits `66364b2`/`a3c1c65`/`2a9e6d2`).
+company-isolation fixes (commits `66364b2`/`a3c1c65`/`2a9e6d2`), and the
+full systematic route-by-route company-isolation audit (a dedicated
+sub-agent read every file in `backend/app/api/routes/*.py`) that found
+and fixed 6 more `INV-COMP-001` gaps (commit `83ca9f0`) — requisition
+approval, goods-receipts listing, three-way-match, physical-count
+approval, a latent 500-instead-of-404 bug on two routes, and a
+platform-wide dashboard leak. **Do not re-run that audit from scratch —
+it already covered every route file.** If you add a NEW entity-id route
+in the future, apply the same check yourself rather than waiting for
+another audit pass.
 
 **Working pattern that paid off repeatedly this session — keep using
 it**: pick a row whose description names a *specific, narrow* gap (not
@@ -192,15 +214,15 @@ not code review):
    expects before touching it.
 
 That's close to exhausting the well-scoped `IN_PROGRESS` domain-logic
-rows (down to ~19, mostly infra/hardening/deployment). A different
-high-value move at this point: **grep every route file for a `GET`
-handler on an `{id}`-style path that does NOT call `assert_company_access`
-before touching the resource**, the same pattern that found the RFQ
-quotations read leak. That leak was found by code-reading while building
-an unrelated screen, not by a systematic search — a deliberate pass
-across `app/api/routes/*.py` for that exact shape is likely to find more,
-and a cross-tenant read leak is a more serious class of defect than
-anything else found so far this session.
+rows (down to ~19, mostly infra/hardening/deployment).
+
+**The systematic company-isolation route audit is DONE** (commit
+`83ca9f0`, see above) — every file in `backend/app/api/routes/*.py` was
+read and checked for a route missing `assert_company_access` against a
+fetched entity's `company_id`. 6 gaps found and fixed. Do not re-run this
+audit from scratch; if a NEW entity-id route gets added in a future
+session, apply the same check as part of building it, not as a separate
+audit pass.
 
 Then continue the audit-instrumentation backlog in `docs/AUDIT.md` (still
 open: Project Control, Enterprise Resources, Commercial, Construction

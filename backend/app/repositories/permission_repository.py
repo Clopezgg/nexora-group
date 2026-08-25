@@ -173,6 +173,11 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     # Administrator/Auditor, mismo patrón que audit.log).
     ("workflow.approval", "read", "Ver la bandeja de aprobaciones"),
     ("workflow.approval", "decide", "Aprobar/rechazar una solicitud de aprobación"),
+    # Track H -- Reports/Search/Analytics (NXR-REQ-0093/0094). Alcance
+    # deliberado de esta fase: Trial Balance + Budget vs Actual únicamente
+    # (ver docs/superpowers/specs/2026-08-25-reports-search-analytics-design.md).
+    ("reports.trial_balance", "read", "Ver el reporte de Balance de Comprobación"),
+    ("reports.budget_vs_actual", "read", "Ver el reporte de Presupuesto vs. Real"),
 )
 # NOTA: ActiveUIContext (GET/PUT /api/context) NO pasa por este motor de
 # permisos -- es una preferencia personal del usuario autenticado (su
@@ -232,6 +237,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("audit.log", "read", SCOPE_OWN),
         ("workflow.approval", "read", SCOPE_OWN),
         ("workflow.approval", "decide", SCOPE_OWN),
+        ("reports.trial_balance", "read", SCOPE_OWN),
+        ("reports.budget_vs_actual", "read", SCOPE_OWN),
     ),
     "Treasury Manager": (
         ("core.company", "read", SCOPE_ANY),
@@ -277,6 +284,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("ar.customer_invoice", "read", SCOPE_OWN),
         ("asset.fixed_asset", "read", SCOPE_OWN),
         ("asset.depreciation", "read", SCOPE_OWN),
+        ("reports.trial_balance", "read", SCOPE_OWN),
     ),
     "Auditor": (
         ("core.company", "read", SCOPE_ANY),
@@ -337,6 +345,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("safety.incident", "read", SCOPE_ANY),
         ("audit.log", "read", SCOPE_ANY),
         ("workflow.approval", "read", SCOPE_ANY),
+        ("reports.trial_balance", "read", SCOPE_ANY),
+        ("reports.budget_vs_actual", "read", SCOPE_ANY),
     ),
     "Viewer": (
         ("core.company", "read", SCOPE_OWN),
@@ -413,6 +423,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("safety.incident", "close", SCOPE_OWN),
         ("workflow.approval", "read", SCOPE_OWN),
         ("workflow.approval", "decide", SCOPE_OWN),
+        ("reports.budget_vs_actual", "read", SCOPE_OWN),
     ),
     "Project Controller": (
         ("core.company", "read", SCOPE_ANY),
@@ -421,6 +432,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("project.planning", "read", SCOPE_OWN),
         ("project.budget", "create", SCOPE_OWN),
         ("project.budget", "read", SCOPE_OWN),
+        ("reports.budget_vs_actual", "read", SCOPE_OWN),
         ("project.change_order", "read", SCOPE_OWN),
         ("project.change_order", "approve", SCOPE_OWN),
         ("project.progress", "read", SCOPE_OWN),

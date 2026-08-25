@@ -1347,3 +1347,89 @@ Integration architecture (`NXR-REQ-0092`-`0096`, Prioridad 4 del
 usuario). `DEFERRED-FINAL-014` (audit log) parcialmente resuelto,
 `DEFERRED-FINAL-016` nuevo (`create_request` sin llamador real). Próximo:
 continuar con Reports/Search/Analytics per `docs/MASTER_PLAN.md`.
+
+## Plan "reports-search-analytics", Task 2 — Reporting: Trial Balance +
+## Budget vs Actual + CSV Export (NXR-REQ-0093/0094)
+
+Construido en worktree aislado `track/h-reporting`, en paralelo con Task 1
+(Global Search) y Task 3 (Settings + Integration Architecture) — sin
+dependencia de archivo compartida salvo `main.py`/`permission_repository.py`,
+resueltos de forma aditiva.
+
+Alcance deliberadamente acotado por la Ruling de
+`docs/superpowers/specs/2026-08-25-reports-search-analytics-design.md`:
+solo Trial Balance + Budget vs Actual. Balance Sheet, P&L, Cash Flow,
+reportes de Treasury/Procurement y Earned Value (CPI/SPI/EAC/VAC) quedan
+explícitamente fuera — no se construyó nada de eso, ni parcialmente.
+
+Antes de escribir código se verificó contra el archivo real que
+`accounting_service.py` **no existe** — `account_balance` vive en
+`treasury_service.py` (`debit_amount - credit_amount`, sin reclasificar
+por `account_type`). Esto significa que el Trial Balance NO necesita
+lógica especial por tipo de cuenta: un balance positivo va siempre a la
+columna débito y uno negativo siempre a la columna crédito, que es
+exactamente la convención correcta para un Trial Balance (a diferencia de
+un Balance Sheet, donde sí habría que reclasificar por tipo). Se agregó
+un test de regresión explícito con una cuenta REVENUE (normalmente
+acreedora) para confirmar que aparece en la columna crédito y no se
+fuerza a positivo/débito.
+
+`budget_service.BudgetSummary` se verificó con los campos reales
+(`authorized`/`committed`/`accrued`/`paid`/`available`, coinciden con lo
+ilustrativo del brief) — `reporting_service.budget_vs_actual` es un
+reshape puro sin recalcular nada.
+
+Backend: `reporting_service.py` (nuevo), `schemas/reporting.py` (nuevo,
+patrón `CamelModel`), `api/routes/reports.py` (nuevo, `GET
+/api/reports/trial-balance?companyId=...` y `GET
+/api/reports/budget-vs-actual?projectId=...`, ambos con
+`assert_company_access`; budget-vs-actual resuelve el proyecto primero
+para su `company_id`, mismo patrón que toda ruta project-scoped ya
+existente). Permisos nuevos `reports.trial_balance`/
+`reports.budget_vs_actual` en `permission_repository.py`, otorgados a
+Finance Manager/Accountant/Auditor (trial balance) y Finance
+Manager/Project Manager/Project Controller/Auditor (budget vs actual);
+Administrator los recibe automáticamente vía `SCOPE_ANY` sobre
+`_BASE_PERMISSIONS`. `backend/tests/test_reporting.py`: 5 tests (cuadre
+débito=crédito real sobre un asiento posteado real, regresión de signo
+con cuenta REVENUE, dos tests de aislamiento de company usando el mismo
+patrón `Finance Manager` que `test_audit.py` estableció, y un test que
+compara byte a byte contra `budget_service.compute_summary` real). RED
+confirmado antes de implementar (404 sin ruta); GREEN después.
+
+Frontend: utilidad compartida `frontend/src/utils/csv.ts` (`toCsv`
+pura + `downloadCsv` con Blob/`<a download>` real), probada como unit
+test puro en `frontend/tests/csv.test.ts` (3 tests: header+filas, escape
+de comillas embebidas, celda vacía honesta en null/undefined) sin
+interceptar una descarga de archivo real. `/control/reportes` ya existía
+como entrada de nav reservada ("Reportes") — no se inventó ruta nueva,
+mismo criterio que `/control/auditoria`/`/inicio/aprobaciones` en tasks
+previas. Como es un único slot de nav para dos reportes distintos, se
+armó `ReportsPage.tsx` con `Tabs` (mismo patrón ya establecido por
+`EquipmentPage.tsx` para alojar sub-vistas bajo un slot), montando
+`TrialBalancePage.tsx` (usa `useActiveCompany`, mismo patrón que
+`AuditLogPage.tsx`) y `BudgetVsActualPage.tsx` (usa `RequiresActiveProject`
+sobre el ActiveUIContext real, mismo patrón que `BudgetPage.tsx` —
+CLAUDE.md §7: ActiveUIContext nunca se confunde con OperationScope). Cada
+página tiene su botón "Exportar CSV" real, deshabilitado cuando no hay
+filas cargadas. `frontend/tests/TrialBalancePage.test.tsx` (2 tests) y
+`frontend/tests/BudgetVsActualPage.test.tsx` (2 tests, incluye clic real
+sobre el segundo tab vía `@testing-library/user-event`).
+
+Verificación: backend 205/205 pytest (200 previos + 5 nuevos en
+`test_reporting.py`), `compileall` limpio. Frontend: `npm ci` corrido una
+vez en el worktree nuevo, typecheck limpio, `eslint .` limpio, 68/68
+vitest (26 archivos, 5 nuevos: `csv.test.ts`, `TrialBalancePage.test.tsx`,
+`BudgetVsActualPage.test.tsx` + los 2 preexistentes que ya cubrían la
+ruta), `npm run build` OK.
+
+`docs/REQUIREMENTS_TRACEABILITY.md`: `NXR-REQ-0093` marcado
+`IN_PROGRESS` (no `IMPLEMENTED` — alcance deliberadamente parcial,
+evidence column nombra explícitamente qué falta); `NXR-REQ-0094` marcado
+`IMPLEMENTED` para alcance CSV-únicamente, XLSX/PDF nombrados
+honestamente como fuera de alcance.
+
+Rama `track/h-reporting` preparada, no fusionada a `feat/nexora-greenfield`
+todavía — pendiente de revisión/merge por el coordinador. Ver
+`.superpowers/sdd/2026-08-25-reports-search-analytics/task-2-report.md`
+para el reporte completo.

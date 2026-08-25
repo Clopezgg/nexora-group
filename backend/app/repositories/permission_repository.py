@@ -90,6 +90,27 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("inventory.stock", "move", "Registrar movimientos de stock"),
     ("inventory.physical_count", "create", "Crear conteos físicos"),
     ("inventory.physical_count", "approve", "Aprobar conteos físicos"),
+    # Track D -- Enterprise Resources (orden maestra §62-66).
+    ("asset.fixed_asset", "create", "Crear activos fijos"),
+    ("asset.fixed_asset", "read", "Ver activos fijos"),
+    ("asset.fixed_asset", "update", "Cambiar estado de un activo fijo"),
+    ("asset.depreciation", "create", "Generar depreciación de un activo fijo"),
+    ("asset.depreciation", "read", "Ver depreciación de un activo fijo"),
+    ("equipment.equipment", "create", "Registrar equipos"),
+    ("equipment.equipment", "read", "Ver equipos"),
+    ("equipment.equipment", "update", "Cambiar estado de un equipo"),
+    ("equipment.fuel_log", "create", "Registrar consumo de combustible"),
+    ("equipment.fuel_log", "read", "Ver consumo de combustible"),
+    ("equipment.maintenance_plan", "create", "Crear planes de mantenimiento"),
+    ("equipment.maintenance_plan", "read", "Ver planes de mantenimiento"),
+    ("equipment.maintenance_order", "create", "Crear órdenes de mantenimiento"),
+    ("equipment.maintenance_order", "read", "Ver órdenes de mantenimiento"),
+    ("equipment.maintenance_order", "update", "Actualizar/cerrar órdenes de mantenimiento"),
+    ("workforce.worker", "create", "Registrar trabajadores"),
+    ("workforce.worker", "read", "Ver trabajadores"),
+    ("workforce.time_entry", "create", "Registrar horas trabajadas"),
+    ("workforce.time_entry", "read", "Ver horas trabajadas"),
+    ("workforce.time_entry", "approve", "Aprobar/rechazar horas trabajadas"),
 )
 # NOTA: ActiveUIContext (GET/PUT /api/context) NO pasa por este motor de
 # permisos -- es una preferencia personal del usuario autenticado (su
@@ -140,6 +161,11 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("ar.customer_invoice", "read", SCOPE_OWN),
         ("ar.customer_receipt", "create", SCOPE_OWN),
         ("ar.customer_receipt", "read", SCOPE_OWN),
+        ("asset.fixed_asset", "create", SCOPE_OWN),
+        ("asset.fixed_asset", "read", SCOPE_OWN),
+        ("asset.fixed_asset", "update", SCOPE_OWN),
+        ("asset.depreciation", "create", SCOPE_OWN),
+        ("asset.depreciation", "read", SCOPE_OWN),
     ),
     "Treasury Manager": (
         ("core.company", "read", SCOPE_ANY),
@@ -182,6 +208,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("procurement.supplier", "read", SCOPE_OWN),
         ("ar.customer_invoice", "create", SCOPE_OWN),
         ("ar.customer_invoice", "read", SCOPE_OWN),
+        ("asset.fixed_asset", "read", SCOPE_OWN),
+        ("asset.depreciation", "read", SCOPE_OWN),
     ),
     "Auditor": (
         ("core.company", "read", SCOPE_ANY),
@@ -217,6 +245,14 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("inventory.item", "read", SCOPE_ANY),
         ("inventory.warehouse", "read", SCOPE_ANY),
         ("inventory.stock", "read", SCOPE_ANY),
+        ("asset.fixed_asset", "read", SCOPE_ANY),
+        ("asset.depreciation", "read", SCOPE_ANY),
+        ("equipment.equipment", "read", SCOPE_ANY),
+        ("equipment.fuel_log", "read", SCOPE_ANY),
+        ("equipment.maintenance_plan", "read", SCOPE_ANY),
+        ("equipment.maintenance_order", "read", SCOPE_ANY),
+        ("workforce.worker", "read", SCOPE_ANY),
+        ("workforce.time_entry", "read", SCOPE_ANY),
     ),
     "Viewer": (
         ("core.company", "read", SCOPE_OWN),
@@ -247,6 +283,10 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("project.change_order", "submit", SCOPE_OWN),
         ("project.progress", "create", SCOPE_OWN),
         ("project.progress", "read", SCOPE_OWN),
+        ("workforce.time_entry", "approve", SCOPE_OWN),
+        ("workforce.time_entry", "read", SCOPE_OWN),
+        ("equipment.equipment", "read", SCOPE_OWN),
+        ("equipment.maintenance_order", "read", SCOPE_OWN),
     ),
     "Project Controller": (
         ("core.company", "read", SCOPE_ANY),
@@ -258,6 +298,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("project.change_order", "read", SCOPE_OWN),
         ("project.change_order", "approve", SCOPE_OWN),
         ("project.progress", "read", SCOPE_OWN),
+        ("asset.depreciation", "read", SCOPE_OWN),
+        ("workforce.time_entry", "read", SCOPE_OWN),
     ),
     "Procurement Manager": (
         ("core.company", "read", SCOPE_OWN),
@@ -313,6 +355,41 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("inventory.stock", "move", SCOPE_OWN),
         ("inventory.physical_count", "create", SCOPE_OWN),
         ("inventory.physical_count", "approve", SCOPE_OWN),
+    ),
+    # Track D -- Enterprise Resources. "Equipment Manager" tiene la custodia
+    # física de activos/equipos/mantenimiento; no otorga asset.depreciation
+    # (eso es contabilización, dueño de Finance Manager/Accountant).
+    "Equipment Manager": (
+        ("core.company", "read", SCOPE_OWN),
+        ("asset.fixed_asset", "create", SCOPE_OWN),
+        ("asset.fixed_asset", "read", SCOPE_OWN),
+        ("asset.fixed_asset", "update", SCOPE_OWN),
+        ("equipment.equipment", "create", SCOPE_OWN),
+        ("equipment.equipment", "read", SCOPE_OWN),
+        ("equipment.equipment", "update", SCOPE_OWN),
+        ("equipment.fuel_log", "create", SCOPE_OWN),
+        ("equipment.fuel_log", "read", SCOPE_OWN),
+        ("equipment.maintenance_plan", "create", SCOPE_OWN),
+        ("equipment.maintenance_plan", "read", SCOPE_OWN),
+        ("equipment.maintenance_order", "create", SCOPE_OWN),
+        ("equipment.maintenance_order", "read", SCOPE_OWN),
+        ("equipment.maintenance_order", "update", SCOPE_OWN),
+        ("workforce.worker", "create", SCOPE_OWN),
+        ("workforce.worker", "read", SCOPE_OWN),
+    ),
+    # "Operations User": personal de campo/site que registra combustible,
+    # abre órdenes de mantenimiento y reporta sus propias horas -- no
+    # aprueba nada (eso corresponde a Project Manager/Equipment Manager).
+    "Operations User": (
+        ("core.company", "read", SCOPE_OWN),
+        ("equipment.equipment", "read", SCOPE_OWN),
+        ("equipment.fuel_log", "create", SCOPE_OWN),
+        ("equipment.fuel_log", "read", SCOPE_OWN),
+        ("equipment.maintenance_order", "create", SCOPE_OWN),
+        ("equipment.maintenance_order", "read", SCOPE_OWN),
+        ("workforce.worker", "read", SCOPE_OWN),
+        ("workforce.time_entry", "create", SCOPE_OWN),
+        ("workforce.time_entry", "read", SCOPE_OWN),
     ),
 }
 

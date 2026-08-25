@@ -8,9 +8,11 @@ from app.api.routes import (
     accounting,
     ap,
     ar,
+    assets,
     auth,
     context,
     dashboard,
+    equipment,
     health,
     inventory,
     master_data,
@@ -18,6 +20,7 @@ from app.api.routes import (
     projects,
     suppliers,
     treasury,
+    workforce,
 )
 from app.core.config import get_settings
 from app.core.database import SessionLocal
@@ -68,6 +71,10 @@ def create_app() -> FastAPI:
     app.include_router(treasury.router, prefix="/api")
     app.include_router(ap.router, prefix="/api")
     app.include_router(ar.router, prefix="/api")
+    # Track D - Enterprise Resources.
+    app.include_router(assets.router, prefix="/api")
+    app.include_router(equipment.router, prefix="/api")
+    app.include_router(workforce.router, prefix="/api")
 
     return app
 

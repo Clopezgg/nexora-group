@@ -29,6 +29,8 @@ DOCUMENT_TYPE_SEEDS = (
     # "SEN" para la entrada de servicio (orden maestra §44-51) para evitar
     # colisión de PK en `document_types.code`.
     ("SEN", "Entrada de servicio", "SEN"),
+    # Track D -- Enterprise Resources (orden maestra §62-69).
+    ("DEP", "Depreciación de activo fijo", "DEP"),
 )
 
 

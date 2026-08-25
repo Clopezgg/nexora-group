@@ -1,6 +1,6 @@
 import os
 
-os.environ["DATABASE_URL"] = "postgresql+psycopg://nexora@localhost:5432/nexora_tracka_test"
+os.environ["DATABASE_URL"] = "postgresql+psycopg://nexora@localhost:5432/nexora_trackd_test"
 os.environ["BOOTSTRAP_ADMIN_EMAIL"] = "admin@nexora.group"
 os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "NexoraAdmin123!"
 os.environ["FRONTEND_URL"] = "http://localhost:5173"

@@ -19,15 +19,20 @@ import { ChangeOrdersPage } from '../features/projects/ChangeOrdersPage'
 import { ProgressPage } from '../features/projects/ProgressPage'
 import { ProjectsPage } from '../features/projects/ProjectsPage'
 import { WBSPage } from '../features/projects/WBSPage'
+import { FixedAssetsPage } from '../features/assets/FixedAssetsPage'
+import { EquipmentPage } from '../features/equipment/EquipmentPage'
 import { navItems } from './navigation'
 
-// Track A (Financial Core), Track B (Project Control) y Track C (Supply
-// Chain) implementan estas rutas; el resto de navItems sigue como
-// PlaceholderPage hasta que su track dueño aterrice.
+// Track A (Financial Core), Track B (Project Control), Track C (Supply
+// Chain) y Track D (Enterprise Resources -- Assets/Equipment/Maintenance;
+// Workforce/Time y Documents/Site/Quality quedan NOT_STARTED en el
+// frontend, ver docs/PROGRESS.md) implementan estas rutas; el resto de
+// navItems sigue como PlaceholderPage hasta que su track dueño aterrice.
 const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/finanzas/tesoreria': <TreasuryPage />,
   '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
   '/finanzas/cuentas-por-cobrar': <AccountsReceivablePage />,
+  '/finanzas/activos': <FixedAssetsPage />,
   '/proyectos': <ProjectsPage />,
   '/proyectos/wbs': <WBSPage />,
   '/proyectos/presupuestos': <BudgetPage />,
@@ -39,6 +44,9 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/abastecimiento/inventario': <InventoryPage />,
   '/abastecimiento/almacenes': <WarehousesPage />,
   '/abastecimiento/proveedores': <SuppliersPage />,
+  '/recursos/equipos': <EquipmentPage />,
+  '/recursos/combustible': <EquipmentPage />,
+  '/recursos/mantenimiento': <EquipmentPage />,
 }
 
 const placeholderRoutes: RouteObject[] = navItems

@@ -6,15 +6,19 @@ from fastapi.responses import JSONResponse
 from app.domain.errors import (
     BudgetBaselineExistsError,
     BudgetCurrencyMismatchError,
+    DepreciationAlreadyPostedError,
     FiscalPeriodClosedError,
     IdempotencyConflictError,
     ImmutableDocumentError,
+    ImmutableMaintenanceOrderError,
     InsufficientStockError,
+    InvalidAssetStateError,
     InvalidChangeOrderStateError,
     InvalidFinancialReferenceError,
     InvalidInvoiceStateError,
     InvalidOperationScopeError,
     InvalidProcurementStateError,
+    InvalidTimeEntryStateError,
     InvalidTransferError,
     NotAuthorizedError,
     OverpaymentError,
@@ -47,6 +51,10 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     BudgetBaselineExistsError: ("NXR-BUDGET-001", 409),
     BudgetCurrencyMismatchError: ("NXR-BUDGET-002", 409),
     InvalidChangeOrderStateError: ("NXR-PROJECT-001", 409),
+    InvalidAssetStateError: ("NXR-ASSET-001", 409),
+    DepreciationAlreadyPostedError: ("NXR-ASSET-002", 409),
+    ImmutableMaintenanceOrderError: ("NXR-EQUIPMENT-001", 409),
+    InvalidTimeEntryStateError: ("NXR-WORKFORCE-001", 409),
 }
 
 

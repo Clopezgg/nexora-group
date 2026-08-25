@@ -179,6 +179,12 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     # (ver docs/superpowers/specs/2026-08-25-reports-search-analytics-design.md).
     ("reports.trial_balance", "read", "Ver el reporte de Balance de Comprobación"),
     ("reports.budget_vs_actual", "read", "Ver el reporte de Presupuesto vs. Real"),
+    # Financial Statements (NXR-REQ-0093, sub-alcance 2026-08-25). Otorgado
+    # exactamente donde reports.trial_balance/read ya está otorgado, mismo
+    # scope -- ver docs/superpowers/specs/2026-08-25-financial-statements-design.md.
+    ("reports.general_ledger", "read", "Ver el Libro Mayor"),
+    ("reports.balance_sheet", "read", "Ver el Balance General"),
+    ("reports.income_statement", "read", "Ver el Estado de Resultados"),
     # Track H -- Reports/Search/Analytics (orden maestra §92-96, NXR-REQ-0092
     # Global Search). Se otorga ampliamente (mismo patrón que
     # document.document/read) porque casi todo rol operativo necesita poder
@@ -246,6 +252,9 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("workflow.approval", "decide", SCOPE_OWN),
         ("reports.trial_balance", "read", SCOPE_OWN),
         ("reports.budget_vs_actual", "read", SCOPE_OWN),
+        ("reports.general_ledger", "read", SCOPE_OWN),
+        ("reports.balance_sheet", "read", SCOPE_OWN),
+        ("reports.income_statement", "read", SCOPE_OWN),
         ("search.global", "read", SCOPE_OWN),
     ),
     "Treasury Manager": (
@@ -294,6 +303,9 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("asset.fixed_asset", "read", SCOPE_OWN),
         ("asset.depreciation", "read", SCOPE_OWN),
         ("reports.trial_balance", "read", SCOPE_OWN),
+        ("reports.general_ledger", "read", SCOPE_OWN),
+        ("reports.balance_sheet", "read", SCOPE_OWN),
+        ("reports.income_statement", "read", SCOPE_OWN),
         ("search.global", "read", SCOPE_OWN),
     ),
     "Auditor": (
@@ -357,6 +369,9 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("workflow.approval", "read", SCOPE_ANY),
         ("reports.trial_balance", "read", SCOPE_ANY),
         ("reports.budget_vs_actual", "read", SCOPE_ANY),
+        ("reports.general_ledger", "read", SCOPE_ANY),
+        ("reports.balance_sheet", "read", SCOPE_ANY),
+        ("reports.income_statement", "read", SCOPE_ANY),
         ("search.global", "read", SCOPE_ANY),
     ),
     "Viewer": (

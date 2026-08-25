@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -21,7 +22,12 @@ router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 
 class ApprovalDecisionRequest(BaseModel):
-    decision: str
+    # Literal whitelist at the schema layer (HTTP callers get a clean 422
+    # straight from Pydantic); approval_service.decide() ALSO validates
+    # this independently (app/services/approval_service.py::APPROVAL_DECISIONS)
+    # since decide() is a service entry point other code calls directly,
+    # not only this route -- don't rely on the schema layer alone.
+    decision: Literal["APPROVED", "REJECTED"]
     comment: str | None = None
 
 

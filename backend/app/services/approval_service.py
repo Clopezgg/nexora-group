@@ -5,10 +5,23 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.domain.errors import InvalidApprovalStateError, SegregationOfDutiesError
+from app.domain.errors import (
+    InvalidApprovalDecisionError,
+    InvalidApprovalStateError,
+    SegregationOfDutiesError,
+)
 from app.models.approval_policy import ApprovalPolicy
 from app.models.approval_request import ApprovalRequest
 from app.repositories import approval_repository
+
+# Mismo patrón que submittal_service.py::SUBMITTAL_DECISIONS -- whitelist
+# explícito, no un enum de dominio separado por módulo. `decide()` valida
+# contra esto ANTES de tocar la base de datos (ver InvalidApprovalDecisionError):
+# la validación de Pydantic en la ruta (`Literal["APPROVED", "REJECTED"]`)
+# cubre el caso HTTP, pero `decide()` es también un entry point de servicio
+# llamado directamente por otro código (Task 3, tests) que no pasa por la
+# ruta -- no se puede confiar solo en la capa de schema.
+APPROVAL_DECISIONS = ("APPROVED", "REJECTED")
 
 """Approval Inbox (Track G / Platform, NXR-REQ-0087/0088/0089). Segregación
 de funciones (INV-WORKFLOW-001): `requested_by != decided_by` siempre; si
@@ -76,6 +89,10 @@ def decide(
     comment: str | None = None,
     executed_by: uuid.UUID | None = None,
 ) -> ApprovalRequest:
+    if decision not in APPROVAL_DECISIONS:
+        raise InvalidApprovalDecisionError(
+            f"decision inválida: {decision!r} (debe ser uno de {APPROVAL_DECISIONS})"
+        )
     request = approval_repository.get_for_update(db, request_id=request_id)
     if request.status != "PENDING":
         raise InvalidApprovalStateError(

@@ -179,3 +179,13 @@ class SegregationOfDutiesError(Exception):
 class InvalidApprovalStateError(Exception):
     """Se intentó decidir un ApprovalRequest que ya no está PENDING
     (doble decisión)."""
+
+
+class InvalidApprovalDecisionError(Exception):
+    """`decision` fuera del whitelist {"APPROVED", "REJECTED"} pasado a
+    `approval_service.decide()` -- se rechaza ANTES de persistir nada
+    sobre el ApprovalRequest ni de llamar al adaptador del dominio, para
+    que `ApprovalRequest.status` nunca quede desincronizado del estado
+    real de la entidad de dominio (p.ej. un adaptador que solo maneja
+    APPROVED/REJECTED haciendo no-op silencioso sobre un valor
+    desconocido)."""

@@ -22,9 +22,10 @@ from app.domain.errors import (
     InvalidOperationScopeError,
     InvalidProcurementStateError,
     InvalidQualityStateError,
+    InvalidApprovalDecisionError,
+    InvalidApprovalStateError,
     InvalidRfiStateError,
     InvalidSafetyRecordError,
-    InvalidApprovalStateError,
     InvalidSafetyStateError,
     InvalidSiteReportStateError,
     InvalidSubmittalStateError,
@@ -83,6 +84,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     InvalidSafetyStateError: ("NXR-SAFETY-002", 409),
     SegregationOfDutiesError: ("NXR-WORKFLOW-001", 422),
     InvalidApprovalStateError: ("NXR-WORKFLOW-002", 409),
+    InvalidApprovalDecisionError: ("NXR-WORKFLOW-003", 422),
 }
 
 

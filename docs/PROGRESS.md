@@ -1816,3 +1816,41 @@ Alembic head `234785d5331f`, no migration.
 Traceability tally: 0 `VERIFIED`, 93 `IMPLEMENTED` (+1), 23
 `IN_PROGRESS`, 6 `NOT_STARTED` (-1), 2 `BLOCKED_EXTERNAL` — 124 rows
 total.
+
+## 2026-08-25 — Crews (closes NXR-REQ-0074)
+
+Continuing down the `NOT_STARTED` list: `Crew`/`CrewMember` (migration
+`24e79c9cb218`), same minimal-scope criterion `Worker` already established
+("covers the least `TimeEntry` needs, not a full HR module") — a named
+group of Workers, `project_id` nullable using the same pattern
+`Warehouse.project_id` already uses (no `OperationScope` engine, that's
+exclusive to financial/administrative documents per `CLAUDE.md` §7), and
+plain membership with no scheduling/rotation by date.
+
+Backend: `workforce_service.create_crew`/`list_crews`/`add_crew_member`/
+`remove_crew_member`/`list_crew_members`; 5 REST endpoints under
+`/api/workforce/crews`; new `workforce.crew` permission
+(`create`/`read`/`manage_members`) granted to Equipment Manager (same
+owner as `workforce.worker`), read also to Operations User and Auditor.
+Added a real `CrewMembershipError` (`NXR-WORKFORCE-002`, 409) for
+duplicate/missing membership instead of letting a bare `ValueError` fall
+through to an unhandled 500 — caught this by actually writing the
+duplicate-membership test first and watching it try to assert on a raw
+500, which is bad API design, not a acceptable "RED" state to build
+toward.
+
+Frontend: `CrewsPage.tsx` at `/recursos/cuadrillas`, which already existed
+as a reserved nav entry ("Cuadrillas", 👷) with no route wired to it
+before this — list/create crews (optional attribution to the active
+project via `ActiveUIContext`), and a members modal to add/remove Workers
+against the real API.
+
+Verification: `cd backend && ./.venv/bin/pytest -q` → 247/247 (+7 tests);
+`compileall` clean; `alembic check` → no drift, single head
+`24e79c9cb218`. `cd frontend && npm run typecheck && npm run lint` clean;
+`npm test -- --run` → 83/83 (+4 tests); `npm run build` clean (same
+pre-existing `DEFERRED-FINAL-017` chunk warning).
+
+Traceability tally: 0 `VERIFIED`, 94 `IMPLEMENTED` (+1), 23
+`IN_PROGRESS`, 5 `NOT_STARTED` (-1), 2 `BLOCKED_EXTERNAL` — 124 rows
+total.

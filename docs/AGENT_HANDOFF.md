@@ -7,8 +7,8 @@ Latest integrated SHA: see `git log -1` on `feat/nexora-greenfield`
 (financial statements slice: `0cfd7cb`/`4603fa5`/`4b928fd`; AP →
 Approval Inbox slice: `8500050`/`3b804c8`/`49b7409`; GL audit
 instrumentation: `adff21c`/`97e2d33`; real AP accrued/paid in Budget vs
-Actual: `0db6ecf`/`17bb521`; Inventory Returns: `dc91a68`, docs commit
-follows this file)
+Actual: `0db6ecf`/`17bb521`; Inventory Returns: `dc91a68`/`06213ed`;
+Crews: `b8ee232`/`7c7cda3`, docs commit follows this file)
 
 **This session is now operating under the user's "CANDADO FINAL" order**:
 no partial/rounded completion claims, `main` stays locked until every
@@ -80,10 +80,16 @@ session, real PostgreSQL, real commands — not inferred):
   `inventory_service.return_to_supplier`, `POST /api/inventory/stock/
   return-to-supplier`. `movement_type="RETURN"` existed only as
   documented intentional debt before this. 243/243 backend tests.
-- Traceability tally after all of the above: 0 `VERIFIED`, 93
-  `IMPLEMENTED`, 23 `IN_PROGRESS`, 6 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
+- Crews (commits `b8ee232`/`7c7cda3`, closes `NXR-REQ-0074`): `Crew`/
+  `CrewMember` (migration `24e79c9cb218`), 5 endpoints under
+  `/api/workforce/crews`, new `CrewMembershipError` (`NXR-WORKFORCE-002`,
+  409 — do NOT let membership errors fall through as a bare 500).
+  `CrewsPage.tsx` at `/recursos/cuadrillas` (was a reserved-but-unwired
+  nav entry). 247/247 backend, 83/83 frontend tests.
+- Traceability tally after all of the above: 0 `VERIFIED`, 94
+  `IMPLEMENTED`, 23 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
   across 124 rows. **This is still far from 100\% by the CANDADO FINAL
-  definition** — 29 rows are not yet `IMPLEMENTED`, and zero rows are
+  definition** — 28 rows are not yet `IMPLEMENTED`, and zero rows are
   `VERIFIED` (VERIFIED requires E2E/independent verification per row,
   which hasn't started). Do not round this up.
 
@@ -116,25 +122,30 @@ RESOLVED this session — do not re-do any of these: `DEFERRED-FINAL-016`
 (AP → Approval Inbox), General Ledger audit instrumentation, real AP
 accrued/paid in Budget vs Actual (`NXR-REQ-0034`/`0035`), the
 `NXR-REQ-0016` traceability reconciliation, `NXR-REQ-0054` Returns
-(`inventory_service.return_to_supplier`, commit `dc91a68`).
+(`inventory_service.return_to_supplier`, commit `dc91a68`), `NXR-REQ-0074`
+Crews (`Crew`/`CrewMember`, commits `b8ee232`/`7c7cda3`).
 
-The 6 rows genuinely `NOT_STARTED` as of this checkpoint (verify with
+The 5 rows genuinely `NOT_STARTED` as of this checkpoint (verify with
 `grep -oE '\| NOT_STARTED \|' docs/REQUIREMENTS_TRACEABILITY.md` combined
 with the row names before trusting this list — it will drift):
 
-1. `NXR-REQ-0074` Crews — nothing built (`⬜` across the board). Good
-   next pick — smallest remaining genuinely-unbuilt scope.
-2. `NXR-REQ-0058` Supplier Performance — deliberately deferred (not
+1. `NXR-REQ-0058` Supplier Performance — deliberately deferred (not
    enough real PO/GR volume to compute honest metrics without fabricating
-   them); re-evaluate only if that premise has changed.
-3. `NXR-REQ-0109` Backup/Restore, `NXR-REQ-0112` E2E (Playwright),
+   them); re-evaluate only if that premise has changed. This is genuinely
+   the last row on the list with no clear resolution path — everything
+   else NOT_STARTED is now infra/hardening-phase.
+2. `NXR-REQ-0109` Backup/Restore, `NXR-REQ-0112` E2E (Playwright),
    `NXR-REQ-0113` Critical User Journey — these are 90–100%
    feature-freeze-phase items per `CLAUDE.md` §10's own "Build Width
-   First" philosophy. With 29/124 rows still not `IMPLEMENTED`, this
+   First" philosophy. With 28/124 rows still not `IMPLEMENTED`, this
    project is not at 90% width yet — prioritize closing more
-   `NOT_STARTED`/`IN_PROGRESS` rows before these, unless the user
-   explicitly asks to jump ahead.
-4. `NXR-REQ-0122` OIDC deployment — blocked on GitHub federated
+   `IN_PROGRESS` rows (there are 23 — a deliberate reconciliation pass
+   over their descriptions against the real code, the same technique that
+   found `NXR-REQ-0034/0035`'s hardcoded zeros and `NXR-REQ-0016`'s stale
+   ownership this session, is likely the next-highest-value use of time)
+   before jumping to these, unless the user explicitly asks to jump
+   ahead.
+3. `NXR-REQ-0122` OIDC deployment — blocked on GitHub federated
    credentials configuration; likely an `EXTERNAL-BLOCKER`, confirm before
    attempting.
 

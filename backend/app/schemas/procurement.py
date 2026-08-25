@@ -90,6 +90,10 @@ class QuotationResponse(CamelModel):
     currency_code: str
     status: str
     total: Decimal
+    delivery_days: int | None
+    payment_terms: str | None
+    valid_until: date | None
+    notes: str | None
     lines: list[QuotationLineResponse] = []
 
 

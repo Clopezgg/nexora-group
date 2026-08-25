@@ -135,6 +135,10 @@ def _quotation_response(db: Session, quotation) -> QuotationResponse:
         currency_code=quotation.currency_code,
         status=quotation.status,
         total=total,
+        delivery_days=quotation.delivery_days,
+        payment_terms=quotation.payment_terms,
+        valid_until=quotation.valid_until,
+        notes=quotation.notes,
         lines=[QuotationLineResponse.model_validate(line, from_attributes=True) for line in lines],
     )
 

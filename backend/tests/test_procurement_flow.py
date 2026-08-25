@@ -418,3 +418,35 @@ def test_creating_po_from_quotation_rejects_a_foreign_companys_quotation(client)
 
     assert response.status_code == 422, response.text
     assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_quotation_exposes_delivery_and_payment_terms_for_bid_comparison(client):
+    """NXR-REQ-0044: comparar cotizaciones necesita más que el total --
+    QuotationResponse omitía delivery_days/payment_terms/valid_until pese a
+    que el modelo ya los tenía."""
+    login_admin(client)
+    company = create_company(client)
+    supplier = _create_supplier(client, company_id=company["id"])
+    rfq = client.post(
+        "/api/procurement/rfqs",
+        json={"companyId": company["id"], "supplierIds": [supplier["id"]]},
+    ).json()
+
+    quotation = client.post(
+        f"/api/procurement/rfqs/{rfq['id']}/quotations",
+        json={
+            "supplierId": supplier["id"],
+            "currencyCode": "HNL",
+            "deliveryDays": 15,
+            "paymentTerms": "50% anticipo, 50% contra entrega",
+            "validUntil": "2026-06-01",
+            "lines": [{"description": "Cemento tipo I", "quantity": "10.0000", "unitPrice": "10.0000"}],
+        },
+    ).json()
+
+    assert quotation["deliveryDays"] == 15
+    assert quotation["paymentTerms"] == "50% anticipo, 50% contra entrega"
+    assert quotation["validUntil"] == "2026-06-01"
+
+    listed = client.get(f"/api/procurement/rfqs/{rfq['id']}/quotations").json()
+    assert listed[0]["deliveryDays"] == 15

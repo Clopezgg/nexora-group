@@ -118,6 +118,15 @@ def get_rfq(db: Session, rfq_id: uuid.UUID) -> RequestForQuotation | None:
     return db.get(RequestForQuotation, rfq_id)
 
 
+def list_rfqs(db: Session, *, company_id: uuid.UUID) -> list[RequestForQuotation]:
+    stmt = (
+        select(RequestForQuotation)
+        .where(RequestForQuotation.company_id == company_id)
+        .order_by(RequestForQuotation.rfq_number.desc())
+    )
+    return list(db.execute(stmt).scalars())
+
+
 def create_quotation(
     db: Session,
     *,

@@ -3,7 +3,11 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.domain.errors import InvalidProcurementStateError, ProcurementCurrencyMismatchError
+from app.domain.errors import (
+    InvalidFinancialReferenceError,
+    InvalidProcurementStateError,
+    ProcurementCurrencyMismatchError,
+)
 from app.models.company import Company
 from app.models.procurement import (
     GoodsReceipt,
@@ -16,6 +20,7 @@ from app.models.procurement import (
 )
 from app.repositories import procurement_repository
 from app.services import inventory_service, numbering_service
+from app.services.financial_validation_service import assert_supplier_belongs_to_company
 
 """Procurement end-to-end (orden maestra §44-51, docs/PROCUREMENT.md).
 Cada función numera su propio documento vía `numbering_service` (nunca
@@ -86,6 +91,8 @@ def create_rfq(
 ) -> RequestForQuotation:
     if not supplier_ids:
         raise InvalidProcurementStateError("Una RFQ debe enviarse a al menos un supplier")
+    for supplier_id in supplier_ids:
+        assert_supplier_belongs_to_company(db, supplier_id=supplier_id, company_id=company_id)
     number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="RFQ")
     rfq = procurement_repository.create_rfq(
         db,
@@ -113,6 +120,10 @@ def submit_quotation(
     notes: str | None,
     lines: list[dict],
 ) -> SupplierQuotation:
+    rfq = procurement_repository.get_rfq(db, request_for_quotation_id)
+    if rfq is None:
+        raise ValueError(f"RequestForQuotation {request_for_quotation_id} no existe")
+    assert_supplier_belongs_to_company(db, supplier_id=supplier_id, company_id=rfq.company_id)
     quotation = procurement_repository.create_quotation(
         db,
         request_for_quotation_id=request_for_quotation_id,
@@ -148,6 +159,11 @@ def create_purchase_order_from_quotation(
     quotation = procurement_repository.get_quotation(db, supplier_quotation_id)
     if quotation is None:
         raise ValueError(f"SupplierQuotation {supplier_quotation_id} no existe")
+    rfq = procurement_repository.get_rfq(db, quotation.request_for_quotation_id)
+    if rfq is None or rfq.company_id != company_id:
+        raise InvalidFinancialReferenceError(
+            "supplier_quotation_id debe pertenecer a una RFQ de la compañía indicada"
+        )
     lines = procurement_repository.list_quotation_lines(db, supplier_quotation_id)
     number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="PO")
     order = procurement_repository.create_purchase_order(

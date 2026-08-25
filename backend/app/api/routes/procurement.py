@@ -92,6 +92,19 @@ def approve_requisition(
     return _requisition_response(db, requisition)
 
 
+@router.get("/rfqs", response_model=list[RfqResponse])
+def list_rfqs(
+    company_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("procurement.rfq", "read")),
+):
+    assert_company_access(
+        db, user_id=user.id, resource="procurement.rfq", action="read", company_id=company_id
+    )
+    rfqs = procurement_repository.list_rfqs(db, company_id=company_id)
+    return [RfqResponse.model_validate(rfq, from_attributes=True) for rfq in rfqs]
+
+
 @router.post("/rfqs", response_model=RfqResponse, status_code=201)
 def create_rfq(
     payload: RfqCreateRequest,
@@ -131,8 +144,16 @@ def submit_quotation(
     rfq_id: uuid.UUID,
     payload: QuotationCreateRequest,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("procurement.quotation", "create")),
+    user=Depends(require_permission("procurement.quotation", "create")),
 ):
+    rfq = procurement_repository.get_rfq(db, rfq_id)
+    if rfq is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="RFQ no encontrada")
+    assert_company_access(
+        db, user_id=user.id, resource="procurement.quotation", action="create", company_id=rfq.company_id
+    )
     quotation = procurement_service.submit_quotation(
         db,
         request_for_quotation_id=rfq_id,
@@ -151,8 +172,16 @@ def submit_quotation(
 def list_quotations(
     rfq_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("procurement.quotation", "read")),
+    user=Depends(require_permission("procurement.quotation", "read")),
 ):
+    rfq = procurement_repository.get_rfq(db, rfq_id)
+    if rfq is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="RFQ no encontrada")
+    assert_company_access(
+        db, user_id=user.id, resource="procurement.quotation", action="read", company_id=rfq.company_id
+    )
     quotations = procurement_repository.list_quotations_for_rfq(db, rfq_id)
     return [_quotation_response(db, q) for q in quotations]
 

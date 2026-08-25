@@ -98,3 +98,10 @@ class ImmutableMaintenanceOrderError(Exception):
 class InvalidTimeEntryStateError(Exception):
     """Transición de estado de TimeEntry inválida (p.ej. aprobar/rechazar un
     registro que ya fue decidido)."""
+
+
+# Track E -- Commercial (orden maestra §72-76).
+class InvalidCommercialStateError(Exception):
+    """Transición de estado inválida en el flujo comercial (p.ej. convertir
+    una Quotation que no está ACCEPTED, o volver a facturar un SalesContract
+    ya BILLED)."""

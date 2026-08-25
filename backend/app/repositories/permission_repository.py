@@ -12,6 +12,7 @@ from app.models.role import Role
 _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("core.company", "create", "Crear compañías"),
     ("core.company", "read", "Ver compañías"),
+    ("core.company", "update", "Actualizar datos de una compañía (Settings)"),
     ("accounting.journal_entry", "create", "Crear asientos contables"),
     ("accounting.journal_entry", "read", "Ver asientos contables"),
     ("accounting.journal_entry", "reverse", "Revertir asientos contables"),
@@ -190,6 +191,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "Administrator": tuple((resource, action, SCOPE_ANY) for resource, action, _ in _BASE_PERMISSIONS),
     "Finance Manager": (
         ("core.company", "read", SCOPE_OWN),
+        ("core.company", "update", SCOPE_OWN),
         ("accounting.journal_entry", "create", SCOPE_OWN),
         ("accounting.journal_entry", "read", SCOPE_OWN),
         ("accounting.journal_entry", "reverse", SCOPE_OWN),

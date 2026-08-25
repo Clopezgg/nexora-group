@@ -35,6 +35,7 @@ import { LeadsPage } from '../features/commercial/LeadsPage'
 import { OpportunitiesPage } from '../features/commercial/OpportunitiesPage'
 import { QuotationsPage } from '../features/commercial/QuotationsPage'
 import { SalesContractsPage } from '../features/commercial/SalesContractsPage'
+import { CompanySettingsPage } from '../features/settings/CompanySettingsPage'
 import { navItems } from './navigation'
 
 // Workforce/Time; Documents/Evidence, RFI/Submittals, and Daily Site
@@ -59,6 +60,9 @@ import { navItems } from './navigation'
 // G, NXR-REQ-0088, Approval Inbox) mismo criterio: ya existía como entrada
 // reservada ("Aprobaciones" bajo el grupo Inicio) en navigation.ts -- no se
 // inventó `/plataforma/aprobaciones` ni ninguna otra ruta nueva.
+// `/control/configuracion` (Task 3, NXR-REQ-0095, Settings) mismo criterio:
+// ya existía como entrada reservada ("Configuración") en navigation.ts --
+// no se inventó una sección nueva, se implementó la ruta ya reservada.
 const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/finanzas/tesoreria': <TreasuryPage />,
   '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
@@ -83,6 +87,7 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/recursos/mantenimiento': <EquipmentPage />,
   '/control/documentos': <DocumentsPage />,
   '/control/auditoria': <AuditLogPage />,
+  '/control/configuracion': <CompanySettingsPage />,
   '/inicio/aprobaciones': <ApprovalInboxPage />,
   '/proyectos/diario-de-obra': <DailyReportsPage />,
   '/proyectos/calidad': <QualityPage />,

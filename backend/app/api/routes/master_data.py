@@ -10,6 +10,7 @@ from app.schemas.master_data import (
     AccountResponse,
     CompanyCreateRequest,
     CompanyResponse,
+    CompanyUpdateRequest,
 )
 from app.services.permission_service import (
     assert_company_access,
@@ -46,6 +47,30 @@ def create_company(
         legal_name=payload.legal_name,
         functional_currency_code=payload.functional_currency_code,
         country=payload.country,
+        fiscal_id=payload.fiscal_id,
+    )
+    db.commit()
+    db.refresh(company)
+    return CompanyResponse.model_validate(company, from_attributes=True)
+
+
+@router.patch("/companies/{company_id}", response_model=CompanyResponse)
+def update_company(
+    company_id: uuid.UUID,
+    payload: CompanyUpdateRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("core.company", "update")),
+) -> CompanyResponse:
+    existing = company_repository.get_by_id(db, company_id)
+    if existing is None:
+        raise ValueError(f"Company {company_id} no existe")
+    assert_company_access(
+        db, user_id=user.id, resource="core.company", action="update", company_id=company_id
+    )
+    company = company_repository.update_company(
+        db,
+        company_id=company_id,
+        legal_name=payload.legal_name,
         fiscal_id=payload.fiscal_id,
     )
     db.commit()

@@ -44,3 +44,23 @@ def create_company(
     db.add(ChartOfAccount(company_id=company.id, name=f"Catálogo contable — {name}"))
     db.flush()
     return company
+
+
+def update_company(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    legal_name: str | None = None,
+    fiscal_id: str | None = None,
+) -> Company:
+    """Solo legal_name/fiscal_id son editables aquí -- code y
+    functional_currency_code son inmutables post-creación (CLAUDE.md)."""
+    company = db.get(Company, company_id)
+    if company is None:
+        raise ValueError(f"Company {company_id} no existe")
+    if legal_name is not None:
+        company.legal_name = legal_name
+    if fiscal_id is not None:
+        company.fiscal_id = fiscal_id
+    db.flush()
+    return company

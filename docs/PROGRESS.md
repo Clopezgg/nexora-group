@@ -1624,3 +1624,53 @@ Recuento exacto de las 124 filas de trazabilidad: 0 `VERIFIED`, 90
 `BLOCKED_EXTERNAL`. `NXR-REQ-0093` permanece honestamente `IN_PROGRESS`
 por sus reportes diferidos; no se infló a `IMPLEMENTED` ni se otorgó ningún
 `VERIFIED` sin E2E.
+
+## 2026-08-25 — Financial Statements: General Ledger + Balance Sheet + Income Statement (NXR-REQ-0093)
+
+Subproyecto de seguimiento de `NXR-REQ-0093`, diseño y plan propios
+(`docs/superpowers/specs/2026-08-25-financial-statements-design.md`,
+`docs/superpowers/plans/2026-08-25-financial-statements.md`), construido
+directamente sobre `feat/nexora-greenfield` (sin worktree/track separado,
+alcance chico y sin dependencias cruzadas).
+
+Backend: `reporting_service.general_ledger`/`balance_sheet`/
+`income_statement` agregan una sola query SQL agrupada por cuenta sobre
+`JournalLine`→`AccountingDocument` (nunca llaman `account_balance()` en
+loop), incluyen documentos `POSTED` y `REVERSED` (nunca `DRAFT`) para que
+reversales neteen a cero, y usan signo natural por `account_type`.
+`balance_sheet()` lanza si `equation_delta != 0` — un Balance Sheet nunca
+sale desbalanceado del servicio. Tres endpoints nuevos con
+`assert_company_access`, validación 422 de rango de fechas y 404 genérico
+(sin fuga cross-company) cuando `accountId` no pertenece a la compañía
+solicitada. Permisos `reports.general_ledger`/`reports.balance_sheet`/
+`reports.income_statement` otorgados exactamente donde ya vivía
+`reports.trial_balance`.
+
+Frontend: tres tabs nuevas en `/control/reportes` — Libro Mayor (paginación
+real Anterior/Siguiente, totales sobre el filtro completo), Balance
+General (secciones Activos/Pasivos/Patrimonio + tarjeta de ecuación con
+delta) y Estado de Resultados (Ingresos/Gastos + utilidad neta). CSV real
+de las filas cargadas; estados de carga/error/vacío honestos.
+
+Verificación real ejecutada en este checkpoint:
+
+- `cd backend && ./.venv/bin/pytest -q` → 228/228 (antes 219; +9 tests:
+  balance sheet, income statement, GL paginado, reversal a cero, rango de
+  fechas inválido, filtro de cuenta cross-company 404, y 403 de
+  aislamiento de company en cada uno de los 3 endpoints nuevos).
+- `./.venv/bin/python -m compileall -q app tests` limpio.
+- `./.venv/bin/alembic heads` → un único head `234785d5331f`, sin
+  migración nueva (diseño elegido explícitamente evita tabla nueva).
+- `cd frontend && npm run typecheck && npm run lint` limpios.
+- `npm test -- --run` → 78/78 (antes 72; +6 tests: ecuación de Balance
+  General, empty state, Estado de Resultados con datos reales, CSV
+  deshabilitado sin filas, paginación real de Libro Mayor con offset,
+  botón Anterior deshabilitado en la primera página).
+- `npm run build` → build/PWA correcto; persiste el warning de chunk
+  >500 kB ya rastreado en `DEFERRED-FINAL-017` (sin cambio, no se atacó en
+  este slice).
+
+`NXR-REQ-0093` permanece `IN_PROGRESS`: Cash Flow (sin clasificación de
+actividad operativa/inversión/financiamiento persistida), reportes de
+Treasury/Procurement y Earned Value compuesto de Project quedan como
+subproyectos futuros independientes.

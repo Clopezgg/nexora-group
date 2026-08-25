@@ -1889,3 +1889,56 @@ npm run typecheck && npm run lint` clean; `npm test -- --run` → 86/86
 Traceability tally: 0 `VERIFIED`, 96 `IMPLEMENTED` (+2), 21
 `IN_PROGRESS` (-2), 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL` — 124 rows
 total.
+
+## 2026-08-25 — Bid Comparison (closes NXR-REQ-0044) + three more real company-isolation fixes
+
+Continued the `IN_PROGRESS` reconciliation pass onto `NXR-REQ-0044` Bid
+Comparison. `docs/PROCUREMENT.md` already flagged one piece of intentional
+debt here: `PurchaseOrderFromQuotationRequest` never validated that the
+quotation belonged to the requesting company ("se confía en que el
+caller ya hizo Bid Comparison correctamente"). Investigating that to fix
+it surfaced two more, more serious gaps in the same pipeline while
+building the screen that finally makes RFQ/Quotations (`NXR-REQ-0042`/
+`0043`, deliberately backend-only until now) visible:
+
+- `GET /rfqs/{rfq_id}/quotations` had **zero** company access check at
+  all — any authenticated user with `procurement.quotation/read` in *any*
+  company could read another company's confidential supplier pricing and
+  terms just by knowing or guessing an `rfq_id`. This was a real
+  cross-tenant read leak, not just a write-path gap like the others found
+  this session.
+- `POST /rfqs/{rfq_id}/quotations` (`submit_quotation`) had the same
+  missing `assert_company_access`, plus never validated the submitted
+  `supplier_id` against the RFQ's company.
+- `procurement_service.create_rfq` never validated `supplier_ids`
+  belonged to the requesting `company_id`.
+
+All four (including the originally-documented one) fixed with the same
+`assert_supplier_belongs_to_company`/company_id-comparison pattern used
+everywhere else in this codebase. Also added `GET /api/procurement/rfqs`
+(list, company-scoped) — it didn't exist at all, so there was no way to
+browse RFQs before drilling into one. `QuotationResponse` gained
+`deliveryDays`/`paymentTerms`/`validUntil`/`notes` — the model already
+had them, but Bid Comparison specifically needs more than price to
+compare bids, and the response omitted them entirely.
+
+Frontend: `BidComparisonPage.tsx` at `/abastecimiento/comparativos`
+(reserved nav entry) — lists RFQs, creates one against a supplier, shows
+the real quotation comparison table, registers new quotations, and lets
+the user pick a winner (creates a real `PurchaseOrder` via the
+now-isolated `from-quotation` endpoint).
+
+Verification: `cd backend && ./.venv/bin/pytest -q` → 258/258 (+13 tests:
+RFQ rejects foreign supplier, RFQ listing + isolation, quotation submit
+requires RFQ-company access, quotation submit rejects foreign supplier,
+quotation listing requires RFQ-company access, PO-from-quotation rejects
+a foreign company's quotation, delivery/payment terms exposed); `compileall`
+clean; `alembic check` → no drift (no schema change). `cd frontend && npm
+run typecheck && npm run lint` clean; `npm test -- --run` → 89/89 (+3);
+`npm run build` clean.
+
+Traceability tally: 0 `VERIFIED`, 97 `IMPLEMENTED` (+1), 20
+`IN_PROGRESS` (-1), 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL` — 124 rows
+total. `NXR-REQ-0042`/`0043` stayed `IMPLEMENTED` but their evidence was
+enriched (their "backend-only" framing is now stale — they have a real
+screen).

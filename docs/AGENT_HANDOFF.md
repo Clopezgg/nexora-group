@@ -9,7 +9,8 @@ Approval Inbox slice: `8500050`/`3b804c8`/`49b7409`; GL audit
 instrumentation: `adff21c`/`97e2d33`; real AP accrued/paid in Budget vs
 Actual: `0db6ecf`/`17bb521`; Inventory Returns: `dc91a68`/`06213ed`;
 Crews: `b8ee232`/`7c7cda3`; Supplier Contracts + company-isolation fix:
-`a1cdb47`/`53908a3`, docs commit follows this file)
+`a1cdb47`/`53908a3`; RFQ/Quotation company-isolation fixes + Bid
+Comparison: `66364b2`/`a3c1c65`/`2a9e6d2`, docs commit follows this file)
 
 **This session is now operating under the user's "CANDADO FINAL" order**:
 no partial/rounded completion claims, `main` stays locked until every
@@ -97,10 +98,26 @@ session, real PostgreSQL, real commands — not inferred):
   guards AP/Budget/Treasury already use. `SupplierContractsPage.tsx` at
   `/abastecimiento/contratos` (reserved-but-unwired nav entry). 251/251
   backend, 86/86 frontend tests.
-- Traceability tally after all of the above: 0 `VERIFIED`, 96
-  `IMPLEMENTED`, 21 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
+- RFQ/Quotation company-isolation fixes + Bid Comparison (commits
+  `66364b2`/`a3c1c65`/`2a9e6d2`, closes `NXR-REQ-0044`, enriches
+  `NXR-REQ-0042`/`0043`): building the comparison screen surfaced a real
+  **cross-tenant READ leak** — `GET /rfqs/{rfq_id}/quotations` had zero
+  `assert_company_access`, so any user with `procurement.quotation/read`
+  in any company could read another company's confidential supplier
+  quotations by guessing an `rfq_id`. Also fixed: `submit_quotation`
+  missing the same check plus no supplier-company validation,
+  `create_rfq` not validating `supplier_ids` against `company_id`, and
+  the already-documented `create_purchase_order_from_quotation` gap (a PO
+  could be created in Company A sourced from Company B's quotation).
+  Added `GET /api/procurement/rfqs` (didn't exist). `BidComparisonPage.tsx`
+  at `/abastecimiento/comparativos` (reserved-but-unwired nav entry) is
+  now the one screen that makes RFQ/Quotations visible — they were
+  deliberately backend-only before. 258/258 backend, 89/89 frontend
+  tests.
+- Traceability tally after all of the above: 0 `VERIFIED`, 97
+  `IMPLEMENTED`, 20 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
   across 124 rows. **This is still far from 100\% by the CANDADO FINAL
-  definition** — 26 rows are not yet `IMPLEMENTED`, and zero rows are
+  definition** — 25 rows are not yet `IMPLEMENTED`, and zero rows are
   `VERIFIED` (VERIFIED requires E2E/independent verification per row,
   which hasn't started). Do not round this up.
 
@@ -136,42 +153,54 @@ accrued/paid in Budget vs Actual (`NXR-REQ-0034`/`0035`), the
 (`inventory_service.return_to_supplier`, commit `dc91a68`), `NXR-REQ-0074`
 Crews (`Crew`/`CrewMember`, commits `b8ee232`/`7c7cda3`),
 `NXR-REQ-0059`/`0060` Supplier Contracts/Subcontracts + the
-`SupplierContract` company-isolation fix (commits `a1cdb47`/`53908a3`).
+`SupplierContract` company-isolation fix (commits `a1cdb47`/`53908a3`),
+`NXR-REQ-0044` Bid Comparison + the RFQ/Quotation pipeline
+company-isolation fixes (commits `66364b2`/`a3c1c65`/`2a9e6d2`).
 
-**Working pattern that paid off repeatedly this session**: pick a row
-whose description names a *specific, narrow* gap (not "needs full
-hardening"), write the tests that gap implies, and see what breaks before
-assuming the description is accurate. This found three real defects
-hiding behind rows that looked like simple scope gaps: hardcoded
+**Working pattern that paid off repeatedly this session — keep using
+it**: pick a row whose description names a *specific, narrow* gap (not
+"needs full hardening"), write the tests that gap implies, and see what
+breaks before assuming the description is accurate. This found SIX real
+defects hiding behind rows that looked like simple scope gaps: hardcoded
 `Decimal("0")` financial figures (`NXR-REQ-0034/0035`), a stale
-traceability ownership note (`NXR-REQ-0016`), and a missing
-`INV-COMP-001` cross-company guard (`NXR-REQ-0059`). Keep using it.
+traceability ownership note (`NXR-REQ-0016`), and four `INV-COMP-001`
+cross-company guards missing across AP/Procurement/RFQ (`NXR-REQ-0059`,
+`NXR-REQ-0044` ×3 — including one **read-path** leak, not just write
+paths, on `GET /rfqs/{id}/quotations`). When a row says "X exists but Y
+screen/test is missing," don't just build Y — check whether X was ever
+actually exercised end-to-end. It often wasn't.
 
 Remaining domain-logic `IN_PROGRESS` rows worth this same treatment
 (narrow, code-reconcilable — NOT the infra/deployment/hardening
 `IN_PROGRESS` rows like `NXR-REQ-0105-0121`, which need actual Azure work,
 not code review):
 
-1. `NXR-REQ-0044` Bid Comparison — `quotation_total()` exists per
-   quotation; row says "no hay endpoint agregado de comparación ni
-   pantalla". `/abastecimiento/comparativos` is ALSO a reserved-but-unwired
-   nav entry (like Crews/Contracts were) — check `docs/PROCUREMENT.md`
-   before designing the aggregate endpoint.
-2. `NXR-REQ-0025` Corrections (posted docs) — row says reversal covers
+1. `NXR-REQ-0025` Corrections (posted docs) — row says reversal covers
    the general case but a domain might need a distinct "correction" flow;
    verify whether any domain has actually hit this gap in practice before
    building anything speculative.
-3. `NXR-REQ-0006` Tax architecture — `TaxCode`/`TaxLine` exist and feed
+2. `NXR-REQ-0006` Tax architecture — `TaxCode`/`TaxLine` exist and feed
    `posting_service.post_manual`, but there's no tax calculation service
    or API. Verify whether any domain actually needs computed tax before
    building — this could be legitimately out of scope rather than a gap.
-4. `NXR-REQ-0008`/`NXR-REQ-0009` Authentication/Sessions — row says
+3. `NXR-REQ-0008`/`NXR-REQ-0009` Authentication/Sessions — row says
    "sigue faltando CSRF/rate-limit/lockout"; this overlaps with
    `NXR-REQ-0107` Security, which is more clearly a 90%+ hardening-phase
-   item. Lower priority than 1-3 above.
-5. `NXR-REQ-0001` Core platform — very broad ("🔶" across most columns),
+   item. Lower priority than 1-2 above.
+4. `NXR-REQ-0001` Core platform — very broad ("🔶" across most columns),
    likely not a single reconcilable gap; read what it actually still
    expects before touching it.
+
+That's close to exhausting the well-scoped `IN_PROGRESS` domain-logic
+rows (down to ~19, mostly infra/hardening/deployment). A different
+high-value move at this point: **grep every route file for a `GET`
+handler on an `{id}`-style path that does NOT call `assert_company_access`
+before touching the resource**, the same pattern that found the RFQ
+quotations read leak. That leak was found by code-reading while building
+an unrelated screen, not by a systematic search — a deliberate pass
+across `app/api/routes/*.py` for that exact shape is likely to find more,
+and a cross-tenant read leak is a more serious class of defect than
+anything else found so far this session.
 
 Then continue the audit-instrumentation backlog in `docs/AUDIT.md` (still
 open: Project Control, Enterprise Resources, Commercial, Construction

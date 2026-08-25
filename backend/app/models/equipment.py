@@ -17,6 +17,14 @@ class Equipment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     capitaliza como Fixed Asset (p.ej. herramienta menor)."""
 
     __tablename__ = "equipment"
+    __table_args__ = (
+        CheckConstraint("hour_meter >= 0", name="ck_equipment_hour_meter_non_negative"),
+        CheckConstraint("odometer >= 0", name="ck_equipment_odometer_non_negative"),
+        CheckConstraint(
+            "status IN ('AVAILABLE','IN_USE','UNDER_MAINTENANCE','OUT_OF_SERVICE')",
+            name="ck_equipment_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
@@ -51,6 +59,9 @@ class FuelLog(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "OR (scope = 'PROJECT' AND project_id IS NOT NULL)",
             name="ck_fuel_logs_operation_scope",
         ),
+        CheckConstraint("quantity > 0", name="ck_fuel_logs_quantity_positive"),
+        CheckConstraint("unit_cost > 0", name="ck_fuel_logs_unit_cost_positive"),
+        CheckConstraint("total_cost > 0", name="ck_fuel_logs_total_cost_positive"),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -71,12 +82,19 @@ class FuelLog(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 MAINTENANCE_TYPES = ("PREVENTIVE", "CORRECTIVE")
-MAINTENANCE_ORDER_STATUSES = ("OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED")
+# "CLOSED" (no "COMPLETED"): un MaintenanceOrder CLOSED o CANCELLED es
+# terminal e inmutable -- ver maintenance_service.update_maintenance_order,
+# INV-EQP-001.
+MAINTENANCE_ORDER_STATUSES = ("OPEN", "IN_PROGRESS", "CLOSED", "CANCELLED")
+MAINTENANCE_TERMINAL_STATUSES = ("CLOSED", "CANCELLED")
 MAINTENANCE_TRIGGER_TYPES = ("DATE", "HOURS", "ODOMETER")
 
 
 class MaintenancePlan(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "maintenance_plans"
+    __table_args__ = (
+        CheckConstraint("trigger_value > 0", name="ck_maintenance_plans_trigger_value_positive"),
+    )
 
     equipment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("equipment.id", ondelete="CASCADE"), nullable=False
@@ -90,6 +108,21 @@ class MaintenancePlan(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class MaintenanceOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "maintenance_orders"
+    __table_args__ = (
+        CheckConstraint("parts_cost >= 0", name="ck_maintenance_orders_parts_cost_non_negative"),
+        CheckConstraint("labor_cost >= 0", name="ck_maintenance_orders_labor_cost_non_negative"),
+        CheckConstraint(
+            "downtime_hours >= 0", name="ck_maintenance_orders_downtime_hours_non_negative"
+        ),
+        CheckConstraint(
+            "status IN ('OPEN','IN_PROGRESS','CLOSED','CANCELLED')",
+            name="ck_maintenance_orders_status_valid",
+        ),
+        CheckConstraint(
+            "order_type IN ('PREVENTIVE','CORRECTIVE')",
+            name="ck_maintenance_orders_type_valid",
+        ),
+    )
 
     equipment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("equipment.id", ondelete="CASCADE"), nullable=False

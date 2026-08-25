@@ -8,6 +8,7 @@ from app.models.accounting import (
 from app.models.ap import SupplierInvoice, SupplierPayment
 from app.models.approval_policy import ApprovalPolicy
 from app.models.ar import CustomerInvoice, CustomerReceipt
+from app.models.asset import DepreciationEntry, FixedAsset
 from app.models.budget import Budget, BudgetLine
 from app.models.business_unit import BusinessUnit
 from app.models.change_order import ChangeOrder
@@ -16,6 +17,7 @@ from app.models.company import Company
 from app.models.cost_center import CostCenter, EconomicCategory
 from app.models.currency import Currency, ExchangeRate
 from app.models.document_type import DocumentType
+from app.models.equipment import Equipment, FuelLog, MaintenanceOrder, MaintenancePlan
 from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.models.idempotency import IdempotencyRecord
 from app.models.inventory import PhysicalCount, PhysicalCountLine, StockLedgerEntry
@@ -59,6 +61,7 @@ from app.models.user_context import UserContext
 from app.models.user_role import UserRole
 from app.models.warehouse import Warehouse
 from app.models.wbs import WBSNode
+from app.models.workforce import TimeEntry, Worker
 
 __all__ = [
     "Account",
@@ -78,11 +81,15 @@ __all__ = [
     "Currency",
     "CustomerInvoice",
     "CustomerReceipt",
+    "DepreciationEntry",
     "DocumentType",
     "EconomicCategory",
+    "Equipment",
     "ExchangeRate",
     "FiscalPeriod",
     "FiscalYear",
+    "FixedAsset",
+    "FuelLog",
     "FundRestriction",
     "GeneralExpense",
     "GoodsReceipt",
@@ -90,6 +97,8 @@ __all__ = [
     "IdempotencyRecord",
     "Item",
     "JournalLine",
+    "MaintenanceOrder",
+    "MaintenancePlan",
     "Milestone",
     "NumberSequence",
     "Permission",
@@ -121,6 +130,7 @@ __all__ = [
     "TaxCode",
     "TaxLine",
     "ThreeWayMatchResult",
+    "TimeEntry",
     "TreasuryAccount",
     "TreasuryTransfer",
     "User",
@@ -129,4 +139,5 @@ __all__ = [
     "UserRole",
     "Warehouse",
     "WBSNode",
+    "Worker",
 ]

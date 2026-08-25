@@ -77,3 +77,24 @@ class BudgetBaselineExistsError(Exception):
 
 class InvalidChangeOrderStateError(Exception):
     """Transición de estado de ChangeOrder inválida (orden maestra §43)."""
+
+
+# Track D -- Enterprise Resources (orden maestra §62-66).
+class InvalidAssetStateError(Exception):
+    """Transición de estado de FixedAsset inválida (p.ej. depreciar un
+    activo DISPOSED/RETIRED)."""
+
+
+class DepreciationAlreadyPostedError(Exception):
+    """INV-AST-001: ya existe un DepreciationEntry para ese asset+periodo;
+    nunca se genera un segundo posting DEP para el mismo periodo."""
+
+
+class ImmutableMaintenanceOrderError(Exception):
+    """INV-EQP-001: un MaintenanceOrder CLOSED/CANCELLED es terminal -- no se
+    permite ninguna mutación posterior, solo lectura."""
+
+
+class InvalidTimeEntryStateError(Exception):
+    """Transición de estado de TimeEntry inválida (p.ej. aprobar/rechazar un
+    registro que ya fue decidido)."""

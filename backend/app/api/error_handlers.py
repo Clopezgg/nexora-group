@@ -21,8 +21,13 @@ from app.domain.errors import (
     InvalidInvoiceStateError,
     InvalidOperationScopeError,
     InvalidProcurementStateError,
+    InvalidQualityStateError,
+    InvalidSafetyRecordError,
+    InvalidSafetyStateError,
+    InvalidSiteReportStateError,
     InvalidTimeEntryStateError,
     InvalidTransferError,
+    NonConformanceRequiresCorrectiveActionError,
     NotAuthorizedError,
     OverpaymentError,
     ProcurementCurrencyMismatchError,
@@ -65,6 +70,11 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     EvidenceTooLargeError: ("NXR-EVIDENCE-003", 422),
     EvidenceStorageNotConfigured: ("NXR-EVIDENCE-001", 503),
     InvalidDocumentStateError: ("NXR-DOCUMENT-001", 409),
+    InvalidSiteReportStateError: ("NXR-SITE-001", 409),
+    InvalidQualityStateError: ("NXR-QUALITY-001", 409),
+    NonConformanceRequiresCorrectiveActionError: ("NXR-QUALITY-002", 409),
+    InvalidSafetyRecordError: ("NXR-SAFETY-001", 422),
+    InvalidSafetyStateError: ("NXR-SAFETY-002", 409),
 }
 
 

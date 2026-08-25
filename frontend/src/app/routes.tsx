@@ -13,6 +13,7 @@ import { PurchaseOrdersPage } from '../features/procurement/PurchaseOrdersPage'
 import { RequisitionsPage } from '../features/procurement/RequisitionsPage'
 import { SuppliersPage } from '../features/procurement/SuppliersPage'
 import { SupplierContractsPage } from '../features/procurement/SupplierContractsPage'
+import { BidComparisonPage } from '../features/procurement/BidComparisonPage'
 import { InventoryPage } from '../features/inventory/InventoryPage'
 import { WarehousesPage } from '../features/inventory/WarehousesPage'
 import { BudgetPage } from '../features/projects/BudgetPage'
@@ -90,6 +91,7 @@ const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
   '/abastecimiento/almacenes': <WarehousesPage />,
   '/abastecimiento/proveedores': <SuppliersPage />,
   '/abastecimiento/contratos': <SupplierContractsPage />,
+  '/abastecimiento/comparativos': <BidComparisonPage />,
   '/recursos/personal': <WorkersPage />,
   '/recursos/cuadrillas': <CrewsPage />,
   '/recursos/tiempo': <TimeEntriesPage />,

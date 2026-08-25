@@ -1,5 +1,13 @@
 import { apiFetch } from './httpClient'
-import type { GoodsReceipt, PurchaseOrder, Requisition, Supplier, SupplierContract } from '../types/procurement'
+import type {
+  GoodsReceipt,
+  PurchaseOrder,
+  Quotation,
+  Requisition,
+  Rfq,
+  Supplier,
+  SupplierContract,
+} from '../types/procurement'
 
 export const procurementService = {
   listSuppliers: (companyId: string) =>
@@ -50,6 +58,35 @@ export const procurementService = {
     apiFetch<PurchaseOrder>(`/procurement/purchase-orders/${id}/approve`, { method: 'POST' }),
   sendPurchaseOrder: (id: string) =>
     apiFetch<PurchaseOrder>(`/procurement/purchase-orders/${id}/send`, { method: 'POST' }),
+
+  listRfqs: (companyId: string) => apiFetch<Rfq[]>(`/procurement/rfqs?company_id=${companyId}`),
+  createRfq: (payload: { companyId: string; supplierIds: string[]; dueDate?: string; terms?: string }) =>
+    apiFetch<Rfq>('/procurement/rfqs', { method: 'POST', body: JSON.stringify(payload) }),
+  listQuotations: (rfqId: string) => apiFetch<Quotation[]>(`/procurement/rfqs/${rfqId}/quotations`),
+  createQuotation: (
+    rfqId: string,
+    payload: {
+      supplierId: string
+      currencyCode: string
+      deliveryDays?: number
+      paymentTerms?: string
+      validUntil?: string
+      lines: { description: string; quantity: string; unitPrice: string }[]
+    },
+  ) =>
+    apiFetch<Quotation>(`/procurement/rfqs/${rfqId}/quotations`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  createPurchaseOrderFromQuotation: (payload: {
+    companyId: string
+    supplierQuotationId: string
+    projectId?: string
+  }) =>
+    apiFetch<PurchaseOrder>('/procurement/purchase-orders/from-quotation', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   listGoodsReceipts: (purchaseOrderId: string) =>
     apiFetch<GoodsReceipt[]>(`/procurement/goods-receipts?purchase_order_id=${purchaseOrderId}`),

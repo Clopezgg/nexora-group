@@ -68,6 +68,36 @@ export interface PurchaseOrder {
   lines: PurchaseOrderLine[]
 }
 
+export interface Rfq {
+  id: string
+  rfqNumber: string
+  purchaseRequisitionId: string | null
+  dueDate: string | null
+  status: string
+}
+
+export interface QuotationLine {
+  id: string
+  description: string
+  quantity: string
+  unitPrice: string
+  taxAmount: string
+}
+
+export interface Quotation {
+  id: string
+  requestForQuotationId: string
+  supplierId: string
+  currencyCode: string
+  status: string
+  total: string
+  deliveryDays: number | null
+  paymentTerms: string | null
+  validUntil: string | null
+  notes: string | null
+  lines: QuotationLine[]
+}
+
 export interface GoodsReceipt {
   id: string
   receiptNumber: string

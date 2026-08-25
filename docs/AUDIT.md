@@ -184,6 +184,19 @@ auditable real para esa entidad es su creación
 (`POST /api/treasury/remittances`), así que se instrumentó esa en su
 lugar.
 
+## Dominios instrumentados (2026-08-25, backlog burn-down)
+
+| Dominio | Acción | Ruta |
+|---------|--------|------|
+| Financial Core / General Ledger | `accounting.journal_entry.create` | `POST /api/accounting/journal-entries` |
+| Financial Core / General Ledger | `accounting.journal_entry.reverse` | `POST /api/accounting/journal-entries/{id}/reverse` |
+
+El reversal audita el documento **original** (`entity_id` = el documento
+que transiciona `POSTED -> REVERSED`), no el nuevo documento de reversal
+que se crea junto a él — ese es un side effect de la misma operación, no
+la entidad cuyo estado mutó. `after.reversalDocumentId` enlaza al
+reversal para quien lea el log.
+
 ## Dominios NO instrumentados todavía (backlog honesto)
 
 Ningún otro dominio tiene audit log todavía. Esto es deliberado e
@@ -197,12 +210,10 @@ incremental (ver design doc), no un olvido:
   venta, AR) — `NOT_STARTED`.
 - **Construction Control** (Documents/Evidence, RFI/Submittals, Daily
   Site Reports, Quality, Safety) — `NOT_STARTED`.
-- Dentro de Financial Core: General Ledger (asientos manuales / reversal),
-  Transfers, General Expenses, Fund Restrictions, Bank Reconciliation
-  (match/exclude) tampoco están instrumentados todavía — solo se cubrieron
-  las rutas de aprobación/creación de mayor valor de auditoría de este
-  task (AP approve/pay, Treasury cash-closing approve + remittance
-  create, Procurement PO approve).
+- Dentro de Financial Core: Transfers, General Expenses, Fund
+  Restrictions, Bank Reconciliation (match/exclude) tampoco están
+  instrumentados todavía. General Ledger (asientos manuales / reversal)
+  ya se cerró (2026-08-25, ver arriba).
 
 Un futuro task puede cerrar estos dominios uno por uno reutilizando
 exactamente el patrón de esta página: leer la ruta real, agregar
@@ -221,8 +232,12 @@ un dominio nuevo.
 - `tests/test_treasury_operations.py`: `test_approving_cash_closing_creates_audit_log_entry`,
   `test_registering_remittance_creates_audit_log_entry`.
 - `tests/test_procurement_flow.py`: `test_approving_purchase_order_creates_audit_log_entry`.
+- `tests/test_posting_engine.py`: `test_creating_journal_entry_creates_audit_log_entry`,
+  `test_reversing_journal_entry_creates_audit_log_entry` (2026-08-25).
 - `frontend/tests/AuditLogPage.test.tsx`: página real contra la API real
-  (mockeada a nivel de `fetch`), nunca datos fabricados.
+  (mockeada a nivel de `fetch`), nunca datos fabricados. No necesitó
+  cambios para el nuevo dominio — la página ya es genérica sobre
+  `entityType`.
 
 ## Limitación conocida: no atomicidad entre la decisión y el audit write
 

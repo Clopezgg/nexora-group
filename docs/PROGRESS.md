@@ -1723,3 +1723,23 @@ Verification executed in this checkpoint:
 `submittal_service` remains unconnected to `create_request` — left as a
 possible future subproject, not silently dropped (see updated
 `DEFERRED-FINAL-016` entry in `docs/DEFERRED.md`).
+
+## 2026-08-25 — Audit: General Ledger manual entries + reversal instrumented
+
+Closed the "General Ledger (asientos manuales / reversal)" line from
+`docs/AUDIT.md`'s honest backlog. `POST /api/accounting/journal-entries`
+now records `accounting.journal_entry.create`; `POST /api/accounting/
+journal-entries/{id}/reverse` records `accounting.journal_entry.reverse`
+against the **original** document's `entity_id` (the entity whose status
+actually transitions `POSTED -> REVERSED`), with `after.reversalDocumentId`
+linking to the new reversal document. Same instrumentation pattern as the
+existing AP/Treasury/Procurement routes — no `AuditLog`/`audit_service`
+change needed, and `AuditLogPage.tsx` needed no frontend change (already
+generic over `entityType`).
+
+Verification: `cd backend && ./.venv/bin/pytest -q` → 237/237 (+2 tests);
+`compileall` clean; single Alembic head `234785d5331f`, no migration.
+Remaining audit backlog (Project Control, Enterprise Resources,
+Commercial, Construction Control, and Transfers/General Expenses/Fund
+Restrictions/Bank Reconciliation within Financial Core) is unchanged and
+still honestly listed in `docs/AUDIT.md`.

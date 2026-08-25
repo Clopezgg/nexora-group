@@ -5,7 +5,8 @@ Repository: Clopezgg/nexora-group
 Canonical branch: feat/nexora-greenfield
 Latest integrated SHA: see `git log -1` on `feat/nexora-greenfield`
 (financial statements slice: `0cfd7cb`/`4603fa5`/`4b928fd`; AP →
-Approval Inbox slice: `8500050`/`3b804c8`, docs commit follows this file)
+Approval Inbox slice: `8500050`/`3b804c8`/`49b7409`; GL audit
+instrumentation: `adff21c`, docs commit follows this file)
 
 ## Canonical state
 
@@ -87,13 +88,21 @@ Housekeeping notes for whoever reads this next:
 ## Next priority
 
 `DEFERRED-FINAL-016` is now RESOLVED (see above) — do not re-do it or
-re-wire AP again. Highest-value dependency-free gaps at this checkpoint,
-confirmed against the real code (grep, not assumption) as of 2026-08-25:
+re-wire AP again. The General Ledger (manual entries/reversal) audit gap
+is also RESOLVED (`accounting.journal_entry.create`/`.reverse`, commit
+`adff21c`) — do not re-instrument it. Highest-value dependency-free gaps
+at this checkpoint, confirmed against the real code (grep, not
+assumption) as of 2026-08-25:
 
 1. Continue the explicit audit-instrumentation backlog documented in
-   `docs/AUDIT.md` (domains still missing `AuditLog` instrumentation —
-   e.g. AP invoice create/cancel are explicitly called out as
-   uninstrumented in the `NXR-REQ-0023` traceability row).
+   `docs/AUDIT.md` — still open: Project Control (WBS/Budgets/Change
+   Orders/Progress), Enterprise Resources (Fixed Assets/Equipment/
+   Workforce), Commercial (CRM/AR), Construction Control (Documents/RFI/
+   Submittals/Daily Reports/Quality/Safety), and within Financial Core:
+   Transfers/General Expenses/Fund Restrictions/Bank Reconciliation. Also
+   AP invoice create/cancel specifically (called out in the
+   `NXR-REQ-0023` traceability row) — only approve/pay/submit are
+   instrumented on AP so far.
 2. Optionally extend the same Approval Inbox pattern just built for AP to
    `submittal_service` (still not wired to `approval_service.
    create_request`, see `docs/DEFERRED.md` `DEFERRED-FINAL-016` for why it

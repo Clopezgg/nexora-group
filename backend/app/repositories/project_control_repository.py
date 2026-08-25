@@ -152,7 +152,7 @@ def create_progress_record(
     wbs_node_id: uuid.UUID | None = None,
     description: str | None = None,
     responsible: str | None = None,
-    evidence_ref: str | None = None,
+    evidence_id: uuid.UUID | None = None,
 ) -> ProgressRecord:
     record = ProgressRecord(
         project_id=project_id,
@@ -162,7 +162,7 @@ def create_progress_record(
         actual_percent=actual_percent,
         description=description,
         responsible=responsible,
-        evidence_ref=evidence_ref,
+        evidence_id=evidence_id,
     )
     db.add(record)
     db.flush()

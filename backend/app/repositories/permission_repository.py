@@ -127,6 +127,13 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("crm.quotation", "convert", "Convertir una cotización aceptada en contrato de venta"),
     ("crm.sales_contract", "read", "Ver contratos de venta"),
     ("crm.sales_contract", "bill", "Facturar un contrato de venta (crea factura AR real)"),
+    # Track D -- Construction Control: Documents/Evidence (orden maestra
+    # §77-79, docs/DOCUMENTS_EVIDENCE.md).
+    ("document.document", "create", "Crear documentos (con su primera versión)"),
+    ("document.document", "read", "Ver documentos"),
+    ("document.document", "version", "Subir una nueva versión de un documento"),
+    ("document.evidence", "create", "Subir evidencia (foto/archivo) a Azure Blob"),
+    ("document.evidence", "read", "Ver metadata de evidencia subida"),
 )
 # NOTA: ActiveUIContext (GET/PUT /api/context) NO pasa por este motor de
 # permisos -- es una preferencia personal del usuario autenticado (su
@@ -276,6 +283,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("crm.opportunity", "read", SCOPE_ANY),
         ("crm.quotation", "read", SCOPE_ANY),
         ("crm.sales_contract", "read", SCOPE_ANY),
+        ("document.document", "read", SCOPE_ANY),
+        ("document.evidence", "read", SCOPE_ANY),
     ),
     "Viewer": (
         ("core.company", "read", SCOPE_OWN),
@@ -291,6 +300,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("project.budget", "read", SCOPE_OWN),
         ("project.change_order", "read", SCOPE_OWN),
         ("project.progress", "read", SCOPE_OWN),
+        ("document.document", "read", SCOPE_OWN),
+        ("document.evidence", "read", SCOPE_OWN),
     ),
     "Project Manager": (
         ("core.company", "read", SCOPE_ANY),
@@ -310,6 +321,11 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("workforce.time_entry", "read", SCOPE_OWN),
         ("equipment.equipment", "read", SCOPE_OWN),
         ("equipment.maintenance_order", "read", SCOPE_OWN),
+        ("document.document", "create", SCOPE_OWN),
+        ("document.document", "read", SCOPE_OWN),
+        ("document.document", "version", SCOPE_OWN),
+        ("document.evidence", "create", SCOPE_OWN),
+        ("document.evidence", "read", SCOPE_OWN),
     ),
     "Project Controller": (
         ("core.company", "read", SCOPE_ANY),
@@ -323,6 +339,8 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("project.progress", "read", SCOPE_OWN),
         ("asset.depreciation", "read", SCOPE_OWN),
         ("workforce.time_entry", "read", SCOPE_OWN),
+        ("document.document", "read", SCOPE_OWN),
+        ("document.evidence", "read", SCOPE_OWN),
     ),
     "Procurement Manager": (
         ("core.company", "read", SCOPE_OWN),

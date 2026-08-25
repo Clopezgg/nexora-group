@@ -180,7 +180,7 @@ class ProgressRecordCreateRequest(CamelModel):
     wbs_node_id: uuid.UUID | None = None
     description: str | None = None
     responsible: str | None = None
-    evidence_ref: str | None = None
+    evidence_id: uuid.UUID | None = None
 
 
 class ProgressRecordResponse(CamelModel):
@@ -192,4 +192,4 @@ class ProgressRecordResponse(CamelModel):
     actual_percent: Decimal
     description: str | None
     responsible: str | None
-    evidence_ref: str | None
+    evidence_id: uuid.UUID | None

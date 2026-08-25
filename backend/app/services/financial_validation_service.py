@@ -8,6 +8,7 @@ from app.models.accounting import OPERATION_SCOPES
 from app.models.chart_of_accounts import Account, ChartOfAccount
 from app.models.cost_center import CostCenter
 from app.models.crm import Customer
+from app.models.evidence import Evidence
 from app.models.project import Project
 from app.models.supplier import Supplier
 
@@ -85,3 +86,21 @@ def assert_customer_belongs_to_company(
             "customer_id debe pertenecer a la compañía propietaria"
         )
     return customer
+
+
+def assert_evidence_belongs_to_company(
+    db: Session, *, evidence_id: uuid.UUID | None, company_id: uuid.UUID
+) -> Evidence | None:
+    """Track D (Construction Control, docs/DOCUMENTS_EVIDENCE.md): cualquier
+    FK `evidence_id` de cualquier dominio (ProgressRecord aquí; Daily Site
+    Report/Quality/Safety en tasks posteriores) se valida con este mismo
+    helper -- nunca se persiste una referencia a Evidence de otra
+    compañía."""
+    if evidence_id is None:
+        return None
+    evidence = db.get(Evidence, evidence_id)
+    if evidence is None or evidence.company_id != company_id:
+        raise InvalidFinancialReferenceError(
+            "evidence_id debe pertenecer a la compañía propietaria"
+        )
+    return evidence

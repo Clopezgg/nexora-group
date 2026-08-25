@@ -30,6 +30,7 @@ from app.schemas.project_control import (
     WBSNodeResponse,
 )
 from app.services import budget_service, forecast_service
+from app.services.financial_validation_service import assert_evidence_belongs_to_company
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -425,6 +426,9 @@ def create_progress(
     assert_company_access(
         db, user_id=user.id, resource="project.progress", action="create", company_id=project.company_id
     )
+    assert_evidence_belongs_to_company(
+        db, evidence_id=payload.evidence_id, company_id=project.company_id
+    )
     record = project_control_repository.create_progress_record(
         db,
         project_id=project_id,
@@ -434,7 +438,7 @@ def create_progress(
         wbs_node_id=payload.wbs_node_id,
         description=payload.description,
         responsible=payload.responsible,
-        evidence_ref=payload.evidence_ref,
+        evidence_id=payload.evidence_id,
     )
     db.commit()
     db.refresh(record)

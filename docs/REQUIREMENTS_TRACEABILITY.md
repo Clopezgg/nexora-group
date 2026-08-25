@@ -227,40 +227,43 @@ CONSTRUCTION CONTROL completo (`NXR-REQ-0077-0086`) está ahora
 
 ## Resumen
 
-Recontado tras Track E (Commercial), pendiente de integración por el
-coordinador, sobre la base de Track 1+F+B+C+A+D ya integrados:
+Recontado en Task 5 del plan `2026-08-25-track-d-construction-control`
+(Tasks 1-4 — Documents/Evidence, Workforce/Time UI, Daily Site Reports/
+Quality/Safety, RFI/Submittals — todas fusionadas a
+`feat/nexora-greenfield` @ `20445a5`), sobre la base de Track
+1+F+B+C+A+D+E ya integrados. Recontado línea por línea contra la tabla
+real (no contra el resumen anterior):
 
 - **VERIFIED:** 0 / 124 (reservado para cuando el coordinador confirme
   comportamiento end-to-end en `feat/nexora-greenfield` — ningún track se
   autootorga `VERIFIED`)
-- **IMPLEMENTED:** 69 / 124 — Track 1: NXR-REQ-0002/0003/0004/0005/0007/
-  0010/0011/0012/0013/0014/0015/0026/0027 (13). Track A: NXR-REQ-0017 a
-  0024, 0080 y 0111 (10). Track F: NXR-REQ-0097 a 0104 (8). Track B:
-  NXR-REQ-0028/0029/0030/0031/0032/0036/0037/0038/0039 (9). Track B+C:
-  NXR-REQ-0033 — Commitments, atribuido a Project Control pero cubierto
-  por la integración de POs de Track C (1). Track C:
-  NXR-REQ-0040/0041/0042/0043/0045/0046/0047/0048/0049/0050/0051/0052/
-  0053/0055/0056/0057 (16). Track D: NXR-REQ-0068/0069/0070/0071/0072 —
-  Fixed Assets/Depreciation/Equipment/Fuel log/Maintenance (5). Track E:
-  NXR-REQ-0061/0062/0063/0064/0065/0066/0067 — Leads/Opportunities/
-  Customers/Sales Quotations/Sales Contracts/Customer Invoices (desde
-  Commercial)/Collections (desde Commercial) (7).
-- **IN_PROGRESS:** 26 / 124 (20 previos + 3 de Track C: 0044 Bid
-  Comparison, 0059/0060 Contracts/Subcontracts + 3 de Track D: 0073/0075/
-  0076 — Employees/Time Entries/Labor Cost, backend+API+tests completos,
-  sin pantalla dedicada todavía)
-- **NOT_STARTED:** 27 / 124 (incluye 0054 Returns y 0058 Supplier
-  Performance de Track C — deuda intencional documentada en
-  `docs/PROCUREMENT.md`/`docs/INVENTORY.md`; incluye 0074 Crews y todo el
-  bloque CONSTRUCTION CONTROL — Documents/Site/Quality, 0077-0079/0081-
-  0086 — que Track D no tocó en este corte, ver task-5-report.md)
+- **IMPLEMENTED:** 81 / 124 — los 69 previos (Track 1/A/F/B/B+C/C/D/E, ver
+  historial de este archivo) más 12 nuevos de este plan: Task 2 —
+  NXR-REQ-0073/0075/0076 (Employees/Time Entries/Labor Cost, ya
+  `IN_PROGRESS` con backend+API+tests; ahora con `WorkersPage`/
+  `TimeEntriesPage` reales, cierra `DEFERRED-FINAL-008`). Task 1 —
+  NXR-REQ-0077/0078/0079 (Documents/Document Versioning/Evidence,
+  `docs/DOCUMENTS_EVIDENCE.md`). Task 3 — NXR-REQ-0081/0082/0083/0084
+  (Daily Site Reports/Quality/Non-Conformance-Corrective-Action/Safety).
+  Task 4 — NXR-REQ-0085/0086 (RFI/Submittals).
+- **IN_PROGRESS:** 21 / 124 — NXR-REQ-0001/0006/0008/0009/0025/0044/
+  0059/0060/0105/0106/0107/0108/0110/0114/0115/0116/0117/0118/0119/0120/
+  0121.
+- **NOT_STARTED:** 20 / 124 — NXR-REQ-0016/0034/0035/0054/0058/0074/
+  0087/0088/0089/0090/0091/0092/0093/0094/0095/0096/0109/0112/0113/0122.
+  0054 Returns y 0058 Supplier Performance (Track C) son deuda intencional
+  documentada en `docs/PROCUREMENT.md`/`docs/INVENTORY.md`. 0074 Crews no
+  se tocó en este plan (fuera de su alcance nombrado). El bloque PLATFORM
+  (0087-0096, Workflow engine/Approval Inbox/Audit/Notifications/Search/
+  Reporting) es la Prioridad 3-4 siguiente, todavía sin empezar — incluye
+  el gap de audit log system-wide ya documentado en `DEFERRED-FINAL-014`.
 - **BLOCKED_EXTERNAL:** 2 / 124 (ambos por la excepción de despliegue
   real, no por incapacidad técnica)
 
-Suma verificada: 0+69+26+27+2 = 124.
+Suma verificada: 0+81+21+20+2 = 124.
 
 Este resumen se actualiza en cada integración de track. Ver progreso vivo
-en `docs/PROGRESS.md`. Recontado en Task 7 (`2026-08-24-interrupted-tracks-recovery`,
+en `docs/PROGRESS.md`. Recontado previamente en Task 7 (`2026-08-24-interrupted-tracks-recovery`,
 verificación end-to-end del sistema combinado Track 1+F+B+C+A+D+E en
 `feat/nexora-greenfield` @ 07be886) — se recontaron las filas de la tabla
 línea por línea contra este resumen y se corrigió un desfase de 1 fila
@@ -268,15 +271,7 @@ línea por línea contra este resumen y se corrigió un desfase de 1 fila
 enumeración); sigue sujeto a una pasada final
 de verificación end-to-end antes de certificar cualquier `VERIFIED`.
 
-**Nota de honestidad (2026-08-25, Task 3 de
-`track-d-construction-control`):** el tally de arriba (0/69/26/27/2 = 124)
-quedó desactualizado desde antes de esta tarea — no refleja todavía la
-integración de Track D Task 1 (Documents/Evidence, `NXR-REQ-0077/0078/
-0079`, 3 filas NOT_STARTED→IMPLEMENTED) ni de esta Task 3 (Daily Site
-Reports/Quality/Safety, `NXR-REQ-0081/0082/0083/0084`, 4 filas
-NOT_STARTED→IMPLEMENTED, ver filas arriba). Las filas individuales de la
-tabla ya están correctas (fuente de verdad real); este tally agregado
-necesita un recontado línea por línea completo del archivo, que no se hizo
-en esta sesión para no introducir un nuevo desfase bajo presión de tiempo
-— queda como trabajo pendiente explícito para el próximo recuento
-sistémico, no oculto.
+La nota de honestidad que Task 3 dejó aquí (tally desactualizado
+pendiente de recontar) fue resuelta por el recontado de Task 5 de arriba
+— el tally ahora coincide exactamente con las filas reales de la tabla
+(0+81+21+20+2 = 124).

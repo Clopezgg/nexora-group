@@ -1014,3 +1014,33 @@ mismo plan).
 Rama `track/d-site-quality-safety` preparada e integration-ready, no
 fusionada a `feat/nexora-greenfield` todavía — pendiente de revisión/merge
 por el coordinador (mismo patrón que todos los tracks anteriores).
+
+## Tasks 3 y 4 revisadas y fusionadas; Task 5 — verificación combinada
+
+Task 4 (RFI/Submittals) fue revisada limpia (0 findings) y fusionada como
+`4430c1a`. Task 3 (Daily Site Reports/Quality/Safety) recibió un fix round
+de 2 findings Important — ambos de precisión documental, no defectos de
+código (`REQUIREMENTS_TRACEABILITY.md` sobreafirmaba el rigor RED/GREEN
+inconsistente con `PROGRESS.md`; `DEFERRED-FINAL-015` sobreafirmaba qué
+valida el backend sobre `responsible_user_id`) — corregido, re-revisado
+limpio, fusionado como `bfc4bf2`. El merge de Task 3 generó 9 conflictos
+aditivos (registries compartidos + docs que describían el mismo item desde
+la perspectiva de cada task antes del merge) y dejó dos heads de Alembic
+(`04d3e460a8a7` y `f66768a419c3`, ambos ramificados en paralelo desde
+`eaf5b6c0d061`) — relinkeado a una sola cadena (`20445a5`).
+
+Con las cuatro tareas del plan fusionadas, Task 5 (verificación del
+sistema combinado): topología de git limpia, un único head de Alembic,
+`alembic upgrade head` limpio de cero en base descartable (cadena completa
+de 12 revisiones), backend 175/175 pytest, `compileall` limpio, frontend
+typecheck/lint limpios, 55/55 vitest, build OK. Recontadas las 124 filas
+de `docs/REQUIREMENTS_TRACEABILITY.md` línea por línea: 0 VERIFIED + 81
+IMPLEMENTED + 21 IN_PROGRESS + 20 NOT_STARTED + 2 BLOCKED_EXTERNAL = 124,
+coincide exactamente con la tabla — resuelve la nota de honestidad
+pendiente que Task 3 había dejado sobre el tally desactualizado.
+
+Plan `2026-08-25-track-d-construction-control` completo. Bloque
+CONSTRUCTION CONTROL (`NXR-REQ-0077`-`0086`) y el frontend de Workforce/
+Time (`NXR-REQ-0073/0075/0076`) están ahora `IMPLEMENTED`. Próximo:
+continuar con el roadmap de `docs/MASTER_PLAN.md` (Track G — Workflow/
+Approvals/Audit/Notifications, luego Reports/Search/Analytics).

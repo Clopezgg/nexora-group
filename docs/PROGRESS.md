@@ -2574,3 +2574,60 @@ logs visible in the run.
 Traceability: `NXR-REQ-0108` moved `IN_PROGRESS` → `IMPLEMENTED`. Tally
 now 106 `IMPLEMENTED` (+1), 11 `IN_PROGRESS` (-1), 3 `NOT_STARTED`, 2
 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.
+
+## 2026-08-25 — Real security response headers (NXR-REQ-0107 evidence updated, stays IN_PROGRESS honestly)
+
+Direct continuation, same session, following straight from the previous
+entry's own "natural next candidate" note. Zero security headers
+existed anywhere in the codebase before this (confirmed by grep across
+`backend/app/` for `X-Frame-Options`/`X-Content-Type-Options`/
+`Strict-Transport-Security`/`Content-Security-Policy`/`Referrer-Policy`
+— no matches).
+
+`app/api/security_headers.py`'s `SecurityHeadersMiddleware`
+(`BaseHTTPMiddleware` is fine here — unlike `CorrelationIdMiddleware`,
+this one only touches the response *after* `call_next()` returns, so
+the Starlette contextvar-propagation gotcha that motivated pure ASGI
+for correlation ids doesn't apply). Registered as the outermost layer
+of the entire middleware stack (added last, after
+`CorrelationIdMiddleware`) specifically so the headers apply to
+absolutely every response, including a 403 from the CORS/CSRF layers
+underneath it — verified by a real test hitting the CSRF rejection
+path, not assumed.
+
+Real design decisions, not defaults copy-pasted from a boilerplate
+list: `X-Content-Type-Options`/`X-Frame-Options`/`Referrer-Policy` are
+universal (safe on every response type, including FastAPI's own
+`/docs` HTML). `Content-Security-Policy: default-src 'none'; frame-
+ancestors 'none'` applies everywhere the backend serves JSON *except*
+`/docs`/`/redoc`/`/openapi.json` — Swagger UI and ReDoc load their real
+JS/CSS from a CDN, so a strict CSP there would break them outright;
+verified this exemption for real
+(`test_docs_endpoint_never_gets_the_strict_csp` actually hits `/docs`
+and gets a 200, not assumed to work). `Strict-Transport-Security` only
+applies when `settings.is_production` — meaningless (and potentially
+confusing during local smoke-testing) over plain HTTP in dev, real over
+HTTPS in production; verified both branches with `monkeypatch` on the
+already-cached `get_settings()` instance rather than spinning up a
+second app/TestClient (simpler, and avoids an unnecessary second
+database schema lifecycle in the test).
+
+4 new tests (`test_security_headers.py`). Full verification: 307/307
+backend pytest (up from 303), `tsc -b --noEmit` clean, `eslint .`
+clean, 91/91 frontend vitest, combined Critical Journey + Accessibility
+E2E 3/3 green (confirms the new headers don't interfere with the SPA's
+real `fetch()` calls to the API — CSP on a JSON response only restricts
+what that response could do if rendered as a *document*, never what a
+`fetch()`/XHR caller can read from it, so this was expected to be safe,
+and was verified to be).
+
+**Deliberately NOT moved to `IMPLEMENTED`**: the row's own name
+includes "rate-limit," which is still genuinely missing and is real
+infrastructure work (Azure Front Door/WAF, not application code) —
+moving this row to `IMPLEMENTED` while that's still absent would be
+exactly the kind of inflation `CLAUDE.md` forbids. Evidence updated
+honestly, status stays `IN_PROGRESS`, gap named explicitly.
+
+Traceability: `NXR-REQ-0107` evidence updated (headers real and
+tested), status unchanged. Tally unchanged: 106 `IMPLEMENTED`, 11
+`IN_PROGRESS`, 3 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.

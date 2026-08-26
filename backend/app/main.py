@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.correlation import CorrelationIdMiddleware
 from app.api.csrf import register_csrf_guard
 from app.api.error_handlers import register_error_handlers
+from app.api.security_headers import register_security_headers
 from app.api.routes import (
     accounting,
     ap,
@@ -77,6 +78,9 @@ def create_app() -> FastAPI:
     # ANTES que cualquier otro middleware pueda necesitarlo (p.ej. el
     # error 403 de CsrfOriginGuardMiddleware ya lo usa).
     app.add_middleware(CorrelationIdMiddleware)
+    # Más externo todavía: los security headers deben aplicar a
+    # absolutamente toda respuesta, incluyendo los 403 de CORS/CSRF.
+    register_security_headers(app)
 
     register_error_handlers(app)
 

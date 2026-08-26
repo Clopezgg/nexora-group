@@ -512,3 +512,44 @@ Verification before this entry: 303/303 backend pytest, `tsc -b
 --noEmit` clean, `eslint .` clean, 91/91 frontend vitest, combined
 Critical Journey + Accessibility E2E 3/3 green with real structured
 JSON logs visible in the run output.
+
+## 2026-08-25 — Real security headers (NXR-REQ-0107 evidence updated, deliberately stays IN_PROGRESS)
+
+Direct continuation, same session, exactly the "natural next candidate"
+the entry above named. Full detail in `docs/PROGRESS.md`'s `2026-08-25
+— Real security response headers...` entry.
+`app/api/security_headers.py`'s `SecurityHeadersMiddleware`, registered
+as the outermost layer of the whole stack (after
+`CorrelationIdMiddleware`) so headers apply even to CORS/CSRF 403s.
+`X-Content-Type-Options`/`X-Frame-Options`/`Referrer-Policy` always; a
+strict `Content-Security-Policy` everywhere except `/docs`/`/redoc`
+(would break Swagger UI's real CDN assets); `Strict-Transport-Security`
+only when `settings.is_production`.
+
+**Important, do not accidentally "fix" this later**: `NXR-REQ-0107` was
+deliberately left `IN_PROGRESS`, not moved to `IMPLEMENTED`, even though
+its headers piece is done — the row's own name includes "rate-limit,"
+which is still genuinely missing and is real Azure Front Door/WAF
+infrastructure work, not something completable from this codebase
+alone. Don't move this row to `IMPLEMENTED` without either building
+rate-limiting for real or splitting the row.
+
+With `0105`/`0106`/`0108`/`0016` done this session plus `0107`'s
+headers piece, the purely-local, non-Azure Track G backlog is now
+genuinely thin. What's left: `NXR-REQ-0093` (Treasury/Procurement/
+Earned Value reports, deliberately out of scope), `0107`'s rate-limit
+remainder (Azure-shaped), `0110` (unit tests, grows naturally — not a
+discrete task to "complete"), `0114` (CI/CD gate — its remaining scope
+is genuinely deployment-shaped per the earlier fork's finding), `0115-
+0121` (Bicep/Azure IaC — `az bicep build`/`what-if` pre-authorized,
+`az deployment ... create` is not, per `CLAUDE.md` §11.1), `0058`
+(deliberately deferred), `0109` (Backup/Restore, gated behind 90% real),
+`0122` (OIDC, needs GitHub-side config this agent can't do alone). At
+this point, re-reading `docs/PRODUCTION_READINESS.md`'s own gate
+against the CURRENT state (not assumed from memory) before picking
+anything further is the right move — the easy, purely-local wins in
+this backlog are largely exhausted.
+
+Verification before this entry: 307/307 backend pytest, `tsc -b
+--noEmit` clean, `eslint .` clean, 91/91 frontend vitest, combined
+Critical Journey + Accessibility E2E 3/3 green.

@@ -24,7 +24,7 @@ proceso, sin una segunda API HTTP interna). Este servicio nunca escribe en
 exclusiva de Track A."""
 
 
-def convert_lead(db: Session, *, lead_id: uuid.UUID) -> tuple[Lead, Customer, Opportunity]:
+def convert_lead(db: Session, *, lead_id: uuid.UUID, commit: bool = True) -> tuple[Lead, Customer, Opportunity]:
     """Idempotente: convertir el mismo lead dos veces devuelve el mismo
     Customer/Opportunity y NO crea una segunda fila (INV-CRM-idempotencia).
     El lock FOR UPDATE serializa intentos concurrentes sobre el mismo lead."""
@@ -67,10 +67,13 @@ def convert_lead(db: Session, *, lead_id: uuid.UUID) -> tuple[Lead, Customer, Op
     lead.status = "CONVERTED"
     lead.converted_customer_id = customer.id
 
-    db.commit()
-    db.refresh(lead)
-    db.refresh(customer)
-    db.refresh(opportunity)
+    if commit:
+        db.commit()
+        db.refresh(lead)
+        db.refresh(customer)
+        db.refresh(opportunity)
+    else:
+        db.flush()
     return lead, customer, opportunity
 
 
@@ -86,6 +89,7 @@ def create_quotation(
     currency_code: str,
     valid_until: date | None,
     description: str | None,
+    commit: bool = True,
 ) -> Quotation:
     opportunity = db.get(Opportunity, opportunity_id)
     if opportunity is None or opportunity.company_id != company_id:
@@ -111,12 +115,15 @@ def create_quotation(
         valid_until=valid_until,
         description=description,
     )
-    db.commit()
-    db.refresh(quotation)
+    if commit:
+        db.commit()
+        db.refresh(quotation)
+    else:
+        db.flush()
     return quotation
 
 
-def accept_quotation(db: Session, *, quotation_id: uuid.UUID) -> Quotation:
+def accept_quotation(db: Session, *, quotation_id: uuid.UUID, commit: bool = True) -> Quotation:
     quotation = db.execute(
         select(Quotation).where(Quotation.id == quotation_id).with_for_update()
     ).scalar_one_or_none()
@@ -127,13 +134,16 @@ def accept_quotation(db: Session, *, quotation_id: uuid.UUID) -> Quotation:
             f"No se puede aceptar una cotización en estado {quotation.status}"
         )
     quotation.status = "ACCEPTED"
-    db.commit()
-    db.refresh(quotation)
+    if commit:
+        db.commit()
+        db.refresh(quotation)
+    else:
+        db.flush()
     return quotation
 
 
 def convert_quotation_to_sales_contract(
-    db: Session, *, quotation_id: uuid.UUID, contract_number: str, start_date: date
+    db: Session, *, quotation_id: uuid.UUID, contract_number: str, start_date: date, commit: bool = True,
 ) -> SalesContract:
     """Solo una Quotation ACCEPTED puede convertirse; preserva amount,
     company, customer y project tal cual (orden maestra §75)."""
@@ -169,8 +179,11 @@ def convert_quotation_to_sales_contract(
     db.add(contract)
     db.flush()
 
-    db.commit()
-    db.refresh(contract)
+    if commit:
+        db.commit()
+        db.refresh(contract)
+    else:
+        db.flush()
     return contract
 
 
@@ -184,6 +197,7 @@ def bill_sales_contract(
     revenue_account_id: uuid.UUID,
     receivable_account_id: uuid.UUID,
     description: str | None = None,
+    commit: bool = True,
 ) -> SalesContract:
     """Factura un SalesContract creando UNA factura real de AR a traves del
     ar_service de Track A -- nunca duplica Accounts Receivable. No produce
@@ -219,7 +233,10 @@ def bill_sales_contract(
 
     contract.status = "BILLED"
     contract.customer_invoice_id = invoice.id
-    db.commit()
-    db.refresh(contract)
-    db.refresh(invoice)
+    if commit:
+        db.commit()
+        db.refresh(contract)
+        db.refresh(invoice)
+    else:
+        db.flush()
     return contract

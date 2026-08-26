@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.repositories import crm_repository
 from app.schemas.crm import (
     CustomerCreateRequest,
@@ -18,7 +19,7 @@ from app.schemas.crm import (
     SalesContractConvertRequest,
     SalesContractResponse,
 )
-from app.services import crm_service
+from app.services import audit_service, crm_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/crm", tags=["crm"])
@@ -53,6 +54,7 @@ def create_customer(
     payload: CustomerCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("crm.customer", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> CustomerResponse:
     assert_company_access(
         db, user_id=user.id, resource="crm.customer", action="create", company_id=payload.company_id
@@ -61,15 +63,25 @@ def create_customer(
         db,
         company_id=payload.company_id,
         legal_name=payload.legal_name,
-        trade_name=payload.trade_name,
-        tax_id=payload.tax_id,
         contact_name=payload.contact_name,
         email=payload.email,
         phone=payload.phone,
-        address=payload.address,
+        tax_id=payload.tax_id,
+    )
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="crm.customer.create",
+        entity_type="crm.customer",
+        entity_id=customer.id,
+        company_id=payload.company_id,
+        project_id=None,
+        before=None,
+        after={"legalName": customer.legal_name},
+        correlation_id=correlation_id,
     )
     db.commit()
-    db.refresh(customer)
     return CustomerResponse.model_validate(customer, from_attributes=True)
 
 
@@ -96,6 +108,7 @@ def create_lead(
     payload: LeadCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("crm.lead", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> LeadResponse:
     assert_company_access(
         db, user_id=user.id, resource="crm.lead", action="create", company_id=payload.company_id
@@ -109,8 +122,20 @@ def create_lead(
         phone=payload.phone,
         source=payload.source,
     )
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="crm.lead.create",
+        entity_type="crm.lead",
+        entity_id=lead.id,
+        company_id=payload.company_id,
+        project_id=None,
+        before=None,
+        after={"name": lead.name, "status": lead.status},
+        correlation_id=correlation_id,
+    )
     db.commit()
-    db.refresh(lead)
     return LeadResponse.model_validate(lead, from_attributes=True)
 
 
@@ -132,12 +157,27 @@ def convert_lead(
     lead_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("crm.lead", "convert")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> LeadConversionResponse:
     lead = _resolve_lead(db, lead_id)
     assert_company_access(
         db, user_id=user.id, resource="crm.lead", action="convert", company_id=lead.company_id
     )
-    lead, customer, opportunity = crm_service.convert_lead(db, lead_id=lead_id)
+    before_status = lead.status
+    lead, customer, opportunity = crm_service.convert_lead(db, lead_id=lead_id, commit=False)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="crm.lead.convert",
+        entity_type="crm.lead",
+        entity_id=lead_id,
+        company_id=lead.company_id,
+        project_id=None,
+        before={"status": before_status},
+        after={"status": lead.status, "customerId": str(customer.id), "opportunityId": str(opportunity.id)},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return LeadConversionResponse(
         lead=LeadResponse.model_validate(lead, from_attributes=True),
         customer=CustomerResponse.model_validate(customer, from_attributes=True),
@@ -171,6 +211,7 @@ def create_quotation(
     payload: QuotationCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("crm.quotation", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> QuotationResponse:
     assert_company_access(
         db, user_id=user.id, resource="crm.quotation", action="create", company_id=payload.company_id
@@ -186,7 +227,21 @@ def create_quotation(
         currency_code=payload.currency_code,
         valid_until=payload.valid_until,
         description=payload.description,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="crm.quotation.create",
+        entity_type="crm.quotation",
+        entity_id=quotation.id,
+        company_id=payload.company_id,
+        project_id=payload.project_id,
+        before=None,
+        after={"quotationNumber": quotation.quotation_number, "amount": str(quotation.amount)},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return QuotationResponse.model_validate(quotation, from_attributes=True)
 
 
@@ -210,12 +265,27 @@ def accept_quotation(
     quotation_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("crm.quotation", "accept")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> QuotationResponse:
     quotation = _resolve_quotation(db, quotation_id)
     assert_company_access(
         db, user_id=user.id, resource="crm.quotation", action="accept", company_id=quotation.company_id
     )
-    quotation = crm_service.accept_quotation(db, quotation_id=quotation_id)
+    before_status = quotation.status
+    quotation = crm_service.accept_quotation(db, quotation_id=quotation_id, commit=False)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="crm.quotation.accept",
+        entity_type="crm.quotation",
+        entity_id=quotation_id,
+        company_id=quotation.company_id,
+        project_id=quotation.project_id,
+        before={"status": before_status},
+        after={"status": quotation.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return QuotationResponse.model_validate(quotation, from_attributes=True)
 
 
@@ -225,6 +295,7 @@ def convert_quotation(
     payload: SalesContractConvertRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("crm.quotation", "convert")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> SalesContractResponse:
     quotation = _resolve_quotation(db, quotation_id)
     assert_company_access(
@@ -235,7 +306,21 @@ def convert_quotation(
         quotation_id=quotation_id,
         contract_number=payload.contract_number,
         start_date=payload.start_date,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="crm.quotation.convert",
+        entity_type="crm.sales_contract",
+        entity_id=contract.id,
+        company_id=quotation.company_id,
+        project_id=quotation.project_id,
+        before={"quotationId": str(quotation_id)},
+        after={"contractNumber": contract.contract_number, "amount": str(contract.amount)},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return SalesContractResponse.model_validate(contract, from_attributes=True)
 
 
@@ -263,11 +348,13 @@ def bill_sales_contract(
     payload: SalesContractBillRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("crm.sales_contract", "bill")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> SalesContractResponse:
     contract = _resolve_sales_contract(db, sales_contract_id)
     assert_company_access(
         db, user_id=user.id, resource="crm.sales_contract", action="bill", company_id=contract.company_id
     )
+    before_status = contract.status
     contract = crm_service.bill_sales_contract(
         db,
         sales_contract_id=sales_contract_id,
@@ -277,5 +364,19 @@ def bill_sales_contract(
         revenue_account_id=payload.revenue_account_id,
         receivable_account_id=payload.receivable_account_id,
         description=payload.description,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="crm.sales_contract.bill",
+        entity_type="crm.sales_contract",
+        entity_id=sales_contract_id,
+        company_id=contract.company_id,
+        project_id=contract.project_id,
+        before={"status": before_status},
+        after={"status": contract.status, "invoiceId": str(contract.customer_invoice_id)},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return SalesContractResponse.model_validate(contract, from_attributes=True)

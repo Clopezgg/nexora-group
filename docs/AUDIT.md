@@ -314,6 +314,20 @@ audit + single `db.commit()`. Service-calling routes (`create_budget_baseline`,
 
 All 16 routes instrumented with atomic audit. Service layers gained `commit: bool = True` on all mutating functions. `update_maintenance_order` was the complex case: two separate commits (order update + equipment status flip to AVAILABLE) replaced by single `flush()` on `commit=False`, with route handling single commit after audit.
 
+## Dominios instrumentados (2026-08-26, backlog burn-down — Commercial/CRM)
+
+| Dominio | Acción | Ruta |
+|---------|--------|------|
+| CRM | `crm.customer.create` | `POST /api/crm/customers` |
+| CRM | `crm.lead.create` | `POST /api/crm/leads` |
+| CRM | `crm.lead.convert` | `POST /api/crm/leads/{id}/convert` |
+| CRM | `crm.quotation.create` | `POST /api/crm/quotations` |
+| CRM | `crm.quotation.accept` | `POST /api/crm/quotations/{id}/accept` |
+| CRM | `crm.quotation.convert` | `POST /api/crm/quotations/{id}/convert` |
+| CRM | `crm.sales_contract.bill` | `POST /api/crm/sales-contracts/{id}/bill` |
+
+All 7 routes instrumented with atomic audit. Service layer gained `commit: bool = True` on all 5 mutating functions. `bill_sales_contract` was the most complex — it calls `ar_service.create_customer_invoice` with `commit=False` internally, so the route-level audit + commit ensures both AR invoice + contract status update are atomically audited.
+
 ## Dominios NO instrumentados todavía (backlog honesto)
 
 La cobertura fuera de las acciones enumeradas arriba sigue siendo parcial.
@@ -328,14 +342,14 @@ completitud:
 - **Enterprise Resources** (Fixed Assets, Equipment, Workforce) —
   `CLOSED` (2026-08-26, ver arriba).
 - **Commercial** (CRM: Leads, Oportunidades, Cotizaciones, Contratos de
-  venta) — `NOT_STARTED`.
+  venta) — `CLOSED` (2026-08-26, ver arriba).
 - **Construction Control** (Documents/Evidence, RFI/Submittals, Daily
   Site Reports, Quality, Safety) — `NOT_STARTED`.
 - **Platform** — Company create/update, User create — `NOT_STARTED`.
 
 Los diez gaps de Treasury, los gaps de creación de AP/AR, los gaps de
 Supply Chain (Procurement + Inventory), los gaps de Project Control,
-y los gaps de Enterprise Resources:
+los gaps de Enterprise Resources, y los gaps de Commercial/CRM:
 **cerrados** (2026-08-26, ver arriba).
 
 Un futuro task puede cerrar estos dominios uno por uno reutilizando

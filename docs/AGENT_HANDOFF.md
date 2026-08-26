@@ -553,3 +553,46 @@ this backlog are largely exhausted.
 Verification before this entry: 307/307 backend pytest, `tsc -b
 --noEmit` clean, `eslint .` clean, 91/91 frontend vitest, combined
 Critical Journey + Accessibility E2E 3/3 green.
+
+## 2026-08-25 — Real Backup/Restore executed (NXR-REQ-0109 → IMPLEMENTED)
+
+Direct continuation, same session, under the user's explicit
+"stop deferring implementable work" master order. Full detail in
+`docs/PROGRESS.md`'s `2026-08-25 — Real Backup/Restore, executed and
+verified...` entry. `scripts/db_backup.sh`/`db_restore.sh` (real
+`pg_dump`/`pg_restore`) + `backend/tests/test_backup_restore.py`
+exercises every item `docs/PRODUCTION_READINESS.md` block 4 names
+against real PostgreSQL: migrations/state, login (real Argon2id hash +
+`verify_password()`), datos críticos, integridad contable (real
+double-entry total surviving the round trip). `docs/BACKUP_RESTORE.md`
+has the strategy/retention/RPO-RTO — DEV values are real and measured;
+Azure DEV/prod values are honestly left undeclared, not invented,
+since no Azure Postgres is deployed yet.
+
+**If you touch this again**: don't re-invent the RPO/RTO for Azure
+DEV/prod from a guess — measure it for real once `NXR-REQ-0118` is
+actually deployed, using the exact same verification steps this test
+already runs (migrations/login/data/integrity), and update
+`docs/BACKUP_RESTORE.md`'s table in place.
+
+Verification before this entry: 308/308 backend pytest.
+
+## Continuing the master order (2026-08-25) — remaining canonical backlog
+
+Per the user's absolute-closure order: work through every remaining
+`NOT_STARTED`/`IN_PROGRESS`/`DEFERRED-FINAL` row until only genuine
+external blockers remain. As of this entry, re-verified against the
+live table (`grep -oE ...`, not memory): 107 `IMPLEMENTED`, 11
+`IN_PROGRESS` (`NXR-REQ-0093/0107/0110/0114/0115/0116/0117/0118/0119/
+0120/0121`), 2 `NOT_STARTED` (`NXR-REQ-0058/0122`), 2 `BLOCKED_EXTERNAL`
+(`0123/0124`), 2 `VERIFIED`. Next up per the order's own explicit
+priority: `NXR-REQ-0058` (Supplier Performance — the order explicitly
+says build it with real controlled fixtures, not defer it for lack of
+volume), then the concurrency/idempotency real-race-condition testing
+pass (order §10), then the remaining CI/CD-completable-locally pieces,
+then the security review checklist (§9), before reassessing what's
+left against `docs/PRODUCTION_READINESS.md` in full.
+
+Do NOT re-plan this from scratch on resume — this list is the current
+real state as of the moment it was written; re-verify against the live
+traceability table before trusting it if time has passed.

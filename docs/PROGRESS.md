@@ -2631,3 +2631,55 @@ honestly, status stays `IN_PROGRESS`, gap named explicitly.
 Traceability: `NXR-REQ-0107` evidence updated (headers real and
 tested), status unchanged. Tally unchanged: 106 `IMPLEMENTED`, 11
 `IN_PROGRESS`, 3 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.
+
+## 2026-08-25 — Real Backup/Restore, executed and verified (NXR-REQ-0109 → IMPLEMENTED)
+
+Direct continuation, same session, under the user's explicit "no more
+deferring implementable work" order — `NXR-REQ-0109` had been
+`NOT_STARTED` with a blanket "gated behind 90%" rationale that no
+longer held once the order explicitly said to execute it locally now
+rather than keep deferring.
+
+`scripts/db_backup.sh`/`scripts/db_restore.sh`: real `pg_dump
+--format=custom` / `pg_restore`, restore always targets a freshly
+dropped+created database, never overwrites a live one. Both scripts'
+only real exercise is `backend/tests/test_backup_restore.py`, so a
+regression in either fails there first, not in an actual incident.
+
+The test does exactly what `docs/PRODUCTION_READINESS.md`'s block 4
+names, item by item, against real PostgreSQL — not simulated: fresh
+`nexora_backup_source_*` DB → `alembic upgrade head` → seed real data
+through the actual repository/service layer (a company, its chart of
+accounts, a treasury account, a real posted CENTRAL remittance for
+L 75,000.00, and a real Administrator user with a real Argon2id hash —
+never a raw `INSERT`, so what gets backed up is exactly what a real
+user action would produce) → `db_backup.sh` → `db_restore.sh` into a
+brand new `nexora_backup_target_*` → verify against the restored DB:
+
+- **migrations/state**: `alembic current` reports the same head.
+- **login**: the restored password hash matches the original byte for
+  byte, and `verify_password()` — the exact function
+  `auth_service.login()` calls in production — accepts the real
+  plaintext password against it.
+- **datos críticos**: the seeded company is present with the same name.
+- **integridad contable**: `SUM(debit_amount) == SUM(credit_amount)`
+  over `journal_lines` in the restored DB, and that total is exactly
+  the real remittance amount — not "data exists," but "the same data,
+  with the same double-entry integrity."
+
+`docs/BACKUP_RESTORE.md` documents the strategy, retention, and RPO/RTO
+honestly: DEV local values are real and measured (`restore < 10s`);
+Azure DEV/production RPO/RTO are explicitly left undeclared rather than
+invented, since there's no deployed Azure Database for PostgreSQL to
+measure them against yet (`NXR-REQ-0118`, currently `BLOCKED_EXTERNAL`
+on the disabled UNAH subscription) — fabricating a number there would
+violate `CLAUDE.md`'s prohibition on fabricated certifications.
+
+Full verification: 308/308 backend pytest (up from 303, this test plus
+one already counted from the prior entry).
+
+Traceability: `NXR-REQ-0109` moved `NOT_STARTED` → `IMPLEMENTED` with
+real, repeated, executed evidence — not `VERIFIED` (that would need
+independent verification against a deployed Azure Postgres instance,
+which doesn't exist yet). Tally now 107 `IMPLEMENTED` (+1), 11
+`IN_PROGRESS`, 2 `NOT_STARTED` (-1), 2 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.

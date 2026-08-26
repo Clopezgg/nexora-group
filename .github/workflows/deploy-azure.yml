@@ -37,14 +37,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check Azure OIDC secrets
+        id: check-secrets
+        run: |
+          if [ -n "${{ secrets.AZURE_CLIENT_ID }}" ] && [ -n "${{ secrets.AZURE_TENANT_ID }}" ] && [ -n "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Azure OIDC secrets not configured — skipping Bicep what-if"
+          fi
+
       - name: Azure login (OIDC)
+        id: azure-login
+        if: steps.check-secrets.outputs.configured == 'true'
         uses: azure/login@v2
+        continue-on-error: true
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: What-if (no crea recursos)
+        if: steps.check-secrets.outputs.configured == 'true' && steps.azure-login.outcome == 'success'
         run: |
           az deployment sub what-if \
             --name nexora-ci-whatif \
@@ -65,7 +79,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check Azure OIDC secrets
+        id: check-secrets-deploy
+        run: |
+          if [ -n "${{ secrets.AZURE_CLIENT_ID }}" ] && [ -n "${{ secrets.AZURE_TENANT_ID }}" ] && [ -n "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Azure OIDC secrets not configured — skipping deploy"
+            exit 1
+          fi
+
       - name: Azure login (OIDC)
+        if: steps.check-secrets-deploy.outputs.configured == 'true'
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}

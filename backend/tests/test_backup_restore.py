@@ -11,6 +11,7 @@ first, not in an actual disaster."""
 import json
 import os
 import re
+import shutil
 import subprocess
 from decimal import Decimal
 from pathlib import Path
@@ -27,6 +28,18 @@ _worktree_slug = re.sub(
 _SOURCE_DB = f"nexora_backup_source_{_worktree_slug}"
 _TARGET_DB = f"nexora_backup_target_{_worktree_slug}"
 _DUMP_PATH = _BACKEND_DIR / f".backup_restore_test_{_worktree_slug}.dump"
+_PG_USER = "nexora"
+_PG_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "nexora")
+_PG_HOST = "localhost"
+_PG_PORT = "5432"
+
+
+def _pg_env() -> dict:
+    return {**os.environ, "PGPASSWORD": _PG_PASSWORD, "PGHOST": _PG_HOST, "PGPORT": _PG_PORT, "PGUSER": _PG_USER}
+
+
+_ALEMBIC_BIN = shutil.which("alembic") or str(_BACKEND_DIR / ".venv" / "bin" / "alembic")
+_PYTHON_BIN = shutil.which("python3") or str(_BACKEND_DIR / ".venv" / "bin" / "python")
 
 
 def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
@@ -36,7 +49,7 @@ def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
 def _alembic_env(db_name: str) -> dict:
     return {
         **os.environ,
-        "DATABASE_URL": f"postgresql+psycopg://nexora@localhost:5432/{db_name}",
+        "DATABASE_URL": f"postgresql+psycopg://{_PG_USER}:{_PG_PASSWORD}@{_PG_HOST}:{_PG_PORT}/{db_name}",
         "BOOTSTRAP_ADMIN_EMAIL": "",
         "BOOTSTRAP_ADMIN_PASSWORD": "",
         "FRONTEND_URL": "http://localhost:5173",
@@ -57,32 +70,33 @@ def _trial_balance(engine) -> tuple[Decimal, Decimal]:
 
 def test_real_pg_dump_backup_then_pg_restore_reproduces_the_same_financial_reality():
     for db_name in (_SOURCE_DB, _TARGET_DB):
-        subprocess.run(["dropdb", "--if-exists", db_name], check=True)
+        subprocess.run(["dropdb", "--if-exists", db_name], check=True, env=_pg_env())
     _DUMP_PATH.unlink(missing_ok=True)
 
     try:
-        subprocess.run(["createdb", _SOURCE_DB], check=True)
+        subprocess.run(["createdb", _SOURCE_DB], check=True, env=_pg_env())
         upgrade = _run(
-            [str(_BACKEND_DIR / ".venv" / "bin" / "alembic"), "upgrade", "head"],
+            [_ALEMBIC_BIN, "upgrade", "head"],
             cwd=_BACKEND_DIR, env=_alembic_env(_SOURCE_DB),
         )
         assert upgrade.returncode == 0, upgrade.stderr
 
         seed = _run(
-            [str(_BACKEND_DIR / ".venv" / "bin" / "python"), "-m", "tests._seed_backup_restore_fixture"],
+            [_PYTHON_BIN, "-m", "tests._seed_backup_restore_fixture"],
             cwd=_BACKEND_DIR, env=_alembic_env(_SOURCE_DB),
         )
         assert seed.returncode == 0, seed.stderr
         seeded = json.loads(seed.stdout.strip().splitlines()[-1])
 
-        source_engine = create_engine(f"postgresql+psycopg://nexora@localhost:5432/{_SOURCE_DB}")
+        source_engine = create_engine(f"postgresql+psycopg://{_PG_USER}:{_PG_PASSWORD}@{_PG_HOST}:{_PG_PORT}/{_SOURCE_DB}")
         source_debit, source_credit = _trial_balance(source_engine)
         assert source_debit == source_credit == Decimal(seeded["remittanceAmount"])
         source_engine.dispose()
 
         # Real backup, via the real script -- not a Python re-implementation.
         backup = _run(
-            ["bash", str(_REPO_ROOT / "scripts" / "db_backup.sh"), _SOURCE_DB, str(_DUMP_PATH)]
+            ["bash", str(_REPO_ROOT / "scripts" / "db_backup.sh"), _SOURCE_DB, str(_DUMP_PATH)],
+            env=_pg_env(),
         )
         assert backup.returncode == 0, backup.stderr
         assert _DUMP_PATH.exists() and _DUMP_PATH.stat().st_size > 0
@@ -90,15 +104,16 @@ def test_real_pg_dump_backup_then_pg_restore_reproduces_the_same_financial_reali
         # Real restore into a SEPARATE, freshly created target database --
         # never restoring onto a live DB (see script docstring).
         restore = _run(
-            ["bash", str(_REPO_ROOT / "scripts" / "db_restore.sh"), str(_DUMP_PATH), _TARGET_DB]
+            ["bash", str(_REPO_ROOT / "scripts" / "db_restore.sh"), str(_DUMP_PATH), _TARGET_DB],
+            env=_pg_env(),
         )
         assert restore.returncode == 0, restore.stderr
 
-        target_engine = create_engine(f"postgresql+psycopg://nexora@localhost:5432/{_TARGET_DB}")
+        target_engine = create_engine(f"postgresql+psycopg://{_PG_USER}:{_PG_PASSWORD}@{_PG_HOST}:{_PG_PORT}/{_TARGET_DB}")
 
         # 1. Migration head survived the round trip.
         current = _run(
-            [str(_BACKEND_DIR / ".venv" / "bin" / "alembic"), "current"],
+            [_ALEMBIC_BIN, "current"],
             cwd=_BACKEND_DIR, env=_alembic_env(_TARGET_DB),
         )
         assert current.returncode == 0, current.stderr
@@ -134,5 +149,5 @@ def test_real_pg_dump_backup_then_pg_restore_reproduces_the_same_financial_reali
         target_engine.dispose()
     finally:
         for db_name in (_SOURCE_DB, _TARGET_DB):
-            subprocess.run(["dropdb", "--if-exists", db_name], check=True)
+            subprocess.run(["dropdb", "--if-exists", db_name], check=True, env=_pg_env())
         _DUMP_PATH.unlink(missing_ok=True)

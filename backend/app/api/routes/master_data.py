@@ -49,30 +49,34 @@ def create_company(
     _user=Depends(require_permission("core.company", "create")),
     correlation_id: str = Depends(get_correlation_id),
 ) -> CompanyResponse:
-    company = company_repository.create_company(
-        db,
-        name=payload.name,
-        code=payload.code,
-        legal_name=payload.legal_name,
-        functional_currency_code=payload.functional_currency_code,
-        country=payload.country,
-        fiscal_id=payload.fiscal_id,
-    )
-    db.flush()
-    audit_service.record(
-        db,
-        actor_user_id=_user.id,
-        action="core.company.create",
-        entity_type="core.company",
-        entity_id=company.id,
-        company_id=company.id,
-        project_id=None,
-        before=None,
-        after={"name": company.name, "code": company.code},
-        correlation_id=correlation_id,
-    )
-    db.commit()
-    return CompanyResponse.model_validate(company, from_attributes=True)
+    try:
+        company = company_repository.create_company(
+            db,
+            name=payload.name,
+            code=payload.code,
+            legal_name=payload.legal_name,
+            functional_currency_code=payload.functional_currency_code,
+            country=payload.country,
+            fiscal_id=payload.fiscal_id,
+        )
+        db.flush()
+        audit_service.record(
+            db,
+            actor_user_id=_user.id,
+            action="core.company.create",
+            entity_type="core.company",
+            entity_id=company.id,
+            company_id=company.id,
+            project_id=None,
+            before=None,
+            after={"name": company.name, "code": company.code},
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        return CompanyResponse.model_validate(company, from_attributes=True)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.patch("/companies/{company_id}", response_model=CompanyResponse)
@@ -83,34 +87,38 @@ def update_company(
     user=Depends(require_permission("core.company", "update")),
     correlation_id: str = Depends(get_correlation_id),
 ) -> CompanyResponse:
-    existing = company_repository.get_by_id(db, company_id)
-    if existing is None:
-        raise ValueError(f"Company {company_id} no existe")
-    assert_company_access(
-        db, user_id=user.id, resource="core.company", action="update", company_id=company_id
-    )
-    before_legal_name = existing.legal_name
-    before_fiscal_id = existing.fiscal_id
-    company = company_repository.update_company(
-        db,
-        company_id=company_id,
-        legal_name=payload.legal_name,
-        fiscal_id=payload.fiscal_id,
-    )
-    audit_service.record(
-        db,
-        actor_user_id=user.id,
-        action="core.company.update",
-        entity_type="core.company",
-        entity_id=company_id,
-        company_id=company_id,
-        project_id=None,
-        before={"legalName": before_legal_name, "fiscalId": before_fiscal_id},
-        after={"legalName": company.legal_name, "fiscalId": company.fiscal_id},
-        correlation_id=correlation_id,
-    )
-    db.commit()
-    return CompanyResponse.model_validate(company, from_attributes=True)
+    try:
+        existing = company_repository.get_by_id(db, company_id)
+        if existing is None:
+            raise ValueError(f"Company {company_id} no existe")
+        assert_company_access(
+            db, user_id=user.id, resource="core.company", action="update", company_id=company_id
+        )
+        before_legal_name = existing.legal_name
+        before_fiscal_id = existing.fiscal_id
+        company = company_repository.update_company(
+            db,
+            company_id=company_id,
+            legal_name=payload.legal_name,
+            fiscal_id=payload.fiscal_id,
+        )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="core.company.update",
+            entity_type="core.company",
+            entity_id=company_id,
+            company_id=company_id,
+            project_id=None,
+            before={"legalName": before_legal_name, "fiscalId": before_fiscal_id},
+            after={"legalName": company.legal_name, "fiscalId": company.fiscal_id},
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        return CompanyResponse.model_validate(company, from_attributes=True)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.get("/accounts", response_model=list[AccountResponse])
@@ -133,36 +141,40 @@ def create_account(
     user=Depends(require_permission("accounting.account", "create")),
     correlation_id: str = Depends(get_correlation_id),
 ) -> AccountResponse:
-    assert_company_access(
-        db,
-        user_id=user.id,
-        resource="accounting.account",
-        action="create",
-        company_id=payload.company_id,
-    )
-    account = account_repository.create_account(
-        db,
-        company_id=payload.company_id,
-        code=payload.code,
-        name=payload.name,
-        account_type=payload.account_type,
-        parent_id=payload.parent_id,
-    )
-    db.flush()
-    audit_service.record(
-        db,
-        actor_user_id=user.id,
-        action="accounting.account.create",
-        entity_type="accounting.account",
-        entity_id=account.id,
-        company_id=payload.company_id,
-        project_id=None,
-        before=None,
-        after={"code": account.code, "name": account.name, "type": account.account_type},
-        correlation_id=correlation_id,
-    )
-    db.commit()
-    return AccountResponse.model_validate(account, from_attributes=True)
+    try:
+        assert_company_access(
+            db,
+            user_id=user.id,
+            resource="accounting.account",
+            action="create",
+            company_id=payload.company_id,
+        )
+        account = account_repository.create_account(
+            db,
+            company_id=payload.company_id,
+            code=payload.code,
+            name=payload.name,
+            account_type=payload.account_type,
+            parent_id=payload.parent_id,
+        )
+        db.flush()
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="accounting.account.create",
+            entity_type="accounting.account",
+            entity_id=account.id,
+            company_id=payload.company_id,
+            project_id=None,
+            before=None,
+            after={"code": account.code, "name": account.name, "type": account.account_type},
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        return AccountResponse.model_validate(account, from_attributes=True)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.patch("/accounts/{account_id}", response_model=AccountResponse)
@@ -176,35 +188,39 @@ def update_account(
     """NXR-REQ-0016/0093, Cash Flow: única forma real de clasificar una
     cuenta hoy (no hay pantalla dedicada de catálogo contable todavía --
     mismo criterio que Tax Codes antes de tener consumidor de UI)."""
-    account = account_repository.get_by_id(db, account_id)
-    if account is None:
-        raise ValueError(f"Account {account_id} no existe")
-    chart = db.get(ChartOfAccount, account.chart_of_account_id)
-    assert_company_access(
-        db, user_id=user.id, resource="accounting.account", action="update", company_id=chart.company_id
-    )
-    if payload.cash_flow_activity is not None and payload.cash_flow_activity not in CASH_FLOW_ACTIVITIES:
-        raise InvalidCashFlowActivityError(
-            f"cash_flow_activity inválido: {payload.cash_flow_activity!r} (debe ser uno de {CASH_FLOW_ACTIVITIES} o null)"
+    try:
+        account = account_repository.get_by_id(db, account_id)
+        if account is None:
+            raise ValueError(f"Account {account_id} no existe")
+        chart = db.get(ChartOfAccount, account.chart_of_account_id)
+        assert_company_access(
+            db, user_id=user.id, resource="accounting.account", action="update", company_id=chart.company_id
         )
-    before_cfa = account.cash_flow_activity
-    account = account_repository.update_cash_flow_activity(
-        db, account=account, cash_flow_activity=payload.cash_flow_activity
-    )
-    audit_service.record(
-        db,
-        actor_user_id=user.id,
-        action="accounting.account.update",
-        entity_type="accounting.account",
-        entity_id=account_id,
-        company_id=chart.company_id,
-        project_id=None,
-        before={"cashFlowActivity": before_cfa},
-        after={"cashFlowActivity": account.cash_flow_activity},
-        correlation_id=correlation_id,
-    )
-    db.commit()
-    return AccountResponse.model_validate(account, from_attributes=True)
+        if payload.cash_flow_activity is not None and payload.cash_flow_activity not in CASH_FLOW_ACTIVITIES:
+            raise InvalidCashFlowActivityError(
+                f"cash_flow_activity inválido: {payload.cash_flow_activity!r} (debe ser uno de {CASH_FLOW_ACTIVITIES} o null)"
+            )
+        before_cfa = account.cash_flow_activity
+        account = account_repository.update_cash_flow_activity(
+            db, account=account, cash_flow_activity=payload.cash_flow_activity
+        )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="accounting.account.update",
+            entity_type="accounting.account",
+            entity_id=account_id,
+            company_id=chart.company_id,
+            project_id=None,
+            before={"cashFlowActivity": before_cfa},
+            after={"cashFlowActivity": account.cash_flow_activity},
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        return AccountResponse.model_validate(account, from_attributes=True)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.get("/tax-codes", response_model=list[TaxCodeResponse])

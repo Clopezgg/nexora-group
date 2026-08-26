@@ -1,0 +1,65 @@
+.nx-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nx-space-2);
+  height: 40px;
+  padding: 0 var(--nx-space-4);
+  border-radius: var(--nx-radius-md);
+  border: 1px solid transparent;
+  font-family: var(--nx-font-family);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.nx-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.nx-button--primary {
+  background: var(--nx-blue-600);
+  color: var(--nx-white);
+}
+.nx-button--primary:hover:not(:disabled) {
+  background: var(--nx-blue-500);
+}
+
+.nx-button--secondary {
+  background: var(--nx-white);
+  color: var(--nx-navy-900);
+  border-color: var(--nx-gray-200);
+}
+.nx-button--secondary:hover:not(:disabled) {
+  border-color: var(--nx-blue-500);
+}
+
+.nx-button--ghost {
+  background: transparent;
+  color: var(--nx-navy-700);
+}
+.nx-button--ghost:hover:not(:disabled) {
+  background: var(--nx-gray-100);
+}
+
+.nx-button--danger {
+  background: var(--nx-danger);
+  color: var(--nx-white);
+}
+
+.nx-button__spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: var(--nx-white);
+  animation: nx-spin 0.7s linear infinite;
+}
+
+@keyframes nx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

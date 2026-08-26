@@ -1,0 +1,131 @@
+.nx-login {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  .nx-login {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.nx-login__brand {
+  display: none;
+  background: linear-gradient(160deg, var(--nx-navy-950), var(--nx-navy-800));
+  color: var(--nx-white);
+  align-items: center;
+  justify-content: center;
+  padding: var(--nx-space-12);
+}
+
+@media (min-width: 900px) {
+  .nx-login__brand {
+    display: flex;
+  }
+}
+
+.nx-login__brand-inner {
+  max-width: 380px;
+}
+
+.nx-login__logo {
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  color: var(--nx-blue-400);
+}
+
+.nx-login__brand-inner h1 {
+  font-size: 32px;
+  line-height: 1.25;
+  margin: var(--nx-space-4) 0;
+}
+
+.nx-login__brand-inner p {
+  color: var(--nx-gray-400);
+  font-size: 15px;
+}
+
+.nx-login__illustration {
+  width: 100%;
+  height: auto;
+  margin-top: var(--nx-space-10);
+}
+
+.nx-login__panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--nx-space-6);
+  background: var(--nx-gray-50);
+}
+
+.nx-login__form {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-4);
+  background: var(--nx-white);
+  padding: var(--nx-space-8);
+  border-radius: var(--nx-radius-lg);
+  box-shadow: var(--nx-shadow-md);
+}
+
+.nx-login__title {
+  margin: 0 0 var(--nx-space-2);
+  color: var(--nx-navy-900);
+}
+
+.nx-login__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--nx-space-2);
+}
+
+.nx-login__remember {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-2);
+  font-size: 13px;
+  color: var(--nx-gray-600);
+  min-height: var(--nx-touch-target);
+}
+
+.nx-login__forgot {
+  border: none;
+  background: none;
+  color: var(--nx-blue-600);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: var(--nx-touch-target);
+  padding: 0;
+}
+
+.nx-login__submit {
+  width: 100%;
+  margin-top: var(--nx-space-2);
+}
+
+.nx-login__notice {
+  font-size: 13px;
+  color: var(--nx-gray-600);
+}
+
+.nx-login__notice--error {
+  color: var(--nx-danger);
+}
+
+@media (max-width: 430px) {
+  .nx-login__panel {
+    padding: var(--nx-space-4);
+  }
+  .nx-login__form {
+    padding: var(--nx-space-6) var(--nx-space-5);
+    max-width: 100%;
+  }
+}

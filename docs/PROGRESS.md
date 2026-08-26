@@ -2446,3 +2446,58 @@ Traceability: `NXR-REQ-0106` moved `IN_PROGRESS` → `IMPLEMENTED` with
 real fresh-install + full round-trip evidence (not "aplicado" by
 itself). Tally now 104 `IMPLEMENTED` (+1), 13 `IN_PROGRESS` (-1), 3
 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.
+
+## 2026-08-25 — Accessibility audited for real, found and fixed 2 real WCAG AA contrast violations (NXR-REQ-0105 → IMPLEMENTED)
+
+Direct continuation, same session. `NXR-REQ-0105`'s own evidence text
+named exactly what was missing: "auditoría de contraste real con
+herramienta y lector de pantalla." The "herramienta" half is genuinely
+buildable by an agent; the "lector de pantalla" half (a manual
+VoiceOver/NVDA pass) is not — no fabricating that evidence, it stays an
+honestly-documented human-only gap.
+
+Added `@axe-core/playwright` (justified: it's literally the tool the
+row's own text called for, and it plugs directly into the existing
+Playwright E2E infrastructure — no new browser automation framework).
+Built `frontend/e2e/accessibility.spec.ts`: scans the login page and 6
+representative real authenticated screens (`/inicio`, `/proyectos`,
+`/finanzas/tesoreria`, `/finanzas/contabilidad`, `/control/reportes`,
+`/control/auditoria`) with axe-core's `wcag2a`/`wcag2aa`/`wcag21aa`
+rule sets, against the real backend+frontend the Critical Journey
+already starts (same `nexora_e2e` DB/ports) — one `npm run test:e2e`
+invocation now runs both specs.
+
+**It failed immediately on first run**, same pattern as the migrations
+test: a real `color-contrast` violation on `.nx-topbar__user-role`
+(`--nx-gray-400`, 2.44:1 against white, needs 4.5:1). `--nx-gray-400`
+turned out to be used as text color in ~14 places across the design
+system (hints, timestamps, empty states, breadcrumb separators, close
+icons) — all failing the same way, since it's genuinely the same
+"muted small text" role everywhere. Fixed at the token level
+(`#9aa7b8` → `#64707f`, ≥5:1) rather than patching each call site.
+
+Re-running surfaced a second, different real bug: the dark sidebar
+(`.nx-sidebar__link`/`.nx-sidebar__group-label`, navy `#050b18`
+background) reused that same now-darkened `--nx-gray-400` token for its
+nav text — 3.9:1 against navy, still failing, because a single gray
+value cannot satisfy 4.5:1 against both white and near-black
+simultaneously. Added a second, purpose-specific token
+(`--nx-navy-100: #a9b4c4`, 9.4:1 against `--nx-navy-950`) instead of
+trying to force one shared value to do both jobs. **Also caught and
+fixed a self-inflicted mistake while making this second fix**: a
+`replace_all` edit on `color: var(--nx-gray-400)` in the same CSS file
+accidentally repainted `.nx-topbar__user-role` (a *light*-background
+element) with the new *dark-background* token, making it nearly
+invisible on white — caught by re-running the scan immediately rather
+than assuming the edit was correct, reverted to the token fix from the
+first pass. Verified visually with a real screenshot after the fix, not
+just by the automated scan passing.
+
+0 violations after both fixes, stable across 2 consecutive scan runs
+plus a combined `npm run test:e2e` run of both E2E specs together.
+
+Traceability: `NXR-REQ-0105` moved `IN_PROGRESS` → `IMPLEMENTED` — real
+tool-based audit done and passing; manual screen-reader pass explicitly
+flagged as the one remaining human-only gap, not hidden. Tally now 105
+`IMPLEMENTED` (+1), 12 `IN_PROGRESS` (-1), 3 `NOT_STARTED`, 2
+`BLOCKED_EXTERNAL`, 2 `VERIFIED`.

@@ -253,7 +253,7 @@ todavía).
 | NXR-REQ-0102 | Tablet | ➖➖➖➖✅➖➖⬜⬜ | IMPLEMENTED | sidebar→drawer en ≤1024px, revisado por código contra 768 (sin browser real disponible) |
 | NXR-REQ-0103 | Mobile | ➖➖➖➖✅➖➖⬜⬜ | IMPLEMENTED | revisado por código contra 430/390/360, touch targets ≥44px vía token `--nx-touch-target` (sin browser real disponible) |
 | NXR-REQ-0104 | PWA | ➖➖➖➖✅➖➖⬜⬜ | IMPLEMENTED | manifest con iconos reales (antes `icons: []`), `NetworkOnly` forzado en `/api/*` (sin caché de datos financieros/sensibles ni mutación offline) |
-| NXR-REQ-0105 | Accessibility (WCAG AA) | ➖➖➖➖🔶➖➖⬜⬜ | IN_PROGRESS | foco visible, labels, `role`/`aria-*` en overlays y estados, touch target ≥44px aplicado; falta auditoría de contraste real con herramienta y lector de pantalla |
+| NXR-REQ-0105 | Accessibility (WCAG AA) | ➖➖➖➖✅➖➖✅✅ | IMPLEMENTED | Foco visible, labels, `role`/`aria-*` en overlays y estados, touch target ≥44px ya aplicado. 2026-08-25: la auditoría de contraste real con herramienta se hizo -- `frontend/e2e/accessibility.spec.ts` (`@axe-core/playwright`, tags `wcag2a`/`wcag2aa`/`wcag21aa`) escaneando login + 6 pantallas autenticadas reales sobre el mismo backend/frontend real del Critical Journey. Encontró y corrigió 2 violaciones reales de contraste (`color-contrast`, serias): `--nx-gray-400` (texto secundario/hints en ~14 lugares) daba 2.44:1 contra fondo blanco, elevado a `#64707f` (≥5:1); el sidebar oscuro reusaba el mismo token para sus links (3.9:1 contra `--nx-navy-950`), separado a un token nuevo `--nx-navy-100` (9.4:1) porque un solo valor no puede cumplir AA simultáneamente sobre fondo claro y fondo oscuro. 0 violaciones tras el fix, verificado 2 corridas. Pendiente explícito, no oculto: un pase manual real con lector de pantalla (VoiceOver/NVDA) es una tarea humana que este agente no puede ejecutar -- ver `frontend/e2e/README.md` |
 
 ## ENGINEERING
 
@@ -297,18 +297,18 @@ Journey E2E real (`NXR-REQ-0112`/`0113`, `feat/nexora-greenfield`, sesión
   pero mover cada fila individual a `VERIFIED` exige mapear su alcance
   exacto contra lo que el recorrido realmente cubre, fila por fila — pasada
   pendiente, no asumida aquí.
-- **IMPLEMENTED:** 104 / 124. `NXR-REQ-0016` (Financial statements,
-  incluyendo Cash Flow) y `NXR-REQ-0106` (Migrations) movieron
-  `IN_PROGRESS` → `IMPLEMENTED` el 2026-08-25.
-- **IN_PROGRESS:** 13 / 124 — NXR-REQ-0093/0105/0107/0108/0110/0114/0115/
-  0116/0117/0118/0119/0120/0121.
+- **IMPLEMENTED:** 105 / 124. `NXR-REQ-0016` (Financial statements,
+  incluyendo Cash Flow), `NXR-REQ-0106` (Migrations) y `NXR-REQ-0105`
+  (Accessibility) movieron `IN_PROGRESS` → `IMPLEMENTED` el 2026-08-25.
+- **IN_PROGRESS:** 12 / 124 — NXR-REQ-0093/0107/0108/0110/0114/0115/0116/
+  0117/0118/0119/0120/0121.
 - **NOT_STARTED:** 3 / 124 — NXR-REQ-0058/0109/0122.
 - **BLOCKED_EXTERNAL:** 2 / 124 — NXR-REQ-0123/0124, ambos dependientes del
   despliegue Azure real sujeto a `CLAUDE.md` §11.1.
 
-Suma verificada contra las 124 filas reales: 2+104+13+3+2 = 124 (recontar con
+Suma verificada contra las 124 filas reales: 2+105+12+3+2 = 124 (recontar con
 `grep -oE '\| (NOT_STARTED|IN_PROGRESS|IMPLEMENTED|VERIFIED|BLOCKED_EXTERNAL) \|' docs/REQUIREMENTS_TRACEABILITY.md | sort | uniq -c`
 antes de fiarse de este resumen prosa, que puede desincronizarse de la
 tabla real). El sistema combinado pasó 297 pruebas backend sobre
-PostgreSQL, 91 pruebas frontend, typecheck, lint, y el Critical Journey
-E2E real 2/2 en verde.
+PostgreSQL, 91 pruebas frontend, typecheck, lint, y el Critical Journey +
+Accessibility E2E real en verde (`npm run test:e2e`, 3/3).

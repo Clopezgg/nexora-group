@@ -422,3 +422,52 @@ same guidance as the entry above.
 Verification before this entry: 297/297 backend pytest, Critical Journey
 E2E green (confirms fresh-install still works after editing four
 historical migrations).
+
+## 2026-08-25 — Accessibility audited for real (NXR-REQ-0105 → IMPLEMENTED), 2 real WCAG AA contrast bugs found + fixed
+
+Direct continuation, same session. Full detail in `docs/PROGRESS.md`'s
+`2026-08-25 — Accessibility audited for real...` entry. Added
+`@axe-core/playwright` + `frontend/e2e/accessibility.spec.ts` (scans
+login + 6 real authenticated screens, shares the Critical Journey's
+webServer infra, runs in the same `npm run test:e2e`). Found real
+`color-contrast` violations: `--nx-gray-400` (used as text color in
+~14 places) was 2.44:1 against white, fixed at the token level
+(`#64707f`, ≥5:1). That fix then surfaced a *second* bug: the dark
+sidebar reused the same token and dropped to 3.9:1 against navy — one
+gray can't satisfy AA on both light and dark backgrounds, so it got its
+own token (`--nx-navy-100`, 9.4:1). Also caught and reverted a
+self-inflicted `replace_all` mistake mid-fix (repainted a light-bg
+element with the new dark-bg token) by re-scanning immediately rather
+than trusting the edit — see PROGRESS.md for the exact sequence.
+
+**If you touch `--nx-gray-400`, `--nx-navy-100`, `.nx-sidebar__link`,
+`.nx-sidebar__group-label`, or `.nx-topbar__user-role` again**: re-run
+`npx playwright test e2e/accessibility.spec.ts` before considering it
+done, not just a visual check — this exact class of bug (one shared
+gray token, two backgrounds) is exactly what silently regressed once
+already this session.
+
+**Explicit remaining gap, not hidden:** a real manual screen-reader
+pass (VoiceOver/NVDA) is human-only work no agent session can perform
+or fabricate evidence for. `NXR-REQ-0105` is `IMPLEMENTED` on the
+strength of the real automated tool audit specifically, with this
+named as the one deliberately-remaining piece.
+
+With this, `NXR-REQ-0016`/`0106`/`0105` all closed this session on top
+of `DEFERRED-FINAL-015` and the original Critical Journey E2E build.
+Remaining `IN_PROGRESS`/`NOT_STARTED`: `NXR-REQ-0093` (Treasury/
+Procurement/Earned Value reports, genuinely out of scope), `0107`
+(Security §121 remainder), `0108` (Observability structured logging),
+`0110` (unit tests, grows naturally with each track), `0114` (CI/CD
+gate completion), `0115-0121` (Bicep/Azure IaC — `az bicep build`/
+`what-if` are pre-authorized, actual `az deployment ... create` is not,
+per `CLAUDE.md` §11.1), `0058` (deliberately deferred), `0109`
+(Backup/Restore, gated behind 90% real per
+`docs/PRODUCTION_READINESS.md`), `0122` (OIDC federated credentials,
+needs GitHub-side config this agent can't do alone). Re-verify
+per-row before picking the next one — this list may already be stale
+by the time it's read.
+
+Verification before this entry: 297/297 backend pytest, `tsc -b
+--noEmit` clean, `eslint .` clean, 91/91 frontend vitest, combined
+`npm run test:e2e` (Critical Journey + Accessibility) 3/3 green.

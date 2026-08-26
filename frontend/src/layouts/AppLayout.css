@@ -36,7 +36,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--nx-gray-400);
+  color: var(--nx-navy-100);
 }
 
 .nx-sidebar__list {
@@ -55,7 +55,7 @@
   min-height: var(--nx-touch-target);
   padding: var(--nx-space-2) var(--nx-space-3);
   border-radius: var(--nx-radius-md);
-  color: var(--nx-gray-400);
+  color: var(--nx-navy-100);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;

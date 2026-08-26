@@ -1,4 +1,4 @@
-# E2E / Critical Journey (NXR-REQ-0112 / NXR-REQ-0113)
+# E2E / Critical Journey / Accessibility (NXR-REQ-0112 / NXR-REQ-0113 / NXR-REQ-0105)
 
 Real Playwright suite, driven against a real backend + real frontend +
 real PostgreSQL — never mocked. Runs in its own database (`nexora_e2e`),
@@ -52,6 +52,19 @@ real backend for those steps via `page.request` (same session cookie as
 the browser context, so it's still testing real authorization/company
 isolation, not a separate unauthenticated client) instead of skipping
 them or inventing UI that doesn't exist.
+
+## Accessibility (NXR-REQ-0105, WCAG AA)
+
+`accessibility.spec.ts` runs a real `axe-core` scan (`@axe-core/playwright`,
+tags `wcag2a`/`wcag2aa`/`wcag21aa`) against the login page and a
+representative sample of real authenticated screens, using the same
+webServer infrastructure as the Critical Journey. It shares one
+`npm run test:e2e` invocation with `critical-journey.spec.ts` — no
+separate command needed.
+
+This is real automated coverage, not a substitute for a manual
+screen-reader pass (VoiceOver/NVDA): that's a genuinely separate,
+human-only gap this suite cannot close and does not claim to.
 
 ## Debugging a failure
 

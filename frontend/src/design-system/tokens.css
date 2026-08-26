@@ -1,5 +1,6 @@
 :root {
   --nx-navy-950: #050b18;
+  --nx-navy-100: #a9b4c4; /* muted text on navy-950 (sidebar), 9.4:1 -- WCAG AA */
   --nx-navy-900: #0b1f3a;
   --nx-navy-800: #122a4e;
   --nx-navy-700: #1b3a66;
@@ -15,7 +16,7 @@
   --nx-gray-50: #f6f8fb;
   --nx-gray-100: #edf1f7;
   --nx-gray-200: #dde4ee;
-  --nx-gray-400: #9aa7b8;
+  --nx-gray-400: #64707f;
   --nx-gray-600: #5b6779;
   --nx-gray-800: #2c3648;
 

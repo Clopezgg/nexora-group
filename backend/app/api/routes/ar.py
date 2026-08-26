@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.domain.errors import NotFoundError
 from app.schemas.ar import (
     CustomerInvoiceCreateRequest,
     CustomerInvoiceResponse,
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/ar", tags=["accounts-receivable"])
 def _resolve_invoice(db: Session, invoice_id: uuid.UUID):
     invoice = ar_service.get_customer_invoice(db, invoice_id=invoice_id)
     if invoice is None:
-        raise ValueError(f"CustomerInvoice {invoice_id} no existe")
+        raise NotFoundError(f"CustomerInvoice {invoice_id} no existe")
     return invoice
 
 

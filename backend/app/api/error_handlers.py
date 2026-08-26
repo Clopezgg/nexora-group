@@ -17,6 +17,7 @@ from app.domain.errors import (
     ImmutableMaintenanceOrderError,
     InsufficientStockError,
     InvalidAssetStateError,
+    InvalidEquipmentStatusError,
     InvalidChangeOrderStateError,
     InvalidCommercialStateError,
     InvalidDocumentStateError,
@@ -46,6 +47,7 @@ from app.domain.errors import (
     UserEmailExistsError,
     UnbalancedJournalEntryError,
     UnsupportedEvidenceMimeTypeError,
+    NotFoundError,
 )
 from app.integrations.azure_blob import EvidenceStorageNotConfigured
 
@@ -77,6 +79,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     InvalidAssetStateError: ("NXR-ASSET-001", 409),
     DepreciationAlreadyPostedError: ("NXR-ASSET-002", 409),
     ImmutableMaintenanceOrderError: ("NXR-EQUIPMENT-001", 409),
+    InvalidEquipmentStatusError: ("NXR-EQUIPMENT-002", 422),
     InvalidTimeEntryStateError: ("NXR-WORKFORCE-001", 409),
     CrewMembershipError: ("NXR-WORKFORCE-002", 409),
     TaxCodeExistsError: ("NXR-TAX-001", 409),
@@ -99,6 +102,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     InvalidApprovalStateError: ("NXR-WORKFLOW-002", 409),
     InvalidApprovalDecisionError: ("NXR-WORKFLOW-003", 422),
     RateLimitExceededError: ("NXR-SECURITY-001", 429),
+    NotFoundError: ("NXR-DATA-002", 404),
 }
 
 

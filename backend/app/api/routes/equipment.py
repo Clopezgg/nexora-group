@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.domain.errors import NotFoundError
 from app.repositories import equipment_repository
 from app.schemas.equipment import (
     EquipmentCreateRequest,
@@ -27,14 +28,14 @@ router = APIRouter(prefix="/equipment", tags=["equipment"])
 def _resolve_equipment(db: Session, equipment_id: uuid.UUID):
     equipment = equipment_service.get_equipment(db, equipment_id)
     if equipment is None:
-        raise ValueError(f"Equipment {equipment_id} no existe")
+        raise NotFoundError(f"Equipment {equipment_id} no existe")
     return equipment
 
 
 def _resolve_order_equipment(db: Session, order_id: uuid.UUID):
     order = equipment_repository.get_maintenance_order(db, order_id)
     if order is None:
-        raise ValueError(f"MaintenanceOrder {order_id} no existe")
+        raise NotFoundError(f"MaintenanceOrder {order_id} no existe")
     equipment = _resolve_equipment(db, order.equipment_id)
     return order, equipment
 
@@ -278,6 +279,7 @@ def create_maintenance_order(
         plan_id=payload.plan_id,
         order_type=payload.order_type,
         opened_at=payload.opened_at,
+        supplier_id=payload.supplier_id,
         supplier_ref=payload.supplier_ref,
         description=payload.description,
         commit=False,

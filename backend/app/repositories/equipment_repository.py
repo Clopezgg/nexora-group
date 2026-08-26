@@ -111,6 +111,7 @@ def create_maintenance_order(
     plan_id: uuid.UUID | None,
     order_type: str,
     opened_at: date,
+    supplier_id: uuid.UUID | None,
     supplier_ref: str | None,
     description: str | None,
 ) -> MaintenanceOrder:
@@ -119,6 +120,7 @@ def create_maintenance_order(
         plan_id=plan_id,
         order_type=order_type,
         opened_at=opened_at,
+        supplier_id=supplier_id,
         supplier_ref=supplier_ref,
         description=description,
     )

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Badge, Button, Card, EmptyState, ErrorState, Input, LoadingState, Modal, Select, Table } from '../../design-system'
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { useMutationError } from '../../hooks/useMutationError'
 import { procurementService } from '../../services/procurementService'
 import type { PurchaseOrder, Quotation, Rfq } from '../../types/procurement'
 
@@ -19,6 +20,7 @@ import type { PurchaseOrder, Quotation, Rfq } from '../../types/procurement'
 export function BidComparisonPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
   const queryClient = useQueryClient()
+  const handleMutationError = useMutationError()
   const [selectedRfqId, setSelectedRfqId] = useState<string | null>(null)
   const [rfqModalOpen, setRfqModalOpen] = useState(false)
   const [quoteModalOpen, setQuoteModalOpen] = useState(false)
@@ -53,6 +55,7 @@ export function BidComparisonPage() {
       setLastCreatedPO(order)
       queryClient.invalidateQueries({ queryKey: ['procurement', 'quotations', selectedRfqId] })
     },
+    onError: (error) => handleMutationError(error, 'Seleccionar cotización ganadora'),
   })
 
   const rfqColumns: TableColumn<Rfq>[] = [
@@ -197,6 +200,7 @@ function NewRfqModal({
   onCreated: (rfq: Rfq) => void
 }) {
   const [supplierId, setSupplierId] = useState('')
+  const handleMutationError = useMutationError()
 
   const mutation = useMutation({
     mutationFn: () => procurementService.createRfq({ companyId, supplierIds: [supplierId] }),
@@ -205,6 +209,7 @@ function NewRfqModal({
       onClose()
       setSupplierId('')
     },
+    onError: (error) => handleMutationError(error, 'Crear RFQ'),
   })
 
   return (
@@ -256,6 +261,7 @@ function NewQuotationModal({
     quantity: '',
     unitPrice: '',
   })
+  const handleMutationError = useMutationError()
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -271,6 +277,7 @@ function NewQuotationModal({
       onClose()
       setForm({ supplierId: '', currencyCode: 'HNL', deliveryDays: '', paymentTerms: '', description: '', quantity: '', unitPrice: '' })
     },
+    onError: (error) => handleMutationError(error, 'Registrar cotización'),
   })
 
   return (

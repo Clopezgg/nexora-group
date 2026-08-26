@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.domain.errors import NotFoundError
 from app.repositories import workforce_repository
 from app.schemas.workforce import (
     CrewCreateRequest,
@@ -27,14 +28,14 @@ router = APIRouter(prefix="/workforce", tags=["workforce"])
 def _resolve_time_entry(db: Session, time_entry_id: uuid.UUID):
     entry = workforce_repository.get_time_entry(db, time_entry_id)
     if entry is None:
-        raise ValueError(f"TimeEntry {time_entry_id} no existe")
+        raise NotFoundError(f"TimeEntry {time_entry_id} no existe")
     return entry
 
 
 def _resolve_crew(db: Session, crew_id: uuid.UUID):
     crew = workforce_repository.get_crew(db, crew_id)
     if crew is None:
-        raise ValueError(f"Crew {crew_id} no existe")
+        raise NotFoundError(f"Crew {crew_id} no existe")
     return crew
 
 

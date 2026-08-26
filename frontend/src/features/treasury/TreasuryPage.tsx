@@ -234,7 +234,6 @@ function RemittanceModal({
       payload: CreateRemittancePayload
       idempotencyKey: string
     }) => treasuryService.createRemittance(payload, idempotencyKey),
-    retry: 1,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
       onClose()
@@ -336,7 +335,6 @@ function GeneralExpenseModal({
       payload: CreateGeneralExpensePayload
       idempotencyKey: string
     }) => treasuryService.createGeneralExpense(payload, idempotencyKey),
-    retry: 1,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
       onClose()
@@ -452,7 +450,6 @@ function TransferModal({
       payload: CreateTransferPayload
       idempotencyKey: string
     }) => treasuryService.createTransfer(payload, idempotencyKey),
-    retry: 1,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
       onClose()

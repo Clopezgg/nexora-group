@@ -83,6 +83,7 @@ class MaintenanceOrderCreateRequest(CamelModel):
     plan_id: uuid.UUID | None = None
     order_type: Literal["PREVENTIVE", "CORRECTIVE"]
     opened_at: date
+    supplier_id: uuid.UUID | None = None
     supplier_ref: str | None = None
     description: str | None = None
 
@@ -104,6 +105,7 @@ class MaintenanceOrderResponse(CamelModel):
     status: str
     opened_at: date
     closed_at: date | None
+    supplier_id: uuid.UUID | None
     supplier_ref: str | None
     parts_cost: Decimal
     labor_cost: Decimal

@@ -3,11 +3,13 @@ import { useState } from 'react'
 import { Badge, Button, Card, EmptyState, ErrorState, Input, LoadingState, Modal, Table } from '../../design-system'
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { useMutationError } from '../../hooks/useMutationError'
 import { procurementService } from '../../services/procurementService'
 import type { Supplier } from '../../types/procurement'
 
 export function SuppliersPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const handleMutationError = useMutationError()
   const [modalOpen, setModalOpen] = useState(false)
   const [legalName, setLegalName] = useState('')
   const [taxId, setTaxId] = useState('')
@@ -28,6 +30,7 @@ export function SuppliersPage() {
       setLegalName('')
       setTaxId('')
     },
+    onError: (error) => handleMutationError(error, 'Crear proveedor'),
   })
 
   const columns: TableColumn<Supplier>[] = [

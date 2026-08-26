@@ -14,6 +14,7 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { useMutationError } from '../../hooks/useMutationError'
 import { documentService } from '../../services/documentService'
 import { DOCUMENT_CATEGORIES, type Document, type DocumentVersion } from '../../types/document'
 
@@ -128,6 +129,7 @@ function CreateDocumentModal({
 }) {
   const [form, setForm] = useState({ title: '', category: 'OTHER', description: '' })
   const [file, setFile] = useState<File | null>(null)
+  const handleMutationError = useMutationError()
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -147,6 +149,7 @@ function CreateDocumentModal({
       setFile(null)
       onCreated()
     },
+    onError: (error) => handleMutationError(error, 'Crear documento'),
   })
 
   return (
@@ -199,6 +202,7 @@ function DocumentVersionsModal({
 }) {
   const [notes, setNotes] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const handleMutationError = useMutationError()
 
   const versionsQuery = useQuery({
     queryKey: ['documents', 'versions', document?.id],
@@ -218,6 +222,7 @@ function DocumentVersionsModal({
       setFile(null)
       onVersionAdded()
     },
+    onError: (error) => handleMutationError(error, 'Agregar versión de documento'),
   })
 
   return (

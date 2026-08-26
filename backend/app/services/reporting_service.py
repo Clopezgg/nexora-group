@@ -58,27 +58,31 @@ def trial_balance(db: Session, *, company_id: uuid.UUID) -> TrialBalanceReport:
     if chart is None:
         return TrialBalanceReport()
 
-    accounts = db.execute(
-        select(Account).where(Account.chart_of_account_id == chart.id).order_by(Account.code)
-    ).scalars()
+    # Single aggregated query instead of N+1 per-account balance calls.
+    rows = db.execute(
+        select(
+            Account.code,
+            Account.name,
+            func.coalesce(func.sum(JournalLine.debit_amount), Decimal("0")).label("total_debit"),
+            func.coalesce(func.sum(JournalLine.credit_amount), Decimal("0")).label("total_credit"),
+        )
+        .join(JournalLine, JournalLine.account_id == Account.id, isouter=True)
+        .where(Account.chart_of_account_id == chart.id)
+        .group_by(Account.id, Account.code, Account.name)
+        .order_by(Account.code)
+    ).all()
 
     report = TrialBalanceReport()
-    for account in accounts:
-        # account_balance() siempre devuelve débito - crédito, sin importar
-        # account_type (ver treasury_service.account_balance). Un balance
-        # positivo va a la columna débito, uno negativo a la columna
-        # crédito -- así es como se arma un Trial Balance real (a
-        # diferencia de un Balance Sheet, aquí NO se reclasifica por tipo
-        # de cuenta).
-        balance = treasury_service.account_balance(db, gl_account_id=account.id)
+    for code, name, total_debit, total_credit in rows:
+        balance = total_debit - total_credit
         if balance == Decimal("0"):
             continue
         debit = balance if balance > 0 else Decimal("0")
         credit = -balance if balance < 0 else Decimal("0")
         report.rows.append(
             TrialBalanceRow(
-                account_code=account.code,
-                account_name=account.name,
+                account_code=code,
+                account_name=name,
                 debit_balance=debit,
                 credit_balance=credit,
             )

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.domain.errors import NotFoundError
 from app.schemas.asset import (
     AssetStatusChangeRequest,
     DepreciationEntryCreateRequest,
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 def _resolve_asset(db: Session, asset_id: uuid.UUID):
     asset = asset_service.get_fixed_asset(db, asset_id)
     if asset is None:
-        raise ValueError(f"FixedAsset {asset_id} no existe")
+        raise NotFoundError(f"FixedAsset {asset_id} no existe")
     return asset
 
 

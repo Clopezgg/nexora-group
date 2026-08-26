@@ -16,6 +16,7 @@ import {
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { assetService } from '../../services/assetService'
 import { masterDataService } from '../../services/masterDataService'
+import { projectService } from '../../services/projectService'
 import type { FixedAsset } from '../../types/asset'
 
 const STATUS_TONE: Record<FixedAsset['status'], 'success' | 'warning' | 'neutral' | 'danger'> = {
@@ -40,6 +41,8 @@ export function FixedAssetsPage() {
     salvageValue: '0',
     depreciationExpenseAccountId: '',
     accumulatedDepreciationAccountId: '',
+    scope: 'GENERAL' as 'GENERAL' | 'PROJECT',
+    projectId: '',
   })
 
   const assetsQuery = useQuery({
@@ -51,6 +54,12 @@ export function FixedAssetsPage() {
   const accountsQuery = useQuery({
     queryKey: ['master-data', 'accounts', activeCompanyId],
     queryFn: () => masterDataService.listAccounts(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+
+  const projectsQuery = useQuery({
+    queryKey: ['projects', activeCompanyId],
+    queryFn: () => projectService.list(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
 
@@ -71,7 +80,8 @@ export function FixedAssetsPage() {
         currencyCode: 'HNL',
         usefulLifeMonths: Number(form.usefulLifeMonths),
         salvageValue: form.salvageValue,
-        scope: 'GENERAL',
+        scope: form.scope,
+        projectId: form.scope === 'PROJECT' ? form.projectId || undefined : undefined,
         depreciationExpenseAccountId: form.depreciationExpenseAccountId,
         accumulatedDepreciationAccountId: form.accumulatedDepreciationAccountId,
       }),
@@ -87,6 +97,8 @@ export function FixedAssetsPage() {
         salvageValue: '0',
         depreciationExpenseAccountId: '',
         accumulatedDepreciationAccountId: '',
+        scope: 'GENERAL',
+        projectId: '',
       })
     },
   })
@@ -199,6 +211,27 @@ export function FixedAssetsPage() {
             value={form.salvageValue}
             onChange={(e) => setForm({ ...form, salvageValue: e.target.value })}
           />
+          <Select
+            label="Ámbito"
+            value={form.scope}
+            onChange={(e) => setForm({ ...form, scope: e.target.value as 'GENERAL' | 'PROJECT', projectId: '' })}
+          >
+            <option value="GENERAL">General</option>
+            <option value="PROJECT">Proyecto</option>
+          </Select>
+          {form.scope === 'PROJECT' ? (
+            <Select
+              label="Proyecto"
+              value={form.projectId}
+              onChange={(e) => setForm({ ...form, projectId: e.target.value })}
+              required
+            >
+              <option value="">Selecciona un proyecto</option>
+              {(projectsQuery.data ?? []).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </Select>
+          ) : null}
           <Select
             label="Cuenta de gasto de depreciación"
             value={form.depreciationExpenseAccountId}

@@ -14,6 +14,7 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { useMutationError } from '../../hooks/useMutationError'
 import { approvalService } from '../../services/approvalService'
 import type { ApprovalPriority, ApprovalRequestEntry } from '../../types/approval'
 
@@ -61,6 +62,7 @@ function DecideControl({
 export function ApprovalInboxPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
   const queryClient = useQueryClient()
+  const handleMutationError = useMutationError()
   const [moduleFilter, setModuleFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | ApprovalPriority>('ALL')
 
@@ -89,6 +91,7 @@ export function ApprovalInboxPage() {
       comment: string
     }) => approvalService.decide(id, decision, comment),
     onSuccess: invalidate,
+    onError: (error) => handleMutationError(error, 'Decidir aprobación'),
   })
 
   const filteredRows = useMemo(() => {

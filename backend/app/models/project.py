@@ -23,6 +23,9 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    customer_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("customers.id", ondelete="SET NULL"), nullable=True
+    )
     customer_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     manager: Mapped[str | None] = mapped_column(String(255), nullable=True)
     currency_code: Mapped[str | None] = mapped_column(

@@ -4,7 +4,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.domain.errors import ProcurementCurrencyMismatchError
+from app.domain.errors import NotFoundError, ProcurementCurrencyMismatchError
 from app.models.company import Company
 from app.models.procurement import (
     GoodsReceipt,
@@ -244,7 +244,7 @@ def project_commitment_total(
     commitment_statuses = ("APPROVED", "SENT", "PARTIALLY_RECEIVED", "RECEIVED")
     company = db.get(Company, company_id)
     if company is None:
-        raise ValueError(f"Company {company_id} no existe")
+        raise NotFoundError(f"Company {company_id} no existe")
     total = func.sum(PurchaseOrderLine.quantity * PurchaseOrderLine.unit_price + PurchaseOrderLine.tax_amount)
     stmt = (
         select(PurchaseOrder.currency_code, total.label("total"))

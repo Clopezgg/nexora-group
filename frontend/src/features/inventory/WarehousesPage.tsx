@@ -3,11 +3,13 @@ import { useState } from 'react'
 import { Badge, Button, Card, EmptyState, ErrorState, Input, LoadingState, Table } from '../../design-system'
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { useMutationError } from '../../hooks/useMutationError'
 import { inventoryService } from '../../services/inventoryService'
 import type { Warehouse } from '../../types/inventory'
 
 export function WarehousesPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const handleMutationError = useMutationError()
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const queryClient = useQueryClient()
@@ -25,6 +27,7 @@ export function WarehousesPage() {
       setCode('')
       setName('')
     },
+    onError: (error) => handleMutationError(error, 'Crear almacén'),
   })
 
   const columns: TableColumn<Warehouse>[] = [

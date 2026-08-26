@@ -3,11 +3,13 @@ import { useState } from 'react'
 import { Badge, Button, Card, EmptyState, ErrorState, Input, LoadingState, Modal, Table } from '../../design-system'
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { useMutationError } from '../../hooks/useMutationError'
 import { procurementService } from '../../services/procurementService'
 import type { Requisition } from '../../types/procurement'
 
 export function RequisitionsPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const handleMutationError = useMutationError()
   const [modalOpen, setModalOpen] = useState(false)
   const [description, setDescription] = useState('')
   const [quantity, setQuantity] = useState('')
@@ -34,11 +36,13 @@ export function RequisitionsPage() {
       setQuantity('')
       setJustification('')
     },
+    onError: (error) => handleMutationError(error, 'Crear requisición'),
   })
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => procurementService.approveRequisition(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['procurement', 'requisitions', activeCompanyId] }),
+    onError: (error) => handleMutationError(error, 'Aprobar requisición'),
   })
 
   const columns: TableColumn<Requisition>[] = [

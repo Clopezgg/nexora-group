@@ -134,8 +134,9 @@ class MaintenanceOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="OPEN")
     opened_at: Mapped[date] = mapped_column(Date, nullable=False)
     closed_at: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # `supplier_ref` es texto libre hasta que Track C aterrice el Supplier
-    # real (mismo patrón de deuda intencional documentado por Track A/C).
+    supplier_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True
+    )
     supplier_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     parts_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=Decimal("0"))
     labor_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=Decimal("0"))

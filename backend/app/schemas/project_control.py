@@ -9,6 +9,7 @@ class ProjectCreateRequest(CamelModel):
     company_id: uuid.UUID
     name: str
     code: str | None = None
+    customer_id: uuid.UUID | None = None
     customer_ref: str | None = None
     manager: str | None = None
     currency_code: str | None = None
@@ -23,6 +24,7 @@ class ProjectResponse(CamelModel):
     company_id: uuid.UUID
     name: str
     code: str | None
+    customer_id: uuid.UUID | None
     customer_ref: str | None
     manager: str | None
     currency_code: str | None

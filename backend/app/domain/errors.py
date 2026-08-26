@@ -6,6 +6,11 @@ class NotAuthenticatedError(Exception):
     pass
 
 
+class NotFoundError(Exception):
+    """Entidad no encontrada. Se devuelve 404 con mensaje genérico para
+    evitar enumeración de IDs."""
+
+
 class AccountLockedError(Exception):
     """NXR-REQ-0008: demasiados intentos fallidos de login consecutivos."""
 
@@ -101,6 +106,11 @@ class DepreciationAlreadyPostedError(Exception):
 class ImmutableMaintenanceOrderError(Exception):
     """INV-EQP-001: un MaintenanceOrder CLOSED/CANCELLED es terminal -- no se
     permite ninguna mutación posterior, solo lectura."""
+
+
+class InvalidEquipmentStatusError(Exception):
+    """Transición de estado de Equipment inválida (p.ej. un status que no
+    está en la familia EQUIPMENT_STATUSES)."""
 
 
 class InvalidTimeEntryStateError(Exception):

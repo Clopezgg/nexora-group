@@ -13,6 +13,7 @@ import {
 } from '../../design-system'
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { useMutationError } from '../../hooks/useMutationError'
 import { inventoryService } from '../../services/inventoryService'
 import { procurementService } from '../../services/procurementService'
 import type { PurchaseOrder } from '../../types/procurement'
@@ -21,6 +22,7 @@ const RECEIVABLE_STATUSES = ['SENT', 'APPROVED', 'PARTIALLY_RECEIVED']
 
 export function GoodsReceiptsPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const handleMutationError = useMutationError()
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null)
   const [warehouseId, setWarehouseId] = useState<string | null>(null)
   const [receivedAt, setReceivedAt] = useState(() => new Date().toISOString().slice(0, 10))
@@ -56,6 +58,7 @@ export function GoodsReceiptsPage() {
       queryClient.invalidateQueries({ queryKey: ['procurement', 'purchase-orders', activeCompanyId] })
       setQuantities({})
     },
+    onError: (error) => handleMutationError(error, 'Registrar recepción'),
   })
 
   const columns: TableColumn<PurchaseOrder>[] = [

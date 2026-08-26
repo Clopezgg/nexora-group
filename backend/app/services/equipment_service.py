@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.errors import (
     ImmutableMaintenanceOrderError,
+    InvalidEquipmentStatusError,
     InvalidFinancialReferenceError,
     InvalidOperationScopeError,
 )
@@ -77,7 +78,7 @@ def change_equipment_status(db: Session, *, equipment_id: uuid.UUID, status: str
     if equipment is None:
         raise ValueError(f"Equipment {equipment_id} no existe")
     if status not in EQUIPMENT_STATUSES:
-        raise InvalidOperationScopeError(f"status inválido: {status!r}")
+        raise InvalidEquipmentStatusError(f"status inválido: {status!r}")
     equipment.status = status
     if commit:
         db.commit()
@@ -173,6 +174,7 @@ def create_maintenance_order(
     plan_id: uuid.UUID | None,
     order_type: str,
     opened_at: date,
+    supplier_id: uuid.UUID | None,
     supplier_ref: str | None,
     description: str | None,
     commit: bool = True,
@@ -183,6 +185,7 @@ def create_maintenance_order(
         plan_id=plan_id,
         order_type=order_type,
         opened_at=opened_at,
+        supplier_id=supplier_id,
         supplier_ref=supplier_ref,
         description=description,
     )

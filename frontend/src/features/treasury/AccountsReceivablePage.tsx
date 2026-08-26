@@ -15,11 +15,13 @@ import {
 import { crmService } from '../../services/crmService'
 import { masterDataService } from '../../services/masterDataService'
 import { treasuryService } from '../../services/treasuryService'
+import { useMutationError } from '../../hooks/useMutationError'
 import { arService, type CustomerInvoice } from '../../services/apArService'
 import './TreasuryPage.css'
 
 export function AccountsReceivablePage() {
   const queryClient = useQueryClient()
+  const handleMutationError = useMutationError()
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [openCreate, setOpenCreate] = useState(false)
 
@@ -56,6 +58,7 @@ export function AccountsReceivablePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ar', 'customer-invoices', activeCompanyId] })
     },
+    onError: (error) => handleMutationError(error, 'Aprobar factura de cliente'),
   })
 
   if (companiesQuery.isLoading) return <LoadingState label="Cargando…" />
@@ -202,6 +205,7 @@ function CreateCustomerInvoiceModal({
   const [amount, setAmount] = useState<number | null>(null)
   const [revenueAccountId, setRevenueAccountId] = useState(revenueAccounts[0]?.id ?? '')
   const [receivableAccountId, setReceivableAccountId] = useState(receivableAccounts[0]?.id ?? '')
+  const handleMutationError = useMutationError()
 
   const customerOptions = customers.map((c) => ({ id: c.id, label: c.legalName }))
 
@@ -223,6 +227,7 @@ function CreateCustomerInvoiceModal({
       onCreated(invoice)
       onClose()
     },
+    onError: (error) => handleMutationError(error, 'Registrar factura de cliente'),
   })
 
   return (
@@ -292,6 +297,7 @@ function CollectButton({
   remaining: number
 }) {
   const queryClient = useQueryClient()
+  const handleMutationError = useMutationError()
   const mutation = useMutation({
     mutationFn: async ({
       payload,
@@ -303,11 +309,11 @@ function CollectButton({
       await arService.collect(invoiceId, payload, idempotencyKey)
       return arService.getInvoice(invoiceId)
     },
-    retry: 1,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ar', 'customer-invoices'] })
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
     },
+    onError: (error) => handleMutationError(error, 'Cobrar factura de cliente'),
   })
 
   return (

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
-from app.domain.errors import InvalidCashFlowActivityError
+from app.domain.errors import InvalidCashFlowActivityError, NotFoundError
 from app.models.chart_of_accounts import CASH_FLOW_ACTIVITIES, ChartOfAccount
 from app.repositories import account_repository, company_repository, role_repository
 from app.schemas.master_data import (
@@ -90,7 +90,7 @@ def update_company(
     try:
         existing = company_repository.get_by_id(db, company_id)
         if existing is None:
-            raise ValueError(f"Company {company_id} no existe")
+            raise NotFoundError(f"Company {company_id} no existe")
         assert_company_access(
             db, user_id=user.id, resource="core.company", action="update", company_id=company_id
         )
@@ -98,7 +98,7 @@ def update_company(
         before_fiscal_id = existing.fiscal_id
         company = company_repository.update_company(
             db,
-            company_id=company_id,
+            company=existing,
             legal_name=payload.legal_name,
             fiscal_id=payload.fiscal_id,
         )
@@ -191,7 +191,7 @@ def update_account(
     try:
         account = account_repository.get_by_id(db, account_id)
         if account is None:
-            raise ValueError(f"Account {account_id} no existe")
+            raise NotFoundError(f"Account {account_id} no existe")
         chart = db.get(ChartOfAccount, account.chart_of_account_id)
         assert_company_access(
             db, user_id=user.id, resource="accounting.account", action="update", company_id=chart.company_id

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.domain.errors import NotFoundError
 from app.repositories import crm_repository
 from app.schemas.crm import (
     CustomerCreateRequest,
@@ -28,21 +29,21 @@ router = APIRouter(prefix="/crm", tags=["crm"])
 def _resolve_lead(db: Session, lead_id: uuid.UUID):
     lead = crm_repository.get_lead(db, lead_id)
     if lead is None:
-        raise ValueError(f"Lead {lead_id} no existe")
+        raise NotFoundError(f"Lead {lead_id} no existe")
     return lead
 
 
 def _resolve_quotation(db: Session, quotation_id: uuid.UUID):
     quotation = crm_repository.get_quotation(db, quotation_id)
     if quotation is None:
-        raise ValueError(f"Quotation {quotation_id} no existe")
+        raise NotFoundError(f"Quotation {quotation_id} no existe")
     return quotation
 
 
 def _resolve_sales_contract(db: Session, sales_contract_id: uuid.UUID):
     contract = crm_repository.get_sales_contract(db, sales_contract_id)
     if contract is None:
-        raise ValueError(f"SalesContract {sales_contract_id} no existe")
+        raise NotFoundError(f"SalesContract {sales_contract_id} no existe")
     return contract
 
 

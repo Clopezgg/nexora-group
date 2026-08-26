@@ -94,6 +94,7 @@ def create_project(
         company_id=payload.company_id,
         name=payload.name,
         code=payload.code,
+        customer_id=payload.customer_id,
         customer_ref=payload.customer_ref,
         manager=payload.manager,
         currency_code=payload.currency_code,
@@ -332,6 +333,20 @@ def create_budget_baseline(
     db.commit()
     db.refresh(budget)
     return _budget_to_response(db, budget)
+
+
+@router.get("/{project_id}/budgets", response_model=list[BudgetResponse])
+def list_budgets(
+    project_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("project.budget", "read")),
+) -> list[BudgetResponse]:
+    project = _get_project_or_404(db, project_id)
+    assert_company_access(
+        db, user_id=user.id, resource="project.budget", action="read", company_id=project.company_id
+    )
+    budgets = budget_repository.list_budgets_for_project(db, project_id)
+    return [_budget_to_response(db, b) for b in budgets]
 
 
 @router.get("/{project_id}/budgets/active", response_model=BudgetResponse)

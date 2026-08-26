@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
-from app.domain.errors import InvalidFinancialReferenceError, SegregationOfDutiesError
+from app.domain.errors import InvalidFinancialReferenceError, NotFoundError, SegregationOfDutiesError
 from app.schemas.ap import (
     SupplierInvoiceCreateRequest,
     SupplierInvoiceResponse,
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/ap", tags=["accounts-payable"])
 def _resolve_invoice(db: Session, invoice_id: uuid.UUID):
     invoice = ap_service.get_supplier_invoice(db, invoice_id=invoice_id)
     if invoice is None:
-        raise ValueError(f"SupplierInvoice {invoice_id} no existe")
+        raise NotFoundError(f"SupplierInvoice {invoice_id} no existe")
     return invoice
 
 

@@ -14,11 +14,13 @@ import {
 } from '../../design-system'
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { useMutationError } from '../../hooks/useMutationError'
 import { procurementService } from '../../services/procurementService'
 import type { PurchaseOrder } from '../../types/procurement'
 
 export function PurchaseOrdersPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const handleMutationError = useMutationError()
   const [modalOpen, setModalOpen] = useState(false)
   const [supplierId, setSupplierId] = useState<string | null>(null)
   const [description, setDescription] = useState('')
@@ -56,15 +58,18 @@ export function PurchaseOrdersPage() {
       setQuantity('')
       setUnitPrice('')
     },
+    onError: (error) => handleMutationError(error, 'Crear orden de compra'),
   })
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => procurementService.approvePurchaseOrder(id),
     onSuccess: invalidate,
+    onError: (error) => handleMutationError(error, 'Aprobar orden de compra'),
   })
   const sendMutation = useMutation({
     mutationFn: (id: string) => procurementService.sendPurchaseOrder(id),
     onSuccess: invalidate,
+    onError: (error) => handleMutationError(error, 'Enviar orden de compra'),
   })
 
   const columns: TableColumn<PurchaseOrder>[] = [

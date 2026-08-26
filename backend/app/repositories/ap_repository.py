@@ -4,7 +4,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.domain.errors import BudgetCurrencyMismatchError
+from app.domain.errors import BudgetCurrencyMismatchError, NotFoundError
 from app.models.ap import SupplierInvoice
 from app.models.company import Company
 
@@ -35,7 +35,7 @@ def project_accrued_total(db: Session, *, company_id: uuid.UUID, project_id: uui
     into one nominal figure."""
     company = db.get(Company, company_id)
     if company is None:
-        raise ValueError(f"Company {company_id} no existe")
+        raise NotFoundError(f"Company {company_id} no existe")
     total_expr = func.sum(SupplierInvoice.amount + SupplierInvoice.tax_amount)
     stmt = (
         select(SupplierInvoice.currency_code, total_expr.label("total"))
@@ -60,7 +60,7 @@ def project_paid_total(db: Session, *, company_id: uuid.UUID, project_id: uuid.U
     SupplierPayment rows."""
     company = db.get(Company, company_id)
     if company is None:
-        raise ValueError(f"Company {company_id} no existe")
+        raise NotFoundError(f"Company {company_id} no existe")
     total_expr = func.sum(SupplierInvoice.amount_paid)
     stmt = (
         select(SupplierInvoice.currency_code, total_expr.label("total"))

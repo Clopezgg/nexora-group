@@ -16,6 +16,7 @@ import {
 } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { equipmentService } from '../../services/equipmentService'
+import { projectService } from '../../services/projectService'
 import type { Equipment, FuelLog, MaintenanceOrder } from '../../types/equipment'
 
 const EQUIPMENT_STATUS_TONE: Record<Equipment['status'], 'success' | 'warning' | 'neutral' | 'danger' | 'info'> = {
@@ -138,7 +139,13 @@ function FuelTab({ companyId }: { companyId: string }) {
   const equipmentQuery = useEquipmentList(companyId)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm] = useState({ logDate: '', quantity: '', unitCost: '' })
+  const [form, setForm] = useState({ logDate: '', quantity: '', unitCost: '', scope: 'GENERAL' as 'GENERAL' | 'PROJECT', projectId: '' })
+
+  const projectsQuery = useQuery({
+    queryKey: ['projects', companyId],
+    queryFn: () => projectService.list(companyId),
+    enabled: Boolean(companyId),
+  })
 
   const fuelLogsQuery = useQuery({
     queryKey: ['equipment', 'fuel-logs', selectedEquipmentId],
@@ -154,12 +161,13 @@ function FuelTab({ companyId }: { companyId: string }) {
         logDate: form.logDate,
         quantity: form.quantity,
         unitCost: form.unitCost,
-        scope: 'GENERAL',
+        scope: form.scope,
+        projectId: form.scope === 'PROJECT' ? form.projectId || undefined : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment', 'fuel-logs', selectedEquipmentId] })
       setModalOpen(false)
-      setForm({ logDate: '', quantity: '', unitCost: '' })
+      setForm({ logDate: '', quantity: '', unitCost: '', scope: 'GENERAL', projectId: '' })
     },
   })
 
@@ -203,6 +211,27 @@ function FuelTab({ companyId }: { companyId: string }) {
           <Input label="Fecha" type="date" value={form.logDate} onChange={(e) => setForm({ ...form, logDate: e.target.value })} required />
           <Input label="Cantidad (galones)" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} required />
           <Input label="Costo unitario" value={form.unitCost} onChange={(e) => setForm({ ...form, unitCost: e.target.value })} required />
+          <Select
+            label="Ámbito"
+            value={form.scope}
+            onChange={(e) => setForm({ ...form, scope: e.target.value as 'GENERAL' | 'PROJECT', projectId: '' })}
+          >
+            <option value="GENERAL">General</option>
+            <option value="PROJECT">Proyecto</option>
+          </Select>
+          {form.scope === 'PROJECT' ? (
+            <Select
+              label="Proyecto"
+              value={form.projectId}
+              onChange={(e) => setForm({ ...form, projectId: e.target.value })}
+              required
+            >
+              <option value="">Selecciona un proyecto</option>
+              {(projectsQuery.data ?? []).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </Select>
+          ) : null}
           <Button type="submit" loading={createMutation.isPending}>
             Guardar
           </Button>

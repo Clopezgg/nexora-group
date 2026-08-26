@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.domain.errors import NotFoundError
 from app.models.chart_of_accounts import Account, ChartOfAccount
 
 
@@ -30,7 +31,7 @@ def create_account(
 ) -> Account:
     chart = get_chart_of_account_for_company(db, company_id)
     if chart is None:
-        raise ValueError(f"La company {company_id} no tiene chart of accounts")
+        raise NotFoundError(f"La company {company_id} no tiene chart of accounts")
     account = Account(
         chart_of_account_id=chart.id,
         code=code,

@@ -14,6 +14,7 @@ import {
 } from '../../design-system'
 import { useAuth } from '../auth/auth-context'
 import { useCompanyUsers } from '../../hooks/useCompanyUsers'
+import { useMutationError } from '../../hooks/useMutationError'
 import { masterDataService } from '../../services/masterDataService'
 import { procurementService } from '../../services/procurementService'
 import { treasuryService } from '../../services/treasuryService'
@@ -22,6 +23,7 @@ import './TreasuryPage.css'
 
 export function AccountsPayablePage() {
   const queryClient = useQueryClient()
+  const handleMutationError = useMutationError()
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [openCreate, setOpenCreate] = useState(false)
   const [submitInvoiceId, setSubmitInvoiceId] = useState<string | null>(null)
@@ -60,6 +62,7 @@ export function AccountsPayablePage() {
       queryClient.invalidateQueries({ queryKey: ['ap', 'supplier-invoices', activeCompanyId] })
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
     },
+    onError: (error) => handleMutationError(error, 'Aprobar factura de proveedor'),
   })
 
   if (companiesQuery.isLoading) return <LoadingState label="Cargando…" />
@@ -222,6 +225,7 @@ function SubmitForApprovalModal({
   const { users: companyUsers } = useCompanyUsers(companyId)
   const { user: currentUser } = useAuth()
   const [assignedTo, setAssignedTo] = useState('')
+  const handleMutationError = useMutationError()
 
   const mutation = useMutation({
     mutationFn: () => apService.submitForApproval(invoiceId, assignedTo),
@@ -229,6 +233,7 @@ function SubmitForApprovalModal({
       onSubmitted()
       onClose()
     },
+    onError: (error) => handleMutationError(error, 'Enviar factura a aprobación'),
   })
 
   return (
@@ -287,6 +292,7 @@ function CreateSupplierInvoiceModal({
   const [amount, setAmount] = useState<number | null>(null)
   const [expenseAccountId, setExpenseAccountId] = useState(expenseAccounts[0]?.id ?? '')
   const [payableAccountId, setPayableAccountId] = useState(payableAccounts[0]?.id ?? '')
+  const handleMutationError = useMutationError()
 
   const supplierOptions = suppliers.map((s) => ({ id: s.id, label: s.legalName }))
 
@@ -308,6 +314,7 @@ function CreateSupplierInvoiceModal({
       onCreated(invoice)
       onClose()
     },
+    onError: (error) => handleMutationError(error, 'Registrar factura de proveedor'),
   })
 
   return (
@@ -377,6 +384,7 @@ function PaySupplierInvoiceButton({
   remaining: number
 }) {
   const queryClient = useQueryClient()
+  const handleMutationError = useMutationError()
   const mutation = useMutation({
     mutationFn: async ({
       payload,
@@ -388,11 +396,11 @@ function PaySupplierInvoiceButton({
       await apService.pay(invoiceId, payload, idempotencyKey)
       return apService.getInvoice(invoiceId)
     },
-    retry: 1,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ap', 'supplier-invoices'] })
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
     },
+    onError: (error) => handleMutationError(error, 'Pagar factura de proveedor'),
   })
 
   return (

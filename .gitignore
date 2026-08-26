@@ -28,3 +28,6 @@ infra/main.parameters.json
 .vscode/
 .idea/
 *.log
+.nexora-context/
+.recovery/
+node_modules/.vite/

@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.domain.errors import NotFoundError
 from app.models.chart_of_accounts import ChartOfAccount
 from app.models.company import Company
 
@@ -49,15 +50,12 @@ def create_company(
 def update_company(
     db: Session,
     *,
-    company_id: uuid.UUID,
+    company: Company,
     legal_name: str | None = None,
     fiscal_id: str | None = None,
 ) -> Company:
     """Solo legal_name/fiscal_id son editables aquí -- code y
     functional_currency_code son inmutables post-creación (CLAUDE.md)."""
-    company = db.get(Company, company_id)
-    if company is None:
-        raise ValueError(f"Company {company_id} no existe")
     if legal_name is not None:
         company.legal_name = legal_name
     if fiscal_id is not None:

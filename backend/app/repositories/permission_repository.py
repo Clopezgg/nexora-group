@@ -92,6 +92,10 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("procurement.purchase_order", "create", "Crear órdenes de compra"),
     ("procurement.purchase_order", "read", "Ver órdenes de compra"),
     ("procurement.purchase_order", "approve", "Aprobar órdenes de compra"),
+    # Supplier Performance (NXR-REQ-0058, 2026-08-25). Mismo scope por rol
+    # que procurement.purchase_order/read -- ver
+    # reporting_service.supplier_performance.
+    ("reports.supplier_performance", "read", "Ver métricas de desempeño de proveedores"),
     ("procurement.goods_receipt", "create", "Registrar recepciones de mercadería"),
     ("procurement.goods_receipt", "read", "Ver recepciones de mercadería"),
     ("procurement.service_entry", "create", "Registrar entradas de servicio"),
@@ -369,6 +373,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("procurement.rfq", "read", SCOPE_ANY),
         ("procurement.quotation", "read", SCOPE_ANY),
         ("procurement.purchase_order", "read", SCOPE_ANY),
+        ("reports.supplier_performance", "read", SCOPE_ANY),
         ("procurement.goods_receipt", "read", SCOPE_ANY),
         ("procurement.service_entry", "read", SCOPE_ANY),
         ("procurement.three_way_match", "read", SCOPE_ANY),
@@ -532,6 +537,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("procurement.quotation", "select", SCOPE_OWN),
         ("procurement.purchase_order", "create", SCOPE_OWN),
         ("procurement.purchase_order", "read", SCOPE_OWN),
+        ("reports.supplier_performance", "read", SCOPE_OWN),
         ("procurement.purchase_order", "approve", SCOPE_OWN),
         ("procurement.goods_receipt", "read", SCOPE_OWN),
         ("procurement.service_entry", "read", SCOPE_OWN),
@@ -554,6 +560,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("procurement.quotation", "read", SCOPE_OWN),
         ("procurement.purchase_order", "create", SCOPE_OWN),
         ("procurement.purchase_order", "read", SCOPE_OWN),
+        ("reports.supplier_performance", "read", SCOPE_OWN),
         ("procurement.goods_receipt", "read", SCOPE_OWN),
         ("procurement.service_entry", "read", SCOPE_OWN),
         ("procurement.three_way_match", "read", SCOPE_OWN),
@@ -565,6 +572,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("core.company", "read", SCOPE_OWN),
         ("core.user", "read", SCOPE_OWN),
         ("procurement.purchase_order", "read", SCOPE_OWN),
+        ("reports.supplier_performance", "read", SCOPE_OWN),
         ("procurement.goods_receipt", "create", SCOPE_OWN),
         ("procurement.goods_receipt", "read", SCOPE_OWN),
         ("inventory.item", "create", SCOPE_OWN),

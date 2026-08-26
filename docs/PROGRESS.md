@@ -2683,3 +2683,64 @@ real, repeated, executed evidence — not `VERIFIED` (that would need
 independent verification against a deployed Azure Postgres instance,
 which doesn't exist yet). Tally now 107 `IMPLEMENTED` (+1), 11
 `IN_PROGRESS`, 2 `NOT_STARTED` (-1), 2 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.
+
+## 2026-08-25 — Supplier Performance built with real controlled fixtures (NXR-REQ-0058 → IMPLEMENTED)
+
+Direct continuation, same session, under the user's explicit "no more
+deferring implementable work" absolute-closure order — which
+specifically named `NXR-REQ-0058` and said the "not enough historical
+volume" rationale was about production data maturity, not about
+whether the metric is buildable, and to build it now with real
+controlled fixtures rather than defer further.
+
+`reporting_service.supplier_performance` (`app/services/
+reporting_service.py`) computes three real metrics per supplier from
+data that real procurement flows actually persist — never fabricated,
+never hardcoded:
+
+- **On-time delivery**: needs a PO born from a `SupplierQuotation` with
+  a real `delivery_days`, and at least one real `GoodsReceipt`.
+  `expected = po.created_at.date() + delivery_days`; on time if the
+  earliest receipt is on or before that date.
+- **Three-way-match clean rate**: fraction of `ThreeWayMatchResult`
+  rows with `status == "MATCHED"` (no exceptions) over the total
+  recorded for that supplier's POs.
+- **Price variance**: `(max - min) / avg` of `PurchaseOrderLine.
+  unit_price`, grouped by `description` (not `item_id` — building the
+  real fixtures surfaced that `SupplierQuotationLine`, which
+  `create_purchase_order_from_quotation` copies lines from, has no
+  `item_id` field at all; it's free text, same as a directly-created
+  PO. Grouping by `item_id` would have silently produced zero samples
+  for every quotation-derived PO, i.e. the only real path this system
+  supports today — caught by actually running the test against real
+  fixtures, not by reading the model definitions).
+
+**The core honesty guarantee, the actual point of this requirement**:
+every rate is `None` — never a fabricated `0%` or `100%` — when there
+isn't enough data, and every rate ships with an explicit `sample_size`
+alongside it, so a supplier with one order is never presented with the
+same confidence as one with fifty. Tested directly: a brand-new
+supplier with zero POs returns `null` for every rate with `sample_size:
+0`, not a misleadingly perfect or terrible number.
+
+`GET /api/reports/supplier-performance?companyId=` (`reports.
+supplier_performance`/`read`, same per-role scope as `procurement.
+purchase_order`/`read`) + a real `SupplierPerformancePage.tsx` tab in
+`/control/reportes`, rendering `"Sin datos suficientes (n=0)"` plainly
+instead of hiding or guessing.
+
+Real controlled fixtures (not synthetic/random data): a "good" supplier
+with two on-time, cleanly-matched, consistently-priced orders, and a
+"bad" supplier with two late deliveries, two 3-way-match exceptions,
+and a real price swing (`L10.00` → `L20.00` for the same line item) —
+built entirely through the actual RFQ → quotation → PO → receipt →
+match API flow, the same one a real user would use.
+
+3 new backend tests, 1 new frontend test. Full verification: 311/311
+backend pytest (up from 308), `tsc -b --noEmit` clean, `eslint .`
+clean, 92/92 frontend vitest, combined Critical Journey + Accessibility
+E2E 3/3 green.
+
+Traceability: `NXR-REQ-0058` moved `NOT_STARTED` → `IMPLEMENTED`. Tally
+now 108 `IMPLEMENTED` (+1), 11 `IN_PROGRESS`, 1 `NOT_STARTED` (-1), 2
+`BLOCKED_EXTERNAL`, 2 `VERIFIED`.

@@ -14,6 +14,7 @@ from app.schemas.reporting import (
     GeneralLedgerRowResponse,
     IncomeStatementReportResponse,
     StatementRowResponse,
+    SupplierPerformanceRowResponse,
     TrialBalanceReportResponse,
     TrialBalanceRowResponse,
 )
@@ -226,3 +227,29 @@ def get_general_ledger(
         total_debit=report.total_debit,
         total_credit=report.total_credit,
     )
+
+
+@router.get("/supplier-performance", response_model=list[SupplierPerformanceRowResponse])
+def get_supplier_performance(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports.supplier_performance", "read")),
+) -> list[SupplierPerformanceRowResponse]:
+    assert_company_access(
+        db, user_id=user.id, resource="reports.supplier_performance", action="read", company_id=company_id
+    )
+    rows = reporting_service.supplier_performance(db, company_id=company_id)
+    return [
+        SupplierPerformanceRowResponse(
+            supplier_id=row.supplier_id,
+            supplier_legal_name=row.supplier_legal_name,
+            purchase_order_count=row.purchase_order_count,
+            on_time_delivery_rate=row.on_time_delivery_rate,
+            on_time_delivery_sample_size=row.on_time_delivery_sample_size,
+            three_way_match_clean_rate=row.three_way_match_clean_rate,
+            three_way_match_sample_size=row.three_way_match_sample_size,
+            price_variance_pct=row.price_variance_pct,
+            price_variance_sample_size=row.price_variance_sample_size,
+        )
+        for row in rows
+    ]

@@ -8,6 +8,7 @@ function stubFetch(overrides: {
   balanceSheet?: unknown
   incomeStatement?: unknown
   cashFlow?: unknown
+  supplierPerformance?: unknown
 }) {
   const companies = overrides.companies ?? [
     { id: 'c1', name: 'Constructora Nexora', code: null, legalName: null, functionalCurrencyCode: 'HNL' },
@@ -37,6 +38,9 @@ function stubFetch(overrides: {
       }
       if (url.includes('/reports/cash-flow')) {
         return Promise.resolve({ ok: true, status: 200, json: async () => overrides.cashFlow ?? {} } as Response)
+      }
+      if (url.includes('/reports/supplier-performance')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => overrides.supplierPerformance ?? [] } as Response)
       }
       if (url.includes('/context')) {
         return Promise.resolve({
@@ -169,5 +173,35 @@ describe('CashFlowPage', () => {
 
     expect(await screen.findByText('Aportes de socios')).toBeInTheDocument()
     expect(screen.queryByText(/sin clasificar/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('SupplierPerformancePage', () => {
+  it('renders real per-supplier metrics with sample size from the real API response', async () => {
+    stubFetch({
+      supplierPerformance: [
+        {
+          supplierId: 's1', supplierLegalName: 'Buen Proveedor S.A.', purchaseOrderCount: 2,
+          onTimeDeliveryRate: '100.00', onTimeDeliverySampleSize: 2,
+          threeWayMatchCleanRate: '100.00', threeWayMatchSampleSize: 2,
+          priceVariancePct: '0.00', priceVarianceSampleSize: 1,
+        },
+        {
+          supplierId: 's2', supplierLegalName: 'Proveedor Nuevo S.A.', purchaseOrderCount: 0,
+          onTimeDeliveryRate: null, onTimeDeliverySampleSize: 0,
+          threeWayMatchCleanRate: null, threeWayMatchSampleSize: 0,
+          priceVariancePct: null, priceVarianceSampleSize: 0,
+        },
+      ],
+    })
+
+    render(renderApp('/control/reportes'))
+    await userEvent.click(await screen.findByRole('tab', { name: /desempeño de proveedores/i }))
+
+    expect(await screen.findByText('Buen Proveedor S.A.')).toBeInTheDocument()
+    expect(screen.getAllByText(/100\.00% \(n=2\)/).length).toBeGreaterThan(0)
+    expect(screen.getByText('Proveedor Nuevo S.A.')).toBeInTheDocument()
+    // honest "no data" instead of a fabricated 0%/100% for the new supplier
+    expect(screen.getAllByText(/sin datos suficientes \(n=0\)/i).length).toBeGreaterThan(0)
   })
 })

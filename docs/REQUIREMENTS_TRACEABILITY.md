@@ -181,7 +181,7 @@ todavía).
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
 | NXR-REQ-0057 | Supplier Master | ✅·✅·✅·✅·✅·⬜·⬜·✅·⬜ | IMPLEMENTED | Track C: `Supplier` (legal_name/trade_name/tax_id/banking_details JSONB, distinto de `TreasuryAccount`), `SuppliersPage` real |
-| NXR-REQ-0058 | Supplier Performance | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | NOT_STARTED | Sin datos históricos suficientes todavía para calcular métricas reales (delivery/quality/price variance) sin fabricarlas — deferred hasta tener volumen de PO/GR real |
+| NXR-REQ-0058 | Supplier Performance | ➖➖✅✅✅✅➖✅⬜ | IMPLEMENTED | 2026-08-25: la falta de "volumen histórico real" bloqueaba la calidad de los números en producción, no la posibilidad de construir el código -- se construyó con fixtures reales controlados vía los flujos reales existentes (RFQ→cotización→PO→recepción→3-way-match), nunca datos fabricados. `reporting_service.supplier_performance` (`app/services/reporting_service.py`): entrega a tiempo (`PO.created_at + SupplierQuotation.delivery_days` vs primera `GoodsReceipt`), tasa de three-way-match sin excepción (`ThreeWayMatchResult.status`), variación de precio (`(max-min)/avg` de `PurchaseOrderLine.unit_price` agrupado por `description` -- no `item_id`, que `SupplierQuotationLine` no tiene). Cada métrica es `None` (nunca 0%/100% fabricado) cuando no hay suficiente muestra, con `sample_size` explícito acompañando cada tasa -- así ningún proveedor con 1 orden se lee con la misma confianza que uno con 50. `GET /api/reports/supplier-performance?companyId=` (`reports.supplier_performance`/`read`, mismo scope por rol que `procurement.purchase_order`/`read`); tab real "Desempeño de Proveedores" en `/control/reportes` (`SupplierPerformancePage.tsx`), muestra "Sin datos suficientes (n=0)" explícito en vez de ocultar o inventar. 3 tests backend reales (métricas correctas contra fixtures de un proveedor bueno y uno malo con muestra real, `None`/sample=0 honesto para un proveedor sin órdenes, aislamiento de company), 1 test frontend |
 | NXR-REQ-0059 | Supplier Contracts | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | 2026-08-25: escribir los tests reales que faltaban ("sin test dedicado todavía") expuso un gap real de `INV-COMP-001` -- `POST /api/procurement/suppliers/contracts` nunca validaba `supplier_id`/`project_id` contra la company del contrato; un contrato podía referenciar un Supplier o Project de otra compañía. Corregido con `assert_supplier_belongs_to_company`/`assert_project_belongs_to_company` (mismo guard que AP/Budget), 422 `NXR-FINANCIAL-001`. `SupplierContractsPage.tsx` real en `/abastecimiento/contratos` (entrada de nav ya reservada, "Contratos") -- lista/crea contratos contra proveedor + proyecto opcional. 4 tests backend (creación/listado real, cross-company supplier rechazado, cross-company project rechazado, aislamiento de company en listado) + 3 tests frontend. Audit `⬜` (sin instrumentar, no forma parte del backlog de `docs/AUDIT.md` en esta fase) |
 | NXR-REQ-0060 | Subcontracts | ✅·✅·✅·✅·✅·✅·⬜·✅·⬜ | IMPLEMENTED | Mismo modelo `SupplierContract` cubre subcontratos (no hay campo distintivo `is_subcontract` — se distingue por convención de `scope_description` hoy; formalizar si se necesita reporting separado). Misma evidencia y mismo fix de company isolation que `NXR-REQ-0059` -- ver esa fila |
 
@@ -297,19 +297,20 @@ Journey E2E real (`NXR-REQ-0112`/`0113`, `feat/nexora-greenfield`, sesión
   pero mover cada fila individual a `VERIFIED` exige mapear su alcance
   exacto contra lo que el recorrido realmente cubre, fila por fila — pasada
   pendiente, no asumida aquí.
-- **IMPLEMENTED:** 107 / 124. `NXR-REQ-0016` (Financial statements,
+- **IMPLEMENTED:** 108 / 124. `NXR-REQ-0016` (Financial statements,
   incluyendo Cash Flow), `NXR-REQ-0106` (Migrations), `NXR-REQ-0105`
-  (Accessibility), `NXR-REQ-0108` (Observability) y `NXR-REQ-0109`
-  (Backup/Restore) movieron a `IMPLEMENTED` el 2026-08-25.
+  (Accessibility), `NXR-REQ-0108` (Observability), `NXR-REQ-0109`
+  (Backup/Restore) y `NXR-REQ-0058` (Supplier Performance) movieron a
+  `IMPLEMENTED` el 2026-08-25.
 - **IN_PROGRESS:** 11 / 124 — NXR-REQ-0093/0107/0110/0114/0115/0116/0117/
   0118/0119/0120/0121.
-- **NOT_STARTED:** 2 / 124 — NXR-REQ-0058/0122.
+- **NOT_STARTED:** 1 / 124 — NXR-REQ-0122.
 - **BLOCKED_EXTERNAL:** 2 / 124 — NXR-REQ-0123/0124, ambos dependientes del
   despliegue Azure real sujeto a `CLAUDE.md` §11.1.
 
-Suma verificada contra las 124 filas reales: 2+107+11+2+2 = 124 (recontar con
+Suma verificada contra las 124 filas reales: 2+108+11+1+2 = 124 (recontar con
 `grep -oE '\| (NOT_STARTED|IN_PROGRESS|IMPLEMENTED|VERIFIED|BLOCKED_EXTERNAL) \|' docs/REQUIREMENTS_TRACEABILITY.md | sort | uniq -c`
 antes de fiarse de este resumen prosa, que puede desincronizarse de la
-tabla real). El sistema combinado pasó 308 pruebas backend sobre
-PostgreSQL, 91 pruebas frontend, typecheck, lint, y el Critical Journey +
+tabla real). El sistema combinado pasó 311 pruebas backend sobre
+PostgreSQL, 92 pruebas frontend, typecheck, lint, y el Critical Journey +
 Accessibility E2E real en verde (`npm run test:e2e`, 3/3).

@@ -4,6 +4,7 @@ import { BudgetVsActualPage } from './BudgetVsActualPage'
 import { CashFlowPage } from './CashFlowPage'
 import { GeneralLedgerPage } from './GeneralLedgerPage'
 import { IncomeStatementPage } from './IncomeStatementPage'
+import { SupplierPerformancePage } from './SupplierPerformancePage'
 import { TrialBalancePage } from './TrialBalancePage'
 
 /** `/control/reportes` ya existía como entrada reservada ("Reportes") en
@@ -22,6 +23,7 @@ export function ReportsPage() {
         { key: 'balance-general', label: 'Balance General', content: <BalanceSheetPage /> },
         { key: 'estado-resultados', label: 'Estado de Resultados', content: <IncomeStatementPage /> },
         { key: 'flujo-de-efectivo', label: 'Flujo de Efectivo', content: <CashFlowPage /> },
+        { key: 'desempeno-proveedores', label: 'Desempeño de Proveedores', content: <SupplierPerformancePage /> },
       ]}
     />
   )

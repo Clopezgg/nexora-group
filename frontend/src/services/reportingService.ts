@@ -5,6 +5,7 @@ import type {
   CashFlowReport,
   GeneralLedgerReport,
   IncomeStatementReport,
+  SupplierPerformanceRow,
   TrialBalanceReport,
 } from '../types/reporting'
 
@@ -19,6 +20,8 @@ export const reportingService = {
     apiFetch<IncomeStatementReport>(`/reports/income-statement?companyId=${companyId}`),
   getCashFlow: (companyId: string) =>
     apiFetch<CashFlowReport>(`/reports/cash-flow?companyId=${companyId}`),
+  getSupplierPerformance: (companyId: string) =>
+    apiFetch<SupplierPerformanceRow[]>(`/reports/supplier-performance?companyId=${companyId}`),
   getGeneralLedger: (companyId: string, offset = 0, limit = 25) => {
     const params = new URLSearchParams({
       companyId,

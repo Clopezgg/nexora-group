@@ -596,3 +596,44 @@ left against `docs/PRODUCTION_READINESS.md` in full.
 Do NOT re-plan this from scratch on resume — this list is the current
 real state as of the moment it was written; re-verify against the live
 traceability table before trusting it if time has passed.
+
+## 2026-08-25 — Supplier Performance built with real fixtures (NXR-REQ-0058 → IMPLEMENTED)
+
+Direct continuation, same session, under the user's absolute-closure
+order which explicitly named this row and forbade deferring it further
+for "not enough historical volume." Full detail in `docs/PROGRESS.md`'s
+`2026-08-25 — Supplier Performance built with real controlled
+fixtures...` entry. `reporting_service.supplier_performance`: on-time
+delivery (PO+quotation delivery_days vs real GoodsReceipt), three-way-
+match clean rate, price variance — every rate is `None` with an
+explicit `sample_size`, never a fabricated 0%/100%, when there isn't
+enough real data.
+
+**Real gap found building the real fixtures, not by reading the
+model**: `SupplierQuotationLine` has no `item_id` at all (free text
+only) — grouping price variance by `item_id` would have silently
+produced zero samples for every quotation-derived PO, the only real
+path this system supports. Grouped by `description` instead. If you
+touch this metric again and it's returning suspiciously empty samples,
+check this first before assuming the fixtures are wrong.
+
+3 new backend tests, 1 frontend test. 311/311 backend pytest, 92/92
+frontend vitest, `tsc`/`eslint` clean, combined E2E 3/3 green.
+
+## Live backlog re-check (2026-08-25, this entry)
+
+Re-verified against the live table, not memory: 108 `IMPLEMENTED`, 11
+`IN_PROGRESS` (`NXR-REQ-0093/0107/0110/0114/0115/0116/0117/0118/0119/
+0120/0121`), **1 `NOT_STARTED`** (`NXR-REQ-0122`, OIDC — needs GitHub-
+side federated credential config this agent cannot do alone), 2
+`BLOCKED_EXTERNAL` (`0123/0124`, real Azure deployment). The
+domain-logic backlog named at the top of this document is now fully
+closed. What's left is Track G platform/hardening/Azure work — continue
+per the user's absolute-closure order into concurrency/idempotency race
+testing (§10), the security review checklist (§9: IDOR, horizontal/
+vertical escalation, file upload security, secrets, dependency
+vulnerabilities), and the CI/CD pieces completable without GitHub admin
+access, before reassessing against `docs/PRODUCTION_READINESS.md` in
+full. Azure subscription (UNAH) is `ReadOnlyDisabledSubscription` as of
+this entry — `az bicep build` stays available, `what-if`/deploy do not
+until it's re-enabled externally.

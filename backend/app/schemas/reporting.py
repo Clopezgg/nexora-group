@@ -91,3 +91,15 @@ class CashFlowReportResponse(CamelModel):
     total_financing: Decimal
     total_unclassified: Decimal
     net_change_in_cash: Decimal
+
+
+class SupplierPerformanceRowResponse(CamelModel):
+    supplier_id: uuid.UUID
+    supplier_legal_name: str
+    purchase_order_count: int
+    on_time_delivery_rate: Decimal | None
+    on_time_delivery_sample_size: int
+    three_way_match_clean_rate: Decimal | None
+    three_way_match_sample_size: int
+    price_variance_pct: Decimal | None
+    price_variance_sample_size: int

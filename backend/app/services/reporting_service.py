@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -8,6 +8,14 @@ from sqlalchemy.orm import Session
 
 from app.models.accounting import AccountingDocument, JournalLine
 from app.models.chart_of_accounts import Account, ChartOfAccount
+from app.models.procurement import (
+    GoodsReceipt,
+    PurchaseOrder,
+    PurchaseOrderLine,
+    SupplierQuotation,
+    ThreeWayMatchResult,
+)
+from app.models.supplier import Supplier
 from app.models.treasury import TreasuryAccount
 from app.services import budget_service, treasury_service
 
@@ -436,3 +444,146 @@ def cash_flow_statement(
             report.unclassified.append(row)
             report.total_unclassified += net
     return report
+
+
+@dataclass
+class SupplierPerformanceRow:
+    supplier_id: uuid.UUID
+    supplier_legal_name: str
+    purchase_order_count: int
+    on_time_delivery_rate: Decimal | None
+    on_time_delivery_sample_size: int
+    three_way_match_clean_rate: Decimal | None
+    three_way_match_sample_size: int
+    price_variance_pct: Decimal | None
+    price_variance_sample_size: int
+
+
+def supplier_performance(db: Session, *, company_id: uuid.UUID) -> list[SupplierPerformanceRow]:
+    """NXR-REQ-0058. Cada métrica es real -- calculada exclusivamente de
+    datos ya persistidos por flujos reales (PO/GoodsReceipt/
+    ThreeWayMatchResult), nunca fabricada -- y `None` (no 0%, no 100%)
+    cuando no hay suficiente data para calcularla honestamente. El
+    `sample_size` que acompaña cada tasa existe precisamente para que un
+    proveedor con una sola orden nunca se lea como "100% a tiempo" con
+    la misma confianza que uno con cincuenta.
+
+    - On-time delivery: requiere que la PO venga de una
+      `SupplierQuotation` con `delivery_days` real y que exista al menos
+      un `GoodsReceipt` -- `expected = po.created_at.date() +
+      delivery_days`, a tiempo si la primera recepción es <= esa fecha.
+    - Three-way match clean rate: fracción de `ThreeWayMatchResult`
+      (`status == "MATCHED"`, sin excepciones) sobre el total de
+      resultados registrados para las POs del proveedor.
+    - Price variance: para cada `description` de línea que el proveedor
+      vendió en 2+ POs distintas, `(max - min) / avg` de `unit_price`
+      entre esas órdenes, promediado entre líneas -- consistencia real
+      de precio en el tiempo, no una comparación contra una cotización
+      que por diseño siempre coincide con el precio de PO
+      (`create_purchase_order_from_quotation` copia el precio literal,
+      sin edición). Se agrupa por `description` y no por `item_id`
+      porque `SupplierQuotationLine` (de donde se copian las líneas de
+      una PO nacida de cotización) no tiene `item_id` -- es texto
+      libre, igual que una PO creada directamente; `description` es el
+      único campo "mismo ítem" poblado en ambos caminos reales."""
+    suppliers = db.execute(
+        select(Supplier).where(Supplier.company_id == company_id).order_by(Supplier.legal_name)
+    ).scalars().all()
+
+    rows: list[SupplierPerformanceRow] = []
+    for supplier in suppliers:
+        orders = db.execute(
+            select(PurchaseOrder.id, PurchaseOrder.created_at, PurchaseOrder.supplier_quotation_id)
+            .where(PurchaseOrder.company_id == company_id, PurchaseOrder.supplier_id == supplier.id)
+        ).all()
+        if not orders:
+            rows.append(
+                SupplierPerformanceRow(supplier.id, supplier.legal_name, 0, None, 0, None, 0, None, 0)
+            )
+            continue
+        order_ids = [o.id for o in orders]
+
+        quotation_ids = [o.supplier_quotation_id for o in orders if o.supplier_quotation_id is not None]
+        delivery_days_by_quotation: dict[uuid.UUID, int | None] = {}
+        if quotation_ids:
+            delivery_days_by_quotation = dict(
+                db.execute(
+                    select(SupplierQuotation.id, SupplierQuotation.delivery_days)
+                    .where(SupplierQuotation.id.in_(quotation_ids))
+                ).all()
+            )
+
+        earliest_receipt_by_order = dict(
+            db.execute(
+                select(GoodsReceipt.purchase_order_id, func.min(GoodsReceipt.received_at))
+                .where(GoodsReceipt.purchase_order_id.in_(order_ids))
+                .group_by(GoodsReceipt.purchase_order_id)
+            ).all()
+        )
+
+        on_time_count = 0
+        delivery_sample = 0
+        for order in orders:
+            delivery_days = delivery_days_by_quotation.get(order.supplier_quotation_id)
+            actual_date = earliest_receipt_by_order.get(order.id)
+            if delivery_days is None or actual_date is None:
+                continue
+            delivery_sample += 1
+            expected_date = order.created_at.date() + timedelta(days=delivery_days)
+            if actual_date <= expected_date:
+                on_time_count += 1
+        on_time_rate = (
+            (Decimal(on_time_count) / Decimal(delivery_sample) * 100).quantize(Decimal("0.01"))
+            if delivery_sample
+            else None
+        )
+
+        match_statuses = db.execute(
+            select(ThreeWayMatchResult.status).where(ThreeWayMatchResult.purchase_order_id.in_(order_ids))
+        ).scalars().all()
+        match_sample = len(match_statuses)
+        match_clean_rate = (
+            (Decimal(sum(1 for s in match_statuses if s == "MATCHED")) / Decimal(match_sample) * 100).quantize(
+                Decimal("0.01")
+            )
+            if match_sample
+            else None
+        )
+
+        # Agrupado por `description`, no `item_id`: SupplierQuotationLine
+        # (de donde `create_purchase_order_from_quotation` copia las
+        # líneas) no tiene `item_id` -- es texto libre, igual que una PO
+        # creada directamente. `description` es el único campo "mismo
+        # ítem" que de verdad está poblado en ambos caminos reales.
+        lines_by_description: dict[str, list[Decimal]] = {}
+        for description, unit_price in db.execute(
+            select(PurchaseOrderLine.description, PurchaseOrderLine.unit_price)
+            .where(PurchaseOrderLine.purchase_order_id.in_(order_ids))
+        ).all():
+            lines_by_description.setdefault(description, []).append(unit_price)
+        item_variances = []
+        for prices in lines_by_description.values():
+            if len(prices) < 2:
+                continue
+            average = sum(prices) / len(prices)
+            if average == 0:
+                continue
+            item_variances.append((max(prices) - min(prices)) / average * 100)
+        price_variance = (
+            (sum(item_variances) / len(item_variances)).quantize(Decimal("0.01")) if item_variances else None
+        )
+
+        rows.append(
+            SupplierPerformanceRow(
+                supplier_id=supplier.id,
+                supplier_legal_name=supplier.legal_name,
+                purchase_order_count=len(orders),
+                on_time_delivery_rate=on_time_rate,
+                on_time_delivery_sample_size=delivery_sample,
+                three_way_match_clean_rate=match_clean_rate,
+                three_way_match_sample_size=match_sample,
+                price_variance_pct=price_variance,
+                price_variance_sample_size=len(item_variances),
+            )
+        )
+    return rows

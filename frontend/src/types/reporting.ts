@@ -88,3 +88,15 @@ export interface CashFlowReport {
   totalUnclassified: string
   netChangeInCash: string
 }
+
+export interface SupplierPerformanceRow {
+  supplierId: string
+  supplierLegalName: string
+  purchaseOrderCount: number
+  onTimeDeliveryRate: string | null
+  onTimeDeliverySampleSize: number
+  threeWayMatchCleanRate: string | null
+  threeWayMatchSampleSize: number
+  priceVariancePct: string | null
+  priceVarianceSampleSize: number
+}

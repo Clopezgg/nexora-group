@@ -521,6 +521,7 @@ def match_reconciliation_line(
     accounting_document_id: uuid.UUID,
     matched_amount: Decimal,
     matched_by_user_id: uuid.UUID,
+    commit: bool = True,
 ) -> ReconciliationMatch:
     if matched_amount <= 0:
         raise InvalidFinancialReferenceError("matched_amount debe ser positivo")
@@ -613,12 +614,17 @@ def match_reconciliation_line(
     )
     db.add(match)
     line.status = "MATCHED" if cumulative_amount == line_amount else "PARTIAL"
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(match)
     return match
 
 
-def exclude_reconciliation_line(db: Session, *, bank_statement_line_id: uuid.UUID) -> BankStatementLine:
+def exclude_reconciliation_line(
+    db: Session, *, bank_statement_line_id: uuid.UUID, commit: bool = True
+) -> BankStatementLine:
     line = db.execute(
         select(BankStatementLine)
         .where(BankStatementLine.id == bank_statement_line_id)
@@ -636,7 +642,10 @@ def exclude_reconciliation_line(db: Session, *, bank_statement_line_id: uuid.UUI
             "Solo una línea UNMATCHED sin historial de conciliación puede excluirse"
         )
     line.status = "EXCLUDED"
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(line)
     return line
 
@@ -648,6 +657,7 @@ def create_fund_restriction(
     restricted_for_project_id: uuid.UUID | None,
     amount: Decimal,
     description: str,
+    commit: bool = True,
 ) -> FundRestriction:
     """IMPORTANTE: esto nunca transfiere la propiedad del dinero al
     proyecto -- Treasury sigue siendo el dueño (CLAUDE.md §7)."""
@@ -668,6 +678,9 @@ def create_fund_restriction(
         description=description,
     )
     db.add(restriction)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(restriction)
     return restriction

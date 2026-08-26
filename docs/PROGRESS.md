@@ -3038,3 +3038,42 @@ emits one `StarletteDeprecationWarning` — `httpx` with
 `starlette.testclient` is deprecated in favor of a future `httpx2`.
 Doesn't affect production code or test correctness; revisit when
 `httpx2` actually ships as a stable package.
+
+## 2026-08-26 — Audit trail backlog burn-down: five Treasury gaps closed (NXR-REQ-0090)
+
+Direct continuation, same session. `docs/AUDIT.md` had an honest,
+explicit backlog: 5 Treasury mutations with zero audit instrumentation
+— `general_expense.create`, `transfer.create`, bank reconciliation
+`match`/`exclude`, and `fund_restriction.create`. All money-movement
+or money-labeling events, exactly the "critical mutating events" the
+master order's audit-completeness gate cares about.
+
+Instrumented all 5 in `app/api/routes/treasury.py`, reusing the established
+pattern (`get_correlation_id` dependency + `audit_service.
+record(...)` right after the domain service call succeeds, actor/
+before/after/company/correlation_id). Review caught that merely adding a
+second route-level commit would leave negocio→audit non-atomic. The five
+routes now call their services with `commit=False` and perform one commit
+after `audit_service.record`, so an audit failure rolls back the business
+mutation too. No change to `audit_service` or `AuditLog` itself:
+
+- `treasury.general_expense.create`
+- `treasury.transfer.create`
+- `treasury.bank_reconciliation.match` / `.exclude` — audits the
+  `BankStatementLine` that changed status; match also records the real
+  `accountingDocumentId` and `reconciliationMatchId` it created.
+- `treasury.fund_restriction.create`
+
+This closes the five explicitly tracked Treasury gaps, **not all of
+Financial Core**. AR still has no audit call sites; AP invoice creation,
+several Treasury creation/configuration routes, the rest of Supply Chain,
+and the other business domains remain in the honest backlog in
+`docs/AUDIT.md`.
+
+Tests in `tests/test_treasury_operations.py` cover the five actions,
+stable reconciliation linkage IDs, single-audit behavior under
+idempotency replay for expenses/transfers, and atomic rollback when the
+audit write fails for each of the five routes. Final full-suite evidence is
+real: targeted Treasury file 27/27; full backend suite 331/331 (was 321
+before this slice), zero regressions; independent code review returned no
+remaining findings and `Ready to commit: Yes`.

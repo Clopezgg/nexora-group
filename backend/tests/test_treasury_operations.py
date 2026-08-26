@@ -1,10 +1,17 @@
 import uuid
 
+import pytest
 from sqlalchemy import select
 
 from app.models.accounting import AccountingDocument
 from app.models.audit import AuditLog
-from app.models.treasury import GeneralExpense, ReconciliationMatch
+from app.models.treasury import (
+    BankStatementLine,
+    FundRestriction,
+    GeneralExpense,
+    ReconciliationMatch,
+    TreasuryTransfer,
+)
 from app.models.permission import UserCompanyAccess
 from tests.helpers import (
     create_account,
@@ -315,6 +322,65 @@ def test_general_expense_retry_is_idempotent(client, db_session):
     assert first.json()["id"] == second.json()["id"]
     assert db_session.query(GeneralExpense).count() == 1
     assert db_session.query(AccountingDocument).count() == documents_before + 1
+    assert (
+        db_session.query(AuditLog)
+        .filter(AuditLog.entity_type == "treasury.general_expense")
+        .count()
+        == 1
+    )
+
+
+def test_transfer_retry_is_idempotent_and_creates_one_audit_event(client, db_session):
+    login_admin(client)
+    company, cash, _diff_account, contributions, _funding_doc = _setup(client)
+    bank_gl = create_account(
+        client, company_id=company["id"], code="1100", name="Bancos", account_type="ASSET"
+    )
+    bank = create_treasury_account(
+        client, company_id=company["id"], gl_account_id=bank_gl["id"]
+    )
+    client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank["id"],
+            "counterAccountId": contributions["id"],
+            "sender": "Aporte",
+            "currencyCode": "HNL",
+            "originalAmount": "500.00",
+            "remittanceDate": "2026-01-01",
+        },
+    )
+    payload = {
+        "companyId": company["id"],
+        "sourceTreasuryAccountId": bank["id"],
+        "destinationTreasuryAccountId": cash["id"],
+        "amount": "100.00",
+        "currencyCode": "HNL",
+        "transferDate": "2026-01-05",
+    }
+
+    first = client.post(
+        "/api/treasury/transfers",
+        json=payload,
+        headers={"Idempotency-Key": "transfer-retry-1"},
+    )
+    second = client.post(
+        "/api/treasury/transfers",
+        json=payload,
+        headers={"Idempotency-Key": "transfer-retry-1"},
+    )
+
+    assert first.status_code == 201, first.text
+    assert second.status_code == 201, second.text
+    assert first.json()["id"] == second.json()["id"]
+    assert db_session.query(TreasuryTransfer).count() == 1
+    assert (
+        db_session.query(AuditLog)
+        .filter(AuditLog.entity_type == "treasury.transfer")
+        .count()
+        == 1
+    )
 
 
 def test_cash_closing_approval_retry_does_not_duplicate_adjustment(client, db_session):
@@ -542,3 +608,311 @@ def test_registering_remittance_creates_audit_log_entry(client, db_session):
     assert len(rows) == 1
     assert rows[0].action == "treasury.remittance.create"
     assert rows[0].after["baseAmount"] == "500.00"
+
+
+def test_registering_general_expense_creates_audit_log_entry(client, db_session):
+    """docs/AUDIT.md backlog burn-down: Financial Core gap (General
+    Expenses) closed."""
+    login_admin(client)
+    company, cash, diff_account, _contributions, _funding_doc = _setup(client)
+
+    expense = client.post(
+        "/api/treasury/general-expenses",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": cash["id"],
+            "expenseAccountId": diff_account["id"],
+            "category": "papeleria",
+            "amount": "25.00",
+            "currencyCode": "HNL",
+            "expenseDate": "2026-01-20",
+            "description": "Gasto de auditoria",
+        },
+    ).json()
+
+    rows = db_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "treasury.general_expense",
+            AuditLog.entity_id == uuid.UUID(expense["id"]),
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].action == "treasury.general_expense.create"
+    assert rows[0].after["amount"] == "25.00"
+
+
+def test_registering_transfer_creates_audit_log_entry(client, db_session):
+    """docs/AUDIT.md backlog burn-down: Financial Core gap (Transfers)
+    closed."""
+    login_admin(client)
+    company, cash, _diff_account, contributions, _funding_doc = _setup(client)
+    bank_gl = create_account(
+        client, company_id=company["id"], code="1100", name="Bancos", account_type="ASSET"
+    )
+    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+    client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank["id"],
+            "counterAccountId": contributions["id"],
+            "sender": "Aporte",
+            "currencyCode": "HNL",
+            "originalAmount": "500.00",
+            "remittanceDate": "2026-01-01",
+        },
+    )
+
+    transfer = client.post(
+        "/api/treasury/transfers",
+        json={
+            "companyId": company["id"],
+            "sourceTreasuryAccountId": bank["id"],
+            "destinationTreasuryAccountId": cash["id"],
+            "amount": "100.00",
+            "currencyCode": "HNL",
+            "transferDate": "2026-01-05",
+        },
+    ).json()
+
+    rows = db_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "treasury.transfer",
+            AuditLog.entity_id == uuid.UUID(transfer["id"]),
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].action == "treasury.transfer.create"
+    assert rows[0].after["amount"] == "100.00"
+
+
+def test_bank_reconciliation_match_and_exclude_create_audit_log_entries(client, db_session):
+    """docs/AUDIT.md backlog burn-down: Financial Core gap (Bank
+    Reconciliation match/exclude) closed."""
+    login_admin(client)
+    _company, cash, _diff_account, _contributions, funding_doc = _setup(client)
+
+    statement_id = client.post(
+        "/api/treasury/bank-statements",
+        json={
+            "treasuryAccountId": cash["id"],
+            "statementDate": "2026-01-31",
+            "openingBalance": "0.00",
+            "closingBalance": "1000.00",
+        },
+    ).json()["id"]
+
+    matched_line = client.post(
+        f"/api/treasury/bank-statements/{statement_id}/lines",
+        json={"lineDate": "2026-01-02", "description": "Fondeo de caja", "amount": "1000.00"},
+    ).json()
+    matched = client.post(
+        f"/api/treasury/bank-statement-lines/{matched_line['id']}/match",
+        json={"accountingDocumentId": funding_doc, "matchedAmount": "1000.00"},
+    )
+    assert matched.status_code == 200, matched.text
+
+    excluded_line = client.post(
+        f"/api/treasury/bank-statements/{statement_id}/lines",
+        json={"lineDate": "2026-01-03", "description": "Sin conciliar", "amount": "50.00"},
+    ).json()
+    excluded = client.post(f"/api/treasury/bank-statement-lines/{excluded_line['id']}/exclude")
+    assert excluded.status_code == 200, excluded.text
+
+    match_rows = db_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "treasury.bank_statement_line",
+            AuditLog.entity_id == uuid.UUID(matched_line["id"]),
+        )
+    ).scalars().all()
+    assert len(match_rows) == 1
+    assert match_rows[0].action == "treasury.bank_reconciliation.match"
+    assert match_rows[0].after["status"] == "MATCHED"
+    reconciliation_match = db_session.execute(
+        select(ReconciliationMatch).where(
+            ReconciliationMatch.bank_statement_line_id == uuid.UUID(matched_line["id"])
+        )
+    ).scalar_one()
+    assert match_rows[0].after["accountingDocumentId"] == funding_doc
+    assert match_rows[0].after["reconciliationMatchId"] == str(reconciliation_match.id)
+
+    exclude_rows = db_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "treasury.bank_statement_line",
+            AuditLog.entity_id == uuid.UUID(excluded_line["id"]),
+        )
+    ).scalars().all()
+    assert len(exclude_rows) == 1
+    assert exclude_rows[0].action == "treasury.bank_reconciliation.exclude"
+    assert exclude_rows[0].after["status"] == "EXCLUDED"
+
+
+def test_creating_fund_restriction_creates_audit_log_entry(client, db_session):
+    """docs/AUDIT.md backlog burn-down: Financial Core gap (Fund
+    Restrictions) closed."""
+    login_admin(client)
+    _company, cash, _diff_account, _contributions, _funding_doc = _setup(client)
+
+    restriction = client.post(
+        "/api/treasury/fund-restrictions",
+        json={
+            "treasuryAccountId": cash["id"],
+            "amount": "300.00",
+            "description": "Reservado para Proyecto Torre Nexora II",
+        },
+    ).json()
+
+    rows = db_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "treasury.fund_restriction",
+            AuditLog.entity_id == uuid.UUID(restriction["id"]),
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].action == "treasury.fund_restriction.create"
+    assert rows[0].after["amount"] == "300.00"
+
+
+def test_general_expense_rolls_back_when_audit_write_fails(client, db_session, monkeypatch):
+    login_admin(client)
+    company, cash, diff_account, _contributions, _funding_doc = _setup(client)
+    documents_before = db_session.query(AccountingDocument).count()
+
+    def fail_audit(*args, **kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr("app.api.routes.treasury.audit_service.record", fail_audit)
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        client.post(
+            "/api/treasury/general-expenses",
+            json={
+                "companyId": company["id"],
+                "treasuryAccountId": cash["id"],
+                "expenseAccountId": diff_account["id"],
+                "category": "papeleria",
+                "amount": "25.00",
+                "currencyCode": "HNL",
+                "expenseDate": "2026-01-20",
+                "description": "Debe revertirse con el audit",
+            },
+        )
+
+    db_session.expire_all()
+    assert db_session.query(GeneralExpense).count() == 0
+    assert db_session.query(AccountingDocument).count() == documents_before
+
+
+def test_transfer_rolls_back_when_audit_write_fails(client, db_session, monkeypatch):
+    login_admin(client)
+    company, cash, _diff_account, contributions, _funding_doc = _setup(client)
+    bank_gl = create_account(
+        client, company_id=company["id"], code="1100", name="Bancos", account_type="ASSET"
+    )
+    bank = create_treasury_account(
+        client, company_id=company["id"], gl_account_id=bank_gl["id"]
+    )
+    client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank["id"],
+            "counterAccountId": contributions["id"],
+            "sender": "Aporte",
+            "currencyCode": "HNL",
+            "originalAmount": "500.00",
+            "remittanceDate": "2026-01-01",
+        },
+    )
+    documents_before = db_session.query(AccountingDocument).count()
+
+    def fail_audit(*args, **kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr("app.api.routes.treasury.audit_service.record", fail_audit)
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        client.post(
+            "/api/treasury/transfers",
+            json={
+                "companyId": company["id"],
+                "sourceTreasuryAccountId": bank["id"],
+                "destinationTreasuryAccountId": cash["id"],
+                "amount": "100.00",
+                "currencyCode": "HNL",
+                "transferDate": "2026-01-05",
+            },
+        )
+
+    db_session.expire_all()
+    assert db_session.query(TreasuryTransfer).count() == 0
+    assert db_session.query(AccountingDocument).count() == documents_before
+
+
+def test_reconciliation_match_rolls_back_when_audit_write_fails(
+    client, db_session, monkeypatch
+):
+    login_admin(client)
+    _company, cash, _diff_account, _contributions, funding_doc = _setup(client)
+    line = _create_statement_line(client, cash, amount="1000.00")
+
+    def fail_audit(*args, **kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr("app.api.routes.treasury.audit_service.record", fail_audit)
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        client.post(
+            f"/api/treasury/bank-statement-lines/{line['id']}/match",
+            json={"accountingDocumentId": funding_doc, "matchedAmount": "1000.00"},
+        )
+
+    db_session.expire_all()
+    persisted_line = db_session.get(BankStatementLine, uuid.UUID(line["id"]))
+    assert persisted_line.status == "UNMATCHED"
+    assert db_session.query(ReconciliationMatch).count() == 0
+
+
+def test_reconciliation_exclude_rolls_back_when_audit_write_fails(
+    client, db_session, monkeypatch
+):
+    login_admin(client)
+    _company, cash, _diff_account, _contributions, _funding_doc = _setup(client)
+    line = _create_statement_line(client, cash, amount="50.00")
+
+    def fail_audit(*args, **kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr("app.api.routes.treasury.audit_service.record", fail_audit)
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        client.post(f"/api/treasury/bank-statement-lines/{line['id']}/exclude")
+
+    db_session.expire_all()
+    persisted_line = db_session.get(BankStatementLine, uuid.UUID(line["id"]))
+    assert persisted_line.status == "UNMATCHED"
+
+
+def test_fund_restriction_rolls_back_when_audit_write_fails(
+    client, db_session, monkeypatch
+):
+    login_admin(client)
+    _company, cash, _diff_account, _contributions, _funding_doc = _setup(client)
+
+    def fail_audit(*args, **kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr("app.api.routes.treasury.audit_service.record", fail_audit)
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        client.post(
+            "/api/treasury/fund-restrictions",
+            json={
+                "treasuryAccountId": cash["id"],
+                "amount": "300.00",
+                "description": "Debe revertirse con el audit",
+            },
+        )
+
+    db_session.expire_all()
+    assert db_session.query(FundRestriction).count() == 0

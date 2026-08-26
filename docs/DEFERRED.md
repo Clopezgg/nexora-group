@@ -125,6 +125,13 @@ certificar el 100%.
   Enterprise Resources, Commercial, Construction Control, y el resto de
   Financial Core — backlog honesto en `docs/AUDIT.md`, no bloquea el
   resto de esos tracks mientras tanto.
+  **Actualización 2026-08-26:** cerrados cinco gaps explícitos de Treasury
+  (`general_expense.create`, `transfer.create`, conciliación
+  `match`/`exclude`, `fund_restriction.create`) con transacción atómica
+  negocio+audit y pruebas de rollback/replay. `DEFERRED-FINAL-014` sigue
+  abierto: AR continúa sin call sites; AP invoice create, otras mutaciones
+  de Treasury/Supply Chain y todos los dominios listados arriba permanecen
+  en el backlog exacto de `docs/AUDIT.md`.
 - `DEFERRED-FINAL-015` — **RESUELTO (2026-08-25, sin worktree separado —
   construido directamente en `feat/nexora-greenfield`, mismo día que el
   Critical Journey E2E que confirmó el gap por segunda vez de forma

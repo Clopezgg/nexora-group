@@ -178,6 +178,7 @@ def create_general_expense(
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.general_expense", "create")),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> GeneralExpenseResponse:
     assert_company_access(
         db,
@@ -207,7 +208,18 @@ def create_general_expense(
             currency_code=payload.currency_code,
             expense_date=payload.expense_date,
             description=payload.description,
-            commit=outcome is None,
+            commit=False,
+        )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="treasury.general_expense.create",
+            entity_type="treasury.general_expense",
+            entity_id=expense.id,
+            company_id=expense.company_id,
+            before=None,
+            after={"amount": str(expense.amount), "category": expense.category},
+            correlation_id=correlation_id,
         )
         response = GeneralExpenseResponse.model_validate(expense, from_attributes=True)
         if outcome is not None:
@@ -218,7 +230,7 @@ def create_general_expense(
                 entity_type="GeneralExpense",
                 entity_id=expense.id,
             )
-            db.commit()
+        db.commit()
         return response
     except Exception:
         db.rollback()
@@ -231,6 +243,7 @@ def create_transfer(
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.transfer", "create")),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> TreasuryTransferResponse:
     assert_company_access(
         db, user_id=user.id, resource="treasury.transfer", action="create", company_id=payload.company_id
@@ -255,7 +268,22 @@ def create_transfer(
             currency_code=payload.currency_code,
             transfer_date=payload.transfer_date,
             notes=payload.notes,
-            commit=outcome is None,
+            commit=False,
+        )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="treasury.transfer.create",
+            entity_type="treasury.transfer",
+            entity_id=transfer.id,
+            company_id=transfer.company_id,
+            before=None,
+            after={
+                "amount": str(transfer.amount),
+                "sourceTreasuryAccountId": str(transfer.source_treasury_account_id),
+                "destinationTreasuryAccountId": str(transfer.destination_treasury_account_id),
+            },
+            correlation_id=correlation_id,
         )
         response = TreasuryTransferResponse.model_validate(transfer, from_attributes=True)
         if outcome is not None:
@@ -266,7 +294,7 @@ def create_transfer(
                 entity_type="TreasuryTransfer",
                 entity_id=transfer.id,
             )
-            db.commit()
+        db.commit()
         return response
     except Exception:
         db.rollback()
@@ -435,6 +463,7 @@ def match_line(
     payload: ReconciliationMatchRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.bank_reconciliation", "match")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> BankStatementLineResponse:
     line = _resolve_statement_line(db, line_id)
     company_id = treasury_service.company_id_for_bank_statement_line(db, line)
@@ -445,15 +474,38 @@ def match_line(
         action="match",
         company_id=company_id,
     )
-    treasury_service.match_reconciliation_line(
-        db,
-        bank_statement_line_id=line_id,
-        accounting_document_id=payload.accounting_document_id,
-        matched_amount=payload.matched_amount,
-        matched_by_user_id=user.id,
-    )
-    line = _resolve_statement_line(db, line_id)
-    return BankStatementLineResponse.model_validate(line, from_attributes=True)
+    before_status = line.status
+    try:
+        match = treasury_service.match_reconciliation_line(
+            db,
+            bank_statement_line_id=line_id,
+            accounting_document_id=payload.accounting_document_id,
+            matched_amount=payload.matched_amount,
+            matched_by_user_id=user.id,
+            commit=False,
+        )
+        line = _resolve_statement_line(db, line_id)
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="treasury.bank_reconciliation.match",
+            entity_type="treasury.bank_statement_line",
+            entity_id=line.id,
+            company_id=company_id,
+            before={"status": before_status},
+            after={
+                "status": line.status,
+                "matchedAmount": str(payload.matched_amount),
+                "accountingDocumentId": str(match.accounting_document_id),
+                "reconciliationMatchId": str(match.id),
+            },
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        return BankStatementLineResponse.model_validate(line, from_attributes=True)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post("/bank-statement-lines/{line_id}/exclude", response_model=BankStatementLineResponse)
@@ -461,6 +513,7 @@ def exclude_line(
     line_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.bank_reconciliation", "match")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> BankStatementLineResponse:
     line = _resolve_statement_line(db, line_id)
     company_id = treasury_service.company_id_for_bank_statement_line(db, line)
@@ -471,8 +524,27 @@ def exclude_line(
         action="match",
         company_id=company_id,
     )
-    line = treasury_service.exclude_reconciliation_line(db, bank_statement_line_id=line_id)
-    return BankStatementLineResponse.model_validate(line, from_attributes=True)
+    before_status = line.status
+    try:
+        line = treasury_service.exclude_reconciliation_line(
+            db, bank_statement_line_id=line_id, commit=False
+        )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="treasury.bank_reconciliation.exclude",
+            entity_type="treasury.bank_statement_line",
+            entity_id=line.id,
+            company_id=company_id,
+            before={"status": before_status},
+            after={"status": line.status},
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        return BankStatementLineResponse.model_validate(line, from_attributes=True)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post("/fund-restrictions", response_model=FundRestrictionResponse, status_code=201)
@@ -480,6 +552,7 @@ def create_fund_restriction(
     payload: FundRestrictionCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.fund_restriction", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> FundRestrictionResponse:
     account = _resolve_treasury_account(db, payload.treasury_account_id)
     assert_company_access(
@@ -489,14 +562,32 @@ def create_fund_restriction(
         action="create",
         company_id=account.company_id,
     )
-    restriction = treasury_service.create_fund_restriction(
-        db,
-        treasury_account_id=payload.treasury_account_id,
-        restricted_for_project_id=payload.restricted_for_project_id,
-        amount=payload.amount,
-        description=payload.description,
-    )
-    return FundRestrictionResponse.model_validate(restriction, from_attributes=True)
+    try:
+        restriction = treasury_service.create_fund_restriction(
+            db,
+            treasury_account_id=payload.treasury_account_id,
+            restricted_for_project_id=payload.restricted_for_project_id,
+            amount=payload.amount,
+            description=payload.description,
+            commit=False,
+        )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="treasury.fund_restriction.create",
+            entity_type="treasury.fund_restriction",
+            entity_id=restriction.id,
+            company_id=account.company_id,
+            project_id=restriction.restricted_for_project_id,
+            before=None,
+            after={"amount": str(restriction.amount)},
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        return FundRestrictionResponse.model_validate(restriction, from_attributes=True)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.get("/fund-restrictions", response_model=list[FundRestrictionResponse])

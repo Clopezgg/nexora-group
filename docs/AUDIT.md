@@ -197,10 +197,46 @@ que se crea junto a él — ese es un side effect de la misma operación, no
 la entidad cuyo estado mutó. `after.reversalDocumentId` enlaza al
 reversal para quien lea el log.
 
+## Dominios instrumentados (2026-08-26, backlog burn-down — cinco gaps de Treasury cerrados)
+
+| Dominio | Acción | Ruta |
+|---------|--------|------|
+| Treasury | `treasury.general_expense.create` | `POST /api/treasury/general-expenses` |
+| Treasury | `treasury.transfer.create` | `POST /api/treasury/transfers` |
+| Treasury | `treasury.bank_reconciliation.match` | `POST /api/treasury/bank-statement-lines/{id}/match` |
+| Treasury | `treasury.bank_reconciliation.exclude` | `POST /api/treasury/bank-statement-lines/{id}/exclude` |
+| Treasury | `treasury.fund_restriction.create` | `POST /api/treasury/fund-restrictions` |
+
+Con esto quedan cerrados los cinco gaps de Treasury que este slice tenía
+enumerados: gastos generales, transferencias, `match`/`exclude` de
+conciliación y restricciones de fondos. No significa que cada mutación de
+Financial Core esté instrumentada: AR todavía no tiene call sites de audit,
+y siguen abiertas mutaciones de creación/configuración en AP y Treasury.
+`match`/`exclude` auditan la `BankStatementLine` afectada
+(`entity_type="treasury.bank_statement_line"`); el `match` incluye además
+`accountingDocumentId` y `reconciliationMatchId`, porque la operación crea
+una fila `ReconciliationMatch`, no solo cambia el `status` de la línea.
+
+Las cinco rutas de este slice persisten la mutación de negocio y el audit en
+**una sola transacción**. Los servicios conservan `commit=True` por
+compatibilidad, pero estas rutas llaman con `commit=False` y hacen el único
+`db.commit()` después de `audit_service.record(...)`. Si el audit falla, la
+mutación completa se revierte; hay pruebas de regresión para las cinco rutas.
+
 ## Dominios NO instrumentados todavía (backlog honesto)
 
-Ningún otro dominio tiene audit log todavía. Esto es deliberado e
-incremental (ver design doc), no un olvido:
+La cobertura fuera de las acciones enumeradas arriba sigue siendo parcial.
+Esto es deliberado e incremental (ver design doc), no se presenta como
+completitud:
+
+- **Financial Core restante** — AP `supplier_invoice.create`; AR
+  `customer_invoice.create`/`approve` y `customer_receipt.create`; Treasury
+  `account.create`, `cash_closing.create`, `bank_statement.create` y
+  `bank_statement_line.create` — `NOT_STARTED`.
+- **Supply Chain / Procurement restante** — requisiciones, RFQ,
+  cotizaciones, creación/envío de PO, recepciones, entradas de servicio,
+  three-way match e inventario — `NOT_STARTED` (solo PO approve está
+  instrumentado).
 
 - **Project Control** (WBS, Presupuestos, Órdenes de cambio, Avances) —
   `NOT_STARTED`.
@@ -210,17 +246,15 @@ incremental (ver design doc), no un olvido:
   venta, AR) — `NOT_STARTED`.
 - **Construction Control** (Documents/Evidence, RFI/Submittals, Daily
   Site Reports, Quality, Safety) — `NOT_STARTED`.
-- Dentro de Financial Core: Transfers, General Expenses, Fund
-  Restrictions, Bank Reconciliation (match/exclude) tampoco están
-  instrumentados todavía. General Ledger (asientos manuales / reversal)
-  ya se cerró (2026-08-25, ver arriba).
+- Los cinco gaps de Treasury de este slice: **cerrados** (2026-08-26, ver
+  arriba); no equivalen al cierre de todo Financial Core.
 
 Un futuro task puede cerrar estos dominios uno por uno reutilizando
-exactamente el patrón de esta página: leer la ruta real, agregar
-`correlation_id: str = Depends(get_correlation_id)`, llamar
-`audit_service.record(...)` justo después de la llamada de servicio que
-tiene éxito, y asegurar que haya un `db.commit()` después si el servicio
-de dominio ya committeó internamente. No se requiere ningún cambio a
+exactamente el patrón corregido de esta página: leer la ruta real, agregar
+`correlation_id: str = Depends(get_correlation_id)`, invocar el servicio con
+`commit=False`, llamar `audit_service.record(...)` después de la mutación y
+hacer un único `db.commit()` al final. Cada ruta debe probar que un fallo del
+audit revierte también el negocio. No se requiere ningún cambio a
 `AuditLog`, `audit_service`, ni al endpoint `GET /api/audit` para agregar
 un dominio nuevo.
 
@@ -230,7 +264,10 @@ un dominio nuevo.
 - `tests/test_ap_ar.py`: `test_approving_supplier_invoice_creates_audit_log_entry`,
   `test_paying_supplier_invoice_creates_audit_log_entry`.
 - `tests/test_treasury_operations.py`: `test_approving_cash_closing_creates_audit_log_entry`,
-  `test_registering_remittance_creates_audit_log_entry`.
+  `test_registering_remittance_creates_audit_log_entry`, las cuatro pruebas
+  de cobertura de los cinco gaps de Treasury, replay idempotente de gasto y
+  transferencia (un solo audit), y rollback atómico ante fallo de audit para
+  las cinco rutas nuevas.
 - `tests/test_procurement_flow.py`: `test_approving_purchase_order_creates_audit_log_entry`.
 - `tests/test_posting_engine.py`: `test_creating_journal_entry_creates_audit_log_entry`,
   `test_reversing_journal_entry_creates_audit_log_entry` (2026-08-25).
@@ -239,7 +276,7 @@ un dominio nuevo.
   cambios para el nuevo dominio — la página ya es genérica sobre
   `entityType`.
 
-## Limitación conocida: no atomicidad entre la decisión y el audit write
+## Limitación conocida: call sites históricos todavía no atómicos
 
 `approval_service.decide()` (Track G Task 2) invoca el adaptador de
 decisión del dominio propietario (p.ej. `ap_service.apply_approval_decision`),
@@ -253,20 +290,17 @@ auditoría de ese evento se pierde — sin riesgo de integridad financiera
 ni de datos (la transacción de negocio ya es correcta y completa), solo
 un hueco de completitud del audit trail para ese evento puntual.
 
-Este mismo patrón ya existe, sin marcar, en las 5 rutas que instrumentó
-Task 1 (`approve_supplier_invoice`/`pay_supplier_invoice`/
-`create_remittance`/`approve_cash_closing`/`approve_purchase_order`
-todas hacen su propio `db.commit()` interno antes de que la ruta llegue
-a su propio `audit_service.record()` + `db.commit()`). No es un defecto
-introducido por Task 2 — es una consecuencia estructural de instrumentar
-auditoría en la capa de ruta sin cambiar la firma/contrato de commit de
-los servicios de dominio existentes (que este plan prohíbe
-explícitamente tocar). Se resolvería dando a cada servicio de dominio
-instrumentado un parámetro `commit: bool = True` (por defecto
-preservando el comportamiento actual para todo el resto de llamadores)
-para que la ruta controle el límite real de la transacción — cambio que
-un futuro task dedicado a esta contract de commit-boundary a nivel de
-proyecto debería hacer, no una instrumentación de auditoría puntual.
+Este mismo patrón existe en call sites históricos
+(`approve_supplier_invoice`/`pay_supplier_invoice`/`create_remittance`/
+`approve_cash_closing`/`approve_purchase_order`, entre otros): el servicio
+puede confirmar antes de que la ruta escriba el audit. No es un defecto
+introducido por este slice, pero sí un gap real de completitud.
+
+Las cinco rutas agregadas el 2026-08-26 **ya no tienen esta limitación**:
+usan el parámetro `commit=False` y confirman negocio + audit juntos. El
+backlog debe aplicar el mismo contrato transaccional a los call sites
+históricos, con tests de rollback ante fallo de audit, antes de certificar
+`Audit completeness` en producción.
 
 ## Frontend
 

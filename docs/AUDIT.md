@@ -291,6 +291,29 @@ audit + single `db.commit()`. Service-calling routes (`create_budget_baseline`,
 `approve_change_order`) use `commit=False` on the service + audit + single
 `db.commit()`.
 
+## Dominios instrumentados (2026-08-26, backlog burn-down — Enterprise Resources: Workforce + Assets + Equipment)
+
+| Dominio | Acción | Ruta |
+|---------|--------|------|
+| Workforce | `workforce.worker.create` | `POST /api/workforce/workers` |
+| Workforce | `workforce.time_entry.create` | `POST /api/workforce/time-entries` |
+| Workforce | `workforce.time_entry.approve` | `POST /api/workforce/time-entries/{id}/approve` |
+| Workforce | `workforce.time_entry.reject` | `POST /api/workforce/time-entries/{id}/reject` |
+| Workforce | `workforce.crew.create` | `POST /api/workforce/crews` |
+| Workforce | `workforce.crew.member.add` | `POST /api/workforce/crews/{id}/members` |
+| Workforce | `workforce.crew.member.remove` | `DELETE /api/workforce/crews/{id}/members/{worker_id}` |
+| Asset | `asset.fixed_asset.create` | `POST /api/assets` |
+| Asset | `asset.fixed_asset.status_change` | `POST /api/assets/{id}/status` |
+| Asset | `asset.depreciation.create` | `POST /api/assets/{id}/depreciation-entries` |
+| Equipment | `equipment.equipment.create` | `POST /api/equipment` |
+| Equipment | `equipment.equipment.status_change` | `POST /api/equipment/{id}/status` |
+| Equipment | `equipment.fuel_log.create` | `POST /api/equipment/fuel-logs` |
+| Equipment | `equipment.maintenance_plan.create` | `POST /api/equipment/{id}/maintenance-plans` |
+| Equipment | `equipment.maintenance_order.create` | `POST /api/equipment/{id}/maintenance-orders` |
+| Equipment | `equipment.maintenance_order.update` | `PATCH /api/equipment/maintenance-orders/{id}` |
+
+All 16 routes instrumented with atomic audit. Service layers gained `commit: bool = True` on all mutating functions. `update_maintenance_order` was the complex case: two separate commits (order update + equipment status flip to AVAILABLE) replaced by single `flush()` on `commit=False`, with route handling single commit after audit.
+
 ## Dominios NO instrumentados todavía (backlog honesto)
 
 La cobertura fuera de las acciones enumeradas arriba sigue siendo parcial.
@@ -303,7 +326,7 @@ completitud:
 - **Project Control** (WBS, Presupuestos, Órdenes de cambio, Avances) —
   `CLOSED` (2026-08-26, ver arriba).
 - **Enterprise Resources** (Fixed Assets, Equipment, Workforce) —
-  `NOT_STARTED`.
+  `CLOSED` (2026-08-26, ver arriba).
 - **Commercial** (CRM: Leads, Oportunidades, Cotizaciones, Contratos de
   venta) — `NOT_STARTED`.
 - **Construction Control** (Documents/Evidence, RFI/Submittals, Daily
@@ -311,7 +334,8 @@ completitud:
 - **Platform** — Company create/update, User create — `NOT_STARTED`.
 
 Los diez gaps de Treasury, los gaps de creación de AP/AR, los gaps de
-Supply Chain (Procurement + Inventory), y los gaps de Project Control:
+Supply Chain (Procurement + Inventory), los gaps de Project Control,
+y los gaps de Enterprise Resources:
 **cerrados** (2026-08-26, ver arriba).
 
 Un futuro task puede cerrar estos dominios uno por uno reutilizando

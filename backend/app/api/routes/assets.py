@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.schemas.asset import (
     AssetStatusChangeRequest,
     DepreciationEntryCreateRequest,
@@ -11,7 +12,7 @@ from app.schemas.asset import (
     FixedAssetCreateRequest,
     FixedAssetResponse,
 )
-from app.services import asset_service
+from app.services import asset_service, audit_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/assets", tags=["assets"])
@@ -29,6 +30,7 @@ def create_fixed_asset(
     payload: FixedAssetCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("asset.fixed_asset", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> FixedAssetResponse:
     assert_company_access(
         db, user_id=user.id, resource="asset.fixed_asset", action="create", company_id=payload.company_id
@@ -50,7 +52,21 @@ def create_fixed_asset(
         cost_center_id=payload.cost_center_id,
         depreciation_expense_account_id=payload.depreciation_expense_account_id,
         accumulated_depreciation_account_id=payload.accumulated_depreciation_account_id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="asset.fixed_asset.create",
+        entity_type="asset.fixed_asset",
+        entity_id=asset.id,
+        company_id=payload.company_id,
+        project_id=payload.project_id,
+        before=None,
+        after={"name": asset.name, "cost": str(asset.cost), "category": asset.category},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return FixedAssetResponse.model_validate(asset, from_attributes=True)
 
 
@@ -88,12 +104,27 @@ def change_asset_status(
     payload: AssetStatusChangeRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("asset.fixed_asset", "update")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> FixedAssetResponse:
     asset = _resolve_asset(db, asset_id)
     assert_company_access(
         db, user_id=user.id, resource="asset.fixed_asset", action="update", company_id=asset.company_id
     )
-    asset = asset_service.change_asset_status(db, asset_id=asset_id, status=payload.status)
+    before_status = asset.status
+    asset = asset_service.change_asset_status(db, asset_id=asset_id, status=payload.status, commit=False)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="asset.fixed_asset.status_change",
+        entity_type="asset.fixed_asset",
+        entity_id=asset_id,
+        company_id=asset.company_id,
+        project_id=asset.project_id,
+        before={"status": before_status},
+        after={"status": asset.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return FixedAssetResponse.model_validate(asset, from_attributes=True)
 
 
@@ -105,6 +136,7 @@ def generate_depreciation_entry(
     payload: DepreciationEntryCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("asset.depreciation", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> DepreciationEntryResponse:
     asset = _resolve_asset(db, asset_id)
     assert_company_access(
@@ -116,7 +148,21 @@ def generate_depreciation_entry(
         period_start=payload.period_start,
         period_end=payload.period_end,
         post=payload.post,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="asset.depreciation.create",
+        entity_type="asset.depreciation_entry",
+        entity_id=entry.id,
+        company_id=asset.company_id,
+        project_id=asset.project_id,
+        before=None,
+        after={"periodStart": str(entry.period_start), "amount": str(entry.amount), "posted": entry.accounting_document_id is not None},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return DepreciationEntryResponse.model_validate(entry, from_attributes=True)
 
 

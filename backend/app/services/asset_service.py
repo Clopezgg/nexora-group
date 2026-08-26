@@ -43,6 +43,7 @@ def create_fixed_asset(
     cost_center_id: uuid.UUID | None,
     depreciation_expense_account_id: uuid.UUID,
     accumulated_depreciation_account_id: uuid.UUID,
+    commit: bool = True,
 ) -> FixedAsset:
     assert_operation_scope(scope, project_id)
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
@@ -77,8 +78,11 @@ def create_fixed_asset(
         depreciation_expense_account_id=depreciation_expense_account_id,
         accumulated_depreciation_account_id=accumulated_depreciation_account_id,
     )
-    db.commit()
-    db.refresh(asset)
+    if commit:
+        db.commit()
+        db.refresh(asset)
+    else:
+        db.flush()
     return asset
 
 
@@ -90,7 +94,7 @@ def list_fixed_assets(db: Session, *, company_id: uuid.UUID) -> list[FixedAsset]
     return asset_repository.list_fixed_assets(db, company_id=company_id)
 
 
-def change_asset_status(db: Session, *, asset_id: uuid.UUID, status: str) -> FixedAsset:
+def change_asset_status(db: Session, *, asset_id: uuid.UUID, status: str, commit: bool = True) -> FixedAsset:
     asset = asset_repository.get_fixed_asset(db, asset_id)
     if asset is None:
         raise ValueError(f"FixedAsset {asset_id} no existe")
@@ -101,8 +105,11 @@ def change_asset_status(db: Session, *, asset_id: uuid.UUID, status: str) -> Fix
             f"El activo {asset.id} está {asset.status}; no admite más transiciones de estado"
         )
     asset.status = status
-    db.commit()
-    db.refresh(asset)
+    if commit:
+        db.commit()
+        db.refresh(asset)
+    else:
+        db.flush()
     return asset
 
 
@@ -121,6 +128,7 @@ def generate_depreciation_entry(
     period_start: date,
     period_end: date,
     post: bool = True,
+    commit: bool = True,
 ) -> DepreciationEntry:
     """INV-AST-001: un mismo asset+periodo nunca genera dos entries/postings
     DEP. La verificación aquí es defensa en profundidad (rechazo temprano,
@@ -180,8 +188,11 @@ def generate_depreciation_entry(
         )
         entry.accounting_document_id = document.id
 
-    db.commit()
-    db.refresh(entry)
+    if commit:
+        db.commit()
+        db.refresh(entry)
+    else:
+        db.flush()
     return entry
 
 

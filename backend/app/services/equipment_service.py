@@ -42,6 +42,7 @@ def create_equipment(
     serial_number: str | None,
     plate_number: str | None,
     operator: str | None,
+    commit: bool = True,
 ) -> Equipment:
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
     equipment = equipment_repository.create_equipment(
@@ -55,8 +56,11 @@ def create_equipment(
         plate_number=plate_number,
         operator=operator,
     )
-    db.commit()
-    db.refresh(equipment)
+    if commit:
+        db.commit()
+        db.refresh(equipment)
+    else:
+        db.flush()
     return equipment
 
 
@@ -68,15 +72,18 @@ def list_equipment(db: Session, *, company_id: uuid.UUID) -> list[Equipment]:
     return equipment_repository.list_equipment(db, company_id=company_id)
 
 
-def change_equipment_status(db: Session, *, equipment_id: uuid.UUID, status: str) -> Equipment:
+def change_equipment_status(db: Session, *, equipment_id: uuid.UUID, status: str, commit: bool = True) -> Equipment:
     equipment = equipment_repository.get_equipment(db, equipment_id)
     if equipment is None:
         raise ValueError(f"Equipment {equipment_id} no existe")
     if status not in EQUIPMENT_STATUSES:
         raise InvalidOperationScopeError(f"status inválido: {status!r}")
     equipment.status = status
-    db.commit()
-    db.refresh(equipment)
+    if commit:
+        db.commit()
+        db.refresh(equipment)
+    else:
+        db.flush()
     return equipment
 
 
@@ -91,6 +98,7 @@ def record_fuel_log(
     unit_cost: Decimal,
     scope: str,
     project_id: uuid.UUID | None,
+    commit: bool = True,
 ) -> FuelLog:
     """`total_cost` SIEMPRE se calcula server-side (quantity * unit_cost);
     nunca se acepta un total hardcodeado del cliente (CLAUDE.md: no hardcoded
@@ -116,8 +124,11 @@ def record_fuel_log(
         scope=scope,
         project_id=project_id,
     )
-    db.commit()
-    db.refresh(log)
+    if commit:
+        db.commit()
+        db.refresh(log)
+    else:
+        db.flush()
     return log
 
 
@@ -133,6 +144,7 @@ def create_maintenance_plan(
     trigger_type: str,
     trigger_value: Decimal,
     description: str | None,
+    commit: bool = True,
 ) -> MaintenancePlan:
     plan = equipment_repository.create_maintenance_plan(
         db,
@@ -142,8 +154,11 @@ def create_maintenance_plan(
         trigger_value=trigger_value,
         description=description,
     )
-    db.commit()
-    db.refresh(plan)
+    if commit:
+        db.commit()
+        db.refresh(plan)
+    else:
+        db.flush()
     return plan
 
 
@@ -160,6 +175,7 @@ def create_maintenance_order(
     opened_at: date,
     supplier_ref: str | None,
     description: str | None,
+    commit: bool = True,
 ) -> MaintenanceOrder:
     order = equipment_repository.create_maintenance_order(
         db,
@@ -173,8 +189,11 @@ def create_maintenance_order(
     equipment = equipment_repository.get_equipment(db, equipment_id)
     if equipment is not None:
         equipment.status = "UNDER_MAINTENANCE"
-    db.commit()
-    db.refresh(order)
+    if commit:
+        db.commit()
+        db.refresh(order)
+    else:
+        db.flush()
     return order
 
 
@@ -192,6 +211,7 @@ def update_maintenance_order(
     downtime_hours: Decimal | None = None,
     description: str | None = None,
     closed_at: date | None = None,
+    commit: bool = True,
 ) -> MaintenanceOrder:
     """INV-EQP-001: un MaintenanceOrder CLOSED/CANCELLED es terminal. Se
     rechaza CUALQUIER mutación (incluido volver a "cerrarlo") antes de tocar
@@ -217,13 +237,19 @@ def update_maintenance_order(
     if description is not None:
         order.description = description
 
-    db.commit()
-    db.refresh(order)
-
-    if order.status == "CLOSED":
-        equipment = equipment_repository.get_equipment(db, order.equipment_id)
-        if equipment is not None and equipment.status == "UNDER_MAINTENANCE":
-            equipment.status = "AVAILABLE"
-            db.commit()
+    if commit:
+        db.commit()
+        db.refresh(order)
+        if order.status == "CLOSED":
+            equipment = equipment_repository.get_equipment(db, order.equipment_id)
+            if equipment is not None and equipment.status == "UNDER_MAINTENANCE":
+                equipment.status = "AVAILABLE"
+                db.commit()
+    else:
+        if order.status == "CLOSED":
+            equipment = equipment_repository.get_equipment(db, order.equipment_id)
+            if equipment is not None and equipment.status == "UNDER_MAINTENANCE":
+                equipment.status = "AVAILABLE"
+        db.flush()
 
     return order

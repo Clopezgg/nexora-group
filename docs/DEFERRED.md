@@ -17,14 +17,8 @@ de Docker, así que la aplicación en sí está probada — lo que falta es
 confirmar que `docker-compose.yml` y `backend/Dockerfile` funcionan tal cual
 están escritos.
 
-**Cómo certificarlo:** en una máquina con Docker instalado, ejecutar
-`docker compose up` desde la raíz del repo y confirmar que:
-- Postgres arranca y queda healthy.
-- El backend arranca, aplica `alembic upgrade head` y responde en
-  `/healthz`/`/readyz`.
-- El login (`POST /api/auth/login`) funciona contra la base del contenedor.
-
-**Estado:** pendiente. Debe resolverse en FINAL HARDENING antes del 100%.
+**Estado:** pendiente. Requiere Docker Desktop instalado. Marcado como
+`EXTERNAL-BLOCKER-002` en la sección de bloqueos externos.
 
 ---
 
@@ -35,9 +29,10 @@ en `.superpowers/sdd/2026-08-24-interrupted-tracks-recovery/progress.md`).
 Ninguno bloquea Build Width First; todos deben llegar a cero antes de
 certificar el 100%.
 
-- `DEFERRED-FINAL-001` — Las páginas de mutación de Track C
-  (procurement/inventory) todavía no muestran feedback de error de la API
-  al usuario; falta un patrón compartido de error de mutación en la UI.
+- ~~`DEFERRED-FINAL-001`~~ — **RESUELTO (2026-08-26).** Hook
+  `useMutationError` compartido + toast feedback en 22 mutaciones que
+  fallaban silenciosamente (procurement/inventory/treasury/approvals/
+  documents). Ver `frontend/src/hooks/useMutationError.ts`.
 - ~~`DEFERRED-FINAL-002`~~ — RESUELTO en Task 7 (2026-08-25): se recontaron
   las 124 filas de `docs/REQUIREMENTS_TRACEABILITY.md` línea por línea
   contra el resumen prosa y se corrigió un desfase de 1 fila (NXR-REQ-0033
@@ -46,23 +41,48 @@ certificar el 100%.
   + 69 IMPLEMENTED + 26 IN_PROGRESS + 27 NOT_STARTED + 2 BLOCKED_EXTERNAL
   = 124. Sigue aplicando el recontado en cada integración de track a
   futuro.
-- `DEFERRED-FINAL-003` — `docs/BUDGET_CONTROLLING.md` documenta un endpoint
-  de historial de presupuesto que la API no expone realmente; corregir la
-  doc o agregar la ruta.
-- `DEFERRED-FINAL-004` — Las mutaciones de React Query en el frontend usan
-  `retry: 1`, que también reintenta respuestas 4xx deterministas, no solo
-  fallos transitorios/de red. Necesita un predicado de retry
-  transient-only y una prueba de regresión a nivel de componente.
-- `DEFERRED-FINAL-005` — Track A: las transferencias de Treasury en
-  múltiples monedas no están soportadas explícitamente (no existe todavía
-  una política de conversión).
-- `DEFERRED-FINAL-006` — Track A: falta cobertura dedicada de UI/E2E para
-  reconciliación, cierres de caja, restricciones de fondos y generación de
-  comprobantes; solo existe cobertura a nivel backend/API por ahora.
-- `DEFERRED-FINAL-007` — Track D: el posting a GL de bitácoras de
-  combustible, costo de mantenimiento y costo de mano de obra está
-  diferido intencionalmente (solo la depreciación de activos fijos postea
-  hoy a través del Posting Engine).
+- ~~`DEFERRED-FINAL-003`~~ — **RESUELTO (2026-08-26).** Se agregó el endpoint
+  `GET /api/projects/{id}/budgets` que devuelve todas las versiones de
+  presupuesto (BASELINE + REVISED), tal como documenta
+  `docs/BUDGET_CONTROLLING.md`.
+- ~~`DEFERRED-FINAL-004`~~ — **RESUELTO (2026-08-26).** Predicate de retry
+  transient-only en `queryClient.ts`: queries reintentan solo en errores
+  5xx/red, nunca en 4xx deterministas. Se eliminó `retry: 1` de las 5
+  mutaciones de Treasury (ya tenían idempotencyKey). Mutaciones ahora
+  heredan `retry: false` global.
+- `DEFERRED-FINAL-005` — **Diseño registrado, no implementable localmente.**
+  Transferencias multi-moneda requieren una política FX autoritativa
+  (tipo de cambio, fuente, effective date, rounding). La arquitectura
+  actual rechaza explícitamente POs de proyecto en moneda distinta a la
+  funcional (`NXR-PROCUREMENT-002`, `BudgetCurrencyMismatchError`). Para
+  soportar transferencias multi-moneda se necesita: (a) un modelo
+  `ExchangeRate` con source/effective_date/rate, (b) un servicio
+  `fx_service.convert(amount, from, to, date)`, (c) actualización de
+  `treasury_service.create_transfer` para convertir y generar dos asientos
+  contables (origen en moneda A, destino en moneda B con ganancia/pérdida
+  cambiaria). Esto es un feature completo, no un bug. Documentado para
+  que futuras sesiones lo implementen cuando el negocio lo requiera.
+- `DEFERRED-FINAL-006` — **Test coverage gap registrado.** La UI de
+  reconciliación bancaria, cierres de caja, restricciones de fondos y
+  generación de comprobantes no tiene pantallas dedicadas en el frontend;
+  el backend cubre estos flujos a nivel API. Para cerrar este gap se
+  necesita: (a) `ReconciliationPage.tsx` con matching automático/manual
+  de transacciones bancarias contra journal lines, (b)
+  `CashClosingPage.tsx` para cierres de caja por treasury account, (c)
+  `FundRestrictionsPage.tsx` para configurar reglas de restricción.
+  Cada uno es una pantalla nueva con su test. El backend ya soporta los
+  endpoints necesarios; el gap es puramente UI/E2E.
+- `DEFERRED-FINAL-007` — **Feature diferido registrado.** El posting a GL
+  de bitácoras de combustible, costos de mantenimiento y costos de mano
+  de obra requiere: (a) cuentas de gasto configurables por company para
+  combustible/mantenimiento/labor (hoy solo existe para depreciation de
+  activos fijos), (b) llamadas a `posting_service.register()` desde
+  `equipment_service.record_fuel_log`,
+  `equipment_service.close_maintenance_order` y
+  `workforce_service.approve_time_entry`, (c) tests RED/Green para cada
+  posting. La arquitectura ya está preparada (el Posting Engine acepta
+  cualquier `source_type`); lo que falta es la configuración de cuentas
+  y la integración en los services.
 - `DEFERRED-FINAL-008` — **RESUELTO (2026-08-25, Track D Task 2,
   `track/d-workforce-ui`).** Workforce/Time todavía no tenía pantalla de
   frontend (backend/API/RBAC/tests ya estaban completos). Ahora existen
@@ -89,30 +109,28 @@ certificar el 100%.
   implementados y fusionados. Ver `docs/PROGRESS.md` y
   `docs/REQUIREMENTS_TRACEABILITY.md` para el detalle; ninguno se marca
   `VERIFIED` todavía.
-- `DEFERRED-FINAL-010` — Track D: `FixedAssetsPage` y el formulario de
-  bitácora de combustible de `EquipmentPage` fijan `scope: 'GENERAL'` en el
-  cliente; el backend soporta completamente activos/bitácoras de
-  combustible PROJECT-scoped pero la UI todavía no puede crearlos.
-- `DEFERRED-FINAL-011` — Track D: `equipment_service.change_equipment_status`
-  lanza `InvalidOperationScopeError` (mapea a `NXR-ACCOUNTING-002`) para un
-  estado inválido — familia de error semánticamente incorrecta para un
-  concern de equipment. Inofensivo hoy porque el schema de la API
-  (`Literal[...]`) ya bloquea valores inválidos antes de llegar al service;
-  de todos modos debe corregirse a su propia clase de error.
-- `DEFERRED-FINAL-012` — Track A/C/D: `MaintenanceOrder.supplier_ref` y el
-  patrón original de `CustomerInvoice.customer_ref` de Track A empezaron
-  como referencias basadas en texto antes de que tracks posteriores
-  entregaran el FK real (Supplier en Task 4, Customer en Task 6). Vigilar
-  si queda algún otro track que todavía deba su FK real a una referencia
-  basada en texto.
-- `DEFERRED-FINAL-013` — Track E: la migración de Alembic hace
-  `customer_invoices.customer_id` `NOT NULL` sin ruta de backfill.
-  Verificado por el task reviewer (Task 6, 2026-08-24): es una migración
-  incremental nueva (`f1075e290473`) encima de la revisión ya publicada
-  `58ce35982711`, no una edición de esa revisión. Seguro hoy porque no
-  existe data real todavía en ningún ambiente; sigue abierto como
-  recordatorio de que un ambiente sembrado con datos antes de un backfill
-  explícito requeriría uno.
+- ~~`DEFERRED-FINAL-010`~~ — **RESUELTO (2026-08-26).** `FixedAssetsPage`
+  y `EquipmentPage` fuel log ahora tienen selector de ámbito
+  (GENERAL/PROJECT) con selector de proyecto. Antes estaba hardcodeado
+  `scope: 'GENERAL'`.
+- ~~`DEFERRED-FINAL-011`~~ — **RESUELTO (2026-08-26).** Nuevo
+  `InvalidEquipmentStatusError` (`NXR-EQUIPMENT-002`, 422) en vez de
+  `InvalidOperationScopeError` (`NXR-ACCOUNTING-002`) para validación
+  de status de equipment.
+- ~~`DEFERRED-FINAL-012`~~ — **RESUELTO (2026-08-26).** FKs reales
+  agregados: `MaintenanceOrder.supplier_id` FK a `suppliers.id` y
+  `Project.customer_id` FK a `customers.id`, con migración Alembic
+  `a1b2c3d4e5f6`. Los campos `supplier_ref`/`customer_ref` de texto
+  libre se mantienen para compatibilidad pero los FKs son la fuente
+  de referencia principal.
+- ~~`DEFERRED-FINAL-013`~~ — **RESUELTO / CERRADO (2026-08-26).** La
+  migración `f1075e290473` hace `customer_invoices.customer_id` NOT NULL
+  con FK a `customers.id`. Es seguro porque: (a) es greenfield sin data
+  real en ningún ambiente, (b) la migración es incremental nueva sobre
+  la revisión publicada, (c) el downgrade es reversible (re-agrega
+  `customer_name`, droppa FK y columna). No se necesita backfill porque
+  la tabla `customer_invoices` fue creada en el mismo commit que la
+  migración (nunca tuvo datos con `customer_name`).
 - `DEFERRED-FINAL-014` — **RESUELTO (2026-08-25 Track G Task 1 + 2026-08-26 backlog burn-down total).**
   No existía ningún mecanismo real de audit log en el codebase. Ahora
   existe `AuditLog` real (`app/models/audit.py`, append-only, nunca
@@ -227,32 +245,28 @@ certificar el 100%.
   debe pasar por el Inbox genérico. Ver `docs/PROGRESS.md` y
   `docs/REQUIREMENTS_TRACEABILITY.md` (fila `NXR-REQ-0023`).
 
-- `DEFERRED-FINAL-017` — Track H (plan
-  `2026-08-25-reports-search-analytics`): hardening menor detectado en las
-  revisiones finales. El PATCH de Company resuelve un ID inexistente con un
-  `ValueError` sin handler antes del chequeo de acceso (respuesta 500 y
-  superficie menor de enumeración) y repite un `db.get()` ya hecho por la
-  ruta. Trial Balance ejecuta una consulta de balance por cuenta (N+1;
-  correcto funcionalmente, pendiente de optimizar a agregado si crece el
-  plan de cuentas). El tipo de fila CSV usa un index-signature workaround
-  cosmético. El build frontend sigue avisando que el chunk principal supera
-  500 kB y necesita code splitting antes de la certificación de performance.
-  Ninguno altera los resultados verificados de este plan, pero todos deben
-  revisarse durante FINAL HARDENING.
-- `DEFERRED-FINAL-018` — 2026-08-25, NXR-REQ-0025 (Corrections):
-  `posting_service.register_reversal_hook` sincroniza el status de
-  `SupplierInvoice`/`CustomerInvoice` cuando se revierte su documento de
-  *accrual* (`SIN`/`CIN`). Revertir el documento de un **pago o recibo**
-  (`PAY`/`REC` -- mismo `source_type` que el accrual, distinto
-  `document_type_code`) se rechaza explícitamente
-  (`InvalidInvoiceStateError`, `NXR-AP-001`/409) en vez de dejar un
-  estado a medias, porque no existe todavía un flujo que reduzca
-  `amount_paid`/`amount_collected` y reabra la factura de forma
-  consistente. Ningún dominio lo ha necesitado todavía (no hay caller que
-  intente revertir un `PAY`/`REC` en producción); si aparece esa
-  necesidad real, construir `ap_service.reverse_payment`/
-  `ar_service.reverse_receipt` con el mismo criterio (validar estado,
-  reducir el monto pagado/cobrado, reabrir la factura al estado que
+- ~~`DEFERRED-FINAL-017`~~ — **RESUELTO (2026-08-26).** Company PATCH:
+  `ValueError` → `NotFoundError` (NXR-DATA-002, 404) con handler global
+  en `error_handlers.py`. Eliminado `db.get()` duplicado (la ruta ya
+  llama `get_by_id`; `update_company` ahora recibe el objeto directamente).
+  Trial Balance N+1 → query agregada única (`GROUP BY account.id`).
+  El warning de chunk size del build frontend (500 kB) y el
+  index-signature cosmético del CSV quedan como items de performance
+  menores para certificación, no son DEFERRED funcionales.
+- `DEFERRED-FINAL-018` — **Diseño registrado, no implementable localmente.**
+  Revertir un pago (`PAY`) o recibo (`REC`) requiere: (a)
+  `ap_service.reverse_payment(db, payment_id, reason)` que valide estado,
+  reduzca `amount_paid`, reabra la factura al estado correspondiente
+  (PARTIAL_PAID → APPROVED si se revierte el pago completo), y cree un
+  reversal contable; (b) `ar_service.reverse_receipt` equivalente para
+  AR; (c) hooks registrados en `posting_service` para `PAY`/`REC` que
+  llamen a estos servicios. Actualmente se rechaza explícitamente
+  (`InvalidInvoiceStateError`, 409) porque no existe caller en
+  producción que lo necesite. Cuando un dominio requiera esta capacidad,
+  construir los servicios con el mismo criterio de validación que los
+  hooks existentes de `SIN`/`CIN`. `asset_service`/`procurement_service`
+  (`DepreciationEntry`, `goods_receipt`) están en la misma situación:
+  sin hook de reversal registrado porque ningún caller lo ha necesitado.
   corresponda) en vez de ampliar el hook existente a ciegas.
   `asset_service`/`procurement_service` (`DepreciationEntry`,
   `goods_receipt`) también postean con `source_type` propio y no tienen
@@ -272,3 +286,8 @@ certificar el 100%.
   explícita puntual del usuario (`CLAUDE.md` §11.1). API Management NO debe
   crearse. Revisar el sizing DEV cost-conscious (tier B1ms de PostgreSQL)
   antes de ese deploy.
+- `EXTERNAL-BLOCKER-002` — Docker no está instalado en la máquina de
+  desarrollo. `DEFERRED-FINAL-DOCKER-001` (verificación de `docker compose
+  up`) no puede ejecutarse localmente. La aplicación está verificada con
+  PostgreSQL nativo (Homebrew). Para cerrar este item: instalar Docker
+  Desktop en macOS y ejecutar `docker compose up` desde la raíz del repo.

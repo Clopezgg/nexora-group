@@ -259,7 +259,7 @@ todavía).
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0106 | Migrations (Alembic) | ➖·✅·✅·➖·➖·➖·➖·🔶·⬜ | IN_PROGRESS | `alembic upgrade head` aplicado; falta certificar fresh-install + upgrade matrix |
+| NXR-REQ-0106 | Migrations (Alembic) | ➖·✅·✅·➖·➖·➖·➖·✅·✅ | IMPLEMENTED | 2026-08-25: certificado con evidencia real, no solo "aplicado". `tests/test_migrations.py` (nuevo) ejecuta contra una PostgreSQL real dedicada: fresh install (`upgrade head` desde vacío) → `downgrade base` completo → `upgrade head` de nuevo, las 18 migraciones en ambas direcciones. Encontró y corrigió un bug real: 6 constraints (FK/unique) en 4 migraciones pasaban `None` como nombre a `create_foreign_key`/`create_unique_constraint` (autogenerado por Alembic), dejando que PostgreSQL le asignara un nombre impredecible -- su propio `downgrade()` intentaba `drop_constraint(None, ...)`, que nunca puede resolver a un constraint real y siempre fallaba (`131a6debf189`/`c622defc2308`/`f1075e290473`/`eaf5b6c0d061`, ahora todos con nombre explícito en creación y en drop). El Critical Journey E2E (`NXR-REQ-0112/0113`) también ejercita fresh-install real en cada corrida (`playwright.config.ts`), evidencia E2E independiente y repetida |
 | NXR-REQ-0107 | Security (CSRF/rate-limit/lockout/headers) | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | Argon2id + HttpOnly + Secure-en-prod; falta el resto de §121 |
 | NXR-REQ-0108 | Observability | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | App Insights opcional wired; falta logging estructurado con correlation_id |
 | NXR-REQ-0109 | Backup / Restore | ⬜⬜⬜⬜➖⬜➖⬜➖ | NOT_STARTED | — |
@@ -297,17 +297,18 @@ Journey E2E real (`NXR-REQ-0112`/`0113`, `feat/nexora-greenfield`, sesión
   pero mover cada fila individual a `VERIFIED` exige mapear su alcance
   exacto contra lo que el recorrido realmente cubre, fila por fila — pasada
   pendiente, no asumida aquí.
-- **IMPLEMENTED:** 103 / 124. `NXR-REQ-0016` (Financial statements,
-  incluyendo Cash Flow) movió `IN_PROGRESS` → `IMPLEMENTED` el 2026-08-25.
-- **IN_PROGRESS:** 14 / 124 — NXR-REQ-0093/0105/0106/0107/0108/0110/0114/
-  0115/0116/0117/0118/0119/0120/0121.
+- **IMPLEMENTED:** 104 / 124. `NXR-REQ-0016` (Financial statements,
+  incluyendo Cash Flow) y `NXR-REQ-0106` (Migrations) movieron
+  `IN_PROGRESS` → `IMPLEMENTED` el 2026-08-25.
+- **IN_PROGRESS:** 13 / 124 — NXR-REQ-0093/0105/0107/0108/0110/0114/0115/
+  0116/0117/0118/0119/0120/0121.
 - **NOT_STARTED:** 3 / 124 — NXR-REQ-0058/0109/0122.
 - **BLOCKED_EXTERNAL:** 2 / 124 — NXR-REQ-0123/0124, ambos dependientes del
   despliegue Azure real sujeto a `CLAUDE.md` §11.1.
 
-Suma verificada contra las 124 filas reales: 2+103+14+3+2 = 124 (recontar con
+Suma verificada contra las 124 filas reales: 2+104+13+3+2 = 124 (recontar con
 `grep -oE '\| (NOT_STARTED|IN_PROGRESS|IMPLEMENTED|VERIFIED|BLOCKED_EXTERNAL) \|' docs/REQUIREMENTS_TRACEABILITY.md | sort | uniq -c`
 antes de fiarse de este resumen prosa, que puede desincronizarse de la
-tabla real). El sistema combinado pasó 296 pruebas backend sobre
+tabla real). El sistema combinado pasó 297 pruebas backend sobre
 PostgreSQL, 91 pruebas frontend, typecheck, lint, y el Critical Journey
 E2E real 2/2 en verde.

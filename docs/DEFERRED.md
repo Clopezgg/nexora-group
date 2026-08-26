@@ -119,19 +119,15 @@ certificar el 100%.
   append-only, nunca UPDATE/DELETE), invocado explícitamente desde la
   capa de ruta (nunca hook oculto de ORM, nunca cambio de firma de
   servicio existente) — ver `docs/AUDIT.md`. Instrumentado por ahora: AP
-  approve+pay, Treasury cash-closing approve + remittance create,
-  Procurement PO approve (5 rutas) y `workflow.approval.decide` (Track G
-  Task 2). Sigue `NOT_STARTED` la instrumentación de Project Control,
-  Enterprise Resources, Commercial, Construction Control, y el resto de
-  Financial Core — backlog honesto en `docs/AUDIT.md`, no bloquea el
+  submit/approve/pay, AR create/approve/collect, Treasury
+  remittance/create/general_expense/transfer/cash-closing approve+create/
+  bank_statement+bank_statement_line create/reconciliation match+exclude/
+  fund_restriction, Procurement PO approve, General Ledger create/reverse;
+  además `workflow.approval.decide`. Sigue `NOT_STARTED` la
+  instrumentación de Project Control, Enterprise Resources, Construction
+  Control, Supply Chain restante, Platform (Company/User create), y el
+  resto de dominios — backlog honesto en `docs/AUDIT.md`, no bloquea el
   resto de esos tracks mientras tanto.
-  **Actualización 2026-08-26:** cerrados cinco gaps explícitos de Treasury
-  (`general_expense.create`, `transfer.create`, conciliación
-  `match`/`exclude`, `fund_restriction.create`) con transacción atómica
-  negocio+audit y pruebas de rollback/replay. `DEFERRED-FINAL-014` sigue
-  abierto: AR continúa sin call sites; AP invoice create, otras mutaciones
-  de Treasury/Supply Chain y todos los dominios listados arriba permanecen
-  en el backlog exacto de `docs/AUDIT.md`.
 - `DEFERRED-FINAL-015` — **RESUELTO (2026-08-25, sin worktree separado —
   construido directamente en `feat/nexora-greenfield`, mismo día que el
   Critical Journey E2E que confirmó el gap por segunda vez de forma

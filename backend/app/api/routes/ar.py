@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.schemas.ar import (
     CustomerInvoiceCreateRequest,
     CustomerInvoiceResponse,
     CustomerReceiptCreateRequest,
     CustomerReceiptResponse,
 )
-from app.services import ar_service, idempotency_service
+from app.services import ar_service, audit_service, idempotency_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/ar", tags=["accounts-receivable"])
@@ -28,6 +29,7 @@ def create_customer_invoice(
     payload: CustomerInvoiceCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("ar.customer_invoice", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> CustomerInvoiceResponse:
     assert_company_access(
         db, user_id=user.id, resource="ar.customer_invoice", action="create", company_id=payload.company_id
@@ -46,7 +48,25 @@ def create_customer_invoice(
         invoice_date=payload.invoice_date,
         due_date=payload.due_date,
         description=payload.description,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="ar.customer_invoice.create",
+        entity_type="ar.customer_invoice",
+        entity_id=invoice.id,
+        company_id=invoice.company_id,
+        project_id=invoice.project_id,
+        before=None,
+        after={
+            "invoiceNumber": invoice.invoice_number,
+            "amount": str(invoice.amount),
+            "status": invoice.status,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return CustomerInvoiceResponse.model_validate(invoice, from_attributes=True)
 
 
@@ -91,6 +111,7 @@ def approve_customer_invoice(
     invoice_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("ar.customer_invoice", "approve")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> CustomerInvoiceResponse:
     invoice = _resolve_invoice(db, invoice_id)
     assert_company_access(
@@ -100,7 +121,21 @@ def approve_customer_invoice(
         action="approve",
         company_id=invoice.company_id,
     )
+    before_status = invoice.status
     invoice = ar_service.approve_customer_invoice(db, invoice_id=invoice_id)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="ar.customer_invoice.approve",
+        entity_type="ar.customer_invoice",
+        entity_id=invoice.id,
+        company_id=invoice.company_id,
+        project_id=invoice.project_id,
+        before={"status": before_status},
+        after={"status": invoice.status, "accountingDocumentId": str(invoice.accounting_document_id)},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return CustomerInvoiceResponse.model_validate(invoice, from_attributes=True)
 
 
@@ -113,6 +148,7 @@ def collect_customer_receipt(
     db: Session = Depends(get_db),
     user=Depends(require_permission("ar.customer_receipt", "create")),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> CustomerReceiptResponse:
     invoice = _resolve_invoice(db, invoice_id)
     assert_company_access(
@@ -142,6 +178,22 @@ def collect_customer_receipt(
             receipt_date=payload.receipt_date,
             commit=outcome is None,
         )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="ar.customer_receipt.create",
+            entity_type="ar.customer_receipt",
+            entity_id=receipt.id,
+            company_id=invoice.company_id,
+            project_id=invoice.project_id,
+            before=None,
+            after={
+                "amount": str(receipt.amount),
+                "invoiceId": str(invoice.id),
+                "accountingDocumentId": str(receipt.accounting_document_id),
+            },
+            correlation_id=correlation_id,
+        )
         response = CustomerReceiptResponse.model_validate(receipt, from_attributes=True)
         if outcome is not None:
             idempotency_service.complete(
@@ -151,7 +203,7 @@ def collect_customer_receipt(
                 entity_type="CustomerReceipt",
                 entity_id=receipt.id,
             )
-            db.commit()
+        db.commit()
         return response
     except Exception:
         db.rollback()

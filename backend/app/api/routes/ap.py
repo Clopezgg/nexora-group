@@ -37,6 +37,7 @@ def create_supplier_invoice(
     payload: SupplierInvoiceCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("ap.supplier_invoice", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> SupplierInvoiceResponse:
     assert_company_access(
         db, user_id=user.id, resource="ap.supplier_invoice", action="create", company_id=payload.company_id
@@ -57,7 +58,26 @@ def create_supplier_invoice(
         invoice_date=payload.invoice_date,
         due_date=payload.due_date,
         description=payload.description,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="ap.supplier_invoice.create",
+        entity_type="ap.supplier_invoice",
+        entity_id=invoice.id,
+        company_id=invoice.company_id,
+        project_id=invoice.project_id,
+        before=None,
+        after={
+            "invoiceNumber": invoice.invoice_number,
+            "amount": str(invoice.amount),
+            "taxAmount": str(invoice.tax_amount),
+            "status": invoice.status,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return SupplierInvoiceResponse.model_validate(invoice, from_attributes=True)
 
 
@@ -175,6 +195,39 @@ def approve_supplier_invoice(
         db,
         actor_user_id=user.id,
         action="ap.supplier_invoice.approve",
+        entity_type="ap.supplier_invoice",
+        entity_id=invoice.id,
+        company_id=invoice.company_id,
+        project_id=invoice.project_id,
+        before={"status": before_status},
+        after={"status": invoice.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    return SupplierInvoiceResponse.model_validate(invoice, from_attributes=True)
+
+
+@router.post("/supplier-invoices/{invoice_id}/cancel", response_model=SupplierInvoiceResponse)
+def cancel_supplier_invoice(
+    invoice_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("ap.supplier_invoice", "cancel")),
+    correlation_id: str = Depends(get_correlation_id),
+) -> SupplierInvoiceResponse:
+    invoice = _resolve_invoice(db, invoice_id)
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="ap.supplier_invoice",
+        action="cancel",
+        company_id=invoice.company_id,
+    )
+    before_status = invoice.status
+    invoice = ap_service.cancel_supplier_invoice(db, invoice_id=invoice_id)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="ap.supplier_invoice.cancel",
         entity_type="ap.supplier_invoice",
         entity_id=invoice.id,
         company_id=invoice.company_id,

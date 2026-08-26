@@ -223,31 +223,47 @@ compatibilidad, pero estas rutas llaman con `commit=False` y hacen el único
 `db.commit()` después de `audit_service.record(...)`. Si el audit falla, la
 mutación completa se revierte; hay pruebas de regresión para las cinco rutas.
 
+## Dominios instrumentados (2026-08-26, backlog burn-down — AP/AR creation + Treasury creation + AP cancel)
+
+| Dominio | Acción | Ruta |
+|---------|--------|------|
+| AP | `ap.supplier_invoice.create` | `POST /api/ap/supplier-invoices` |
+| AP | `ap.supplier_invoice.cancel` | `POST /api/ap/supplier-invoices/{id}/cancel` |
+| AR | `ar.customer_invoice.create` | `POST /api/ar/customer-invoices` |
+| AR | `ar.customer_invoice.approve` | `POST /api/ar/customer-invoices/{id}/approve` |
+| AR | `ar.customer_receipt.create` | `POST /api/ar/customer-invoices/{id}/receipts` |
+| Treasury | `treasury.account.create` | `POST /api/treasury/accounts` |
+| Treasury | `treasury.cash_closing.create` | `POST /api/treasury/cash-closings` |
+| Treasury | `treasury.bank_statement.create` | `POST /api/treasury/bank-statements` |
+| Treasury | `treasury.bank_statement_line.create` | `POST /api/treasury/bank-statements/{id}/lines` |
+
+These nine routes close the remaining Financial Core creation/definition gaps.
+All use `commit=False` + single `db.commit()` for atomic business+audit
+transactions, with rollback test coverage. The `cancel` action is a new
+endpoint added in this slice (`POST /api/ap/supplier-invoices/{id}/cancel`).
+
 ## Dominios NO instrumentados todavía (backlog honesto)
 
 La cobertura fuera de las acciones enumeradas arriba sigue siendo parcial.
 Esto es deliberado e incremental (ver design doc), no se presenta como
 completitud:
 
-- **Financial Core restante** — AP `supplier_invoice.create`; AR
-  `customer_invoice.create`/`approve` y `customer_receipt.create`; Treasury
-  `account.create`, `cash_closing.create`, `bank_statement.create` y
-  `bank_statement_line.create` — `NOT_STARTED`.
 - **Supply Chain / Procurement restante** — requisiciones, RFQ,
   cotizaciones, creación/envío de PO, recepciones, entradas de servicio,
   three-way match e inventario — `NOT_STARTED` (solo PO approve está
   instrumentado).
-
 - **Project Control** (WBS, Presupuestos, Órdenes de cambio, Avances) —
   `NOT_STARTED`.
 - **Enterprise Resources** (Fixed Assets, Equipment, Workforce) —
   `NOT_STARTED`.
 - **Commercial** (CRM: Leads, Oportunidades, Cotizaciones, Contratos de
-  venta, AR) — `NOT_STARTED`.
+  venta) — `NOT_STARTED`.
 - **Construction Control** (Documents/Evidence, RFI/Submittals, Daily
   Site Reports, Quality, Safety) — `NOT_STARTED`.
-- Los cinco gaps de Treasury de este slice: **cerrados** (2026-08-26, ver
-  arriba); no equivalen al cierre de todo Financial Core.
+- **Platform** — Company create/update, User create — `NOT_STARTED`.
+
+Los diez gaps de Treasury y los gaps de creación de AP/AR de este y el slice
+anterior: **cerrados** (2026-08-26, ver arriba).
 
 Un futuro task puede cerrar estos dominios uno por uno reutilizando
 exactamente el patrón corregido de esta página: leer la ruta real, agregar
@@ -271,6 +287,8 @@ un dominio nuevo.
 - `tests/test_procurement_flow.py`: `test_approving_purchase_order_creates_audit_log_entry`.
 - `tests/test_posting_engine.py`: `test_creating_journal_entry_creates_audit_log_entry`,
   `test_reversing_journal_entry_creates_audit_log_entry` (2026-08-25).
+- Tests updated to filter by `AuditLog.action` where multiple audit entries
+  now exist per entity (create + approve/collect), ensuring precision.
 - `frontend/tests/AuditLogPage.test.tsx`: página real contra la API real
   (mockeada a nivel de `fetch`), nunca datos fabricados. No necesitó
   cambios para el nuevo dominio — la página ya es genérica sobre
@@ -296,11 +314,13 @@ Este mismo patrón existe en call sites históricos
 puede confirmar antes de que la ruta escriba el audit. No es un defecto
 introducido por este slice, pero sí un gap real de completitud.
 
-Las cinco rutas agregadas el 2026-08-26 **ya no tienen esta limitación**:
-usan el parámetro `commit=False` y confirman negocio + audit juntos. El
-backlog debe aplicar el mismo contrato transaccional a los call sites
-históricos, con tests de rollback ante fallo de audit, antes de certificar
-`Audit completeness` en producción.
+Las rutas agregadas el 2026-08-26 (cinco gaps de Treasury) **y las
+agregadas en este slice** (AP create/cancel, AR create/approve/collect,
+Treasury account/cash-closing/bank-statement/bank-statement-line create)
+**ya no tienen esta limitación**: usan el parámetro `commit=False` y
+confirman negocio + audit juntos. El backlog debe aplicar el mismo contrato
+transaccional a los call sites históricos restantes, con tests de rollback
+ante fallo de audit, antes de certificar `Audit completeness` en producción.
 
 ## Frontend
 

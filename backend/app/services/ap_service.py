@@ -44,6 +44,7 @@ def create_supplier_invoice(
     invoice_date: date,
     due_date: date,
     description: str | None,
+    commit: bool = True,
 ) -> SupplierInvoice:
     if amount <= 0 or tax_amount < 0:
         raise OverpaymentError("La factura requiere amount > 0 y tax_amount >= 0")
@@ -83,8 +84,11 @@ def create_supplier_invoice(
         status="DRAFT",
     )
     db.add(invoice)
-    db.commit()
-    db.refresh(invoice)
+    if commit:
+        db.commit()
+        db.refresh(invoice)
+    else:
+        db.flush()
     return invoice
 
 

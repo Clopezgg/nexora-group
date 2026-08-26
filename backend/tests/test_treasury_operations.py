@@ -562,10 +562,10 @@ def test_approving_cash_closing_creates_audit_log_entry(client, db_session):
         select(AuditLog).where(
             AuditLog.entity_type == "treasury.cash_closing",
             AuditLog.entity_id == uuid.UUID(closing["id"]),
+            AuditLog.action == "treasury.cash_closing.approve",
         )
     ).scalars().all()
     assert len(rows) == 1
-    assert rows[0].action == "treasury.cash_closing.approve"
     assert rows[0].after["status"] == "APPROVED"
 
 
@@ -723,10 +723,10 @@ def test_bank_reconciliation_match_and_exclude_create_audit_log_entries(client, 
         select(AuditLog).where(
             AuditLog.entity_type == "treasury.bank_statement_line",
             AuditLog.entity_id == uuid.UUID(matched_line["id"]),
+            AuditLog.action == "treasury.bank_reconciliation.match",
         )
     ).scalars().all()
     assert len(match_rows) == 1
-    assert match_rows[0].action == "treasury.bank_reconciliation.match"
     assert match_rows[0].after["status"] == "MATCHED"
     reconciliation_match = db_session.execute(
         select(ReconciliationMatch).where(
@@ -740,10 +740,10 @@ def test_bank_reconciliation_match_and_exclude_create_audit_log_entries(client, 
         select(AuditLog).where(
             AuditLog.entity_type == "treasury.bank_statement_line",
             AuditLog.entity_id == uuid.UUID(excluded_line["id"]),
+            AuditLog.action == "treasury.bank_reconciliation.exclude",
         )
     ).scalars().all()
     assert len(exclude_rows) == 1
-    assert exclude_rows[0].action == "treasury.bank_reconciliation.exclude"
     assert exclude_rows[0].after["status"] == "EXCLUDED"
 
 

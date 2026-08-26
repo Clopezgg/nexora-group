@@ -75,6 +75,7 @@ def create_account(
     payload: TreasuryAccountCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.account", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> TreasuryAccountResponse:
     assert_company_access(
         db, user_id=user.id, resource="treasury.account", action="create", company_id=payload.company_id
@@ -88,7 +89,24 @@ def create_account(
         account_reference=payload.account_reference,
         currency_code=payload.currency_code,
         gl_account_id=payload.gl_account_id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="treasury.account.create",
+        entity_type="treasury.account",
+        entity_id=account.id,
+        company_id=account.company_id,
+        before=None,
+        after={
+            "name": account.name,
+            "kind": account.kind,
+            "currencyCode": account.currency_code,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _account_to_response(db, account)
 
 
@@ -306,6 +324,7 @@ def create_cash_closing(
     payload: CashClosingCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.cash_closing", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> CashClosingResponse:
     account = _resolve_treasury_account(db, payload.treasury_account_id)
     assert_company_access(
@@ -323,7 +342,27 @@ def create_cash_closing(
         expected_amount=payload.expected_amount,
         counted_amount=payload.counted_amount,
         responsible_user_id=user.id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="treasury.cash_closing.create",
+        entity_type="treasury.cash_closing",
+        entity_id=closing.id,
+        company_id=account.company_id,
+        before=None,
+        after={
+            "closingDate": str(closing.closing_date),
+            "openingAmount": str(closing.opening_amount),
+            "expectedAmount": str(closing.expected_amount),
+            "countedAmount": str(closing.counted_amount),
+            "differenceAmount": str(closing.difference_amount),
+            "status": closing.status,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return CashClosingResponse.model_validate(closing, from_attributes=True)
 
 
@@ -407,6 +446,7 @@ def create_bank_statement(
     payload: BankStatementCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.bank_reconciliation", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> dict:
     account = _resolve_treasury_account(db, payload.treasury_account_id)
     assert_company_access(
@@ -423,7 +463,25 @@ def create_bank_statement(
         opening_balance=payload.opening_balance,
         closing_balance=payload.closing_balance,
         reference=payload.reference,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="treasury.bank_statement.create",
+        entity_type="treasury.bank_statement",
+        entity_id=statement.id,
+        company_id=account.company_id,
+        before=None,
+        after={
+            "statementDate": str(statement.statement_date),
+            "openingBalance": str(statement.opening_balance),
+            "closingBalance": str(statement.closing_balance),
+            "reference": statement.reference,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return {"id": str(statement.id)}
 
 
@@ -437,6 +495,7 @@ def add_bank_statement_line(
     payload: BankStatementLineCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("treasury.bank_reconciliation", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> BankStatementLineResponse:
     statement = _resolve_statement(db, bank_statement_id)
     company_id = treasury_service.company_id_for_bank_statement(db, statement)
@@ -453,7 +512,25 @@ def add_bank_statement_line(
         line_date=payload.line_date,
         description=payload.description,
         amount=payload.amount,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="treasury.bank_statement_line.create",
+        entity_type="treasury.bank_statement_line",
+        entity_id=line.id,
+        company_id=company_id,
+        before=None,
+        after={
+            "lineDate": str(line.line_date),
+            "description": line.description,
+            "amount": str(line.amount),
+            "status": line.status,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return BankStatementLineResponse.model_validate(line, from_attributes=True)
 
 

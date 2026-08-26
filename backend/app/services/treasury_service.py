@@ -62,6 +62,7 @@ def create_treasury_account(
     account_reference: str | None,
     currency_code: str,
     gl_account_id: uuid.UUID,
+    commit: bool = True,
 ) -> TreasuryAccount:
     assert_account_belongs_to_company(
         db,
@@ -86,8 +87,11 @@ def create_treasury_account(
         gl_account_id=gl_account_id,
     )
     db.add(account)
-    db.commit()
-    db.refresh(account)
+    if commit:
+        db.commit()
+        db.refresh(account)
+    else:
+        db.flush()
     return account
 
 
@@ -371,6 +375,7 @@ def create_cash_closing(
     expected_amount: Decimal,
     counted_amount: Decimal,
     responsible_user_id: uuid.UUID,
+    commit: bool = True,
 ) -> CashClosing:
     if opening_amount < 0 or expected_amount < 0 or counted_amount < 0:
         raise InvalidFinancialReferenceError("Los montos del cierre de caja no pueden ser negativos")
@@ -391,8 +396,11 @@ def create_cash_closing(
         status="DRAFT",
     )
     db.add(closing)
-    db.commit()
-    db.refresh(closing)
+    if commit:
+        db.commit()
+        db.refresh(closing)
+    else:
+        db.flush()
     return closing
 
 
@@ -476,6 +484,7 @@ def create_bank_statement(
     opening_balance: Decimal,
     closing_balance: Decimal,
     reference: str | None,
+    commit: bool = True,
 ) -> BankStatement:
     treasury_account = db.get(TreasuryAccount, treasury_account_id)
     if treasury_account is None:
@@ -488,13 +497,16 @@ def create_bank_statement(
         reference=reference,
     )
     db.add(statement)
-    db.commit()
-    db.refresh(statement)
+    if commit:
+        db.commit()
+        db.refresh(statement)
+    else:
+        db.flush()
     return statement
 
 
 def add_bank_statement_line(
-    db: Session, *, bank_statement_id: uuid.UUID, line_date: date, description: str, amount: Decimal
+    db: Session, *, bank_statement_id: uuid.UUID, line_date: date, description: str, amount: Decimal, commit: bool = True
 ) -> BankStatementLine:
     """Append-only: una vez creada, esta línea nunca se edita/borra."""
     if amount == 0:
@@ -509,8 +521,11 @@ def add_bank_statement_line(
         status="UNMATCHED",
     )
     db.add(line)
-    db.commit()
-    db.refresh(line)
+    if commit:
+        db.commit()
+        db.refresh(line)
+    else:
+        db.flush()
     return line
 
 

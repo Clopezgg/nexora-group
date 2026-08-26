@@ -539,10 +539,10 @@ def test_approving_supplier_invoice_creates_audit_log_entry(client, db_session):
         select(AuditLog).where(
             AuditLog.entity_type == "ap.supplier_invoice",
             AuditLog.entity_id == uuid.UUID(invoice["id"]),
+            AuditLog.action == "ap.supplier_invoice.approve",
         )
     ).scalars().all()
     assert len(rows) == 1
-    assert rows[0].action == "ap.supplier_invoice.approve"
     assert rows[0].after["status"] == "APPROVED"
 
 

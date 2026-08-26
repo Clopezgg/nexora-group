@@ -272,3 +272,36 @@ resources without the point-in-time confirmation required by `CLAUDE.md`
 §11.1, and never claim 100%/VERIFIED without real evidence. `main` stays
 read-only until every gate in the user's recovery order is green — do not
 merge, push, cherry-pick, or rebase anything onto `main`.
+
+## 2026-08-25 — Critical Journey E2E built and green (NXR-REQ-0112/0113 → VERIFIED, first VERIFIED rows in the matrix)
+
+`frontend/e2e/critical-journey.spec.ts` + `frontend/playwright.config.ts`
+(own DB `nexora_e2e`, own ports 8010/5175, fresh-install `alembic upgrade
+head`, `npm run test:e2e` from `frontend/`) — one continuous real
+recorrido through essentially the whole system, 2/2 green. Full detail
+and the 3 real bugs it found/fixed (treasury same-GL-account cancellation,
+AP submit-for-approval SCOPE_ANY + missing SoD guard, ProjectsPage
+company creation missing `functionalCurrencyCode`) are in
+`docs/PROGRESS.md`'s `2026-08-25 — Real Critical Journey E2E built...`
+entry — read that before touching Treasury/AP-approval/company-creation
+code again so you don't reintroduce any of the three.
+
+**Known real gap, NOT fixed this session (deliberate scope discipline,
+not an oversight):** there is no user-management/invite API or UI at all
+— only the single bootstrap Administrator exists after a fresh install.
+Already flagged above (the free-text UUID inputs in `QualityPage.tsx`/AP
+submit-for-approval modal) but worth restating: this blocks any real
+multi-user UI flow until it's built. Not in the traceability matrix as
+its own row yet — if picking up user management as new work, add one
+first (`docs/MASTER_PLAN.md` should already scope where it belongs
+before inventing a row number).
+
+Do NOT re-run or re-debug the Critical Journey from scratch — it passes.
+If it starts failing after a future change, that's a real regression;
+bisect from `git log` on `frontend/e2e/critical-journey.spec.ts` and the
+files it exercises, don't rewrite the test.
+
+Verification run this session before declaring the above done: 280/280
+backend pytest, `tsc -b --noEmit` clean, `eslint .` clean, 89/89 frontend
+vitest, Critical Journey E2E 2/2 green. Nothing committed/pushed yet as
+of writing this entry — see git status for what's staged vs. pending.

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
-from app.domain.errors import InvalidFinancialReferenceError
+from app.domain.errors import InvalidFinancialReferenceError, SegregationOfDutiesError
 from app.schemas.ap import (
     SupplierInvoiceCreateRequest,
     SupplierInvoiceResponse,
@@ -17,6 +17,7 @@ from app.services import ap_service, audit_service, idempotency_service
 from app.services.permission_service import (
     assert_company_access,
     require_permission,
+    user_has_any_company_scope,
     user_has_company_access,
     user_has_permission,
 )
@@ -114,10 +115,17 @@ def submit_supplier_invoice_for_approval(
         action="submit",
         company_id=invoice.company_id,
     )
+    if payload.assigned_to == user.id:
+        raise SegregationOfDutiesError(
+            "El solicitante no puede asignarse a sí mismo la aprobación (INV-SOD-001)"
+        )
     if not user_has_permission(
         db, user_id=payload.assigned_to, resource="workflow.approval", action="decide"
-    ) or not user_has_company_access(
-        db, user_id=payload.assigned_to, company_id=invoice.company_id
+    ) or not (
+        user_has_any_company_scope(
+            db, user_id=payload.assigned_to, resource="workflow.approval", action="decide"
+        )
+        or user_has_company_access(db, user_id=payload.assigned_to, company_id=invoice.company_id)
     ):
         raise InvalidFinancialReferenceError(
             "assignedTo debe ser un usuario con permiso para decidir aprobaciones en esta compañía"

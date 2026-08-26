@@ -2120,3 +2120,142 @@ existing request path (none of the ~277 tests send an `Origin` header).
 Traceability: `NXR-REQ-0008`/`NXR-REQ-0009` both moved `IN_PROGRESS` →
 `IMPLEMENTED`. Tally now 101 `IMPLEMENTED` (+2), 16 `IN_PROGRESS` (-2),
 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 0 `VERIFIED`.
+
+## 2026-08-25 — Core platform reconciled (closes NXR-REQ-0001), domain-logic gap hunt effectively exhausted
+
+`NXR-REQ-0001` had never been reconciled since the original bootstrap
+commit (`62c56eb`) — its markers were uniformly partial (🔶) across the
+board, not because anything was broken, but because the row was never
+revisited. `docs/MASTER_PLAN.md` groups "Core platform" together with
+Master Data/RBAC/Chart of Accounts/Posting Engine/GL/OperationScope/
+ActiveUIContext under Track 1 — but every one of those already has its
+own separately-reconciled row (`NXR-REQ-0002/0003/0004/0007/0008/0009/
+0010/0012`). Verified directly against the code that the row's real
+remaining scope — bootstrap, settings, health checks — is genuinely
+complete: `app/core/config.py` (real `pydantic-settings` config with a
+real Key Vault override path for production), `/healthz` (liveness),
+`/readyz` (a real `SELECT 1` against PostgreSQL, 503 if the DB doesn't
+respond — not a stub), both with a real test (`tests/test_health.py`).
+No code changes needed; this was pure verification, not construction.
+
+Traceability: `NXR-REQ-0001` moved `IN_PROGRESS` → `IMPLEMENTED`. Tally
+now 102 `IMPLEMENTED` (+1), 15 `IN_PROGRESS` (-1), 5 `NOT_STARTED`, 2
+`BLOCKED_EXTERNAL`, 0 `VERIFIED`.
+
+Checked what's left in `IN_PROGRESS`/`NOT_STARTED`: `NXR-REQ-0016`/`0093`
+(Cash Flow — needs a real schema decision on activity classification, not
+a quick fix), `NXR-REQ-0058` (Supplier Performance — deliberately
+deferred, no real PO/GR volume to compute honest metrics), and
+everything else (`0105-0122`) is squarely the 90–100% feature-freeze
+phase per `CLAUDE.md` §10: accessibility, migrations certification,
+security hardening, observability, unit-test completeness, E2E, CI/CD,
+Bicep/Azure resources, OIDC. The domain-logic gap-hunting pass this
+session ran is effectively exhausted — every remaining row either needs
+a real design decision, real data volume that doesn't exist yet, or real
+infra/testing work rather than a code-reconciliation fix.
+
+## 2026-08-25 — Real Critical Journey E2E built, executed green, 3 real bugs found and fixed (closes NXR-REQ-0112/0113)
+
+Built `frontend/e2e/critical-journey.spec.ts` (Playwright): one continuous
+sequential recorrido, not disconnected tests, against a real backend +
+frontend it starts itself (`frontend/playwright.config.ts`, dedicated
+`nexora_e2e` PostgreSQL DB, dedicated ports 8010/5175, fresh-install
+`alembic upgrade head` against an empty DB on every run — a real exercise
+of the same migration path `backend/Dockerfile`'s `CMD` uses). Covers, in
+one login session (plus a real second-user session for the approval
+step): login → company/project creation → ActiveUIContext → WBS → chart
+of accounts → Treasury account + CENTRAL remittance → GENERAL expense →
+project budget baseline → PR → approval → RFQ → supplier quotation →
+Bid Comparison → PO → goods receipt → supplier invoice → 3-way match →
+supplier payment → inventory receive/transfer/issue-to-project → crew +
+time entry → equipment + fuel log + maintenance order → progress record
+→ daily site report → quality inspection → safety observation → RFI →
+submittal → change order (submit+approve) → journal entry correction/
+reversal (`ANU-` prefix) → CRM (lead → convert → quotation → accept →
+convert to sales contract → bill → AR receipt) → Approval Inbox (real
+SoD enforcement + a real second approver) → notifications → global
+search → reports (Trial Balance, General Ledger, Balance Sheet, Income
+Statement) → audit trail → logout → login → persistence. 2/2 consecutive
+runs green.
+
+Getting there for real (not by writing the test and declaring victory)
+surfaced three genuine product bugs, each fixed with a real regression
+test, not just patched in the E2E script:
+
+1. **`treasury_service.register_remittance`/`register_general_expense`
+   accepted a counter/expense account equal to the treasury account's own
+   GL account** — that produces a debit and credit to the *same* GL
+   account, which cancels out the net movement while the
+   `AccountingDocument` still looks balanced (`SUM(debit)==SUM(credit)`
+   holds trivially). Real INV-TRE violation, found because the E2E test's
+   first naive remittance attempt showed `L 0.00` where `L 100,000.00`
+   was expected. Fixed with an explicit guard raising
+   `InvalidFinancialReferenceError` (`NXR-FINANCIAL-001`) in both
+   functions; regression tests in `tests/test_treasury.py`.
+2. **`ap.py`'s `submit_supplier_invoice_for_approval` had two real
+   authorization bugs.** First: it validated `assignedTo`'s company
+   access with a raw `user_has_company_access` call instead of
+   `assert_company_access`'s SCOPE_ANY-aware logic — since company
+   creation never inserts an explicit `UserCompanyAccess` row for anyone,
+   this silently rejected assigning an approval to *any*
+   Administrator/Auditor in a company they didn't get an explicit row
+   for (which is every company, for every Administrator, always). Fixed
+   by checking `user_has_any_company_scope` before falling back to the
+   raw row check, mirroring `assert_company_access`. Second: there was no
+   real INV-SOD-001 guard at submit time — self-assignment (the same
+   user submitting and being asked to decide) was only ever going to be
+   caught later, incidentally, at `decide()` time, and only because of
+   bug #1's false rejection accidentally standing in as a guard. Added a
+   real `SegregationOfDutiesError` (`NXR-WORKFLOW-001`) check at submit
+   time. `test_ap_ar.py`'s existing self-assignment test was actually
+   asserting on bug #1's error code (`NXR-FINANCIAL-001`) as an
+   incidental side effect — updated it to assert the real SoD code, and
+   added `test_submit_for_approval_accepts_an_administrator_with_no_explicit_company_access_row`
+   as the positive-path regression for bug #1.
+3. **`ProjectsPage`'s primary "Crear compañía" flow never set
+   `functionalCurrencyCode`**, and `functional_currency_code` is
+   immutable post-creation (`CompanyUpdateRequest` deliberately excludes
+   it, per `CLAUDE.md`) — so every company created through the app's main
+   onboarding screen was permanently unable to have a `Budget`
+   (`NXR-BUDGET-002`). `TreasuryPage`'s separate "quick start" flow
+   already hardcoded `functionalCurrencyCode: 'HNL'`; applied the same
+   default to `ProjectsPage`/`companyService.create`.
+
+Also fixed, incidentally found while wiring the RFQ→PO E2E step:
+`PurchaseOrderResponse` never returned `supplier_quotation_id` even
+though the model has the column — the field existed everywhere except
+the response schema. Regression test in `test_procurement_flow.py`.
+
+No product-code change for the *test's* own bugs (route paths, payload
+shapes, Playwright strict-mode selector ambiguities, a `.fill()` vs.
+non-breaking-space text-matcher mismatch, 204-body handling) — those were
+fixed only in the spec file.
+
+Full verification before calling this done: 280/280 backend pytest
+(up from 219 pre-session), `tsc -b --noEmit` clean, `eslint .` clean
+(after excluding `e2e/**` from app lint — Playwright specs use `any` for
+live API response shapes by design, same as the rest of the industry;
+added to `eslint.config.js`'s `globalIgnores`), 89/89 frontend vitest
+(after excluding `e2e/**` from vitest's default test glob in
+`vite.config.ts`, which was picking up the Playwright spec and failing
+on `test.describe.configure`), and the E2E suite itself green twice in a
+row.
+
+Real product gap surfaced but deliberately NOT built in this pass (scope
+discipline, not an oversight): there is no user-management/invite API or
+UI anywhere in the backend yet — only the single bootstrap Administrator
+exists in a fresh install. The E2E test's second-approver step works
+around this the same way `tests/helpers.py::create_user_with_role`
+already does in pytest: it calls the backend's own
+`user_repository.create_user`/`role_repository.assign_role`/
+`hash_password` directly (same code path `bootstrap_service.py` uses,
+not a mock) via a one-off Python subprocess against the real `nexora_e2e`
+DB. This is real, not faked — but it underlines that user management
+itself is a real, currently-`NOT_STARTED`-in-practice gap the
+traceability matrix doesn't yet have its own row for.
+
+Traceability: `NXR-REQ-0112`/`NXR-REQ-0113` moved `NOT_STARTED` →
+`VERIFIED` — the first two rows in the entire matrix to reach that
+state, with real executed evidence (not code-read, not "parece
+funcionar"). Tally now 102 `IMPLEMENTED`, 15 `IN_PROGRESS`, 3
+`NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.

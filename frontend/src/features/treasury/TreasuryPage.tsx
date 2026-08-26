@@ -262,6 +262,7 @@ function RemittanceModal({
         }}
       >
         <Select
+          name="treasuryAccountId"
           label="Cuenta de tesorería"
           value={treasuryAccountId}
           onChange={(e) => setTreasuryAccountId(e.target.value)}
@@ -273,6 +274,7 @@ function RemittanceModal({
           ))}
         </Select>
         <Select
+          name="counterAccountId"
           label="Cuenta contrapartida"
           value={counterAccountId}
           onChange={(e) => setCounterAccountId(e.target.value)}
@@ -371,6 +373,7 @@ function GeneralExpenseModal({
         }}
       >
         <Select
+          name="treasuryAccountId"
           label="Cuenta de tesorería"
           value={treasuryAccountId}
           onChange={(e) => setTreasuryAccountId(e.target.value)}
@@ -382,6 +385,7 @@ function GeneralExpenseModal({
           ))}
         </Select>
         <Select
+          name="expenseAccountId"
           label="Cuenta de gasto"
           value={expenseAccountId}
           onChange={(e) => setExpenseAccountId(e.target.value)}
@@ -474,7 +478,12 @@ function TransferModal({
           })
         }}
       >
-        <Select label="Origen" value={sourceId} onChange={(e) => setSourceId(e.target.value)}>
+        <Select
+          name="sourceId"
+          label="Origen"
+          value={sourceId}
+          onChange={(e) => setSourceId(e.target.value)}
+        >
           {treasuryAccounts.map((account) => (
             <option key={account.id} value={account.id}>
               {account.name}
@@ -482,6 +491,7 @@ function TransferModal({
           ))}
         </Select>
         <Select
+          name="destinationId"
           label="Destino"
           value={destinationId}
           onChange={(e) => setDestinationId(e.target.value)}

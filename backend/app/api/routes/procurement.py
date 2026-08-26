@@ -210,6 +210,7 @@ def _purchase_order_response(db: Session, order) -> PurchaseOrderResponse:
         po_number=order.po_number,
         supplier_id=order.supplier_id,
         project_id=order.project_id,
+        supplier_quotation_id=order.supplier_quotation_id,
         currency_code=order.currency_code,
         status=order.status,
         lines=[PurchaseOrderLineResponse.model_validate(line, from_attributes=True) for line in lines],

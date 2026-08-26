@@ -95,6 +95,10 @@ def test_requisition_to_purchase_order_end_to_end(client):
     assert po["poNumber"].startswith("PO-")
     assert po["status"] == "DRAFT"
     assert float(po["lines"][0]["unitPrice"]) == 10.0
+    assert po["supplierQuotationId"] == quotation["id"]
+
+    listed = client.get(f"/api/procurement/purchase-orders?company_id={company['id']}").json()
+    assert next(p for p in listed if p["id"] == po["id"])["supplierQuotationId"] == quotation["id"]
 
     approved_po = client.post(f"/api/procurement/purchase-orders/{po['id']}/approve").json()
     assert approved_po["status"] == "APPROVED"

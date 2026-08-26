@@ -28,7 +28,7 @@ export function ProjectsPage() {
   })
 
   const createCompany = useMutation({
-    mutationFn: () => companyService.create(newCompanyName),
+    mutationFn: () => companyService.create(newCompanyName, 'HNL'),
     onSuccess: (company) => {
       queryClient.invalidateQueries({ queryKey: ['companies'] })
       setSelectedCompanyId(company.id)
@@ -96,6 +96,7 @@ export function ProjectsPage() {
       ) : (
         <Card title="Crea tu primera compañía">
           <Input
+            name="companyName"
             label="Nombre de la compañía"
             value={newCompanyName}
             onChange={(event) => setNewCompanyName(event.target.value)}
@@ -114,11 +115,13 @@ export function ProjectsPage() {
         <>
           <Card title="Nuevo proyecto">
             <Input
+              name="projectName"
               label="Nombre"
               value={newProjectName}
               onChange={(event) => setNewProjectName(event.target.value)}
             />
             <Input
+              name="projectCode"
               label="Código (opcional)"
               value={newProjectCode}
               onChange={(event) => setNewProjectCode(event.target.value)}

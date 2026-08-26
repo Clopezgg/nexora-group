@@ -26,6 +26,51 @@ def _setup(client):
     return company, bank, cash, contributions, expense
 
 
+def test_remittance_rejects_counter_account_equal_to_treasury_gl_account(client):
+    """Un remesa cuya cuenta contrapartida es la misma cuenta GL de la
+    cuenta de tesorería anularía el movimiento neto (debit y credit al
+    mismo account_id se cancelan) mientras el documento sigue "balanceado"
+    -- INV-TRE bug real encontrado vía Critical Journey E2E."""
+    login_admin(client)
+    company, bank, _cash, _contributions, _expense = _setup(client)
+
+    response = client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank["id"],
+            "counterAccountId": bank["glAccountId"],
+            "sender": "Constructora Matriz",
+            "currencyCode": "HNL",
+            "originalAmount": "50000.00",
+            "remittanceDate": "2026-01-15",
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_general_expense_rejects_expense_account_equal_to_treasury_gl_account(client):
+    login_admin(client)
+    company, bank, _cash, _contributions, _expense = _setup(client)
+
+    response = client.post(
+        "/api/treasury/general-expenses",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank["id"],
+            "expenseAccountId": bank["glAccountId"],
+            "category": "papeleria",
+            "amount": "150.00",
+            "currencyCode": "HNL",
+            "expenseDate": "2026-01-16",
+            "description": "Papelería administrativa",
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
 def test_remittance_is_always_central_scope_and_increases_treasury_balance(client):
     """Orden maestra §27 / INV-OPS-001."""
     login_admin(client)

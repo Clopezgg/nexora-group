@@ -94,7 +94,7 @@ todavía).
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0001 | Core platform | 🔶·🔶·🔶·🔶·🔶·➖·➖·🔶·⬜ | IN_PROGRESS | `62c56eb` monorepo, settings, healthz/readyz (sin cambios en este track) |
+| NXR-REQ-0001 | Core platform | ✅·➖·✅·✅·➖·➖·➖·✅·⬜ | IMPLEMENTED | 2026-08-25: reconciliado -- esta fila nunca se había revisado desde el bootstrap (`62c56eb`), de ahí los marcadores parciales genéricos. `docs/MASTER_PLAN.md` agrupa "Core platform" con Master Data/RBAC/Chart of Accounts/Posting Engine/GL/OperationScope/ActiveUIContext bajo Track 1 -- pero cada uno de esos ya tiene su propia fila reconciliada (`NXR-REQ-0002` Multi-company, `0003` Master Data, `0004` Fiscal periods, `0007` Number sequences, `0008`/`0009` Auth/Sessions, `0010` RBAC, `0012` ActiveUIContext), así que el alcance REAL restante de esta fila es solo bootstrap/monorepo/settings/health, verificado directamente contra el código: `app/core/config.py` (`Settings` vía `pydantic-settings`, override real desde Key Vault en producción), `/healthz` (liveness trivial) y `/readyz` (`SELECT 1` real contra PostgreSQL, 503 si la DB no responde -- no un mock), ambos con test real (`tests/test_health.py`). Dom/API/BE/Test reales; DB/FE/Perm/Audit `➖` (no aplican a bootstrap/settings/health-check); falta E2E (compartido con el resto del sistema, no un gap propio de esta fila) |
 | NXR-REQ-0002 | Multi-company | ✅·✅·✅·✅·⬜·➖·⬜·✅·⬜ | IMPLEMENTED | Track 1: Company con code/legal_name/functional_currency/country/fiscal_id, ChartOfAccount 1:1 por company, API `/api/master-data/companies`; falta UI (Track F) |
 | NXR-REQ-0003 | Master Data | ✅·✅·🔶·🔶·⬜·➖·⬜·✅·⬜ | IMPLEMENTED | Track 1: BusinessUnit, FiscalYear/FiscalPeriod, Currency/ExchangeRate, TaxCode, ChartOfAccount/Account, CostCenter/EconomicCategory, DocumentType, NumberSequence, ApprovalPolicy(skeleton). API solo para companies/accounts; el resto solo tiene repositorio/modelo. Falta UI |
 | NXR-REQ-0004 | Fiscal periods | ✅·✅·✅·⬜·⬜·➖·⬜·✅·⬜ | IMPLEMENTED | Track 1: FiscalYear/FiscalPeriod OPEN/SOFT_CLOSED/CLOSED, enforcement real en `posting_service` (INV-ACC-003); sin API dedicada todavía |
@@ -265,8 +265,8 @@ todavía).
 | NXR-REQ-0109 | Backup / Restore | ⬜⬜⬜⬜➖⬜➖⬜➖ | NOT_STARTED | — |
 | NXR-REQ-0110 | Unit tests | ➖➖✅➖✅➖➖✅➖ | IN_PROGRESS | Track A: suite combinada 81 backend + 24 frontend; crecerá con los tracks restantes |
 | NXR-REQ-0111 | Integration tests (PostgreSQL) | ➖➖✅➖➖➖➖✅➖ | IMPLEMENTED | Track A: pruebas reales contra PostgreSQL para lifecycle, aislamiento, constraints, postings, idempotencia y conciliación |
-| NXR-REQ-0112 | E2E (Playwright) | ➖➖➖➖➖➖➖➖⬜ | NOT_STARTED | — |
-| NXR-REQ-0113 | Critical User Journey | ➖➖➖➖➖➖➖➖⬜ | NOT_STARTED | — |
+| NXR-REQ-0112 | E2E (Playwright) | ➖➖➖➖➖➖➖➖✅ | VERIFIED | `npx playwright test e2e/critical-journey.spec.ts` real (`frontend/playwright.config.ts`, DB propia `nexora_e2e`, fresh-install `alembic upgrade head` sobre DB vacía, backend+frontend reales en :8010/:5175) — 2/2 corridas consecutivas en verde |
+| NXR-REQ-0113 | Critical User Journey | ➖➖➖➖➖➖➖➖✅ | VERIFIED | Un solo recorrido secuencial real (`frontend/e2e/critical-journey.spec.ts`) cubre login→company/project/ActiveUIContext→WBS→Treasury/remesa CENTRAL→gasto GENERAL→budget/PR/aprobación→RFQ/cotización/comparativo/PO→recepción/factura/3-way-match/pago→inventario→cuadrilla/tiempo→equipo/combustible/mantenimiento→avance/reporte diario/calidad/seguridad/RFI/submittal/orden de cambio→reversal→CRM lead→oportunidad→cotización→contrato→AR→Approval Inbox (INV-SOD-001 real, con segundo usuario real)→notificaciones→búsqueda global→reportes (TB/GL/BS/Estado de resultados)→auditoría→logout/login/persistencia. Encontró y corrigió 3 bugs reales en el camino: (1) `treasury_service` permitía contrapartida = misma cuenta GL del banco, anulando el movimiento neto; (2) `ap.py submit_supplier_invoice_for_approval` usaba `user_has_company_access` crudo sin fallback SCOPE_ANY, rechazando falsamente a Administrator/Auditor sin fila explícita `UserCompanyAccess`, y no tenía guard real de SoD en el propio submit (ahora `SegregationOfDutiesError`/`NXR-WORKFLOW-001`); (3) `ProjectsPage`/`companyService.create` nunca fijaba `functionalCurrencyCode`, dejando compañías creadas por el flujo principal permanentemente incapaces de tener Budget (`functional_currency_code` es inmutable post-creación) |
 | NXR-REQ-0114 | CI/CD | ➖➖🔶➖➖➖➖🔶➖ | IN_PROGRESS | workflows build+test+bicep-what-if existen; falta gate completo §118-119 |
 
 ## AZURE
@@ -286,26 +286,27 @@ todavía).
 
 ## Resumen
 
-Recontado fila por fila en Task 4 del plan
-`2026-08-25-reports-search-analytics`, después de integrar Global Search,
-Trial Balance + Budget vs Actual + CSV, Settings e Integration Architecture
-en `feat/nexora-greenfield` @ `a62fc71`:
+Recontado fila por fila tras construir y hacer pasar en verde el Critical
+Journey E2E real (`NXR-REQ-0112`/`0113`, `feat/nexora-greenfield`, sesión
+2026-08-25):
 
-- **VERIFIED:** 0 / 124. Se reserva para evidencia E2E real; ningún track se
-  autootorga este estado.
-- **IMPLEMENTED:** 90 / 124. Incluye `NXR-REQ-0092` (Global Search),
-  `NXR-REQ-0094` (exportación CSV), `NXR-REQ-0095` (Settings de Company) y
-  `NXR-REQ-0096` (arquitectura de integración).
-- **IN_PROGRESS:** 22 / 124 — NXR-REQ-0001/0006/0008/0009/0025/0044/
-  0059/0060/0093/0105/0106/0107/0108/0110/0114/0115/0116/0117/0118/
-  0119/0120/0121. Reporting (`0093`) contiene Trial Balance y Budget vs
-  Actual reales, pero todavía no cubre todo el sub-alcance documentado.
-- **NOT_STARTED:** 10 / 124 — NXR-REQ-0016/0034/0035/0054/0058/0074/
-  0109/0112/0113/0122.
+- **VERIFIED:** 2 / 124 — NXR-REQ-0112/0113. Primeras filas que alcanzan
+  este estado en el proyecto, con evidencia E2E real ejecutada (ver arriba).
+  El resto de las filas `IMPLEMENTED` NO se reclasifica automáticamente por
+  esto: el Critical Journey ejercita una porción amplia y real del sistema,
+  pero mover cada fila individual a `VERIFIED` exige mapear su alcance
+  exacto contra lo que el recorrido realmente cubre, fila por fila — pasada
+  pendiente, no asumida aquí.
+- **IMPLEMENTED:** 102 / 124.
+- **IN_PROGRESS:** 15 / 124 — NXR-REQ-0016/0093/0105/0106/0107/0108/0110/
+  0114/0115/0116/0117/0118/0119/0120/0121.
+- **NOT_STARTED:** 3 / 124 — NXR-REQ-0058/0109/0122.
 - **BLOCKED_EXTERNAL:** 2 / 124 — NXR-REQ-0123/0124, ambos dependientes del
   despliegue Azure real sujeto a `CLAUDE.md` §11.1.
 
-Suma verificada contra las 124 filas reales: 0+90+22+10+2 = 124. El sistema
-combinado pasó 219 pruebas backend sobre PostgreSQL, `compileall`, typecheck,
-lint, 72 pruebas frontend y build; esto valida la integración, pero no
-sustituye el E2E requerido para mover filas a `VERIFIED`.
+Suma verificada contra las 124 filas reales: 2+102+15+3+2 = 124 (recontar con
+`grep -oE '\| (NOT_STARTED|IN_PROGRESS|IMPLEMENTED|VERIFIED|BLOCKED_EXTERNAL) \|' docs/REQUIREMENTS_TRACEABILITY.md | sort | uniq -c`
+antes de fiarse de este resumen prosa, que puede desincronizarse de la
+tabla real). El sistema combinado pasó 280 pruebas backend sobre
+PostgreSQL, 89 pruebas frontend, typecheck, lint, y el Critical Journey
+E2E real 2/2 en verde.

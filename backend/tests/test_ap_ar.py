@@ -701,8 +701,11 @@ def test_deciding_the_approval_request_rejects_the_invoice_via_the_real_adapter(
 def test_submitter_cannot_decide_their_own_invoice_approval(client, db_session):
     """INV-SOD-001 / NXR-WORKFLOW-001: the same user cannot both submit and
     decide -- the submitter here is the bootstrap Administrator, who also
-    holds `workflow.approval decide`, so the guard must be the service-level
-    SegregationOfDutiesError, not merely a missing-permission 403."""
+    holds `workflow.approval decide`, so the guard must be the real
+    SegregationOfDutiesError raised at submit time, not a company-access
+    side effect (that would be a false negative for any Administrator who
+    never got an explicit UserCompanyAccess row for this company -- see
+    the SCOPE_ANY fallback fix in submit_supplier_invoice_for_approval)."""
     login_admin(client)
     company, _bank, expense, payable, supplier = _setup_ap(client)
     invoice = _create_draft_invoice(
@@ -720,7 +723,34 @@ def test_submitter_cannot_decide_their_own_invoice_approval(client, db_session):
         json={"assignedTo": str(admin.id)},
     )
     assert submit.status_code == 422, submit.text
-    assert submit.json()["error"]["code"] == "NXR-FINANCIAL-001"
+    assert submit.json()["error"]["code"] == "NXR-WORKFLOW-001"
+
+
+def test_submit_for_approval_accepts_an_administrator_with_no_explicit_company_access_row(
+    client, db_session
+):
+    """Real bug found via the Critical Journey E2E: an Administrator/Auditor
+    only ever gets `workflow.approval decide` through a SCOPE_ANY role grant
+    -- company creation never inserts a `UserCompanyAccess` row for anyone.
+    The assignedTo check must accept that SCOPE_ANY grant the same way
+    `assert_company_access` does everywhere else, not require an explicit
+    row via a raw `user_has_company_access` call."""
+    login_admin(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
+    invoice = _create_draft_invoice(
+        client, company_id=company["id"], expense_id=expense["id"], payable_id=payable["id"],
+        supplier_id=supplier["id"], number="SUB-SCOPE-ANY",
+    )
+    other_admin = create_user_with_role(
+        db_session, email="other-admin@nexora.group", role_name="Administrator"
+    )
+
+    submit = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/submit-for-approval",
+        json={"assignedTo": str(other_admin.id)},
+    )
+    assert submit.status_code == 200, submit.text
+    assert submit.json()["status"] == "REVIEW"
 
 
 def test_cannot_submit_an_invoice_that_is_not_draft(client, db_session):

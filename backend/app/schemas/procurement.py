@@ -135,6 +135,7 @@ class PurchaseOrderResponse(CamelModel):
     po_number: str
     supplier_id: uuid.UUID
     project_id: uuid.UUID | None
+    supplier_quotation_id: uuid.UUID | None
     currency_code: str
     status: str
     lines: list[PurchaseOrderLineResponse] = []

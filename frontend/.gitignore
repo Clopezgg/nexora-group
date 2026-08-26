@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Playwright E2E artifacts (NXR-REQ-0112/0113) -- generated on every run,
+# never committed.
+/e2e-report
+/test-results
+/playwright-report
+/blob-report
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

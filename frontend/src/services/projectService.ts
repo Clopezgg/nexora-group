@@ -12,10 +12,10 @@ import type {
 
 export const companyService = {
   list: () => apiFetch<Company[]>('/master-data/companies'),
-  create: (name: string) =>
+  create: (name: string, functionalCurrencyCode: string) =>
     apiFetch<Company>('/master-data/companies', {
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, functionalCurrencyCode }),
     }),
 }
 

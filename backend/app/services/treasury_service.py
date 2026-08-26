@@ -160,6 +160,11 @@ def register_remittance(
         company_id=company_id,
         field_name="counter_account_id",
     )
+    if counter_account_id == treasury_account.gl_account_id:
+        raise InvalidFinancialReferenceError(
+            "counter_account_id no puede ser la misma cuenta GL de la cuenta de tesorería "
+            "(anularía el movimiento neto de la remesa)"
+        )
 
     base_amount = (original_amount * fx_rate).quantize(Decimal("0.01"))
 
@@ -246,6 +251,11 @@ def register_general_expense(
         company_id=company_id,
         field_name="expense_account_id",
     )
+    if expense_account_id == treasury_account.gl_account_id:
+        raise InvalidFinancialReferenceError(
+            "expense_account_id no puede ser la misma cuenta GL de la cuenta de tesorería "
+            "(anularía el movimiento neto del gasto)"
+        )
 
     document = posting_service.post_manual(
         db,

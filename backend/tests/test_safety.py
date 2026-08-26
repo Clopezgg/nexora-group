@@ -165,3 +165,30 @@ def test_company_access_blocks_cross_company_safety_incident(client, db_session)
     response = client.get(f"/api/safety/incidents/{incident_b.json()['id']}")
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_safety_incident_responsible_user_must_belong_to_same_company(client, db_session):
+    """DEFERRED-FINAL-015: mismo criterio que Quality -- un
+    responsible_user_id de otra compañía (sin company_scope=ANY) se
+    rechaza con 422 controlado."""
+    login_admin(client)
+    company_a = create_company(client, name="Constructora A")
+    company_b = create_company(client, name="Constructora B")
+    project_a = _create_project(client, company_id=company_a["id"], name="Torre A")
+
+    user_b = create_user_with_role(db_session, email="pm-b@nexora.group", role_name="Project Manager")
+    db_session.add(UserCompanyAccess(user_id=user_b.id, company_id=company_b["id"]))
+    db_session.commit()
+
+    rejected = client.post(
+        "/api/safety/incidents",
+        json={
+            "projectId": project_a["id"],
+            "incidentDate": "2026-03-01",
+            "description": "Caída de altura en andamio",
+            "severity": "HIGH",
+            "responsibleUserId": str(user_b.id),
+        },
+    )
+    assert rejected.status_code == 422, rejected.text
+    assert rejected.json()["error"]["code"] == "NXR-FINANCIAL-001"

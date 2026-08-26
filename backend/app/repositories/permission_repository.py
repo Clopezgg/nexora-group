@@ -1,7 +1,9 @@
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.permission import SCOPE_ANY, SCOPE_OWN, Permission, RolePermission
+from app.models.permission import SCOPE_ANY, SCOPE_OWN, Permission, RolePermission, UserCompanyAccess
 from app.models.role import Role
 
 # Matriz de permisos (docs/RBAC.md). Cubre los recursos que YA existen:
@@ -13,6 +15,14 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("core.company", "create", "Crear compañías"),
     ("core.company", "read", "Ver compañías"),
     ("core.company", "update", "Actualizar datos de una compañía (Settings)"),
+    # DEFERRED-FINAL-015: directorio de usuarios por compañía -- crear
+    # usuarios queda deliberadamente Administrator-only (via el grant
+    # automático de _BASE_PERMISSIONS más abajo); leer el directorio se
+    # otorga por rol igual que "core.company"/"read" (mismo scope, misma
+    # razón: cualquier rol que puede ver la compañía puede ver quién
+    # trabaja en ella para asignar responsabilidad/aprobación).
+    ("core.user", "create", "Crear usuarios y asignarles un rol"),
+    ("core.user", "read", "Ver el directorio de usuarios de una compañía"),
     ("accounting.journal_entry", "create", "Crear asientos contables"),
     ("accounting.journal_entry", "read", "Ver asientos contables"),
     ("accounting.journal_entry", "reverse", "Revertir asientos contables"),
@@ -214,6 +224,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "Administrator": tuple((resource, action, SCOPE_ANY) for resource, action, _ in _BASE_PERMISSIONS),
     "Finance Manager": (
         ("core.company", "read", SCOPE_OWN),
+        ("core.user", "read", SCOPE_OWN),
         ("core.company", "update", SCOPE_OWN),
         ("accounting.journal_entry", "create", SCOPE_OWN),
         ("accounting.journal_entry", "read", SCOPE_OWN),
@@ -269,6 +280,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "Treasury Manager": (
         ("core.company", "read", SCOPE_ANY),
+        ("core.user", "read", SCOPE_ANY),
         ("accounting.account", "read", SCOPE_OWN),
         ("treasury.account", "create", SCOPE_OWN),
         ("treasury.account", "read", SCOPE_OWN),
@@ -295,6 +307,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "Accountant": (
         ("core.company", "read", SCOPE_OWN),
+        ("core.user", "read", SCOPE_OWN),
         ("accounting.journal_entry", "create", SCOPE_OWN),
         ("accounting.journal_entry", "read", SCOPE_OWN),
         ("accounting.account", "read", SCOPE_OWN),
@@ -321,6 +334,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "Auditor": (
         ("core.company", "read", SCOPE_ANY),
+        ("core.user", "read", SCOPE_ANY),
         ("accounting.journal_entry", "read", SCOPE_ANY),
         ("accounting.account", "read", SCOPE_ANY),
         ("tax.tax_code", "read", SCOPE_ANY),
@@ -389,6 +403,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "Viewer": (
         ("core.company", "read", SCOPE_OWN),
+        ("core.user", "read", SCOPE_OWN),
         ("accounting.journal_entry", "read", SCOPE_OWN),
         ("accounting.account", "read", SCOPE_OWN),
         ("treasury.account", "read", SCOPE_OWN),
@@ -415,6 +430,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "Project Manager": (
         ("core.company", "read", SCOPE_ANY),
+        ("core.user", "read", SCOPE_ANY),
         ("project", "create", SCOPE_OWN),
         ("project", "read", SCOPE_OWN),
         ("project.wbs", "create", SCOPE_OWN),
@@ -468,6 +484,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "Project Controller": (
         ("core.company", "read", SCOPE_ANY),
+        ("core.user", "read", SCOPE_ANY),
         ("project", "read", SCOPE_OWN),
         ("project.wbs", "read", SCOPE_OWN),
         ("project.planning", "read", SCOPE_OWN),
@@ -493,6 +510,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "Procurement Manager": (
         ("core.company", "read", SCOPE_OWN),
+        ("core.user", "read", SCOPE_OWN),
         ("procurement.supplier", "create", SCOPE_OWN),
         ("procurement.supplier", "read", SCOPE_OWN),
         ("procurement.contract", "create", SCOPE_OWN),
@@ -518,6 +536,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "Buyer": (
         ("core.company", "read", SCOPE_OWN),
+        ("core.user", "read", SCOPE_OWN),
         ("procurement.supplier", "read", SCOPE_OWN),
         ("procurement.requisition", "create", SCOPE_OWN),
         ("procurement.requisition", "read", SCOPE_OWN),
@@ -536,6 +555,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "Warehouse Manager": (
         ("core.company", "read", SCOPE_OWN),
+        ("core.user", "read", SCOPE_OWN),
         ("procurement.purchase_order", "read", SCOPE_OWN),
         ("procurement.goods_receipt", "create", SCOPE_OWN),
         ("procurement.goods_receipt", "read", SCOPE_OWN),
@@ -554,6 +574,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     # (eso es contabilización, dueño de Finance Manager/Accountant).
     "Equipment Manager": (
         ("core.company", "read", SCOPE_OWN),
+        ("core.user", "read", SCOPE_OWN),
         ("asset.fixed_asset", "create", SCOPE_OWN),
         ("asset.fixed_asset", "read", SCOPE_OWN),
         ("asset.fixed_asset", "update", SCOPE_OWN),
@@ -579,6 +600,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     # aprueba nada (eso corresponde a Project Manager/Equipment Manager).
     "Operations User": (
         ("core.company", "read", SCOPE_OWN),
+        ("core.user", "read", SCOPE_OWN),
         ("equipment.equipment", "read", SCOPE_OWN),
         ("equipment.fuel_log", "create", SCOPE_OWN),
         ("equipment.fuel_log", "read", SCOPE_OWN),
@@ -597,6 +619,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
     # permisos ar.* -- la facturación real la sigue controlando Track A.
     "Sales Manager": (
         ("core.company", "read", SCOPE_OWN),
+        ("core.user", "read", SCOPE_OWN),
         ("accounting.account", "read", SCOPE_OWN),
         ("project", "read", SCOPE_OWN),
         ("crm.customer", "create", SCOPE_OWN),
@@ -655,3 +678,14 @@ def ensure_base_permissions(db: Session) -> None:
                 existing_grants[key].company_scope = company_scope
 
     db.flush()
+
+
+def grant_company_access(db: Session, *, user_id: uuid.UUID, company_id: uuid.UUID) -> UserCompanyAccess:
+    """DEFERRED-FINAL-015: mismo modelo `UserCompanyAccess` que ya usa
+    INV-COMP-001 en todo el motor de permisos, ahora con un caller real
+    fuera de tests (antes solo `db_session.add(UserCompanyAccess(...))`
+    directo en `tests/helpers.py`)."""
+    grant = UserCompanyAccess(user_id=user_id, company_id=company_id)
+    db.add(grant)
+    db.flush()
+    return grant

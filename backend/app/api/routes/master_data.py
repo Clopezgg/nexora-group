@@ -4,16 +4,18 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.repositories import account_repository, company_repository
+from app.repositories import account_repository, company_repository, role_repository
 from app.schemas.master_data import (
     AccountCreateRequest,
     AccountResponse,
     CompanyCreateRequest,
     CompanyResponse,
     CompanyUpdateRequest,
+    UserCreateRequest,
+    UserResponse,
 )
 from app.schemas.tax import TaxCodeCreateRequest, TaxCodeResponse
-from app.services import tax_service
+from app.services import tax_service, user_service
 from app.services.permission_service import (
     assert_company_access,
     list_user_company_ids,
@@ -149,3 +151,45 @@ def create_tax_code(
         rate_percent=payload.rate_percent,
     )
     return TaxCodeResponse.model_validate(tax_code, from_attributes=True)
+
+
+def _user_response(db: Session, user) -> UserResponse:
+    roles = role_repository.get_role_names_for_user(db, user.id)
+    return UserResponse(id=user.id, email=user.email, full_name=user.full_name, roles=roles)
+
+
+@router.get("/users", response_model=list[UserResponse])
+def list_users(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("core.user", "read")),
+) -> list[UserResponse]:
+    assert_company_access(
+        db, user_id=user.id, resource="core.user", action="read", company_id=company_id
+    )
+    users = user_service.list_company_users(db, company_id=company_id)
+    return [_user_response(db, u) for u in users]
+
+
+@router.post("/users", response_model=UserResponse, status_code=201)
+def create_user(
+    payload: UserCreateRequest,
+    db: Session = Depends(get_db),
+    requesting_user=Depends(require_permission("core.user", "create")),
+) -> UserResponse:
+    assert_company_access(
+        db,
+        user_id=requesting_user.id,
+        resource="core.user",
+        action="create",
+        company_id=payload.company_id,
+    )
+    created = user_service.create_user_with_role(
+        db,
+        company_id=payload.company_id,
+        email=payload.email,
+        full_name=payload.full_name,
+        password=payload.password,
+        role_name=payload.role_name,
+    )
+    return _user_response(db, created)

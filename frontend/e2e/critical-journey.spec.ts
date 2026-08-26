@@ -1,9 +1,4 @@
-import { execSync } from 'node:child_process'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { expect, test, type APIRequestContext } from '@playwright/test'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 /**
  * NXR-REQ-0112/0113 -- Critical Journey. Un solo recorrido secuencial e
@@ -31,37 +26,6 @@ async function api<T = any>(
   expect(response.ok(), `${method.toUpperCase()} ${path} -> ${response.status()}: ${await response.text()}`).toBeTruthy()
   if (response.status() === 204) return undefined as T
   return response.json()
-}
-
-/**
- * INV-SOD-001 now correctly rejects an approver assigning an approval to
- * themselves (real bug found + fixed via this same Critical Journey --
- * see ap.py's submit_supplier_invoice_for_approval). There is no user
- * management API/UI yet (product gap, tracked separately), so exercising
- * the real Approval Inbox with a genuinely different approver has to
- * create that second user through the backend's own repository functions
- * directly -- the same code path bootstrap_service.py and
- * tests/helpers.py::create_user_with_role already use, not a mock.
- */
-function createSecondApprover(email: string, password: string): string {
-  const backendDir = path.resolve(__dirname, '../../backend')
-  const script = [
-    'from app.core.database import SessionLocal',
-    'from app.repositories import role_repository, user_repository',
-    'from app.security.passwords import hash_password',
-    'db = SessionLocal()',
-    'role = role_repository.get_by_name(db, "Administrator")',
-    `user = user_repository.create_user(db, email="${email}", full_name="Aprobador E2E", password_hash=hash_password("${password}"))`,
-    'role_repository.assign_role(db, user_id=user.id, role_id=role.id)',
-    'db.commit()',
-    'print(user.id)',
-  ].join('\n')
-  return execSync(`./.venv/bin/python -c '${script}'`, {
-    cwd: backendDir,
-    env: { ...process.env, DATABASE_URL: 'postgresql+psycopg://nexora@localhost:5432/nexora_e2e' },
-  })
-    .toString()
-    .trim()
 }
 
 test.describe.configure({ mode: 'serial' })
@@ -398,9 +362,16 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     expect(selfAssign.status()).toBe(422)
     expect((await selfAssign.json()).error.code).toBe('NXR-WORKFLOW-001')
 
+    // DEFERRED-FINAL-015: real user-management API now exists -- create
+    // the second approver through it (same as any other admin action in
+    // this journey), not a backend-internal workaround.
     const approverEmail = 'aprobador-e2e@nexora.group'
     const approverPassword = 'AprobadorE2E123!'
-    const approverId = createSecondApprover(approverEmail, approverPassword)
+    const approver = await api<any>(page.request, 'post', '/master-data/users', {
+      companyId, email: approverEmail, fullName: 'Aprobador E2E',
+      password: approverPassword, roleName: 'Administrator',
+    })
+    const approverId = approver.id
     await api(page.request, 'post', `/ap/supplier-invoices/${pendingInvoice.id}/submit-for-approval`, {
       assignedTo: approverId,
     })

@@ -2259,3 +2259,77 @@ Traceability: `NXR-REQ-0112`/`NXR-REQ-0113` moved `NOT_STARTED` →
 state, with real executed evidence (not code-read, not "parece
 funcionar"). Tally now 102 `IMPLEMENTED`, 15 `IN_PROGRESS`, 3
 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.
+
+## 2026-08-25 — DEFERRED-FINAL-015 closed for real: user directory + real user-management API + generic FK safety net
+
+Continuing immediately per the master order (no stopping between
+checkpoints): the canonical next-gap check (`docs/AGENT_HANDOFF.md` +
+`docs/PRODUCTION_READINESS.md`) confirmed `NXR-REQ-0109` (Backup/Restore)
+is explicitly gated behind "90% real" and Build Width First — not yet
+active work. The correct next independent gap was
+`DEFERRED-FINAL-015` (open, well-scoped, no Azure dependency): Quality/
+Safety's `responsible_user_id` was never validated against
+existence/company-membership, and there was no real API to create users
+beyond the single bootstrap Administrator — confirmed as a real,
+still-current gap by the Critical Journey E2E work just finished (its
+`createSecondApprover()` had to call backend repository functions
+directly because no such endpoint existed).
+
+All three pieces from the original gap plan:
+
+1. `assert_user_belongs_to_company` (new, `financial_validation_service.py`)
+   validates `responsible_user_id` before persisting in
+   `quality_service.create_non_conformance`/`create_corrective_action`,
+   `safety_service.create_observation`/`create_incident`, and
+   `treasury_service.create_cash_closing` (the "same preexisting pattern"
+   the original gap note already flagged in another track — closed too,
+   though there it's pure defense-in-depth since that field is always
+   `user.id` of the requester, never external input).
+2. `_integrity_error_handler` (`app/api/error_handlers.py`) — a generic
+   catch-all for any `IntegrityError` that reaches a route without a
+   specific validator, returning a clean `NXR-DATA-001`/422 instead of an
+   uncaught 500, with the real psycopg message logged server-side, never
+   returned to the client.
+3. `GET/POST /api/master-data/users` — the first real user-management API
+   beyond the bootstrap Administrator. `create` is Administrator-only
+   (`core.user`/`create`, base-permission auto-grant); `read` follows the
+   same per-role scope as `core.company`/`read`.
+
+Getting the "who belongs to this company" semantics right took an actual
+wrong turn caught by tests, worth recording: the first version of
+`assert_user_belongs_to_company` treated *any* SCOPE_ANY permission grant
+as "this user is company-agnostic." That's wrong — Project Manager has
+SCOPE_ANY on `core.company`/`core.user` *read* (for cross-company
+dashboards) without being a real member of every company, and Auditor
+has SCOPE_ANY on nearly everything *read* with zero write/assignment
+actions. Both incorrectly qualified as valid `responsible_user_id`/
+directory members for companies they have no real relationship to. Fixed
+by narrowing the signal specifically to `core.user`/`create` in
+SCOPE_ANY (Administrator-only) rather than "any resource/action at all"
+— caught by `test_list_users_includes_explicit_access_and_any_scope_roles`
+and the quality/safety cross-company tests actually failing on the first
+implementation, not by inspection.
+
+`QualityPage.tsx`, `SafetyPage.tsx`, and `AccountsPayablePage.tsx`'s
+submit-for-approval modal all replaced their free-text UUID inputs with
+a real `Select` populated from the new endpoint (`useCompanyUsers` hook,
+`frontend/src/hooks/useCompanyUsers.ts`). `frontend/e2e/critical-journey.spec.ts`
+no longer needs its Python-subprocess workaround to create a second
+approver — it calls the real API, same as any other admin action in
+that journey.
+
+10 new backend tests (`test_user_management.py` x5, 2 quality + 1 safety
+cross-company/existence cases, 1 error-handler unit test, plus the
+positive-path company-access test), 1 frontend test updated
+(`TreasuryPage.test.tsx`'s AP submit-for-approval test now selects a
+real user from the directory instead of typing a UUID). Full
+verification: 290/290 backend pytest (up from 280), `tsc -b --noEmit`
+clean, `eslint .` clean, 89/89 frontend vitest, Critical Journey E2E
+green 2/2 after the user-management API swap.
+
+Traceability: no row moved to `VERIFIED` from this slice (it's a bug fix
++ new API within `NXR-REQ-0010`/`0023`/`0082`/`0084`'s already-
+`IMPLEMENTED` scope, not a new top-level capability) — evidence updated
+on those four rows instead. `docs/DEFERRED.md`'s `DEFERRED-FINAL-015`
+marked RESOLVED. Tally unchanged: 102 `IMPLEMENTED`, 15 `IN_PROGRESS`, 3
+`NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.

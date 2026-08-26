@@ -6,7 +6,10 @@ from sqlalchemy.orm import Session
 from app.domain.errors import InvalidQualityStateError, NonConformanceRequiresCorrectiveActionError
 from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
 from app.repositories import quality_repository
-from app.services.financial_validation_service import assert_evidence_belongs_to_company
+from app.services.financial_validation_service import (
+    assert_evidence_belongs_to_company,
+    assert_user_belongs_to_company,
+)
 
 """Quality: Inspection / Non-Conformance / Corrective Action (bloque
 CONSTRUCTION CONTROL, orden maestra §82-83, NXR-REQ-0082/0083).
@@ -68,6 +71,7 @@ def create_non_conformance(
     evidence_id: uuid.UUID | None,
 ) -> NonConformance:
     assert_evidence_belongs_to_company(db, evidence_id=evidence_id, company_id=company_id)
+    assert_user_belongs_to_company(db, user_id=responsible_user_id, company_id=company_id)
     non_conformance = quality_repository.create_non_conformance(
         db,
         project_id=project_id,
@@ -108,6 +112,7 @@ def create_corrective_action(
             f"No se puede agregar una CorrectiveAction a una NonConformance {non_conformance.status}"
         )
     assert_evidence_belongs_to_company(db, evidence_id=evidence_id, company_id=company_id)
+    assert_user_belongs_to_company(db, user_id=responsible_user_id, company_id=company_id)
     corrective_action = quality_repository.create_corrective_action(
         db,
         non_conformance_id=non_conformance_id,

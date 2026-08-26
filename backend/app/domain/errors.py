@@ -209,3 +209,13 @@ class CrewMembershipError(Exception):
 class TaxCodeExistsError(Exception):
     """Ya existe un TaxCode con ese `code` en esta company
     (uq_tax_codes_company_code)."""
+
+
+# DEFERRED-FINAL-015, User directory/creation.
+class UserEmailExistsError(Exception):
+    """Ya existe un User con ese email (columna `unique=True`)."""
+
+
+class RoleNotFoundError(Exception):
+    """`role_name` no corresponde a ninguno de los roles base
+    (`app.models.role.ROLE_NAMES`)."""

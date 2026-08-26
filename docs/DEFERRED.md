@@ -125,7 +125,48 @@ certificar el 100%.
   Enterprise Resources, Commercial, Construction Control, y el resto de
   Financial Core — backlog honesto en `docs/AUDIT.md`, no bloquea el
   resto de esos tracks mientras tanto.
-- `DEFERRED-FINAL-015` — Track D (Task 3, Site/Quality/Safety): no existe
+- `DEFERRED-FINAL-015` — **RESUELTO (2026-08-25, sin worktree separado —
+  construido directamente en `feat/nexora-greenfield`, mismo día que el
+  Critical Journey E2E que confirmó el gap por segunda vez de forma
+  independiente).** Las tres piezas del plan original están construidas:
+  (a) `assert_user_belongs_to_company` (nueva, en
+  `financial_validation_service.py`) valida `responsible_user_id` antes
+  de persistir en `quality_service.create_non_conformance`/
+  `create_corrective_action`, `safety_service.create_observation`/
+  `create_incident`, y también en `treasury_service.create_cash_closing`
+  (el "mismo patrón preexistente" que este mismo texto ya señalaba abajo
+  — cerrado también, aunque ahí `responsible_user_id` siempre es
+  `user.id` del propio requester, nunca input externo, así que es
+  defensa en profundidad, no un gap explotable real como en Quality/
+  Safety). "Pertenece a la compañía" = `UserCompanyAccess` explícito, o
+  `core.user`/`create` en SCOPE_ANY (Administrator-only) — deliberadamente
+  NO "cualquier resource/action en SCOPE_ANY": varios roles operativos
+  (Project Manager) tienen SCOPE_ANY solo en lecturas puntuales sin ser
+  miembros reales de cada compañía, y Auditor tiene SCOPE_ANY en lecturas
+  de todo el sistema sin ninguna acción de escritura/asignación real —
+  ninguno de los dos debe poder "pertenecer" a una compañía a la que
+  nunca se le dio acceso explícito (confirmado por un bug real que los
+  tests atraparon durante la construcción: el primer intento usaba
+  cualquier SCOPE_ANY como señal y dejaba pasar a un Project Manager de
+  otra compañía). (b) `_integrity_error_handler` genérico
+  (`app/api/error_handlers.py`, `NXR-DATA-001`/422) para cualquier FK sin
+  validador específico que aún así llegue a violarse — loguea el mensaje
+  real de psycopg, nunca lo devuelve al cliente. (c)
+  `GET/POST /api/master-data/users` (`core.user` create/read,
+  create=Administrator-only vía `_BASE_PERMISSIONS`, read=mismo scope por
+  rol que `core.company`/read) — primera API real de creación de
+  usuarios más allá del bootstrap Administrator inicial.
+  `QualityPage.tsx`/`SafetyPage.tsx`/`AccountsPayablePage.tsx`
+  (submit-for-approval) reemplazaron sus campos de texto UUID por un
+  `Select` real poblado desde este endpoint.
+  `frontend/e2e/critical-journey.spec.ts` ya no necesita su workaround de
+  subprocess de Python para crear el segundo usuario del Approval Inbox
+  — usa el endpoint real. 10 tests backend nuevos
+  (`test_user_management.py`, más casos en `test_quality.py`/
+  `test_safety.py`/`test_error_handlers.py`), 290/290 backend + 89/89
+  frontend + Critical Journey E2E 2/2 en verde tras el cambio.
+
+  Texto original del gap, preservado para contexto histórico: no existía
   todavía ningún directorio/selector de usuarios en el frontend (ningún
   track anterior lo construyó — Track A tampoco lo necesitó para
   `approved_by`/`uploaded_by`, que siempre usan el usuario autenticado

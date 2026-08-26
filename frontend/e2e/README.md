@@ -37,13 +37,9 @@ npm run test:e2e
    root) before running any test.
 
 The Approval Inbox step needs a real second user (INV-SOD-001 forbids a
-submitter deciding their own approval) — there is no user-management
-API/UI yet, so `critical-journey.spec.ts`'s `createSecondApprover()`
-helper creates one the same way `tests/helpers.py::create_user_with_role`
-does in pytest: by calling the backend's own repository functions
-directly (same code `bootstrap_service.py` uses) via a one-off Python
-subprocess against `nexora_e2e`. Real, not mocked — just working around
-a real product gap.
+submitter deciding their own approval) — created via the real
+`POST /api/master-data/users` endpoint (DEFERRED-FINAL-015), same as any
+other admin action in this journey.
 
 ## Why some steps are API calls, not clicks
 

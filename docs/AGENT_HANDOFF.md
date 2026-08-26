@@ -286,15 +286,17 @@ company creation missing `functionalCurrencyCode`) are in
 entry — read that before touching Treasury/AP-approval/company-creation
 code again so you don't reintroduce any of the three.
 
-**Known real gap, NOT fixed this session (deliberate scope discipline,
-not an oversight):** there is no user-management/invite API or UI at all
-— only the single bootstrap Administrator exists after a fresh install.
-Already flagged above (the free-text UUID inputs in `QualityPage.tsx`/AP
-submit-for-approval modal) but worth restating: this blocks any real
-multi-user UI flow until it's built. Not in the traceability matrix as
-its own row yet — if picking up user management as new work, add one
-first (`docs/MASTER_PLAN.md` should already scope where it belongs
-before inventing a row number).
+**Update (same day, immediate continuation):** the user-management gap
+flagged right below was NOT deliberately left open — it turned out to be
+the same, still-open `DEFERRED-FINAL-015` from an earlier track. It's
+now resolved: `GET/POST /api/master-data/users` is real
+(Administrator-only create, per-role-scoped read), and
+`QualityPage.tsx`/`SafetyPage.tsx`/`AccountsPayablePage.tsx` all use a
+real user picker now, no more free-text UUID inputs. Full detail in
+`docs/PROGRESS.md`'s `2026-08-25 — DEFERRED-FINAL-015 closed for
+real...` entry. Do not re-add a free-text UUID field anywhere a
+responsible/approver user is picked — use `useCompanyUsers`
+(`frontend/src/hooks/useCompanyUsers.ts`) instead.
 
 Do NOT re-run or re-debug the Critical Journey from scratch — it passes.
 If it starts failing after a future change, that's a real regression;
@@ -305,3 +307,43 @@ Verification run this session before declaring the above done: 280/280
 backend pytest, `tsc -b --noEmit` clean, `eslint .` clean, 89/89 frontend
 vitest, Critical Journey E2E 2/2 green. Nothing committed/pushed yet as
 of writing this entry — see git status for what's staged vs. pending.
+
+## 2026-08-25 — DEFERRED-FINAL-015 closed (user directory + real user-management API)
+
+Direct continuation of the entry above, same session, no user
+intervention between the two — the user explicitly ordered continuing
+through the canonical priority list without stopping. Checked
+`docs/PRODUCTION_READINESS.md` first: it explicitly says its 35-block
+certification checklist (including `NXR-REQ-0109` Backup/Restore, which
+the user suggested as a starting point) is **not active work yet** while
+still in Build Width First — confirmed correct to skip it and pick the
+real next independent gap instead, which was `DEFERRED-FINAL-015`
+(already open, well-scoped, no Azure dependency, and re-confirmed real
+by the Critical Journey work). Full detail in `docs/PROGRESS.md`'s
+`2026-08-25 — DEFERRED-FINAL-015 closed for real...` entry.
+
+Committed and pushed to `feat/nexora-greenfield` — check `git log` for
+the exact commit if picking this up later; `main` is still untouched.
+
+**Next gap, per the same canonical-priority check that led here:**
+`docs/AGENT_HANDOFF.md`'s own earlier backlog (this file, above) lists
+`NXR-REQ-0016`/`0093` (Cash Flow — needs a real activity-classification
+schema decision) as the one remaining well-scoped domain-logic gap.
+After that, everything left (`0105-0122`) is Track G
+platform-completion/hardening — re-read `docs/PRODUCTION_READINESS.md`'s
+own "no aplicar todavía" gate before starting any of its 35 blocks; some
+Track G rows (security, observability, migrations, CI/CD) may be
+legitimate incremental work per `docs/MASTER_PLAN.md` §4 ("Track G se
+completa incrementalmente junto con cada track funcional") even before
+90% — read each row's own evidence text before assuming it's gated.
+
+Do not re-derive the "who belongs to this company" semantics question
+from scratch if touching `assert_user_belongs_to_company` or
+`list_users_for_company` again — read the wrong-turn writeup in
+`docs/PROGRESS.md` first (the "any SCOPE_ANY grant" version was wrong
+and caught by tests, not by review).
+
+Verification before this entry: 290/290 backend pytest, `tsc -b --noEmit`
+clean, `eslint .` clean, 89/89 frontend vitest, Critical Journey E2E 2/2
+green (using the new real user-management API, no more subprocess
+workaround).

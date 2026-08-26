@@ -16,3 +16,10 @@ export interface Account {
   parentId: string | null
   isPostable: boolean
 }
+
+export interface CompanyUser {
+  id: string
+  email: string
+  fullName: string
+  roles: string[]
+}

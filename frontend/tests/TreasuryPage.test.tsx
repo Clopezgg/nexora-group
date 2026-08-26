@@ -227,6 +227,16 @@ describe('TreasuryPage', () => {
             json: async () => [{ id: 's1', companyId: 'c1', legalName: 'Proveedor persistido', tradeName: null, taxId: null, email: null, phone: null, status: 'ACTIVE', classification: null }],
           } as Response)
         }
+        if (url.includes('/master-data/users')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              { id: 'u1', email: 'admin@nexora.group', fullName: 'Admin', roles: ['Administrator'] },
+              { id: 'u2', email: 'aprobador@nexora.group', fullName: 'Aprobador', roles: ['Finance Manager'] },
+            ],
+          } as Response)
+        }
         if (url.includes('/submit-for-approval')) {
           submitted = true
           return Promise.resolve({
@@ -249,9 +259,9 @@ describe('TreasuryPage', () => {
     render(renderApp('/finanzas/cuentas-por-pagar'))
 
     await userEvent.click(await screen.findByRole('button', { name: /enviar a aprobación/i }))
-    await userEvent.type(
-      screen.getByLabelText(/id del usuario aprobador/i),
-      '11111111-1111-1111-1111-111111111111',
+    await userEvent.selectOptions(
+      await screen.findByLabelText(/usuario aprobador/i),
+      'u2',
     )
     await userEvent.click(screen.getByRole('button', { name: /^enviar$/i }))
 

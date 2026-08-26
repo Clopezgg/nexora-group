@@ -26,6 +26,7 @@ from app.services import posting_service
 from app.services.financial_validation_service import (
     assert_account_belongs_to_company,
     assert_project_belongs_to_company,
+    assert_user_belongs_to_company,
 )
 from app.services.posting_service import JournalLineInput
 
@@ -376,6 +377,9 @@ def create_cash_closing(
     treasury_account = db.get(TreasuryAccount, treasury_account_id)
     if treasury_account is None:
         raise InvalidFinancialReferenceError("treasury_account_id no existe")
+    assert_user_belongs_to_company(
+        db, user_id=responsible_user_id, company_id=treasury_account.company_id
+    )
     closing = CashClosing(
         treasury_account_id=treasury_account_id,
         closing_date=closing_date,

@@ -16,7 +16,9 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { useAuth } from '../auth/auth-context'
+import { useCompanyUsers } from '../../hooks/useCompanyUsers'
 import { RequiresActiveProject } from '../projects/RequiresActiveProject'
+import { projectService } from '../../services/projectService'
 import { safetyService } from '../../services/safetyService'
 import type { SafetyIncident, SafetyObservation, SafetySeverity } from '../../types/safety'
 
@@ -37,6 +39,8 @@ const SEVERITIES_REQUIRING_RESPONSIBLE: SafetySeverity[] = ['HIGH', 'CRITICAL']
 function ObservationsTab({ projectId }: { projectId: string }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const projectQuery = useQuery({ queryKey: ['project', projectId], queryFn: () => projectService.get(projectId) })
+  const { users: companyUsers } = useCompanyUsers(projectQuery.data?.companyId)
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({
     observationDate: '',
@@ -168,16 +172,23 @@ function ObservationsTab({ projectId }: { projectId: string }) {
             <option value="HIGH">Alta</option>
             <option value="CRITICAL">Crítica</option>
           </Select>
-          <Input
+          <Select
             label={
               requiresResponsible
-                ? 'ID de usuario responsable (UUID) — obligatorio para severidad Alta o Crítica'
-                : 'ID de usuario responsable (UUID) — opcional para esta severidad'
+                ? 'Usuario responsable — obligatorio para severidad Alta o Crítica'
+                : 'Usuario responsable — opcional para esta severidad'
             }
             value={form.responsibleUserId}
             onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })}
             required={requiresResponsible}
-          />
+          >
+            {requiresResponsible ? null : <option value="">— sin asignar —</option>}
+            {companyUsers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName} ({u.email})
+              </option>
+            ))}
+          </Select>
           <Button
             type="submit"
             loading={createMutation.isPending}
@@ -195,6 +206,8 @@ function ObservationsTab({ projectId }: { projectId: string }) {
 function IncidentsTab({ projectId }: { projectId: string }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const projectQuery = useQuery({ queryKey: ['project', projectId], queryFn: () => projectService.get(projectId) })
+  const { users: companyUsers } = useCompanyUsers(projectQuery.data?.companyId)
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({
     incidentDate: '',
@@ -317,16 +330,23 @@ function IncidentsTab({ projectId }: { projectId: string }) {
             <option value="HIGH">Alta</option>
             <option value="CRITICAL">Crítica</option>
           </Select>
-          <Input
+          <Select
             label={
               requiresResponsible
-                ? 'ID de usuario responsable (UUID) — obligatorio para severidad Alta o Crítica'
-                : 'ID de usuario responsable (UUID) — opcional para esta severidad'
+                ? 'Usuario responsable — obligatorio para severidad Alta o Crítica'
+                : 'Usuario responsable — opcional para esta severidad'
             }
             value={form.responsibleUserId}
             onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })}
             required={requiresResponsible}
-          />
+          >
+            {requiresResponsible ? null : <option value="">— sin asignar —</option>}
+            {companyUsers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName} ({u.email})
+              </option>
+            ))}
+          </Select>
           <Button
             type="submit"
             loading={createMutation.isPending}

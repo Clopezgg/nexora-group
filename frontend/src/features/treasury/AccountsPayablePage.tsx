@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   EmptyState,
-  Input,
   LoadingState,
   Modal,
   MoneyInput,
@@ -13,6 +12,8 @@ import {
   Table,
   type TableColumn,
 } from '../../design-system'
+import { useAuth } from '../auth/auth-context'
+import { useCompanyUsers } from '../../hooks/useCompanyUsers'
 import { masterDataService } from '../../services/masterDataService'
 import { procurementService } from '../../services/procurementService'
 import { treasuryService } from '../../services/treasuryService'
@@ -184,9 +185,10 @@ export function AccountsPayablePage() {
         />
       ) : null}
 
-      {submitInvoiceId ? (
+      {submitInvoiceId && activeCompanyId ? (
         <SubmitForApprovalModal
           invoiceId={submitInvoiceId}
+          companyId={activeCompanyId}
           onClose={() => setSubmitInvoiceId(null)}
           onSubmitted={() =>
             queryClient.invalidateQueries({
@@ -201,20 +203,24 @@ export function AccountsPayablePage() {
 
 /** Ver DEFERRED-FINAL-016 / docs/DEFERRED.md: `approval_service.create_request`
  * ahora tiene un llamador real -- este modal es ese punto de entrada.
- * No existe todavía un endpoint de directorio de usuarios por compañía
- * (gap ya documentado en otra entrada de DEFERRED.md), así que el
- * aprobador se identifica por UUID en texto libre, mismo patrón que
- * `responsibleUserId` en QualityPage.tsx -- no un Select simulado con
- * datos inventados. */
+ * DEFERRED-FINAL-015 (resuelto): el aprobador ahora se elige de un
+ * directorio real de usuarios de la compañía (`GET /master-data/users`),
+ * no un UUID en texto libre. INV-SOD-001 se sigue validando en el
+ * backend (el propio solicitante nunca aparece como opción válida más
+ * allá de lo que el backend rechace explícitamente). */
 function SubmitForApprovalModal({
   invoiceId,
+  companyId,
   onClose,
   onSubmitted,
 }: {
   invoiceId: string
+  companyId: string
   onClose: () => void
   onSubmitted: () => void
 }) {
+  const { users: companyUsers } = useCompanyUsers(companyId)
+  const { user: currentUser } = useAuth()
   const [assignedTo, setAssignedTo] = useState('')
 
   const mutation = useMutation({
@@ -234,13 +240,22 @@ function SubmitForApprovalModal({
           mutation.mutate()
         }}
       >
-        <Input
+        <Select
           name="assignedTo"
-          label="ID del usuario aprobador (UUID) — debe ser distinto de tu propio usuario"
+          label="Usuario aprobador"
           value={assignedTo}
           onChange={(e) => setAssignedTo(e.target.value)}
           required
-        />
+        >
+          <option value="">Selecciona un aprobador…</option>
+          {companyUsers
+            .filter((u) => u.id !== currentUser?.id)
+            .map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName} ({u.email})
+              </option>
+            ))}
+        </Select>
         {mutation.isError ? (
           <p className="nx-field__error">{(mutation.error as Error).message}</p>
         ) : null}

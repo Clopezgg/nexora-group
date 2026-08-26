@@ -45,3 +45,19 @@ class AccountResponse(CamelModel):
     account_type: str
     parent_id: uuid.UUID | None
     is_postable: bool
+
+
+# DEFERRED-FINAL-015: directorio de usuarios por compañía.
+class UserCreateRequest(CamelModel):
+    company_id: uuid.UUID
+    email: str
+    full_name: str
+    password: str
+    role_name: str
+
+
+class UserResponse(CamelModel):
+    id: uuid.UUID
+    email: str
+    full_name: str
+    roles: list[str]

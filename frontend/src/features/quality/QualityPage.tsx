@@ -16,7 +16,9 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { useAuth } from '../auth/auth-context'
+import { useCompanyUsers } from '../../hooks/useCompanyUsers'
 import { RequiresActiveProject } from '../projects/RequiresActiveProject'
+import { projectService } from '../../services/projectService'
 import { qualityService } from '../../services/qualityService'
 import type { CorrectiveAction, NonConformance, QualityInspection } from '../../types/quality'
 
@@ -142,6 +144,8 @@ function InspectionsTab({ projectId }: { projectId: string }) {
 function NonConformancesTab({ projectId }: { projectId: string }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const projectQuery = useQuery({ queryKey: ['project', projectId], queryFn: () => projectService.get(projectId) })
+  const { users: companyUsers } = useCompanyUsers(projectQuery.data?.companyId)
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ description: '', responsibleUserId: user?.id ?? '', dueDate: '' })
   const [selected, setSelected] = useState<NonConformance | null>(null)
@@ -221,12 +225,18 @@ function NonConformancesTab({ projectId }: { projectId: string }) {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             required
           />
-          <Input
-            label="ID de usuario responsable (UUID) — por defecto, tu propio usuario"
+          <Select
+            label="Usuario responsable"
             value={form.responsibleUserId}
             onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })}
             required
-          />
+          >
+            {companyUsers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName} ({u.email})
+              </option>
+            ))}
+          </Select>
           <Input
             label="Fecha límite"
             type="date"
@@ -256,6 +266,12 @@ function CorrectiveActionsModal({
 }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const projectQuery = useQuery({
+    queryKey: ['project', nonConformance?.projectId],
+    queryFn: () => projectService.get(nonConformance!.projectId),
+    enabled: Boolean(nonConformance),
+  })
+  const { users: companyUsers } = useCompanyUsers(projectQuery.data?.companyId)
   const [form, setForm] = useState({ description: '', responsibleUserId: user?.id ?? '', dueDate: '' })
 
   const actionsQuery = useQuery({
@@ -344,12 +360,18 @@ function CorrectiveActionsModal({
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             required
           />
-          <Input
-            label="ID de usuario responsable (UUID)"
+          <Select
+            label="Usuario responsable"
             value={form.responsibleUserId}
             onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })}
             required
-          />
+          >
+            {companyUsers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName} ({u.email})
+              </option>
+            ))}
+          </Select>
           <Input
             label="Fecha límite"
             type="date"

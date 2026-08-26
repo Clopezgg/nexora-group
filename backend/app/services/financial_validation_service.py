@@ -11,6 +11,8 @@ from app.models.crm import Customer
 from app.models.evidence import Evidence
 from app.models.project import Project
 from app.models.supplier import Supplier, SupplierContract
+from app.models.user import User
+from app.services.permission_service import user_has_any_company_scope, user_has_company_access
 
 
 def assert_operation_scope(scope: str, project_id: uuid.UUID | None) -> None:
@@ -102,6 +104,39 @@ def assert_customer_belongs_to_company(
             "customer_id debe pertenecer a la compañía propietaria"
         )
     return customer
+
+
+def assert_user_belongs_to_company(
+    db: Session, *, user_id: uuid.UUID | None, company_id: uuid.UUID
+) -> User | None:
+    """DEFERRED-FINAL-015: cualquier FK que asigna responsabilidad a un
+    usuario arbitrario (no el usuario autenticado de la request --
+    `responsible_user_id` en Quality/Safety) se valida aquí antes de
+    persistir, en vez de dejar que una violación de FK caiga como un 500
+    sin controlar (`IntegrityError`) o acepte silenciosamente un usuario
+    de otra compañía. "Pertenecer a la compañía" es lo mismo que en
+    `assert_company_access`: una fila `UserCompanyAccess` explícita para
+    esta company, o un rol company-agnóstico de verdad -- se usa
+    `core.user`/`create` (Administrator-only, ver `_BASE_PERMISSIONS`)
+    como señal, no "cualquier resource/action en SCOPE_ANY": varios roles
+    operativos (p.ej. Project Manager) tienen SCOPE_ANY solo en lecturas
+    puntuales (`core.company`/`core.user` read, para dashboards/directorio
+    cross-company) sin que eso los convierta en asignables a la
+    responsabilidad operativa de una compañía ajena -- ni Auditor
+    (SCOPE_ANY en lecturas de todo el sistema, pero sin ninguna acción de
+    escritura/asignación real) califica por la misma razón."""
+    if user_id is None:
+        return None
+    user = db.get(User, user_id)
+    if user is None:
+        raise InvalidFinancialReferenceError("responsible_user_id no existe")
+    if user_has_company_access(db, user_id=user_id, company_id=company_id) or user_has_any_company_scope(
+        db, user_id=user_id, resource="core.user", action="create"
+    ):
+        return user
+    raise InvalidFinancialReferenceError(
+        "responsible_user_id debe pertenecer a la compañía propietaria"
+    )
 
 
 def assert_evidence_belongs_to_company(

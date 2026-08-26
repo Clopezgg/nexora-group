@@ -1,7 +1,9 @@
+import logging
 import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 from app.domain.errors import (
     BudgetBaselineExistsError,
@@ -37,7 +39,9 @@ from app.domain.errors import (
     OverpaymentError,
     ProcurementCurrencyMismatchError,
     SegregationOfDutiesError,
+    RoleNotFoundError,
     TaxCodeExistsError,
+    UserEmailExistsError,
     UnbalancedJournalEntryError,
     UnsupportedEvidenceMimeTypeError,
 )
@@ -74,6 +78,8 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     InvalidTimeEntryStateError: ("NXR-WORKFORCE-001", 409),
     CrewMembershipError: ("NXR-WORKFORCE-002", 409),
     TaxCodeExistsError: ("NXR-TAX-001", 409),
+    UserEmailExistsError: ("NXR-USER-001", 409),
+    RoleNotFoundError: ("NXR-USER-002", 422),
     InvalidCommercialStateError: ("NXR-CRM-001", 409),
     UnsupportedEvidenceMimeTypeError: ("NXR-EVIDENCE-002", 422),
     EvidenceTooLargeError: ("NXR-EVIDENCE-003", 422),
@@ -109,6 +115,30 @@ def _make_handler(code: str, status_code: int):
     return _handler
 
 
+_logger = logging.getLogger(__name__)
+
+
+async def _integrity_error_handler(_request: Request, exc: Exception) -> JSONResponse:
+    """Red de seguridad genérica (DEFERRED-FINAL-015): cualquier FK/unique
+    de PostgreSQL violada que no pasó por un `assert_*_belongs_to_company`
+    específico llega aquí en vez de tumbarse como un 500 sin controlar. El
+    mensaje real de psycopg (nombres de tabla/columna) se loguea, nunca se
+    devuelve al cliente."""
+    _logger.warning("Unhandled IntegrityError: %s", exc)
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "NXR-DATA-001",
+                "message": "La operación viola una restricción de datos (referencia inexistente o duplicada)",
+                "field": None,
+                "correlationId": str(uuid.uuid4()),
+            }
+        },
+    )
+
+
 def register_error_handlers(app: FastAPI) -> None:
     for exc_type, (code, status_code) in _ERROR_CODES.items():
         app.add_exception_handler(exc_type, _make_handler(code, status_code))
+    app.add_exception_handler(IntegrityError, _integrity_error_handler)

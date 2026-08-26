@@ -176,3 +176,68 @@ def test_non_conformance_evidence_must_belong_to_same_company(client, db_session
     )
     assert rejected.status_code == 422, rejected.text
     assert rejected.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_non_conformance_responsible_user_must_belong_to_same_company(client, db_session):
+    """DEFERRED-FINAL-015: un responsible_user_id de otra compañía (sin
+    company_scope=ANY) se rechaza con un 422 controlado, no un 500 sin
+    capturar por violación de FK."""
+    login_admin(client)
+    company_a = create_company(client, name="Constructora A")
+    company_b = create_company(client, name="Constructora B")
+    project_a = _create_project(client, company_id=company_a["id"], name="Torre A")
+
+    user_b = create_user_with_role(db_session, email="pm-b@nexora.group", role_name="Project Manager")
+    db_session.add(UserCompanyAccess(user_id=user_b.id, company_id=company_b["id"]))
+    db_session.commit()
+
+    rejected = client.post(
+        "/api/quality/non-conformances",
+        json={
+            "projectId": project_a["id"],
+            "description": "Fisura en columna",
+            "responsibleUserId": str(user_b.id),
+        },
+    )
+    assert rejected.status_code == 422, rejected.text
+    assert rejected.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_non_conformance_responsible_user_must_exist(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    project = _create_project(client, company_id=company["id"])
+
+    rejected = client.post(
+        "/api/quality/non-conformances",
+        json={
+            "projectId": project["id"],
+            "description": "Fisura en columna",
+            "responsibleUserId": str(uuid.uuid4()),
+        },
+    )
+    assert rejected.status_code == 422, rejected.text
+    assert rejected.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_non_conformance_accepts_responsible_user_with_explicit_company_access(client, db_session):
+    """El caso positivo simétrico: un usuario SIN rol SCOPE_ANY pero CON
+    UserCompanyAccess explícito a la company correcta sí puede ser
+    responsable."""
+    login_admin(client)
+    company = create_company(client)
+    project = _create_project(client, company_id=company["id"])
+
+    user = create_user_with_role(db_session, email="pm-own@nexora.group", role_name="Project Manager")
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company["id"]))
+    db_session.commit()
+
+    accepted = client.post(
+        "/api/quality/non-conformances",
+        json={
+            "projectId": project["id"],
+            "description": "Fisura en columna",
+            "responsibleUserId": str(user.id),
+        },
+    )
+    assert accepted.status_code == 201, accepted.text

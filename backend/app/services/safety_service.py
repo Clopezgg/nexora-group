@@ -6,7 +6,10 @@ from sqlalchemy.orm import Session
 from app.domain.errors import InvalidSafetyRecordError, InvalidSafetyStateError
 from app.models.safety import SAFETY_SEVERITIES, SAFETY_SEVERITIES_REQUIRING_RESPONSIBLE, SafetyIncident, SafetyObservation
 from app.repositories import safety_repository
-from app.services.financial_validation_service import assert_evidence_belongs_to_company
+from app.services.financial_validation_service import (
+    assert_evidence_belongs_to_company,
+    assert_user_belongs_to_company,
+)
 
 """Safety: Observation / Incident (bloque CONSTRUCTION CONTROL, orden
 maestra §84, NXR-REQ-0084).
@@ -45,6 +48,7 @@ def create_observation(
 ) -> SafetyObservation:
     _assert_severity_requires_responsible(severity, responsible_user_id)
     assert_evidence_belongs_to_company(db, evidence_id=evidence_id, company_id=company_id)
+    assert_user_belongs_to_company(db, user_id=responsible_user_id, company_id=company_id)
     observation = safety_repository.create_observation(
         db,
         project_id=project_id,
@@ -98,6 +102,7 @@ def create_incident(
 ) -> SafetyIncident:
     _assert_severity_requires_responsible(severity, responsible_user_id)
     assert_evidence_belongs_to_company(db, evidence_id=evidence_id, company_id=company_id)
+    assert_user_belongs_to_company(db, user_id=responsible_user_id, company_id=company_id)
     incident = safety_repository.create_incident(
         db,
         project_id=project_id,

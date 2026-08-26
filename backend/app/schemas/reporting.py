@@ -79,3 +79,15 @@ class GeneralLedgerReportResponse(CamelModel):
     limit: int
     total_debit: Decimal
     total_credit: Decimal
+
+
+class CashFlowReportResponse(CamelModel):
+    operating: list[StatementRowResponse]
+    investing: list[StatementRowResponse]
+    financing: list[StatementRowResponse]
+    unclassified: list[StatementRowResponse]
+    total_operating: Decimal
+    total_investing: Decimal
+    total_financing: Decimal
+    total_unclassified: Decimal
+    net_change_in_cash: Decimal

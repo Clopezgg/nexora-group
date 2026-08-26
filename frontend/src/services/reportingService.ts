@@ -2,6 +2,7 @@ import { apiFetch } from './httpClient'
 import type {
   BalanceSheetReport,
   BudgetVsActualReport,
+  CashFlowReport,
   GeneralLedgerReport,
   IncomeStatementReport,
   TrialBalanceReport,
@@ -16,6 +17,8 @@ export const reportingService = {
     apiFetch<BalanceSheetReport>(`/reports/balance-sheet?companyId=${companyId}`),
   getIncomeStatement: (companyId: string) =>
     apiFetch<IncomeStatementReport>(`/reports/income-statement?companyId=${companyId}`),
+  getCashFlow: (companyId: string) =>
+    apiFetch<CashFlowReport>(`/reports/cash-flow?companyId=${companyId}`),
   getGeneralLedger: (companyId: string, offset = 0, limit = 25) => {
     const params = new URLSearchParams({
       companyId,

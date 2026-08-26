@@ -28,6 +28,7 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("accounting.journal_entry", "reverse", "Revertir asientos contables"),
     ("accounting.account", "create", "Crear cuentas del catálogo contable"),
     ("accounting.account", "read", "Ver el catálogo contable"),
+    ("accounting.account", "update", "Clasificar una cuenta (p.ej. Cash Flow activity)"),
     # NXR-REQ-0006, Tax architecture.
     ("tax.tax_code", "create", "Crear códigos de impuesto"),
     ("tax.tax_code", "read", "Ver códigos de impuesto"),
@@ -202,6 +203,9 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("reports.general_ledger", "read", "Ver el Libro Mayor"),
     ("reports.balance_sheet", "read", "Ver el Balance General"),
     ("reports.income_statement", "read", "Ver el Estado de Resultados"),
+    # Cash Flow (NXR-REQ-0016/0093, 2026-08-25). Mismo scope por rol que
+    # reports.balance_sheet/read -- ver reporting_service.cash_flow_statement.
+    ("reports.cash_flow", "read", "Ver el Estado de Flujo de Efectivo"),
     # Track H -- Reports/Search/Analytics (orden maestra §92-96, NXR-REQ-0092
     # Global Search). Se otorga ampliamente (mismo patrón que
     # document.document/read) porque casi todo rol operativo necesita poder
@@ -231,6 +235,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("accounting.journal_entry", "reverse", SCOPE_OWN),
         ("accounting.account", "create", SCOPE_OWN),
         ("accounting.account", "read", SCOPE_OWN),
+        ("accounting.account", "update", SCOPE_OWN),
         ("tax.tax_code", "create", SCOPE_OWN),
         ("tax.tax_code", "read", SCOPE_OWN),
         ("treasury.account", "create", SCOPE_OWN),
@@ -275,6 +280,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("reports.budget_vs_actual", "read", SCOPE_OWN),
         ("reports.general_ledger", "read", SCOPE_OWN),
         ("reports.balance_sheet", "read", SCOPE_OWN),
+        ("reports.cash_flow", "read", SCOPE_OWN),
         ("reports.income_statement", "read", SCOPE_OWN),
         ("search.global", "read", SCOPE_OWN),
     ),
@@ -329,6 +335,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("reports.trial_balance", "read", SCOPE_OWN),
         ("reports.general_ledger", "read", SCOPE_OWN),
         ("reports.balance_sheet", "read", SCOPE_OWN),
+        ("reports.cash_flow", "read", SCOPE_OWN),
         ("reports.income_statement", "read", SCOPE_OWN),
         ("search.global", "read", SCOPE_OWN),
     ),
@@ -398,6 +405,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("reports.budget_vs_actual", "read", SCOPE_ANY),
         ("reports.general_ledger", "read", SCOPE_ANY),
         ("reports.balance_sheet", "read", SCOPE_ANY),
+        ("reports.cash_flow", "read", SCOPE_ANY),
         ("reports.income_statement", "read", SCOPE_ANY),
         ("search.global", "read", SCOPE_ANY),
     ),

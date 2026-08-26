@@ -1,6 +1,7 @@
 import { Tabs } from '../../design-system'
 import { BalanceSheetPage } from './BalanceSheetPage'
 import { BudgetVsActualPage } from './BudgetVsActualPage'
+import { CashFlowPage } from './CashFlowPage'
 import { GeneralLedgerPage } from './GeneralLedgerPage'
 import { IncomeStatementPage } from './IncomeStatementPage'
 import { TrialBalancePage } from './TrialBalancePage'
@@ -20,6 +21,7 @@ export function ReportsPage() {
         { key: 'libro-mayor', label: 'Libro Mayor', content: <GeneralLedgerPage /> },
         { key: 'balance-general', label: 'Balance General', content: <BalanceSheetPage /> },
         { key: 'estado-resultados', label: 'Estado de Resultados', content: <IncomeStatementPage /> },
+        { key: 'flujo-de-efectivo', label: 'Flujo de Efectivo', content: <CashFlowPage /> },
       ]}
     />
   )

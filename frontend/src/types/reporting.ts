@@ -76,3 +76,15 @@ export interface GeneralLedgerReport {
   totalDebit: string
   totalCredit: string
 }
+
+export interface CashFlowReport {
+  operating: StatementRow[]
+  investing: StatementRow[]
+  financing: StatementRow[]
+  unclassified: StatementRow[]
+  totalOperating: string
+  totalInvesting: string
+  totalFinancing: string
+  totalUnclassified: string
+  netChangeInCash: string
+}

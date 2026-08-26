@@ -9,6 +9,7 @@ from app.repositories import project_repository
 from app.schemas.reporting import (
     BalanceSheetReportResponse,
     BudgetVsActualReportResponse,
+    CashFlowReportResponse,
     GeneralLedgerReportResponse,
     GeneralLedgerRowResponse,
     IncomeStatementReportResponse,
@@ -138,6 +139,34 @@ def get_income_statement(
         total_revenue=report.total_revenue,
         total_expenses=report.total_expenses,
         net_income=report.net_income,
+    )
+
+
+@router.get("/cash-flow", response_model=CashFlowReportResponse)
+def get_cash_flow(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    date_from: date | None = Query(default=None, alias="dateFrom"),
+    date_to: date | None = Query(default=None, alias="dateTo"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports.cash_flow", "read")),
+) -> CashFlowReportResponse:
+    assert_company_access(
+        db, user_id=user.id, resource="reports.cash_flow", action="read", company_id=company_id
+    )
+    _assert_date_range(date_from, date_to)
+    report = reporting_service.cash_flow_statement(
+        db, company_id=company_id, date_from=date_from, date_to=date_to
+    )
+    return CashFlowReportResponse(
+        operating=[_statement_row(row) for row in report.operating],
+        investing=[_statement_row(row) for row in report.investing],
+        financing=[_statement_row(row) for row in report.financing],
+        unclassified=[_statement_row(row) for row in report.unclassified],
+        total_operating=report.total_operating,
+        total_investing=report.total_investing,
+        total_financing=report.total_financing,
+        total_unclassified=report.total_unclassified,
+        net_change_in_cash=report.net_change_in_cash,
     )
 
 

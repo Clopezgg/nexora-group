@@ -45,3 +45,9 @@ def create_account(
 
 def get_by_id(db: Session, account_id: uuid.UUID) -> Account | None:
     return db.get(Account, account_id)
+
+
+def update_cash_flow_activity(db: Session, *, account: Account, cash_flow_activity: str | None) -> Account:
+    account.cash_flow_activity = cash_flow_activity
+    db.flush()
+    return account

@@ -2333,3 +2333,64 @@ Traceability: no row moved to `VERIFIED` from this slice (it's a bug fix
 on those four rows instead. `docs/DEFERRED.md`'s `DEFERRED-FINAL-015`
 marked RESOLVED. Tally unchanged: 102 `IMPLEMENTED`, 15 `IN_PROGRESS`, 3
 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.
+
+## 2026-08-25 — Cash Flow statement built for real (closes NXR-REQ-0016, moves IN_PROGRESS → IMPLEMENTED)
+
+Direct continuation, same session. Next canonical gap per
+`docs/AGENT_HANDOFF.md`'s own backlog after `DEFERRED-FINAL-015`: Cash
+Flow, the one remaining well-scoped domain-logic item, explicitly
+flagged as needing "a real schema decision" (no persisted cash-flow
+activity classification existed —
+`docs/superpowers/specs/2026-08-25-financial-statements-design.md`
+carried it as "explicitly out of scope" since the original Financial
+Statements subproject).
+
+**Design decision (direct method, not indirect):** `Account` gains a
+nullable `cash_flow_activity` column (`OPERATING`/`INVESTING`/
+`FINANCING`/`NULL`, migration `8496f11b1227`, no backfill needed —
+existing accounts start unclassified and the report says so honestly).
+Cash itself is never explicitly classified: it's identified structurally
+as whatever GL account a `TreasuryAccount.gl_account_id` in this company
+points to (Treasury already owns that boundary per `CLAUDE.md` §7). By
+double-entry conservation, the net change across all Treasury-linked
+accounts in a period is exactly the negative of the sum of
+(credit-debit) across every other account touched in the same period —
+so `reporting_service.cash_flow_statement` never has to correlate
+individual documents or explicitly exclude Treasury-to-Treasury
+transfers (both legs are "cash," so they cancel out of the non-cash sum
+automatically). Classified non-cash accounts sum into
+operating/investing/financing; anything not yet classified sums into an
+explicit `unclassified` bucket instead of being hidden, guessed, or
+silently dropped — and the report always reconciles exactly:
+`operating + investing + financing + unclassified == net_change_in_cash`
+(this is asserted as a real invariant in
+`test_cash_flow_general_expense_is_operating_when_classified`, not just
+hoped for).
+
+Shipped: `PATCH /api/master-data/accounts/{id}` (the first way to edit
+an account post-creation at all — `accounting.account`/`update`,
+Administrator/Finance Manager, same `SCOPE_OWN`/`SCOPE_ANY` split as
+`create`) to set the classification; `GET /api/reports/cash-flow`
+(`reports.cash_flow`/`read`, granted wherever `reports.balance_sheet`
+already is); a generic `InvalidCashFlowActivityError` (`NXR-ACCOUNTING-005`/
+422) for a garbage classification value; `CashFlowPage.tsx` as a new tab
+in `/control/reportes`, CSV export included. No dedicated Chart of
+Accounts admin screen was built to set the classification through the
+UI — same precedent as Tax Codes before Bid Comparison existed:
+API-real, no UI consumer yet, documented `➖` for that specific gap
+rather than invented scope.
+
+7 new backend tests (`test_reporting.py`), 2 new frontend tests
+(`FinancialStatementsPage.test.tsx`). Full verification: 296/296 backend
+pytest (up from 290), `tsc -b --noEmit` clean, `eslint .` clean, 91/91
+frontend vitest (up from 89), Critical Journey E2E green (confirms the
+new migration doesn't break the fresh-install `alembic upgrade head`
+path — 18 migrations now, still clean).
+
+Traceability: `NXR-REQ-0016` (Financial statements: TB/GL/BS/P&L/Cash
+Flow) moved `IN_PROGRESS` → `IMPLEMENTED` — Cash Flow was the only
+missing piece. `NXR-REQ-0093` (Reporting, broader row) stays
+`IN_PROGRESS`: Treasury/Procurement operational reports and Earned Value
+remain genuinely out of scope, unrelated to Cash Flow. Tally now 103
+`IMPLEMENTED` (+1), 14 `IN_PROGRESS` (-1), 3 `NOT_STARTED`, 2
+`BLOCKED_EXTERNAL`, 2 `VERIFIED`.

@@ -4,10 +4,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.domain.errors import InvalidCashFlowActivityError
+from app.models.chart_of_accounts import CASH_FLOW_ACTIVITIES, ChartOfAccount
 from app.repositories import account_repository, company_repository, role_repository
 from app.schemas.master_data import (
     AccountCreateRequest,
     AccountResponse,
+    AccountUpdateRequest,
     CompanyCreateRequest,
     CompanyResponse,
     CompanyUpdateRequest,
@@ -115,6 +118,35 @@ def create_account(
         name=payload.name,
         account_type=payload.account_type,
         parent_id=payload.parent_id,
+    )
+    db.commit()
+    db.refresh(account)
+    return AccountResponse.model_validate(account, from_attributes=True)
+
+
+@router.patch("/accounts/{account_id}", response_model=AccountResponse)
+def update_account(
+    account_id: uuid.UUID,
+    payload: AccountUpdateRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("accounting.account", "update")),
+) -> AccountResponse:
+    """NXR-REQ-0016/0093, Cash Flow: única forma real de clasificar una
+    cuenta hoy (no hay pantalla dedicada de catálogo contable todavía --
+    mismo criterio que Tax Codes antes de tener consumidor de UI)."""
+    account = account_repository.get_by_id(db, account_id)
+    if account is None:
+        raise ValueError(f"Account {account_id} no existe")
+    chart = db.get(ChartOfAccount, account.chart_of_account_id)
+    assert_company_access(
+        db, user_id=user.id, resource="accounting.account", action="update", company_id=chart.company_id
+    )
+    if payload.cash_flow_activity is not None and payload.cash_flow_activity not in CASH_FLOW_ACTIVITIES:
+        raise InvalidCashFlowActivityError(
+            f"cash_flow_activity inválido: {payload.cash_flow_activity!r} (debe ser uno de {CASH_FLOW_ACTIVITIES} o null)"
+        )
+    account = account_repository.update_cash_flow_activity(
+        db, account=account, cash_flow_activity=payload.cash_flow_activity
     )
     db.commit()
     db.refresh(account)

@@ -219,3 +219,9 @@ class UserEmailExistsError(Exception):
 class RoleNotFoundError(Exception):
     """`role_name` no corresponde a ninguno de los roles base
     (`app.models.role.ROLE_NAMES`)."""
+
+
+# NXR-REQ-0016/0093, Cash Flow.
+class InvalidCashFlowActivityError(Exception):
+    """`cash_flow_activity` no es None ni uno de
+    `app.models.chart_of_accounts.CASH_FLOW_ACTIVITIES`."""

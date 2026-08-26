@@ -2,7 +2,22 @@ import uuid
 from decimal import Decimal
 
 from app.models.permission import UserCompanyAccess
-from tests.helpers import create_account, create_company, create_user_with_role, login_admin, login_as
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_treasury_account,
+    create_user_with_role,
+    login_admin,
+    login_as,
+)
+
+
+def _classify_account(client, *, account_id: str, cash_flow_activity: str | None):
+    response = client.patch(
+        f"/api/master-data/accounts/{account_id}", json={"cashFlowActivity": cash_flow_activity}
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
 
 
 def _create_project(client, *, company_id: str, name: str = "Reporte Torre I") -> dict:
@@ -376,5 +391,171 @@ def test_income_statement_never_returns_another_companys_accounts(client, db_ses
     login_as(client, email="finance-is@nexora.group")
 
     response = client.get(f"/api/reports/income-statement?companyId={company_a['id']}")
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_cash_flow_classifies_a_remittance_as_financing_and_reconciles_net_change(client, db_session):
+    """Método directo (NXR-REQ-0016/0093): una remesa CENTRAL (débito
+    Banco, crédito Aportes de socios) clasificada FINANCING debe aparecer
+    como entrada de efectivo bajo Financing, y net_change_in_cash debe
+    coincidir exactamente con el monto real depositado en Treasury."""
+    login_admin(client)
+    company = create_company(client)
+    bank_gl = create_account(client, company_id=company["id"], code="1100", name="Bancos", account_type="ASSET")
+    contributions = create_account(
+        client, company_id=company["id"], code="3100", name="Aportes de socios", account_type="EQUITY"
+    )
+    _classify_account(client, account_id=contributions["id"], cash_flow_activity="FINANCING")
+    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+
+    remittance = client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank["id"],
+            "counterAccountId": contributions["id"],
+            "sender": "Socio fundador",
+            "currencyCode": "HNL",
+            "originalAmount": "10000.00",
+            "remittanceDate": "2026-01-15",
+        },
+    )
+    assert remittance.status_code == 201, remittance.text
+
+    response = client.get(f"/api/reports/cash-flow?companyId={company['id']}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+
+    assert Decimal(body["totalFinancing"]) == Decimal("10000.00")
+    assert Decimal(body["totalOperating"]) == Decimal("0")
+    assert Decimal(body["totalInvesting"]) == Decimal("0")
+    assert Decimal(body["totalUnclassified"]) == Decimal("0")
+    assert Decimal(body["netChangeInCash"]) == Decimal("10000.00")
+    assert len(body["financing"]) == 1
+    assert body["financing"][0]["accountCode"] == "3100"
+
+
+def test_cash_flow_general_expense_is_operating_when_classified(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    bank_gl = create_account(client, company_id=company["id"], code="1100", name="Bancos", account_type="ASSET")
+    contributions = create_account(
+        client, company_id=company["id"], code="3100", name="Aportes de socios", account_type="EQUITY"
+    )
+    expense = create_account(
+        client, company_id=company["id"], code="5100", name="Gastos administrativos", account_type="EXPENSE"
+    )
+    _classify_account(client, account_id=contributions["id"], cash_flow_activity="FINANCING")
+    _classify_account(client, account_id=expense["id"], cash_flow_activity="OPERATING")
+    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+
+    client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"], "treasuryAccountId": bank["id"], "counterAccountId": contributions["id"],
+            "sender": "Socio", "currencyCode": "HNL", "originalAmount": "5000.00", "remittanceDate": "2026-01-01",
+        },
+    )
+    expense_response = client.post(
+        "/api/treasury/general-expenses",
+        json={
+            "companyId": company["id"], "treasuryAccountId": bank["id"], "expenseAccountId": expense["id"],
+            "category": "papeleria", "amount": "300.00", "currencyCode": "HNL", "expenseDate": "2026-01-02",
+            "description": "Papelería",
+        },
+    )
+    assert expense_response.status_code == 201, expense_response.text
+
+    body = client.get(f"/api/reports/cash-flow?companyId={company['id']}").json()
+    assert Decimal(body["totalOperating"]) == Decimal("-300.00")
+    assert Decimal(body["totalFinancing"]) == Decimal("5000.00")
+    assert Decimal(body["netChangeInCash"]) == Decimal("4700.00")
+    # invariant: the classified buckets + unclassified must always
+    # reconcile exactly to the real net change in cash (double-entry
+    # conservation, not a coincidence of this fixture).
+    reconciled = (
+        Decimal(body["totalOperating"])
+        + Decimal(body["totalInvesting"])
+        + Decimal(body["totalFinancing"])
+        + Decimal(body["totalUnclassified"])
+    )
+    assert reconciled == Decimal(body["netChangeInCash"])
+
+
+def test_cash_flow_shows_unclassified_bucket_instead_of_hiding_or_guessing(client, db_session):
+    """CLAUDE.md: no fabricar datos, no ocultar bugs -- una cuenta sin
+    clasificar aparece explícitamente en `unclassified`, nunca se le
+    asigna una actividad adivinada ni se omite del reporte."""
+    login_admin(client)
+    company = create_company(client)
+    bank_gl = create_account(client, company_id=company["id"], code="1100", name="Bancos", account_type="ASSET")
+    contributions = create_account(
+        client, company_id=company["id"], code="3100", name="Aportes de socios", account_type="EQUITY"
+    )
+    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+
+    client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"], "treasuryAccountId": bank["id"], "counterAccountId": contributions["id"],
+            "sender": "Socio", "currencyCode": "HNL", "originalAmount": "2000.00", "remittanceDate": "2026-01-01",
+        },
+    )
+
+    body = client.get(f"/api/reports/cash-flow?companyId={company['id']}").json()
+    assert Decimal(body["totalFinancing"]) == Decimal("0")
+    assert Decimal(body["totalUnclassified"]) == Decimal("2000.00")
+    assert len(body["unclassified"]) == 1
+    assert body["unclassified"][0]["accountCode"] == "3100"
+
+
+def test_update_account_rejects_invalid_cash_flow_activity(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    account = create_account(client, company_id=company["id"], code="3100", name="Aportes", account_type="EQUITY")
+
+    response = client.patch(
+        f"/api/master-data/accounts/{account['id']}", json={"cashFlowActivity": "NOT_A_REAL_ACTIVITY"}
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-ACCOUNTING-005"
+
+
+def test_update_account_never_crosses_company(client, db_session):
+    login_admin(client)
+    company_a = create_company(client, name="Flujo A")
+    company_b = create_company(client, name="Flujo B")
+    account_b = create_account(
+        client, company_id=company_b["id"], code="3100", name="Aportes", account_type="EQUITY"
+    )
+
+    user = create_user_with_role(
+        db_session, email="finance-cf@nexora.group", role_name="Finance Manager"
+    )
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_a["id"]))
+    db_session.commit()
+    login_as(client, email="finance-cf@nexora.group")
+
+    response = client.patch(
+        f"/api/master-data/accounts/{account_b['id']}", json={"cashFlowActivity": "FINANCING"}
+    )
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_cash_flow_never_returns_another_companys_accounts(client, db_session):
+    login_admin(client)
+    company_a = create_company(client, name="Flujo C")
+    company_b = create_company(client, name="Flujo D")
+
+    user = create_user_with_role(
+        db_session, email="finance-cf2@nexora.group", role_name="Finance Manager"
+    )
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_b["id"]))
+    db_session.commit()
+    login_as(client, email="finance-cf2@nexora.group")
+
+    response = client.get(f"/api/reports/cash-flow?companyId={company_a['id']}")
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "NXR-PERM-001"

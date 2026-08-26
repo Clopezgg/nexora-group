@@ -7,6 +7,7 @@ function stubFetch(overrides: {
   companies?: unknown[]
   balanceSheet?: unknown
   incomeStatement?: unknown
+  cashFlow?: unknown
 }) {
   const companies = overrides.companies ?? [
     { id: 'c1', name: 'Constructora Nexora', code: null, legalName: null, functionalCurrencyCode: 'HNL' },
@@ -33,6 +34,9 @@ function stubFetch(overrides: {
       }
       if (url.includes('/reports/income-statement')) {
         return Promise.resolve({ ok: true, status: 200, json: async () => overrides.incomeStatement ?? {} } as Response)
+      }
+      if (url.includes('/reports/cash-flow')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => overrides.cashFlow ?? {} } as Response)
       }
       if (url.includes('/context')) {
         return Promise.resolve({
@@ -117,5 +121,53 @@ describe('IncomeStatementPage', () => {
     await userEvent.click(await screen.findByRole('tab', { name: /estado de resultados/i }))
 
     expect(await screen.findByRole('button', { name: /exportar csv/i })).toBeDisabled()
+  })
+})
+
+describe('CashFlowPage', () => {
+  it('renders classified activities, the unclassified bucket and the net cash change from the real API response', async () => {
+    stubFetch({
+      cashFlow: {
+        operating: [{ accountId: 'a1', accountCode: '5100', accountName: 'Gastos administrativos', accountType: 'OPERATING', balance: '-300.00' }],
+        investing: [],
+        financing: [{ accountId: 'a2', accountCode: '3100', accountName: 'Aportes de socios', accountType: 'FINANCING', balance: '5000.00' }],
+        unclassified: [{ accountId: 'a3', accountCode: '2100', accountName: 'CxP sin clasificar', accountType: 'UNCLASSIFIED', balance: '-100.00' }],
+        totalOperating: '-300.00',
+        totalInvesting: '0.00',
+        totalFinancing: '5000.00',
+        totalUnclassified: '-100.00',
+        netChangeInCash: '4600.00',
+      },
+    })
+
+    render(renderApp('/control/reportes'))
+    await userEvent.click(await screen.findByRole('tab', { name: /flujo de efectivo/i }))
+
+    expect(await screen.findByText('Aportes de socios')).toBeInTheDocument()
+    expect(screen.getByText('Gastos administrativos')).toBeInTheDocument()
+    expect(screen.getByText('CxP sin clasificar')).toBeInTheDocument()
+    expect(screen.getByText(/cambio neto en efectivo: 4600.00/i)).toBeInTheDocument()
+  })
+
+  it('hides the unclassified card when every account is classified', async () => {
+    stubFetch({
+      cashFlow: {
+        operating: [],
+        investing: [],
+        financing: [{ accountId: 'a2', accountCode: '3100', accountName: 'Aportes de socios', accountType: 'FINANCING', balance: '1000.00' }],
+        unclassified: [],
+        totalOperating: '0.00',
+        totalInvesting: '0.00',
+        totalFinancing: '1000.00',
+        totalUnclassified: '0.00',
+        netChangeInCash: '1000.00',
+      },
+    })
+
+    render(renderApp('/control/reportes'))
+    await userEvent.click(await screen.findByRole('tab', { name: /flujo de efectivo/i }))
+
+    expect(await screen.findByText('Aportes de socios')).toBeInTheDocument()
+    expect(screen.queryByText(/sin clasificar/i)).not.toBeInTheDocument()
   })
 })

@@ -38,6 +38,15 @@ class AccountCreateRequest(CamelModel):
     parent_id: uuid.UUID | None = None
 
 
+class AccountUpdateRequest(CamelModel):
+    """NXR-REQ-0016/0093, Cash Flow. Única pieza editable de una cuenta
+    post-creación por ahora -- code/name/account_type/parent_id se
+    mantienen inmutables (no hay caso de uso real todavía que los
+    requiera; el catálogo contable es create-only fuera de esto)."""
+
+    cash_flow_activity: str | None = None
+
+
 class AccountResponse(CamelModel):
     id: uuid.UUID
     code: str
@@ -45,6 +54,7 @@ class AccountResponse(CamelModel):
     account_type: str
     parent_id: uuid.UUID | None
     is_postable: bool
+    cash_flow_activity: str | None
 
 
 # DEFERRED-FINAL-015: directorio de usuarios por compañía.

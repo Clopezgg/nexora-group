@@ -9,6 +9,13 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 ACCOUNT_TYPES = ("ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE")
 
+# NXR-REQ-0016/0093, Cash Flow. Clasificación opcional de una cuenta NO
+# ligada a Treasury (ver docs/superpowers/specs/2026-08-25-financial-
+# statements-design.md, "Explícitamente fuera de alcance" -- ahora sí en
+# alcance). None = sin clasificar todavía (el reporte lo muestra como
+# "Sin clasificar", nunca lo oculta ni lo fuerza a un valor).
+CASH_FLOW_ACTIVITIES = ("OPERATING", "INVESTING", "FINANCING")
+
 
 class ChartOfAccount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "chart_of_accounts"
@@ -33,3 +40,4 @@ class Account(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
     )
     is_postable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    cash_flow_activity: Mapped[str | None] = mapped_column(String(16), nullable=True)

@@ -8,19 +8,22 @@ from sqlalchemy.orm import Session
 
 from app.models.accounting import AccountingDocument, JournalLine
 from app.models.chart_of_accounts import Account, ChartOfAccount
+from app.models.treasury import TreasuryAccount
 from app.services import budget_service, treasury_service
 
 """Reporting (orden maestra, NXR-REQ-0093/0094). Este servicio SOLO arma
 reportes de lectura reusando cálculos ya existentes y confiables
 (treasury_service.account_balance, budget_service.compute_summary) --
 nunca recalcula en paralelo lo que esos servicios ya calculan, salvo el
-General Ledger / Balance Sheet / Income Statement de más abajo, que agregan
-directamente sobre AccountingDocument/JournalLine (el General Ledger es la
-verdad contable, CLAUDE.md §8) porque account_balance() no acepta rango de
-fechas y consultarlo cuenta por cuenta sería O(n) queries. Cash Flow /
-reportes de Treasury o Procurement / Earned Value (CPI/SPI/EAC/VAC) quedan
-fuera de alcance -- ver
-docs/superpowers/specs/2026-08-25-financial-statements-design.md."""
+General Ledger / Balance Sheet / Income Statement / Cash Flow de más
+abajo, que agregan directamente sobre AccountingDocument/JournalLine (el
+General Ledger es la verdad contable, CLAUDE.md §8) porque
+account_balance() no acepta rango de fechas y consultarlo cuenta por
+cuenta sería O(n) queries. Reportes de Treasury o Procurement / Earned
+Value (CPI/SPI/EAC/VAC) quedan fuera de alcance -- ver
+docs/superpowers/specs/2026-08-25-financial-statements-design.md (Cash
+Flow salió de "fuera de alcance" el 2026-08-25, ver cash_flow_statement
+más abajo)."""
 
 _LEDGER_STATUSES = ("POSTED", "REVERSED")
 
@@ -190,6 +193,7 @@ def _activity_query(
             Account.code,
             Account.name,
             Account.account_type,
+            Account.cash_flow_activity,
             func.coalesce(func.sum(JournalLine.debit_amount), Decimal("0")),
             func.coalesce(func.sum(JournalLine.credit_amount), Decimal("0")),
         )
@@ -202,7 +206,9 @@ def _activity_query(
             AccountingDocument.company_id == company_id,
             AccountingDocument.status.in_(_LEDGER_STATUSES),
         )
-        .group_by(Account.id, Account.code, Account.name, Account.account_type)
+        .group_by(
+            Account.id, Account.code, Account.name, Account.account_type, Account.cash_flow_activity
+        )
         .order_by(Account.code)
     )
     if date_from is not None:
@@ -220,7 +226,7 @@ def balance_sheet(
     report = BalanceSheetReport()
     total_revenue = Decimal("0")
     total_expenses = Decimal("0")
-    for account_id, code, name, account_type, debit, credit in db.execute(
+    for account_id, code, name, account_type, _cfa, debit, credit in db.execute(
         _activity_query(db, company_id=company_id, date_from=None, date_to=as_of)
     ):
         if account_type == "ASSET":
@@ -265,7 +271,7 @@ def income_statement(
     date_to: date | None = None,
 ) -> IncomeStatementReport:
     report = IncomeStatementReport()
-    for account_id, code, name, account_type, debit, credit in db.execute(
+    for account_id, code, name, account_type, _cfa, debit, credit in db.execute(
         _activity_query(db, company_id=company_id, date_from=date_from, date_to=date_to)
     ):
         if account_type == "REVENUE":
@@ -365,3 +371,68 @@ def general_ledger(
         total_debit=totals_row[0],
         total_credit=totals_row[1],
     )
+
+
+@dataclass
+class CashFlowReport:
+    operating: list[StatementRow] = field(default_factory=list)
+    investing: list[StatementRow] = field(default_factory=list)
+    financing: list[StatementRow] = field(default_factory=list)
+    unclassified: list[StatementRow] = field(default_factory=list)
+    total_operating: Decimal = Decimal("0")
+    total_investing: Decimal = Decimal("0")
+    total_financing: Decimal = Decimal("0")
+    total_unclassified: Decimal = Decimal("0")
+    net_change_in_cash: Decimal = Decimal("0")
+
+
+def cash_flow_statement(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> CashFlowReport:
+    """Método directo (orden maestra, NXR-REQ-0016/0093): el efectivo son
+    las cuentas GL 1:1 con un TreasuryAccount de esta company
+    (CLAUDE.md §7 -- Treasury es dueño del dinero). Por partida doble, el
+    cambio neto en esas cuentas en el período es exactamente el negativo
+    de la suma de (credit - debit) de TODAS las demás cuentas tocadas en
+    el mismo período -- no hace falta correlacionar documento por
+    documento ni excluir explícitamente las transferencias Treasury<->
+    Treasury (ambos lados son "cash", así que se cancelan solos en la
+    resta). Cada cuenta no-cash se clasifica en Operating/Investing/
+    Financing vía `Account.cash_flow_activity` (ver
+    `PATCH /api/master-data/accounts/{id}`); una cuenta sin clasificar
+    cae en `unclassified`, mostrado explícitamente en vez de ocultado o
+    forzado a un valor (CLAUDE.md: no fabricar datos, no ocultar bugs)."""
+    cash_account_ids = set(
+        db.execute(
+            select(TreasuryAccount.gl_account_id).where(TreasuryAccount.company_id == company_id)
+        ).scalars()
+    )
+
+    report = CashFlowReport()
+    for account_id, code, name, _account_type, activity, debit, credit in db.execute(
+        _activity_query(db, company_id=company_id, date_from=date_from, date_to=date_to)
+    ):
+        net = credit - debit
+        if net == Decimal("0"):
+            continue
+        if account_id in cash_account_ids:
+            report.net_change_in_cash += debit - credit
+            continue
+        row = StatementRow(account_id, code, name, activity or "UNCLASSIFIED", net)
+        if activity == "OPERATING":
+            report.operating.append(row)
+            report.total_operating += net
+        elif activity == "INVESTING":
+            report.investing.append(row)
+            report.total_investing += net
+        elif activity == "FINANCING":
+            report.financing.append(row)
+            report.total_financing += net
+        else:
+            report.unclassified.append(row)
+            report.total_unclassified += net
+    return report

@@ -347,3 +347,41 @@ Verification before this entry: 290/290 backend pytest, `tsc -b --noEmit`
 clean, `eslint .` clean, 89/89 frontend vitest, Critical Journey E2E 2/2
 green (using the new real user-management API, no more subprocess
 workaround).
+
+## 2026-08-25 — Cash Flow statement built (NXR-REQ-0016 → IMPLEMENTED)
+
+Direct continuation, same session, still no user intervention between
+entries. This closes the last well-scoped domain-logic gap this
+session's earlier backlog named (`NXR-REQ-0016`/`0093` Cash Flow —
+"needs a real schema decision"). Full design/implementation detail in
+`docs/PROGRESS.md`'s `2026-08-25 — Cash Flow statement built for
+real...` entry: direct method, `Account.cash_flow_activity` (new
+nullable column, migration `8496f11b1227`), cash identified structurally
+via `TreasuryAccount.gl_account_id` rather than tagged per-account,
+explicit `unclassified` bucket instead of hiding/guessing.
+
+Do not re-derive the "why doesn't this need to correlate documents or
+exclude Treasury-to-Treasury transfers explicitly" reasoning from
+scratch if touching `reporting_service.cash_flow_statement` again — it's
+a direct consequence of double-entry conservation, explained in both the
+function's docstring and the PROGRESS.md entry.
+
+**What's left after this, per the same canonical-priority check:** the
+domain-logic gap-hunting backlog this session worked through is now
+genuinely exhausted (`NXR-REQ-0058` Supplier Performance stays
+deliberately deferred — still no real PO/GR volume to compute honest
+metrics off). Everything remaining in `IN_PROGRESS`/`NOT_STARTED` is
+Track G platform-completion/hardening/Azure
+(`NXR-REQ-0105-0122`) or `BLOCKED_EXTERNAL` (`0123`/`0124`, real Azure
+deployment). Before starting any of those: re-read
+`docs/PRODUCTION_READINESS.md`'s own "no aplicar todavía" gate (Build
+Width First) against the CURRENT state — some Track G rows may
+legitimately be incremental work already per `docs/MASTER_PLAN.md` §4,
+but confirm per-row rather than assuming either way. This is a natural
+point to re-run the full `docs/REQUIREMENTS_TRACEABILITY.md` reconcile
+sweep (row by row, not by memory) before picking the next specific gap,
+since several rows have shifted this session.
+
+Verification before this entry: 296/296 backend pytest, `tsc -b --noEmit`
+clean, `eslint .` clean, 91/91 frontend vitest, Critical Journey E2E
+green (confirms the new migration doesn't break fresh-install).

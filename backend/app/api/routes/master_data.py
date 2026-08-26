@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.domain.errors import InvalidCashFlowActivityError
 from app.models.chart_of_accounts import CASH_FLOW_ACTIVITIES, ChartOfAccount
 from app.repositories import account_repository, company_repository, role_repository
@@ -18,7 +19,7 @@ from app.schemas.master_data import (
     UserResponse,
 )
 from app.schemas.tax import TaxCodeCreateRequest, TaxCodeResponse
-from app.services import tax_service, user_service
+from app.services import audit_service, tax_service, user_service
 from app.services.permission_service import (
     assert_company_access,
     list_user_company_ids,
@@ -46,6 +47,7 @@ def create_company(
     payload: CompanyCreateRequest,
     db: Session = Depends(get_db),
     _user=Depends(require_permission("core.company", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> CompanyResponse:
     company = company_repository.create_company(
         db,
@@ -56,8 +58,20 @@ def create_company(
         country=payload.country,
         fiscal_id=payload.fiscal_id,
     )
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=_user.id,
+        action="core.company.create",
+        entity_type="core.company",
+        entity_id=company.id,
+        company_id=company.id,
+        project_id=None,
+        before=None,
+        after={"name": company.name, "code": company.code},
+        correlation_id=correlation_id,
+    )
     db.commit()
-    db.refresh(company)
     return CompanyResponse.model_validate(company, from_attributes=True)
 
 
@@ -67,6 +81,7 @@ def update_company(
     payload: CompanyUpdateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("core.company", "update")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> CompanyResponse:
     existing = company_repository.get_by_id(db, company_id)
     if existing is None:
@@ -74,14 +89,27 @@ def update_company(
     assert_company_access(
         db, user_id=user.id, resource="core.company", action="update", company_id=company_id
     )
+    before_legal_name = existing.legal_name
+    before_fiscal_id = existing.fiscal_id
     company = company_repository.update_company(
         db,
         company_id=company_id,
         legal_name=payload.legal_name,
         fiscal_id=payload.fiscal_id,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="core.company.update",
+        entity_type="core.company",
+        entity_id=company_id,
+        company_id=company_id,
+        project_id=None,
+        before={"legalName": before_legal_name, "fiscalId": before_fiscal_id},
+        after={"legalName": company.legal_name, "fiscalId": company.fiscal_id},
+        correlation_id=correlation_id,
+    )
     db.commit()
-    db.refresh(company)
     return CompanyResponse.model_validate(company, from_attributes=True)
 
 
@@ -103,6 +131,7 @@ def create_account(
     payload: AccountCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("accounting.account", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> AccountResponse:
     assert_company_access(
         db,
@@ -119,8 +148,20 @@ def create_account(
         account_type=payload.account_type,
         parent_id=payload.parent_id,
     )
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="accounting.account.create",
+        entity_type="accounting.account",
+        entity_id=account.id,
+        company_id=payload.company_id,
+        project_id=None,
+        before=None,
+        after={"code": account.code, "name": account.name, "type": account.account_type},
+        correlation_id=correlation_id,
+    )
     db.commit()
-    db.refresh(account)
     return AccountResponse.model_validate(account, from_attributes=True)
 
 
@@ -130,6 +171,7 @@ def update_account(
     payload: AccountUpdateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("accounting.account", "update")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> AccountResponse:
     """NXR-REQ-0016/0093, Cash Flow: única forma real de clasificar una
     cuenta hoy (no hay pantalla dedicada de catálogo contable todavía --
@@ -145,11 +187,23 @@ def update_account(
         raise InvalidCashFlowActivityError(
             f"cash_flow_activity inválido: {payload.cash_flow_activity!r} (debe ser uno de {CASH_FLOW_ACTIVITIES} o null)"
         )
+    before_cfa = account.cash_flow_activity
     account = account_repository.update_cash_flow_activity(
         db, account=account, cash_flow_activity=payload.cash_flow_activity
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="accounting.account.update",
+        entity_type="accounting.account",
+        entity_id=account_id,
+        company_id=chart.company_id,
+        project_id=None,
+        before={"cashFlowActivity": before_cfa},
+        after={"cashFlowActivity": account.cash_flow_activity},
+        correlation_id=correlation_id,
+    )
     db.commit()
-    db.refresh(account)
     return AccountResponse.model_validate(account, from_attributes=True)
 
 
@@ -171,6 +225,7 @@ def create_tax_code(
     payload: TaxCodeCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("tax.tax_code", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> TaxCodeResponse:
     assert_company_access(
         db, user_id=user.id, resource="tax.tax_code", action="create", company_id=payload.company_id
@@ -181,7 +236,21 @@ def create_tax_code(
         code=payload.code,
         name=payload.name,
         rate_percent=payload.rate_percent,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="tax.tax_code.create",
+        entity_type="tax.tax_code",
+        entity_id=tax_code.id,
+        company_id=payload.company_id,
+        project_id=None,
+        before=None,
+        after={"code": tax_code.code, "name": tax_code.name, "ratePercent": str(tax_code.rate_percent)},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return TaxCodeResponse.model_validate(tax_code, from_attributes=True)
 
 
@@ -208,6 +277,7 @@ def create_user(
     payload: UserCreateRequest,
     db: Session = Depends(get_db),
     requesting_user=Depends(require_permission("core.user", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> UserResponse:
     assert_company_access(
         db,
@@ -223,5 +293,19 @@ def create_user(
         full_name=payload.full_name,
         password=payload.password,
         role_name=payload.role_name,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=requesting_user.id,
+        action="core.user.create",
+        entity_type="core.user",
+        entity_id=created.id,
+        company_id=payload.company_id,
+        project_id=None,
+        before=None,
+        after={"email": created.email, "fullName": created.full_name},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _user_response(db, created)

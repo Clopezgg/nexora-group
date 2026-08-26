@@ -22,15 +22,19 @@ la moneda que sea, no hay conversión involucrada."""
 
 
 def create_tax_code(
-    db: Session, *, company_id: uuid.UUID, code: str, name: str, rate_percent: Decimal
+    db: Session, *, company_id: uuid.UUID, code: str, name: str, rate_percent: Decimal,
+    commit: bool = True,
 ) -> TaxCode:
     if tax_repository.get_tax_code_by_code(db, company_id=company_id, code=code) is not None:
         raise TaxCodeExistsError(f"Ya existe un TaxCode con código {code!r} en esta compañía")
     tax_code = tax_repository.create_tax_code(
         db, company_id=company_id, code=code, name=name, rate_percent=rate_percent
     )
-    db.commit()
-    db.refresh(tax_code)
+    if commit:
+        db.commit()
+        db.refresh(tax_code)
+    else:
+        db.flush()
     return tax_code
 
 

@@ -25,6 +25,7 @@ def create_user_with_role(
     full_name: str,
     password: str,
     role_name: str,
+    commit: bool = True,
 ) -> User:
     if user_repository.get_by_email(db, email) is not None:
         raise UserEmailExistsError(f"Ya existe un usuario con email {email!r}")
@@ -36,8 +37,11 @@ def create_user_with_role(
     )
     role_repository.assign_role(db, user_id=user.id, role_id=role.id)
     permission_repository.grant_company_access(db, user_id=user.id, company_id=company_id)
-    db.commit()
-    db.refresh(user)
+    if commit:
+        db.commit()
+        db.refresh(user)
+    else:
+        db.flush()
     return user
 
 

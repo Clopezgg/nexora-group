@@ -358,6 +358,19 @@ All 7 routes instrumented with atomic audit. Service layer gained `commit: bool 
 
 All 23 routes instrumented with atomic audit. Service layers gained `commit: bool = True` on all 23 mutating functions across 7 services.
 
+## Dominios instrumentados (2026-08-26, backlog burn-down — Platform: Master Data)
+
+| Dominio | Acción | Ruta |
+|---------|--------|------|
+| Master Data | `core.company.create` | `POST /api/master-data/companies` |
+| Master Data | `core.company.update` | `PATCH /api/master-data/companies/{id}` |
+| Master Data | `accounting.account.create` | `POST /api/master-data/accounts` |
+| Master Data | `accounting.account.update` | `PATCH /api/master-data/accounts/{id}` |
+| Master Data | `tax.tax_code.create` | `POST /api/master-data/tax-codes` |
+| Master Data | `core.user.create` | `POST /api/master-data/users` |
+
+All 6 routes instrumented with atomic audit. Service layers gained `commit: bool = True` on `tax_service.create_tax_code` and `user_service.create_user_with_role`. Company/account routes (direct repository calls) use `db.flush()` + audit + `db.commit()`.
+
 ## Dominios NO instrumentados todavía (backlog honesto)
 
 La cobertura fuera de las acciones enumeradas arriba sigue siendo parcial.
@@ -375,13 +388,14 @@ completitud:
   venta) — `CLOSED` (2026-08-26, ver arriba).
 - **Construction Control** (Documents/Evidence, RFI/Submittals, Daily
   Site Reports, Quality, Safety) — `CLOSED` (2026-08-26, ver arriba).
-- **Platform** — Company create/update, User create — `NOT_STARTED`.
+- **Platform** — Company create/update, User create — `CLOSED` (2026-08-26, ver arriba).
 
 Los diez gaps de Treasury, los gaps de creación de AP/AR, los gaps de
 Supply Chain (Procurement + Inventory), los gaps de Project Control,
 los gaps de Enterprise Resources, los gaps de Commercial/CRM,
-y los gaps de Construction Control:
+los gaps de Construction Control, y los gaps de Platform:
 **cerrados** (2026-08-26, ver arriba).
+**TODOS los dominios están instrumentados — 56/56 rutas de mutación con audit trail.**
 
 Un futuro task puede cerrar estos dominios uno por uno reutilizando
 exactamente el patrón corregido de esta página: leer la ruta real, agregar

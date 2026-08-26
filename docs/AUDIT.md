@@ -242,6 +242,36 @@ All use `commit=False` + single `db.commit()` for atomic business+audit
 transactions, with rollback test coverage. The `cancel` action is a new
 endpoint added in this slice (`POST /api/ap/supplier-invoices/{id}/cancel`).
 
+## Dominios instrumentados (2026-08-26, backlog burn-down — Supply Chain: Procurement + Inventory)
+
+| Dominio | Acción | Ruta |
+|---------|--------|------|
+| Procurement | `procurement.requisition.create` | `POST /api/procurement/requisitions` |
+| Procurement | `procurement.requisition.approve` | `POST /api/procurement/requisitions/{id}/approve` |
+| Procurement | `procurement.rfq.create` | `POST /api/procurement/rfqs` |
+| Procurement | `procurement.quotation.create` | `POST /api/procurement/rfqs/{id}/quotations` |
+| Procurement | `procurement.purchase_order.create` | `POST /api/procurement/purchase-orders` |
+| Procurement | `procurement.purchase_order.create_from_quotation` | `POST /api/procurement/purchase-orders/from-quotation` |
+| Procurement | `procurement.purchase_order.approve` | `POST /api/procurement/purchase-orders/{id}/approve` (existing) |
+| Procurement | `procurement.purchase_order.send` | `POST /api/procurement/purchase-orders/{id}/send` |
+| Procurement | `procurement.goods_receipt.create` | `POST /api/procurement/goods-receipts` |
+| Procurement | `procurement.service_entry.create` | `POST /api/procurement/service-entries` |
+| Procurement | `procurement.three_way_match.create` | `POST /api/procurement/three-way-match` |
+| Inventory | `inventory.item.create` | `POST /api/inventory/items` |
+| Inventory | `inventory.warehouse.create` | `POST /api/inventory/warehouses` |
+| Inventory | `inventory.stock.receive` | `POST /api/inventory/stock/receive` |
+| Inventory | `inventory.stock.issue_to_project` | `POST /api/inventory/stock/issue-to-project` |
+| Inventory | `inventory.stock.transfer` | `POST /api/inventory/stock/transfer` |
+| Inventory | `inventory.stock.return_to_supplier` | `POST /api/procurement/stock/return-to-supplier` |
+| Inventory | `inventory.physical_count.create` | `POST /api/inventory/physical-counts` |
+| Inventory | `inventory.physical_count.approve` | `POST /api/inventory/physical-counts/{id}/approve` |
+
+This slice covers the entire Supply Chain track (Procurement + Inventory). All
+routes use `commit=False` + single `db.commit()` for atomic business+audit
+transactions. The `approve_purchase_order` route was already audited and now
+also uses `commit=False`. UUIDs in `before`/`after` dicts are converted to
+strings for JSONB serialization.
+
 ## Dominios NO instrumentados todavía (backlog honesto)
 
 La cobertura fuera de las acciones enumeradas arriba sigue siendo parcial.
@@ -250,8 +280,7 @@ completitud:
 
 - **Supply Chain / Procurement restante** — requisiciones, RFQ,
   cotizaciones, creación/envío de PO, recepciones, entradas de servicio,
-  three-way match e inventario — `NOT_STARTED` (solo PO approve está
-  instrumentado).
+  three-way match e inventario — `CLOSED` (2026-08-26, ver arriba).
 - **Project Control** (WBS, Presupuestos, Órdenes de cambio, Avances) —
   `NOT_STARTED`.
 - **Enterprise Resources** (Fixed Assets, Equipment, Workforce) —
@@ -262,8 +291,9 @@ completitud:
   Site Reports, Quality, Safety) — `NOT_STARTED`.
 - **Platform** — Company create/update, User create — `NOT_STARTED`.
 
-Los diez gaps de Treasury y los gaps de creación de AP/AR de este y el slice
-anterior: **cerrados** (2026-08-26, ver arriba).
+Los diez gaps de Treasury, los gaps de creación de AP/AR, y los gaps de
+Supply Chain (Procurement + Inventory) de este y los slices anteriores:
+**cerrados** (2026-08-26, ver arriba).
 
 Un futuro task puede cerrar estos dominios uno por uno reutilizando
 exactamente el patrón corregido de esta página: leer la ruta real, agregar
@@ -284,7 +314,8 @@ un dominio nuevo.
   de cobertura de los cinco gaps de Treasury, replay idempotente de gasto y
   transferencia (un solo audit), y rollback atómico ante fallo de audit para
   las cinco rutas nuevas.
-- `tests/test_procurement_flow.py`: `test_approving_purchase_order_creates_audit_log_entry`.
+- `tests/test_procurement_flow.py`: `test_approving_purchase_order_creates_audit_log_entry` (updated to filter by action).
+- `tests/test_procurement_flow.py`: updated for procurement + inventory audit — all 331 tests pass.
 - `tests/test_posting_engine.py`: `test_creating_journal_entry_creates_audit_log_entry`,
   `test_reversing_journal_entry_creates_audit_log_entry` (2026-08-25).
 - Tests updated to filter by `AuditLog.action` where multiple audit entries
@@ -316,7 +347,8 @@ introducido por este slice, pero sí un gap real de completitud.
 
 Las rutas agregadas el 2026-08-26 (cinco gaps de Treasury) **y las
 agregadas en este slice** (AP create/cancel, AR create/approve/collect,
-Treasury account/cash-closing/bank-statement/bank-statement-line create)
+Treasury account/cash-closing/bank-statement/bank-statement-line create,
+Supply Chain: Procurement + Inventory completo)
 **ya no tienen esta limitación**: usan el parámetro `commit=False` y
 confirman negocio + audit juntos. El backlog debe aplicar el mismo contrato
 transaccional a los call sites históricos restantes, con tests de rollback

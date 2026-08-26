@@ -93,6 +93,7 @@ def receive_stock(
     unit_cost: Decimal,
     source_type: str | None = None,
     source_id: uuid.UUID | None = None,
+    commit: bool = True,
 ) -> StockLedgerEntry:
     """RECEIPT. Actualiza el costo promedio ponderado (moving average)."""
     entry = _receive_stock_entry(
@@ -105,8 +106,11 @@ def receive_stock(
         source_type=source_type,
         source_id=source_id,
     )
-    db.commit()
-    db.refresh(entry)
+    if commit:
+        db.commit()
+        db.refresh(entry)
+    else:
+        db.flush()
     return entry
 
 
@@ -159,6 +163,7 @@ def issue_to_project(
     warehouse_id: uuid.UUID,
     project_id: uuid.UUID,
     quantity: Decimal,
+    commit: bool = True,
 ) -> StockLedgerEntry:
     """INV-INV-002: reduce warehouse stock y reconoce el costo (al costo
     promedio) sobre el project_id indicado. El posting contable real (débito
@@ -176,8 +181,11 @@ def issue_to_project(
         source_type="project_issue",
         source_id=project_id,
     )
-    db.commit()
-    db.refresh(entry)
+    if commit:
+        db.commit()
+        db.refresh(entry)
+    else:
+        db.flush()
     return entry
 
 
@@ -190,6 +198,7 @@ def return_to_supplier(
     supplier_id: uuid.UUID,
     quantity: Decimal,
     notes: str | None = None,
+    commit: bool = True,
 ) -> StockLedgerEntry:
     """RETURN (devolución a proveedor, docs/INVENTORY.md deuda intencional
     ahora resuelta): reduce stock exactamente igual que un ISSUE -- mismo
@@ -209,8 +218,11 @@ def return_to_supplier(
         source_id=supplier_id,
         notes=notes,
     )
-    db.commit()
-    db.refresh(entry)
+    if commit:
+        db.commit()
+        db.refresh(entry)
+    else:
+        db.flush()
     return entry
 
 
@@ -222,6 +234,7 @@ def transfer_stock(
     from_warehouse_id: uuid.UUID,
     to_warehouse_id: uuid.UUID,
     quantity: Decimal,
+    commit: bool = True,
 ) -> tuple[StockLedgerEntry, StockLedgerEntry]:
     """Move stock in one database transaction or leave neither ledger leg."""
     # Bloquea AMBAS posiciones por adelantado, en orden canónico (nunca en
@@ -262,7 +275,10 @@ def transfer_stock(
             source_type="transfer_from",
             source_id=from_warehouse_id,
         )
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except Exception:
         db.rollback()
         raise
@@ -271,7 +287,13 @@ def transfer_stock(
     return outgoing, incoming
 
 
-def apply_physical_count(db: Session, *, physical_count_id: uuid.UUID, approved_by_id: uuid.UUID) -> PhysicalCount:
+def apply_physical_count(
+    db: Session,
+    *,
+    physical_count_id: uuid.UUID,
+    approved_by_id: uuid.UUID,
+    commit: bool = True,
+) -> PhysicalCount:
     """Genera un ADJUSTMENT por cada línea con variance != 0 y marca el
     conteo como APPROVED. No se editan entradas previas del ledger -- una
     corrección siempre es una entrada nueva."""
@@ -303,6 +325,9 @@ def apply_physical_count(db: Session, *, physical_count_id: uuid.UUID, approved_
         )
     count.status = "APPROVED"
     count.approved_by_id = approved_by_id
-    db.commit()
-    db.refresh(count)
+    if commit:
+        db.commit()
+        db.refresh(count)
+    else:
+        db.flush()
     return count

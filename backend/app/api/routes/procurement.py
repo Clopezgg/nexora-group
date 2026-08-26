@@ -65,6 +65,7 @@ def create_requisition(
     payload: RequisitionCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.requisition", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     assert_company_access(
         db, user_id=user.id, resource="procurement.requisition", action="create", company_id=payload.company_id
@@ -78,7 +79,24 @@ def create_requisition(
         priority=payload.priority,
         required_date=payload.required_date,
         lines=[line.model_dump() for line in payload.lines],
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.requisition.create",
+        entity_type="procurement.requisition",
+        entity_id=requisition.id,
+        company_id=requisition.company_id,
+        project_id=requisition.project_id,
+        before=None,
+        after={
+            "requisitionNumber": requisition.requisition_number,
+            "status": requisition.status,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _requisition_response(db, requisition)
 
 
@@ -87,6 +105,7 @@ def approve_requisition(
     requisition_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.requisition", "approve")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     requisition = procurement_repository.get_requisition(db, requisition_id)
     if requisition is None:
@@ -100,7 +119,23 @@ def approve_requisition(
         action="approve",
         company_id=requisition.company_id,
     )
-    requisition = procurement_service.approve_requisition(db, requisition_id=requisition_id, approved_by_id=user.id)
+    before_status = requisition.status
+    requisition = procurement_service.approve_requisition(
+        db, requisition_id=requisition_id, approved_by_id=user.id, commit=False,
+    )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.requisition.approve",
+        entity_type="procurement.requisition",
+        entity_id=requisition.id,
+        company_id=requisition.company_id,
+        project_id=requisition.project_id,
+        before={"status": before_status},
+        after={"status": requisition.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _requisition_response(db, requisition)
 
 
@@ -122,6 +157,7 @@ def create_rfq(
     payload: RfqCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.rfq", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     assert_company_access(
         db, user_id=user.id, resource="procurement.rfq", action="create", company_id=payload.company_id
@@ -133,7 +169,25 @@ def create_rfq(
         due_date=payload.due_date,
         terms=payload.terms,
         supplier_ids=payload.supplier_ids,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.rfq.create",
+        entity_type="procurement.rfq",
+        entity_id=rfq.id,
+        company_id=rfq.company_id,
+        project_id=None,
+        before=None,
+        after={
+            "rfqNumber": rfq.rfq_number,
+            "status": rfq.status,
+            "supplierIds": [str(s) for s in payload.supplier_ids],
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return RfqResponse.model_validate(rfq, from_attributes=True)
 
 
@@ -161,6 +215,7 @@ def submit_quotation(
     payload: QuotationCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.quotation", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     rfq = procurement_repository.get_rfq(db, rfq_id)
     if rfq is None:
@@ -180,7 +235,25 @@ def submit_quotation(
         valid_until=payload.valid_until,
         notes=payload.notes,
         lines=[line.model_dump() for line in payload.lines],
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.quotation.create",
+        entity_type="procurement.quotation",
+        entity_id=quotation.id,
+        company_id=rfq.company_id,
+        project_id=None,
+        before=None,
+        after={
+            "supplierId": str(payload.supplier_id),
+            "currencyCode": payload.currency_code,
+            "status": quotation.status,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _quotation_response(db, quotation)
 
 
@@ -256,6 +329,7 @@ def create_purchase_order(
     payload: PurchaseOrderCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.purchase_order", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     assert_company_access(
         db, user_id=user.id, resource="procurement.purchase_order", action="create", company_id=payload.company_id
@@ -267,7 +341,25 @@ def create_purchase_order(
         project_id=payload.project_id,
         currency_code=payload.currency_code,
         lines=[line.model_dump() for line in payload.lines],
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.purchase_order.create",
+        entity_type="procurement.purchase_order",
+        entity_id=order.id,
+        company_id=order.company_id,
+        project_id=order.project_id,
+        before=None,
+        after={
+            "poNumber": order.po_number,
+            "status": order.status,
+            "supplierId": str(payload.supplier_id),
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _purchase_order_response(db, order)
 
 
@@ -276,6 +368,7 @@ def create_purchase_order_from_quotation(
     payload: PurchaseOrderFromQuotationRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.purchase_order", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     assert_company_access(
         db, user_id=user.id, resource="procurement.purchase_order", action="create", company_id=payload.company_id
@@ -285,7 +378,25 @@ def create_purchase_order_from_quotation(
         company_id=payload.company_id,
         supplier_quotation_id=payload.supplier_quotation_id,
         project_id=payload.project_id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.purchase_order.create_from_quotation",
+        entity_type="procurement.purchase_order",
+        entity_id=order.id,
+        company_id=order.company_id,
+        project_id=order.project_id,
+        before=None,
+        after={
+            "poNumber": order.po_number,
+            "status": order.status,
+            "supplierQuotationId": str(payload.supplier_quotation_id),
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _purchase_order_response(db, order)
 
 
@@ -309,7 +420,7 @@ def approve_purchase_order(
         company_id=order.company_id,
     )
     before_status = order.status
-    order = procurement_service.approve_purchase_order(db, purchase_order_id=po_id)
+    order = procurement_service.approve_purchase_order(db, purchase_order_id=po_id, commit=False)
     audit_service.record(
         db,
         actor_user_id=user.id,
@@ -331,6 +442,7 @@ def send_purchase_order(
     po_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.purchase_order", "approve")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     order = procurement_repository.get_purchase_order(db, po_id)
     if order is None:
@@ -344,7 +456,21 @@ def send_purchase_order(
         action="approve",
         company_id=order.company_id,
     )
-    order = procurement_service.send_purchase_order(db, purchase_order_id=po_id)
+    before_status = order.status
+    order = procurement_service.send_purchase_order(db, purchase_order_id=po_id, commit=False)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.purchase_order.send",
+        entity_type="procurement.purchase_order",
+        entity_id=order.id,
+        company_id=order.company_id,
+        project_id=order.project_id,
+        before={"status": before_status},
+        after={"status": order.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return _purchase_order_response(db, order)
 
 
@@ -375,6 +501,7 @@ def create_goods_receipt(
     payload: GoodsReceiptCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.goods_receipt", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     order = procurement_repository.get_purchase_order(db, payload.purchase_order_id)
     if order is None:
@@ -393,7 +520,24 @@ def create_goods_receipt(
         received_at=payload.received_at,
         quality_notes=payload.quality_notes,
         lines=[line.model_dump() for line in payload.lines],
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.goods_receipt.create",
+        entity_type="procurement.goods_receipt",
+        entity_id=receipt.id,
+        company_id=order.company_id,
+        project_id=order.project_id,
+        before=None,
+        after={
+            "receiptNumber": receipt.receipt_number,
+            "purchaseOrderId": str(payload.purchase_order_id),
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return GoodsReceiptResponse.model_validate(receipt, from_attributes=True)
 
 
@@ -402,6 +546,7 @@ def create_service_entry(
     payload: ServiceEntryCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.service_entry", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     order = procurement_repository.get_purchase_order(db, payload.purchase_order_id)
     if order is None:
@@ -420,7 +565,25 @@ def create_service_entry(
         progress_percentage=payload.progress_percentage,
         accepted_value=payload.accepted_value,
         approved_by_id=user.id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.service_entry.create",
+        entity_type="procurement.service_entry",
+        entity_id=entry.id,
+        company_id=order.company_id,
+        project_id=order.project_id,
+        before=None,
+        after={
+            "entryNumber": entry.entry_number,
+            "purchaseOrderId": str(payload.purchase_order_id),
+            "progressPercentage": str(payload.progress_percentage),
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return ServiceEntryResponse.model_validate(entry, from_attributes=True)
 
 
@@ -429,6 +592,7 @@ def run_three_way_match(
     payload: ThreeWayMatchRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.three_way_match", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ):
     order = procurement_repository.get_purchase_order(db, payload.purchase_order_id)
     if order is None:
@@ -450,5 +614,23 @@ def run_three_way_match(
         supplier_invoice_quantity=payload.supplier_invoice_quantity,
         quantity_tolerance_pct=payload.quantity_tolerance_pct,
         amount_tolerance_pct=payload.amount_tolerance_pct,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.three_way_match.create",
+        entity_type="procurement.three_way_match",
+        entity_id=result.id,
+        company_id=order.company_id,
+        project_id=order.project_id,
+        before=None,
+        after={
+            "resultId": str(result.id),
+            "purchaseOrderId": str(payload.purchase_order_id),
+            "matchStatus": result.status,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return ThreeWayMatchResponse.model_validate(result, from_attributes=True)

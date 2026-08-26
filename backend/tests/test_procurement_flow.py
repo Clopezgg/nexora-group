@@ -269,10 +269,10 @@ def test_approving_purchase_order_creates_audit_log_entry(client, db_session):
         select(AuditLog).where(
             AuditLog.entity_type == "procurement.purchase_order",
             AuditLog.entity_id == uuid.UUID(order["id"]),
+            AuditLog.action == "procurement.purchase_order.approve",
         )
     ).scalars().all()
     assert len(rows) == 1
-    assert rows[0].action == "procurement.purchase_order.approve"
     assert rows[0].after["status"] == "APPROVED"
 
 

@@ -38,6 +38,7 @@ def create_requisition(
     priority: str,
     required_date,
     lines: list[dict],
+    commit: bool = True,
 ) -> PurchaseRequisition:
     number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="PR")
     requisition = procurement_repository.create_requisition(
@@ -60,12 +61,15 @@ def create_requisition(
             estimated_unit_cost=line.get("estimated_unit_cost", Decimal("0")),
         )
     requisition.status = "SUBMITTED"
-    db.commit()
-    db.refresh(requisition)
+    if commit:
+        db.commit()
+        db.refresh(requisition)
+    else:
+        db.flush()
     return requisition
 
 
-def approve_requisition(db: Session, *, requisition_id: uuid.UUID, approved_by_id: uuid.UUID) -> PurchaseRequisition:
+def approve_requisition(db: Session, *, requisition_id: uuid.UUID, approved_by_id: uuid.UUID, commit: bool = True) -> PurchaseRequisition:
     requisition = procurement_repository.get_requisition(db, requisition_id)
     if requisition is None:
         raise ValueError(f"PurchaseRequisition {requisition_id} no existe")
@@ -75,8 +79,11 @@ def approve_requisition(db: Session, *, requisition_id: uuid.UUID, approved_by_i
         )
     requisition.status = "APPROVED"
     requisition.approved_by_id = approved_by_id
-    db.commit()
-    db.refresh(requisition)
+    if commit:
+        db.commit()
+        db.refresh(requisition)
+    else:
+        db.flush()
     return requisition
 
 
@@ -88,6 +95,7 @@ def create_rfq(
     due_date,
     terms: str | None,
     supplier_ids: list[uuid.UUID],
+    commit: bool = True,
 ) -> RequestForQuotation:
     if not supplier_ids:
         raise InvalidProcurementStateError("Una RFQ debe enviarse a al menos un supplier")
@@ -103,8 +111,11 @@ def create_rfq(
         terms=terms,
         supplier_ids=supplier_ids,
     )
-    db.commit()
-    db.refresh(rfq)
+    if commit:
+        db.commit()
+        db.refresh(rfq)
+    else:
+        db.flush()
     return rfq
 
 
@@ -119,6 +130,7 @@ def submit_quotation(
     valid_until,
     notes: str | None,
     lines: list[dict],
+    commit: bool = True,
 ) -> SupplierQuotation:
     rfq = procurement_repository.get_rfq(db, request_for_quotation_id)
     if rfq is None:
@@ -135,8 +147,11 @@ def submit_quotation(
         notes=notes,
         lines=lines,
     )
-    db.commit()
-    db.refresh(quotation)
+    if commit:
+        db.commit()
+        db.refresh(quotation)
+    else:
+        db.flush()
     return quotation
 
 
@@ -153,6 +168,7 @@ def create_purchase_order_from_quotation(
     company_id: uuid.UUID,
     supplier_quotation_id: uuid.UUID,
     project_id: uuid.UUID | None,
+    commit: bool = True,
 ) -> PurchaseOrder:
     """El usuario ya decidió el ganador (Bid Comparison manual); esto solo
     convierte la cotización seleccionada en una PO real con sus líneas."""
@@ -185,8 +201,11 @@ def create_purchase_order_from_quotation(
         ],
     )
     quotation.status = "SELECTED"
-    db.commit()
-    db.refresh(order)
+    if commit:
+        db.commit()
+        db.refresh(order)
+    else:
+        db.flush()
     return order
 
 
@@ -198,6 +217,7 @@ def create_purchase_order(
     project_id: uuid.UUID | None,
     currency_code: str,
     lines: list[dict],
+    commit: bool = True,
 ) -> PurchaseOrder:
     """PO directa sin pasar por RFQ/cotización (compras menores)."""
     number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="PO")
@@ -211,12 +231,15 @@ def create_purchase_order(
         currency_code=currency_code,
         lines=lines,
     )
-    db.commit()
-    db.refresh(order)
+    if commit:
+        db.commit()
+        db.refresh(order)
+    else:
+        db.flush()
     return order
 
 
-def approve_purchase_order(db: Session, *, purchase_order_id: uuid.UUID) -> PurchaseOrder:
+def approve_purchase_order(db: Session, *, purchase_order_id: uuid.UUID, commit: bool = True) -> PurchaseOrder:
     order = procurement_repository.get_purchase_order(db, purchase_order_id)
     if order is None:
         raise ValueError(f"PurchaseOrder {purchase_order_id} no existe")
@@ -236,20 +259,26 @@ def approve_purchase_order(db: Session, *, purchase_order_id: uuid.UUID) -> Purc
                 f"{company.functional_currency_code}; no existe una política FX autoritativa"
             )
     order.status = "APPROVED"
-    db.commit()
-    db.refresh(order)
+    if commit:
+        db.commit()
+        db.refresh(order)
+    else:
+        db.flush()
     return order
 
 
-def send_purchase_order(db: Session, *, purchase_order_id: uuid.UUID) -> PurchaseOrder:
+def send_purchase_order(db: Session, *, purchase_order_id: uuid.UUID, commit: bool = True) -> PurchaseOrder:
     order = procurement_repository.get_purchase_order(db, purchase_order_id)
     if order is None:
         raise ValueError(f"PurchaseOrder {purchase_order_id} no existe")
     if order.status != "APPROVED":
         raise InvalidProcurementStateError("Solo se puede enviar una PO APPROVED")
     order.status = "SENT"
-    db.commit()
-    db.refresh(order)
+    if commit:
+        db.commit()
+        db.refresh(order)
+    else:
+        db.flush()
     return order
 
 
@@ -268,6 +297,7 @@ def record_goods_receipt(
     received_at,
     quality_notes: str | None,
     lines: list[dict],
+    commit: bool = True,
 ) -> GoodsReceipt:
     """GR: soporta recepción parcial. Actualiza `quantity_received` de cada
     PurchaseOrderLine y recalcula el status de la PO
@@ -329,8 +359,11 @@ def record_goods_receipt(
     else:
         order.status = "PARTIALLY_RECEIVED"
 
-    db.commit()
-    db.refresh(receipt)
+    if commit:
+        db.commit()
+        db.refresh(receipt)
+    else:
+        db.flush()
     return receipt
 
 
@@ -344,6 +377,7 @@ def record_service_entry(
     progress_percentage: Decimal,
     accepted_value: Decimal,
     approved_by_id: uuid.UUID,
+    commit: bool = True,
 ) -> ServiceEntry:
     order = procurement_repository.get_purchase_order(db, purchase_order_id)
     if order is None:
@@ -360,8 +394,11 @@ def record_service_entry(
         accepted_value=accepted_value,
         approved_by_id=approved_by_id,
     )
-    db.commit()
-    db.refresh(entry)
+    if commit:
+        db.commit()
+        db.refresh(entry)
+    else:
+        db.flush()
     return entry
 
 
@@ -374,6 +411,7 @@ def run_three_way_match(
     supplier_invoice_quantity: Decimal,
     quantity_tolerance_pct: Decimal = Decimal("0"),
     amount_tolerance_pct: Decimal = Decimal("0"),
+    commit: bool = True,
 ) -> ThreeWayMatchResult:
     """INV-PROC-001: compara PO vs Goods Receipt/Service Entry vs Supplier
     Invoice. Las diferencias fuera de tolerancia NUNCA se descartan
@@ -434,6 +472,9 @@ def run_three_way_match(
         status="EXCEPTION" if exceptions else "MATCHED",
         exceptions=exceptions,
     )
-    db.commit()
-    db.refresh(result)
+    if commit:
+        db.commit()
+        db.refresh(result)
+    else:
+        db.flush()
     return result

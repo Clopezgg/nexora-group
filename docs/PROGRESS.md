@@ -1047,10 +1047,10 @@ Approvals/Audit/Notifications, luego Reports/Search/Analytics).
 
 ## Track G, Task 1 — Audit trail foundation (`NXR-REQ-0090`)
 
-Resuelve `DEFERRED-FINAL-014` (no existía ningún mecanismo de audit log en
-el sistema). Construido en `track/g-workflow-audit`, worktree
-`nexora-group-trackG`, rama nueva desde el head de
-`feat/nexora-greenfield` (`bb1fe85`).
+**RESUELTO COMPLETAMENTE (2026-08-26 backlog burn-down total).**
+`DEFERRED-FINAL-014` cerrado — los 56 routes de mutación del codebase
+están instrumentados con atomic audit (commit=False + audit_service.record()
++ db.commit()). Ver `docs/AUDIT.md` para la tabla completa.
 
 `AuditLog` real (`app/models/audit.py`), tabla `audit_logs`, append-only
 por diseño (ningún servicio/ruta nuevo hace `UPDATE`/`DELETE` sobre una
@@ -1344,7 +1344,8 @@ Plan `2026-08-25-track-g-workflow-audit` completo. Bloque PLATFORM
 parcialmente `IMPLEMENTED` (Workflow/Approvals/SoD/Audit/Notifications);
 sigue `NOT_STARTED` Global Search, Reporting, Export, Settings,
 Integration architecture (`NXR-REQ-0092`-`0096`, Prioridad 4 del
-usuario). `DEFERRED-FINAL-014` (audit log) parcialmente resuelto,
+usuario). `DEFERRED-FINAL-014` (audit log) resuelto completamente
+(2026-08-26, 56/56 routes instrumentados, ver `docs/AUDIT.md`),
 `DEFERRED-FINAL-016` nuevo (`create_request` sin llamador real). Próximo:
 continuar con Reports/Search/Analytics per `docs/MASTER_PLAN.md`.
 

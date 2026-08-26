@@ -113,21 +113,22 @@ certificar el 100%.
   existe data real todavía en ningún ambiente; sigue abierto como
   recordatorio de que un ambiente sembrado con datos antes de un backfill
   explícito requeriría uno.
-- `DEFERRED-FINAL-014` — **PARCIALMENTE RESUELTO (2026-08-25, Track G
-  Task 1).** No existía ningún mecanismo real de audit log en el
-  codebase. Ahora existe `AuditLog` real (`app/models/audit.py`,
-  append-only, nunca UPDATE/DELETE), invocado explícitamente desde la
-  capa de ruta (nunca hook oculto de ORM, nunca cambio de firma de
-  servicio existente) — ver `docs/AUDIT.md`. Instrumentado por ahora: AP
-  submit/approve/pay, AR create/approve/collect, Treasury
-  remittance/create/general_expense/transfer/cash-closing approve+create/
-  bank_statement+bank_statement_line create/reconciliation match+exclude/
-  fund_restriction, Procurement PO approve, General Ledger create/reverse;
-  además `workflow.approval.decide`. Sigue `NOT_STARTED` la
-  instrumentación de Project Control, Enterprise Resources, Construction
-  Control, Supply Chain restante, Platform (Company/User create), y el
-  resto de dominios — backlog honesto en `docs/AUDIT.md`, no bloquea el
-  resto de esos tracks mientras tanto.
+- `DEFERRED-FINAL-014` — **RESUELTO (2026-08-25 Track G Task 1 + 2026-08-26 backlog burn-down total).**
+  No existía ningún mecanismo real de audit log en el codebase. Ahora
+  existe `AuditLog` real (`app/models/audit.py`, append-only, nunca
+  UPDATE/DELETE), invocado explícitamente desde la capa de ruta (nunca
+  hook oculto de ORM, nunca cambio de firma de servicio existente) —
+  ver `docs/AUDIT.md`. **COBERTURA COMPLETA 2026-08-26:** los 56
+  routes de mutación del codebase están instrumentados con atomic audit
+  (commit=False + audit_service.record() + db.commit()). Dominios:
+  Financial Core (AP/AR/Treasury/GL), Supply Chain (Procurement/
+  Inventory/Stock), Project Control (Project/WBS/Task/Milestone/Budget/
+  ChangeOrder/Progress), Enterprise Resources (Workforce/Assets/
+  Equipment), Commercial/CRM, Construction Control (RFI/Submittals/
+  Quality/Safety/SiteReport/Documents/Evidence), Platform (Company/
+  Account/TaxCode/User), Notifications, Approvals, Workflow. 10 service
+  layers ganaron `commit: bool = True`. Si audit falla, toda la
+  mutación hace rollback. Solo queda E2E como futuro work item.
 - `DEFERRED-FINAL-015` — **RESUELTO (2026-08-25, sin worktree separado —
   construido directamente en `feat/nexora-greenfield`, mismo día que el
   Critical Journey E2E que confirmó el gap por segunda vez de forma

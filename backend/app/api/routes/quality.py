@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.models.project import Project
 from app.repositories import project_repository, quality_repository
 from app.schemas.quality import (
@@ -14,7 +15,7 @@ from app.schemas.quality import (
     QualityInspectionCreateRequest,
     QualityInspectionResponse,
 )
-from app.services import quality_service
+from app.services import audit_service, quality_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/quality", tags=["quality"])
@@ -59,6 +60,7 @@ def create_inspection(
     payload: QualityInspectionCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("quality.inspection", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> QualityInspectionResponse:
     project = _resolve_project_or_404(db, payload.project_id)
     assert_company_access(
@@ -75,7 +77,21 @@ def create_inspection(
         result=payload.result,
         notes=payload.notes,
         evidence_id=payload.evidence_id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="quality.inspection.create",
+        entity_type="quality.inspection",
+        entity_id=inspection.id,
+        company_id=project.company_id,
+        project_id=payload.project_id,
+        before=None,
+        after={"inspectionType": inspection.inspection_type, "result": inspection.result},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return QualityInspectionResponse.model_validate(inspection, from_attributes=True)
 
 
@@ -114,6 +130,7 @@ def create_non_conformance(
     payload: NonConformanceCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("quality.non_conformance", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> NonConformanceResponse:
     project = _resolve_project_or_404(db, payload.project_id)
     assert_company_access(
@@ -132,7 +149,21 @@ def create_non_conformance(
         responsible_user_id=payload.responsible_user_id,
         due_date=payload.due_date,
         evidence_id=payload.evidence_id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="quality.non_conformance.create",
+        entity_type="quality.non_conformance",
+        entity_id=non_conformance.id,
+        company_id=project.company_id,
+        project_id=payload.project_id,
+        before=None,
+        after={"description": non_conformance.description[:100]},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return NonConformanceResponse.model_validate(non_conformance, from_attributes=True)
 
 
@@ -184,6 +215,7 @@ def create_corrective_action(
     payload: CorrectiveActionCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("quality.corrective_action", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> CorrectiveActionResponse:
     non_conformance = _resolve_non_conformance_or_404(db, non_conformance_id)
     project = _resolve_project_or_404(db, non_conformance.project_id)
@@ -202,7 +234,21 @@ def create_corrective_action(
         responsible_user_id=payload.responsible_user_id,
         due_date=payload.due_date,
         evidence_id=payload.evidence_id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="quality.corrective_action.create",
+        entity_type="quality.corrective_action",
+        entity_id=corrective_action.id,
+        company_id=project.company_id,
+        project_id=non_conformance.project_id,
+        before=None,
+        after={"description": corrective_action.description[:100]},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return CorrectiveActionResponse.model_validate(corrective_action, from_attributes=True)
 
 
@@ -237,6 +283,7 @@ def complete_corrective_action(
     corrective_action_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("quality.corrective_action", "complete")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> CorrectiveActionResponse:
     corrective_action = _resolve_corrective_action_or_404(db, corrective_action_id)
     non_conformance = _resolve_non_conformance_or_404(db, corrective_action.non_conformance_id)
@@ -248,10 +295,24 @@ def complete_corrective_action(
         action="complete",
         company_id=project.company_id,
     )
-    corrective_action = quality_service.complete_corrective_action(
-        db, corrective_action_id=corrective_action_id
+    before_status = corrective_action.status
+    updated = quality_service.complete_corrective_action(
+        db, corrective_action_id=corrective_action_id, commit=False
     )
-    return CorrectiveActionResponse.model_validate(corrective_action, from_attributes=True)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="quality.corrective_action.complete",
+        entity_type="quality.corrective_action",
+        entity_id=corrective_action_id,
+        company_id=project.company_id,
+        project_id=non_conformance.project_id,
+        before={"status": before_status},
+        after={"status": updated.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    return CorrectiveActionResponse.model_validate(updated, from_attributes=True)
 
 
 @router.post("/non-conformances/{non_conformance_id}/close", response_model=NonConformanceResponse)
@@ -259,6 +320,7 @@ def close_non_conformance(
     non_conformance_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("quality.non_conformance", "close")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> NonConformanceResponse:
     non_conformance = _resolve_non_conformance_or_404(db, non_conformance_id)
     project = _resolve_project_or_404(db, non_conformance.project_id)
@@ -269,5 +331,19 @@ def close_non_conformance(
         action="close",
         company_id=project.company_id,
     )
-    non_conformance = quality_service.close_non_conformance(db, non_conformance_id=non_conformance_id)
-    return NonConformanceResponse.model_validate(non_conformance, from_attributes=True)
+    before_status = non_conformance.status
+    updated = quality_service.close_non_conformance(db, non_conformance_id=non_conformance_id, commit=False)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="quality.non_conformance.close",
+        entity_type="quality.non_conformance",
+        entity_id=non_conformance_id,
+        company_id=project.company_id,
+        project_id=non_conformance.project_id,
+        before={"status": before_status},
+        after={"status": updated.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    return NonConformanceResponse.model_validate(updated, from_attributes=True)

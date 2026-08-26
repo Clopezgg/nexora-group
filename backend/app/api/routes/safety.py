@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.models.project import Project
 from app.repositories import project_repository
 from app.schemas.safety import (
@@ -12,7 +13,7 @@ from app.schemas.safety import (
     SafetyObservationCreateRequest,
     SafetyObservationResponse,
 )
-from app.services import safety_service
+from app.services import audit_service, safety_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/safety", tags=["safety"])
@@ -48,6 +49,7 @@ def create_observation(
     payload: SafetyObservationCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("safety.observation", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> SafetyObservationResponse:
     project = _resolve_project_or_404(db, payload.project_id)
     assert_company_access(
@@ -64,7 +66,21 @@ def create_observation(
         responsible_user_id=payload.responsible_user_id,
         corrective_action=payload.corrective_action,
         evidence_id=payload.evidence_id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="safety.observation.create",
+        entity_type="safety.observation",
+        entity_id=observation.id,
+        company_id=project.company_id,
+        project_id=payload.project_id,
+        before=None,
+        after={"category": observation.category, "severity": observation.severity},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return SafetyObservationResponse.model_validate(observation, from_attributes=True)
 
 
@@ -103,14 +119,29 @@ def close_observation(
     observation_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("safety.observation", "close")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> SafetyObservationResponse:
     observation = _resolve_observation_or_404(db, observation_id)
     project = _resolve_project_or_404(db, observation.project_id)
     assert_company_access(
         db, user_id=user.id, resource="safety.observation", action="close", company_id=project.company_id
     )
-    observation = safety_service.close_observation(db, observation_id=observation_id)
-    return SafetyObservationResponse.model_validate(observation, from_attributes=True)
+    before_status = observation.status
+    updated = safety_service.close_observation(db, observation_id=observation_id, commit=False)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="safety.observation.close",
+        entity_type="safety.observation",
+        entity_id=observation_id,
+        company_id=project.company_id,
+        project_id=observation.project_id,
+        before={"status": before_status},
+        after={"status": updated.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    return SafetyObservationResponse.model_validate(updated, from_attributes=True)
 
 
 @router.post("/incidents", response_model=SafetyIncidentResponse, status_code=201)
@@ -118,6 +149,7 @@ def create_incident(
     payload: SafetyIncidentCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("safety.incident", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> SafetyIncidentResponse:
     project = _resolve_project_or_404(db, payload.project_id)
     assert_company_access(
@@ -133,7 +165,21 @@ def create_incident(
         responsible_user_id=payload.responsible_user_id,
         corrective_action=payload.corrective_action,
         evidence_id=payload.evidence_id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="safety.incident.create",
+        entity_type="safety.incident",
+        entity_id=incident.id,
+        company_id=project.company_id,
+        project_id=payload.project_id,
+        before=None,
+        after={"severity": incident.severity, "description": incident.description[:100]},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return SafetyIncidentResponse.model_validate(incident, from_attributes=True)
 
 
@@ -172,11 +218,26 @@ def close_incident(
     incident_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("safety.incident", "close")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> SafetyIncidentResponse:
     incident = _resolve_incident_or_404(db, incident_id)
     project = _resolve_project_or_404(db, incident.project_id)
     assert_company_access(
         db, user_id=user.id, resource="safety.incident", action="close", company_id=project.company_id
     )
-    incident = safety_service.close_incident(db, incident_id=incident_id)
-    return SafetyIncidentResponse.model_validate(incident, from_attributes=True)
+    before_status = incident.status
+    updated = safety_service.close_incident(db, incident_id=incident_id, commit=False)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="safety.incident.close",
+        entity_type="safety.incident",
+        entity_id=incident_id,
+        company_id=project.company_id,
+        project_id=incident.project_id,
+        before={"status": before_status},
+        after={"status": updated.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    return SafetyIncidentResponse.model_validate(updated, from_attributes=True)

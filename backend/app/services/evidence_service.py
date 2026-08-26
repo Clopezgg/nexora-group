@@ -35,6 +35,7 @@ def upload_evidence(
     category: str | None = None,
     entity_type: str | None = None,
     entity_id: uuid.UUID | None = None,
+    commit: bool = True,
 ) -> Evidence:
     if mime_type not in EVIDENCE_ALLOWED_MIME_TYPES:
         raise UnsupportedEvidenceMimeTypeError(
@@ -80,8 +81,11 @@ def upload_evidence(
         entity_type=entity_type,
         entity_id=entity_id,
     )
-    db.commit()
-    db.refresh(evidence)
+    if commit:
+        db.commit()
+        db.refresh(evidence)
+    else:
+        db.flush()
     return evidence
 
 

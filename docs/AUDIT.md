@@ -328,6 +328,36 @@ All 16 routes instrumented with atomic audit. Service layers gained `commit: boo
 
 All 7 routes instrumented with atomic audit. Service layer gained `commit: bool = True` on all 5 mutating functions. `bill_sales_contract` was the most complex — it calls `ar_service.create_customer_invoice` with `commit=False` internally, so the route-level audit + commit ensures both AR invoice + contract status update are atomically audited.
 
+## Dominios instrumentados (2026-08-26, backlog burn-down — Construction Control)
+
+| Dominio | Acción | Ruta |
+|---------|--------|------|
+| RFI | `construction.rfi.create` | `POST /api/rfis` |
+| RFI | `construction.rfi.respond` | `POST /api/rfis/{id}/respond` |
+| RFI | `construction.rfi.close` | `POST /api/rfis/{id}/close` |
+| Submittal | `construction.submittal.create` | `POST /api/submittals` |
+| Submittal | `construction.submittal.response` | `POST /api/submittals/{id}/response` |
+| Submittal | `construction.submittal.decide` | `POST /api/submittals/{id}/decision` |
+| Quality | `quality.inspection.create` | `POST /api/quality/inspections` |
+| Quality | `quality.non_conformance.create` | `POST /api/quality/non-conformances` |
+| Quality | `quality.corrective_action.create` | `POST /api/quality/non-conformances/{id}/corrective-actions` |
+| Quality | `quality.corrective_action.complete` | `POST /api/quality/corrective-actions/{id}/complete` |
+| Quality | `quality.non_conformance.close` | `POST /api/quality/non-conformances/{id}/close` |
+| Safety | `safety.observation.create` | `POST /api/safety/observations` |
+| Safety | `safety.observation.close` | `POST /api/safety/observations/{id}/close` |
+| Safety | `safety.incident.create` | `POST /api/safety/incidents` |
+| Safety | `safety.incident.close` | `POST /api/safety/incidents/{id}/close` |
+| Site Reports | `site.daily_report.create` | `POST /api/site-reports` |
+| Site Reports | `site.daily_report.photo_add` | `POST /api/site-reports/{id}/photos` |
+| Site Reports | `site.daily_report.submit` | `POST /api/site-reports/{id}/submit` |
+| Site Reports | `site.daily_report.approve` | `POST /api/site-reports/{id}/approve` |
+| Site Reports | `site.daily_report.reject` | `POST /api/site-reports/{id}/reject` |
+| Documents | `document.document.create` | `POST /api/documents` |
+| Documents | `document.document.version_add` | `POST /api/documents/{id}/versions` |
+| Evidence | `document.evidence.upload` | `POST /api/evidence` |
+
+All 23 routes instrumented with atomic audit. Service layers gained `commit: bool = True` on all 23 mutating functions across 7 services.
+
 ## Dominios NO instrumentados todavía (backlog honesto)
 
 La cobertura fuera de las acciones enumeradas arriba sigue siendo parcial.
@@ -344,12 +374,13 @@ completitud:
 - **Commercial** (CRM: Leads, Oportunidades, Cotizaciones, Contratos de
   venta) — `CLOSED` (2026-08-26, ver arriba).
 - **Construction Control** (Documents/Evidence, RFI/Submittals, Daily
-  Site Reports, Quality, Safety) — `NOT_STARTED`.
+  Site Reports, Quality, Safety) — `CLOSED` (2026-08-26, ver arriba).
 - **Platform** — Company create/update, User create — `NOT_STARTED`.
 
 Los diez gaps de Treasury, los gaps de creación de AP/AR, los gaps de
 Supply Chain (Procurement + Inventory), los gaps de Project Control,
-los gaps de Enterprise Resources, y los gaps de Commercial/CRM:
+los gaps de Enterprise Resources, los gaps de Commercial/CRM,
+y los gaps de Construction Control:
 **cerrados** (2026-08-26, ver arriba).
 
 Un futuro task puede cerrar estos dominios uno por uno reutilizando

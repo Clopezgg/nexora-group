@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.schemas.document import (
     DocumentCreateRequest,
     DocumentResponse,
     DocumentVersionCreateRequest,
     DocumentVersionResponse,
 )
-from app.services import document_service
+from app.services import audit_service, document_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -28,6 +29,7 @@ def create_document(
     payload: DocumentCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("document.document", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> DocumentResponse:
     assert_company_access(
         db, user_id=user.id, resource="document.document", action="create", company_id=payload.company_id
@@ -42,7 +44,21 @@ def create_document(
         description=payload.description,
         evidence_id=payload.evidence_id,
         uploaded_by=user.id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="document.document.create",
+        entity_type="document.document",
+        entity_id=document.id,
+        company_id=payload.company_id,
+        project_id=payload.project_id,
+        before=None,
+        after={"title": document.title, "category": document.category},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return DocumentResponse.model_validate(document, from_attributes=True)
 
 
@@ -97,16 +113,32 @@ def add_document_version(
     payload: DocumentVersionCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("document.document", "version")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> DocumentVersionResponse:
     document = _resolve_document(db, document_id)
     assert_company_access(
         db, user_id=user.id, resource="document.document", action="version", company_id=document.company_id
     )
+    current_version_number = document.current_version.version_number if document.current_version else None
     version = document_service.add_document_version(
         db,
         document_id=document_id,
         evidence_id=payload.evidence_id,
         uploaded_by=user.id,
         notes=payload.notes,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="document.document.version_add",
+        entity_type="document.document_version",
+        entity_id=version.id,
+        company_id=document.company_id,
+        project_id=document.project_id,
+        before={"currentVersion": current_version_number},
+        after={"versionNumber": version.version_number},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return DocumentVersionResponse.model_validate(version, from_attributes=True)

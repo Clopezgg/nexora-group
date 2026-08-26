@@ -29,6 +29,7 @@ def create_report(
     incidents: str | None,
     observations: str | None,
     author_id: uuid.UUID,
+    commit: bool = True,
 ) -> DailySiteReport:
     report = site_report_repository.create_report(
         db,
@@ -43,8 +44,12 @@ def create_report(
         observations=observations,
         author_id=author_id,
     )
-    db.commit()
-    return site_report_repository.get_report(db, report.id)
+    if commit:
+        db.commit()
+        return site_report_repository.get_report(db, report.id)
+    else:
+        db.flush()
+        return report
 
 
 def get_report(db: Session, report_id: uuid.UUID) -> DailySiteReport | None:
@@ -56,18 +61,22 @@ def list_reports(db: Session, *, project_id: uuid.UUID) -> list[DailySiteReport]
 
 
 def add_photo(
-    db: Session, *, daily_site_report_id: uuid.UUID, evidence_id: uuid.UUID, company_id: uuid.UUID
+    db: Session, *, daily_site_report_id: uuid.UUID, evidence_id: uuid.UUID, company_id: uuid.UUID,
+    commit: bool = True,
 ) -> DailySiteReportPhoto:
     assert_evidence_belongs_to_company(db, evidence_id=evidence_id, company_id=company_id)
     photo = site_report_repository.add_photo(
         db, daily_site_report_id=daily_site_report_id, evidence_id=evidence_id
     )
-    db.commit()
-    db.refresh(photo)
+    if commit:
+        db.commit()
+        db.refresh(photo)
+    else:
+        db.flush()
     return photo
 
 
-def submit_report(db: Session, *, report_id: uuid.UUID) -> DailySiteReport:
+def submit_report(db: Session, *, report_id: uuid.UUID, commit: bool = True) -> DailySiteReport:
     report = site_report_repository.get_report(db, report_id)
     if report is None:
         raise ValueError(f"DailySiteReport {report_id} no existe")
@@ -76,12 +85,15 @@ def submit_report(db: Session, *, report_id: uuid.UUID) -> DailySiteReport:
             f"Solo se puede enviar un DailySiteReport DRAFT (estado actual: {report.status})"
         )
     report.status = "SUBMITTED"
-    db.commit()
-    db.refresh(report)
+    if commit:
+        db.commit()
+        db.refresh(report)
+    else:
+        db.flush()
     return report
 
 
-def approve_report(db: Session, *, report_id: uuid.UUID, approved_by_id: uuid.UUID) -> DailySiteReport:
+def approve_report(db: Session, *, report_id: uuid.UUID, approved_by_id: uuid.UUID, commit: bool = True) -> DailySiteReport:
     report = site_report_repository.get_report(db, report_id)
     if report is None:
         raise ValueError(f"DailySiteReport {report_id} no existe")
@@ -92,12 +104,15 @@ def approve_report(db: Session, *, report_id: uuid.UUID, approved_by_id: uuid.UU
     report.status = "APPROVED"
     report.approved_by_id = approved_by_id
     report.approved_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(report)
+    if commit:
+        db.commit()
+        db.refresh(report)
+    else:
+        db.flush()
     return report
 
 
-def reject_report(db: Session, *, report_id: uuid.UUID, approved_by_id: uuid.UUID) -> DailySiteReport:
+def reject_report(db: Session, *, report_id: uuid.UUID, approved_by_id: uuid.UUID, commit: bool = True) -> DailySiteReport:
     report = site_report_repository.get_report(db, report_id)
     if report is None:
         raise ValueError(f"DailySiteReport {report_id} no existe")
@@ -108,6 +123,9 @@ def reject_report(db: Session, *, report_id: uuid.UUID, approved_by_id: uuid.UUI
     report.status = "REJECTED"
     report.approved_by_id = approved_by_id
     report.approved_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(report)
+    if commit:
+        db.commit()
+        db.refresh(report)
+    else:
+        db.flush()
     return report

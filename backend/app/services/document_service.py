@@ -33,6 +33,7 @@ def create_document(
     description: str | None,
     evidence_id: uuid.UUID,
     uploaded_by: uuid.UUID,
+    commit: bool = True,
 ) -> Document:
     assert_operation_scope(scope, project_id)
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
@@ -54,8 +55,12 @@ def create_document(
         evidence_id=evidence_id,
         uploaded_by=uploaded_by,
     )
-    db.commit()
-    return document_repository.get_document(db, document.id)
+    if commit:
+        db.commit()
+        return document_repository.get_document(db, document.id)
+    else:
+        db.flush()
+        return document
 
 
 def get_document(db: Session, document_id: uuid.UUID) -> Document | None:
@@ -79,6 +84,7 @@ def add_document_version(
     evidence_id: uuid.UUID,
     uploaded_by: uuid.UUID,
     notes: str | None = None,
+    commit: bool = True,
 ) -> DocumentVersion:
     document = document_repository.get_document(db, document_id)
     if document is None:
@@ -108,6 +114,9 @@ def add_document_version(
         uploaded_by=uploaded_by,
         notes=notes,
     )
-    db.commit()
-    db.refresh(new_version)
+    if commit:
+        db.commit()
+        db.refresh(new_version)
+    else:
+        db.flush()
     return new_version

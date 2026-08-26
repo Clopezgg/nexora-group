@@ -33,6 +33,7 @@ def create_inspection(
     result: str,
     notes: str | None,
     evidence_id: uuid.UUID | None,
+    commit: bool = True,
 ) -> QualityInspection:
     assert_evidence_belongs_to_company(db, evidence_id=evidence_id, company_id=company_id)
     inspection = quality_repository.create_inspection(
@@ -46,8 +47,11 @@ def create_inspection(
         notes=notes,
         evidence_id=evidence_id,
     )
-    db.commit()
-    db.refresh(inspection)
+    if commit:
+        db.commit()
+        db.refresh(inspection)
+    else:
+        db.flush()
     return inspection
 
 
@@ -69,6 +73,7 @@ def create_non_conformance(
     responsible_user_id: uuid.UUID,
     due_date: date | None,
     evidence_id: uuid.UUID | None,
+    commit: bool = True,
 ) -> NonConformance:
     assert_evidence_belongs_to_company(db, evidence_id=evidence_id, company_id=company_id)
     assert_user_belongs_to_company(db, user_id=responsible_user_id, company_id=company_id)
@@ -81,8 +86,11 @@ def create_non_conformance(
         due_date=due_date,
         evidence_id=evidence_id,
     )
-    db.commit()
-    db.refresh(non_conformance)
+    if commit:
+        db.commit()
+        db.refresh(non_conformance)
+    else:
+        db.flush()
     return non_conformance
 
 
@@ -103,6 +111,7 @@ def create_corrective_action(
     responsible_user_id: uuid.UUID,
     due_date: date,
     evidence_id: uuid.UUID | None,
+    commit: bool = True,
 ) -> CorrectiveAction:
     non_conformance = quality_repository.get_non_conformance(db, non_conformance_id)
     if non_conformance is None:
@@ -121,8 +130,11 @@ def create_corrective_action(
         due_date=due_date,
         evidence_id=evidence_id,
     )
-    db.commit()
-    db.refresh(corrective_action)
+    if commit:
+        db.commit()
+        db.refresh(corrective_action)
+    else:
+        db.flush()
     return corrective_action
 
 
@@ -130,7 +142,7 @@ def list_corrective_actions(db: Session, *, non_conformance_id: uuid.UUID) -> li
     return quality_repository.list_corrective_actions(db, non_conformance_id=non_conformance_id)
 
 
-def complete_corrective_action(db: Session, *, corrective_action_id: uuid.UUID) -> CorrectiveAction:
+def complete_corrective_action(db: Session, *, corrective_action_id: uuid.UUID, commit: bool = True) -> CorrectiveAction:
     corrective_action = quality_repository.get_corrective_action(db, corrective_action_id)
     if corrective_action is None:
         raise ValueError(f"CorrectiveAction {corrective_action_id} no existe")
@@ -140,12 +152,15 @@ def complete_corrective_action(db: Session, *, corrective_action_id: uuid.UUID) 
         )
     corrective_action.status = "COMPLETED"
     corrective_action.completed_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(corrective_action)
+    if commit:
+        db.commit()
+        db.refresh(corrective_action)
+    else:
+        db.flush()
     return corrective_action
 
 
-def close_non_conformance(db: Session, *, non_conformance_id: uuid.UUID) -> NonConformance:
+def close_non_conformance(db: Session, *, non_conformance_id: uuid.UUID, commit: bool = True) -> NonConformance:
     non_conformance = quality_repository.get_non_conformance(db, non_conformance_id)
     if non_conformance is None:
         raise ValueError(f"NonConformance {non_conformance_id} no existe")
@@ -163,6 +178,9 @@ def close_non_conformance(db: Session, *, non_conformance_id: uuid.UUID) -> NonC
         )
     non_conformance.status = "CLOSED"
     non_conformance.closed_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(non_conformance)
+    if commit:
+        db.commit()
+        db.refresh(non_conformance)
+    else:
+        db.flush()
     return non_conformance

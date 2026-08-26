@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.schemas.submittal import (
     SubmittalCreateRequest,
     SubmittalDecisionRequest,
     SubmittalResponse,
     SubmittalResponseRequest,
 )
-from app.services import submittal_service
+from app.services import audit_service, submittal_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/submittals", tags=["submittals"])
@@ -28,6 +29,7 @@ def create_submittal(
     payload: SubmittalCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("construction.submittal", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> SubmittalResponse:
     assert_company_access(
         db,
@@ -49,7 +51,21 @@ def create_submittal(
         submitted_at=payload.submitted_at,
         due_date=payload.due_date,
         evidence_id=payload.evidence_id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="construction.submittal.create",
+        entity_type="construction.submittal",
+        entity_id=submittal.id,
+        company_id=payload.company_id,
+        project_id=payload.project_id,
+        before=None,
+        after={"number": submittal.number, "title": submittal.title},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return SubmittalResponse.model_validate(submittal, from_attributes=True)
 
 
@@ -92,6 +108,7 @@ def record_submittal_response(
     payload: SubmittalResponseRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("construction.submittal", "review")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> SubmittalResponse:
     submittal = _resolve_submittal(db, submittal_id)
     assert_company_access(
@@ -101,9 +118,23 @@ def record_submittal_response(
         action="review",
         company_id=submittal.company_id,
     )
+    before_status = submittal.status
     updated = submittal_service.record_submittal_response(
-        db, submittal_id=submittal_id, response=payload.response, reviewed_by=user.id
+        db, submittal_id=submittal_id, response=payload.response, reviewed_by=user.id, commit=False
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="construction.submittal.response",
+        entity_type="construction.submittal",
+        entity_id=submittal_id,
+        company_id=submittal.company_id,
+        project_id=submittal.project_id,
+        before={"status": before_status},
+        after={"status": updated.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return SubmittalResponse.model_validate(updated, from_attributes=True)
 
 
@@ -113,6 +144,7 @@ def decide_submittal(
     payload: SubmittalDecisionRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("construction.submittal", "decide")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> SubmittalResponse:
     submittal = _resolve_submittal(db, submittal_id)
     assert_company_access(
@@ -122,7 +154,21 @@ def decide_submittal(
         action="decide",
         company_id=submittal.company_id,
     )
+    before_status = submittal.status
     updated = submittal_service.decide_submittal(
-        db, submittal_id=submittal_id, decision=payload.decision, decided_by=user.id
+        db, submittal_id=submittal_id, decision=payload.decision, decided_by=user.id, commit=False
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="construction.submittal.decide",
+        entity_type="construction.submittal",
+        entity_id=submittal_id,
+        company_id=submittal.company_id,
+        project_id=submittal.project_id,
+        before={"status": before_status},
+        after={"status": updated.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return SubmittalResponse.model_validate(updated, from_attributes=True)

@@ -45,6 +45,7 @@ def create_observation(
     responsible_user_id: uuid.UUID | None,
     corrective_action: str | None,
     evidence_id: uuid.UUID | None,
+    commit: bool = True,
 ) -> SafetyObservation:
     _assert_severity_requires_responsible(severity, responsible_user_id)
     assert_evidence_belongs_to_company(db, evidence_id=evidence_id, company_id=company_id)
@@ -60,8 +61,11 @@ def create_observation(
         corrective_action=corrective_action,
         evidence_id=evidence_id,
     )
-    db.commit()
-    db.refresh(observation)
+    if commit:
+        db.commit()
+        db.refresh(observation)
+    else:
+        db.flush()
     return observation
 
 
@@ -73,7 +77,7 @@ def list_observations(db: Session, *, project_id: uuid.UUID) -> list[SafetyObser
     return safety_repository.list_observations_for_project(db, project_id)
 
 
-def close_observation(db: Session, *, observation_id: uuid.UUID) -> SafetyObservation:
+def close_observation(db: Session, *, observation_id: uuid.UUID, commit: bool = True) -> SafetyObservation:
     observation = safety_repository.get_observation(db, observation_id)
     if observation is None:
         raise ValueError(f"SafetyObservation {observation_id} no existe")
@@ -83,8 +87,11 @@ def close_observation(db: Session, *, observation_id: uuid.UUID) -> SafetyObserv
         )
     observation.status = "CLOSED"
     observation.closed_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(observation)
+    if commit:
+        db.commit()
+        db.refresh(observation)
+    else:
+        db.flush()
     return observation
 
 
@@ -99,6 +106,7 @@ def create_incident(
     responsible_user_id: uuid.UUID | None,
     corrective_action: str | None,
     evidence_id: uuid.UUID | None,
+    commit: bool = True,
 ) -> SafetyIncident:
     _assert_severity_requires_responsible(severity, responsible_user_id)
     assert_evidence_belongs_to_company(db, evidence_id=evidence_id, company_id=company_id)
@@ -113,8 +121,11 @@ def create_incident(
         corrective_action=corrective_action,
         evidence_id=evidence_id,
     )
-    db.commit()
-    db.refresh(incident)
+    if commit:
+        db.commit()
+        db.refresh(incident)
+    else:
+        db.flush()
     return incident
 
 
@@ -126,7 +137,7 @@ def list_incidents(db: Session, *, project_id: uuid.UUID) -> list[SafetyIncident
     return safety_repository.list_incidents_for_project(db, project_id)
 
 
-def close_incident(db: Session, *, incident_id: uuid.UUID) -> SafetyIncident:
+def close_incident(db: Session, *, incident_id: uuid.UUID, commit: bool = True) -> SafetyIncident:
     incident = safety_repository.get_incident(db, incident_id)
     if incident is None:
         raise ValueError(f"SafetyIncident {incident_id} no existe")
@@ -136,6 +147,9 @@ def close_incident(db: Session, *, incident_id: uuid.UUID) -> SafetyIncident:
         )
     incident.status = "CLOSED"
     incident.closed_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(incident)
+    if commit:
+        db.commit()
+        db.refresh(incident)
+    else:
+        db.flush()
     return incident

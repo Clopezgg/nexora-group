@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.schemas.rfi import RfiCreateRequest, RfiRespondRequest, RfiResponse
-from app.services import rfi_service
+from app.services import audit_service, rfi_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/rfis", tags=["rfi"])
@@ -23,6 +24,7 @@ def create_rfi(
     payload: RfiCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("construction.rfi", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> RfiResponse:
     assert_company_access(
         db, user_id=user.id, resource="construction.rfi", action="create", company_id=payload.company_id
@@ -37,7 +39,21 @@ def create_rfi(
         responsible=payload.responsible,
         requested_by=user.id,
         due_date=payload.due_date,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="construction.rfi.create",
+        entity_type="construction.rfi",
+        entity_id=rfi.id,
+        company_id=payload.company_id,
+        project_id=payload.project_id,
+        before=None,
+        after={"number": rfi.number, "subject": rfi.subject},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return RfiResponse.model_validate(rfi, from_attributes=True)
 
 
@@ -76,12 +92,27 @@ def respond_rfi(
     payload: RfiRespondRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("construction.rfi", "respond")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> RfiResponse:
     rfi = _resolve_rfi(db, rfi_id)
     assert_company_access(
         db, user_id=user.id, resource="construction.rfi", action="respond", company_id=rfi.company_id
     )
-    updated = rfi_service.respond_rfi(db, rfi_id=rfi_id, response=payload.response, responded_by=user.id)
+    before_status = rfi.status
+    updated = rfi_service.respond_rfi(db, rfi_id=rfi_id, response=payload.response, responded_by=user.id, commit=False)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="construction.rfi.respond",
+        entity_type="construction.rfi",
+        entity_id=rfi_id,
+        company_id=rfi.company_id,
+        project_id=rfi.project_id,
+        before={"status": before_status},
+        after={"status": updated.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return RfiResponse.model_validate(updated, from_attributes=True)
 
 
@@ -90,10 +121,25 @@ def close_rfi(
     rfi_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("construction.rfi", "close")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> RfiResponse:
     rfi = _resolve_rfi(db, rfi_id)
     assert_company_access(
         db, user_id=user.id, resource="construction.rfi", action="close", company_id=rfi.company_id
     )
-    updated = rfi_service.close_rfi(db, rfi_id=rfi_id)
+    before_status = rfi.status
+    updated = rfi_service.close_rfi(db, rfi_id=rfi_id, commit=False)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="construction.rfi.close",
+        entity_type="construction.rfi",
+        entity_id=rfi_id,
+        company_id=rfi.company_id,
+        project_id=rfi.project_id,
+        before={"status": before_status},
+        after={"status": updated.status},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return RfiResponse.model_validate(updated, from_attributes=True)

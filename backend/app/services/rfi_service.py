@@ -27,6 +27,7 @@ def create_rfi(
     responsible: str | None,
     requested_by: uuid.UUID,
     due_date: date | None,
+    commit: bool = True,
 ) -> RequestForInformation:
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
 
@@ -45,8 +46,11 @@ def create_rfi(
         requested_by=requested_by,
         due_date=due_date,
     )
-    db.commit()
-    db.refresh(rfi)
+    if commit:
+        db.commit()
+        db.refresh(rfi)
+    else:
+        db.flush()
     return rfi
 
 
@@ -61,7 +65,7 @@ def list_rfis(
 
 
 def respond_rfi(
-    db: Session, *, rfi_id: uuid.UUID, response: str, responded_by: uuid.UUID
+    db: Session, *, rfi_id: uuid.UUID, response: str, responded_by: uuid.UUID, commit: bool = True,
 ) -> RequestForInformation:
     rfi = rfi_repository.get_rfi(db, rfi_id)
     if rfi is None:
@@ -74,12 +78,15 @@ def respond_rfi(
     rfi.responded_by = responded_by
     rfi.responded_at = datetime.now(timezone.utc)
     rfi.status = "ANSWERED"
-    db.commit()
-    db.refresh(rfi)
+    if commit:
+        db.commit()
+        db.refresh(rfi)
+    else:
+        db.flush()
     return rfi
 
 
-def close_rfi(db: Session, *, rfi_id: uuid.UUID) -> RequestForInformation:
+def close_rfi(db: Session, *, rfi_id: uuid.UUID, commit: bool = True) -> RequestForInformation:
     rfi = rfi_repository.get_rfi(db, rfi_id)
     if rfi is None:
         raise ValueError(f"RFI {rfi_id} no existe")
@@ -87,6 +94,9 @@ def close_rfi(db: Session, *, rfi_id: uuid.UUID) -> RequestForInformation:
         raise InvalidRfiStateError("El RFI ya está CLOSED")
     rfi.status = "CLOSED"
     rfi.closed_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(rfi)
+    if commit:
+        db.commit()
+        db.refresh(rfi)
+    else:
+        db.flush()
     return rfi

@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_correlation import get_correlation_id
 from app.schemas.document import EvidenceResponse
-from app.services import evidence_service
+from app.services import audit_service, evidence_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
@@ -28,6 +29,7 @@ async def upload_evidence(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user=Depends(require_permission("document.evidence", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> EvidenceResponse:
     assert_company_access(
         db, user_id=user.id, resource="document.evidence", action="create", company_id=company_id
@@ -43,7 +45,21 @@ async def upload_evidence(
         category=category,
         entity_type=entity_type,
         entity_id=entity_id,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="document.evidence.upload",
+        entity_type="document.evidence",
+        entity_id=evidence.id,
+        company_id=company_id,
+        project_id=None,
+        before=None,
+        after={"originalFilename": evidence.original_filename, "sizeBytes": evidence.size_bytes},
+        correlation_id=correlation_id,
+    )
+    db.commit()
     return EvidenceResponse.model_validate(evidence, from_attributes=True)
 
 

@@ -39,6 +39,7 @@ def create_submittal(
     submitted_at: date,
     due_date: date | None,
     evidence_id: uuid.UUID | None,
+    commit: bool = True,
 ) -> Submittal:
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
     if supplier_id is not None:
@@ -64,8 +65,11 @@ def create_submittal(
         due_date=due_date,
         evidence_id=evidence_id,
     )
-    db.commit()
-    db.refresh(submittal)
+    if commit:
+        db.commit()
+        db.refresh(submittal)
+    else:
+        db.flush()
     return submittal
 
 
@@ -80,7 +84,7 @@ def list_submittals(
 
 
 def record_submittal_response(
-    db: Session, *, submittal_id: uuid.UUID, response: str, reviewed_by: uuid.UUID
+    db: Session, *, submittal_id: uuid.UUID, response: str, reviewed_by: uuid.UUID, commit: bool = True,
 ) -> Submittal:
     submittal = submittal_repository.get_submittal(db, submittal_id)
     if submittal is None:
@@ -93,13 +97,16 @@ def record_submittal_response(
     submittal.reviewed_by = reviewed_by
     submittal.response_recorded_at = datetime.now(timezone.utc)
     submittal.status = "UNDER_REVIEW"
-    db.commit()
-    db.refresh(submittal)
+    if commit:
+        db.commit()
+        db.refresh(submittal)
+    else:
+        db.flush()
     return submittal
 
 
 def decide_submittal(
-    db: Session, *, submittal_id: uuid.UUID, decision: str, decided_by: uuid.UUID
+    db: Session, *, submittal_id: uuid.UUID, decision: str, decided_by: uuid.UUID, commit: bool = True,
 ) -> Submittal:
     if decision not in SUBMITTAL_DECISIONS:
         raise InvalidSubmittalStateError(f"decision inválida: {decision!r}")
@@ -118,8 +125,11 @@ def decide_submittal(
     submittal.status = decision
     submittal.decided_by = decided_by
     submittal.decided_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(submittal)
+    if commit:
+        db.commit()
+        db.refresh(submittal)
+    else:
+        db.flush()
     return submittal
 
 

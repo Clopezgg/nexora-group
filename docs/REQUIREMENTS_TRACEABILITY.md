@@ -261,7 +261,7 @@ todavía).
 |---|---|---|---|---|
 | NXR-REQ-0106 | Migrations (Alembic) | ➖·✅·✅·➖·➖·➖·➖·✅·✅ | IMPLEMENTED | 2026-08-25: certificado con evidencia real, no solo "aplicado". `tests/test_migrations.py` (nuevo) ejecuta contra una PostgreSQL real dedicada: fresh install (`upgrade head` desde vacío) → `downgrade base` completo → `upgrade head` de nuevo, las 18 migraciones en ambas direcciones. Encontró y corrigió un bug real: 6 constraints (FK/unique) en 4 migraciones pasaban `None` como nombre a `create_foreign_key`/`create_unique_constraint` (autogenerado por Alembic), dejando que PostgreSQL le asignara un nombre impredecible -- su propio `downgrade()` intentaba `drop_constraint(None, ...)`, que nunca puede resolver a un constraint real y siempre fallaba (`131a6debf189`/`c622defc2308`/`f1075e290473`/`eaf5b6c0d061`, ahora todos con nombre explícito en creación y en drop). El Critical Journey E2E (`NXR-REQ-0112/0113`) también ejercita fresh-install real en cada corrida (`playwright.config.ts`), evidencia E2E independiente y repetida |
 | NXR-REQ-0107 | Security (CSRF/rate-limit/lockout/headers) | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | Argon2id + HttpOnly + Secure-en-prod; falta el resto de §121 |
-| NXR-REQ-0108 | Observability | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | App Insights opcional wired; falta logging estructurado con correlation_id |
+| NXR-REQ-0108 | Observability | ➖➖✅➖➖➖➖✅➖ | IMPLEMENTED | App Insights opcional wired (queda igual). 2026-08-25: logging estructurado real con `correlation_id`, la pieza que faltaba. `app/core/logging.py` (`ContextVar` + formatter JSON, un `correlationId` por request) + `app/api/correlation.py` (`CorrelationIdMiddleware`, ASGI puro -- no `BaseHTTPMiddleware`, evita el problema conocido de Starlette con `ContextVar`s que no se propagan de forma confiable a través de `call_next()`). Antes `Depends(get_correlation_id)` en 5 rutas (ap/accounting/approvals/treasury/procurement) parseaba el header por su cuenta cada vez, y `error_handlers.py`/`csrf.py` generaban su propio `uuid.uuid4()` random para el body de cualquier error -- sin relación entre sí. Ahora una sola fuente: el middleware (agregado último = capa más externa, ver orden de `add_middleware` en Starlette) fija el `ContextVar` antes de que cualquier otra cosa lo necesite; logs, audit log (`AuditLog.correlation_id`), y el body de cualquier error comparten el mismo id por request, reusando `X-Correlation-Id` si el caller ya trae uno (tracing distribuido real) y devolviéndolo siempre en la respuesta. Log de una línea por request (método/path/status/duración) además de cualquier log de aplicación. 6 tests reales (`test_observability.py`: header se reusa vs se genera, `correlationId` del error coincide con el header de respuesta, rechazo CSRF coincide, `AuditLog.correlation_id` persistido coincide con la request real, formatter JSON). 303/303 backend, Critical Journey E2E verificado con logs JSON reales visibles en la salida |
 | NXR-REQ-0109 | Backup / Restore | ⬜⬜⬜⬜➖⬜➖⬜➖ | NOT_STARTED | — |
 | NXR-REQ-0110 | Unit tests | ➖➖✅➖✅➖➖✅➖ | IN_PROGRESS | Track A: suite combinada 81 backend + 24 frontend; crecerá con los tracks restantes |
 | NXR-REQ-0111 | Integration tests (PostgreSQL) | ➖➖✅➖➖➖➖✅➖ | IMPLEMENTED | Track A: pruebas reales contra PostgreSQL para lifecycle, aislamiento, constraints, postings, idempotencia y conciliación |
@@ -297,18 +297,19 @@ Journey E2E real (`NXR-REQ-0112`/`0113`, `feat/nexora-greenfield`, sesión
   pero mover cada fila individual a `VERIFIED` exige mapear su alcance
   exacto contra lo que el recorrido realmente cubre, fila por fila — pasada
   pendiente, no asumida aquí.
-- **IMPLEMENTED:** 105 / 124. `NXR-REQ-0016` (Financial statements,
-  incluyendo Cash Flow), `NXR-REQ-0106` (Migrations) y `NXR-REQ-0105`
-  (Accessibility) movieron `IN_PROGRESS` → `IMPLEMENTED` el 2026-08-25.
-- **IN_PROGRESS:** 12 / 124 — NXR-REQ-0093/0107/0108/0110/0114/0115/0116/
-  0117/0118/0119/0120/0121.
+- **IMPLEMENTED:** 106 / 124. `NXR-REQ-0016` (Financial statements,
+  incluyendo Cash Flow), `NXR-REQ-0106` (Migrations), `NXR-REQ-0105`
+  (Accessibility) y `NXR-REQ-0108` (Observability) movieron `IN_PROGRESS`
+  → `IMPLEMENTED` el 2026-08-25.
+- **IN_PROGRESS:** 11 / 124 — NXR-REQ-0093/0107/0110/0114/0115/0116/0117/
+  0118/0119/0120/0121.
 - **NOT_STARTED:** 3 / 124 — NXR-REQ-0058/0109/0122.
 - **BLOCKED_EXTERNAL:** 2 / 124 — NXR-REQ-0123/0124, ambos dependientes del
   despliegue Azure real sujeto a `CLAUDE.md` §11.1.
 
-Suma verificada contra las 124 filas reales: 2+105+12+3+2 = 124 (recontar con
+Suma verificada contra las 124 filas reales: 2+106+11+3+2 = 124 (recontar con
 `grep -oE '\| (NOT_STARTED|IN_PROGRESS|IMPLEMENTED|VERIFIED|BLOCKED_EXTERNAL) \|' docs/REQUIREMENTS_TRACEABILITY.md | sort | uniq -c`
 antes de fiarse de este resumen prosa, que puede desincronizarse de la
-tabla real). El sistema combinado pasó 297 pruebas backend sobre
+tabla real). El sistema combinado pasó 303 pruebas backend sobre
 PostgreSQL, 91 pruebas frontend, typecheck, lint, y el Critical Journey +
 Accessibility E2E real en verde (`npm run test:e2e`, 3/3).

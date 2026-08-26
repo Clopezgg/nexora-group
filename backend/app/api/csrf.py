@@ -1,10 +1,9 @@
-import uuid
-
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import get_settings
+from app.core.logging import get_correlation_id
 
 """NXR-REQ-0008 (CSRF). Decisión explícita: la sesión vive en una cookie
 httponly (`SameSite=Lax` en dev, `SameSite=None; Secure` en producción --
@@ -42,7 +41,7 @@ class CsrfOriginGuardMiddleware(BaseHTTPMiddleware):
                             "code": "NXR-AUTH-001",
                             "message": "Origin no autorizado para esta operación",
                             "field": None,
-                            "correlationId": str(uuid.uuid4()),
+                            "correlationId": get_correlation_id(),
                         }
                     },
                 )

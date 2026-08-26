@@ -1,10 +1,10 @@
 import logging
-import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
+from app.core.logging import get_correlation_id
 from app.domain.errors import (
     BudgetBaselineExistsError,
     BudgetCurrencyMismatchError,
@@ -109,7 +109,7 @@ def _make_handler(code: str, status_code: int):
                     "code": code,
                     "message": str(exc),
                     "field": None,
-                    "correlationId": str(uuid.uuid4()),
+                    "correlationId": get_correlation_id(),
                 }
             },
         )
@@ -134,7 +134,7 @@ async def _integrity_error_handler(_request: Request, exc: Exception) -> JSONRes
                 "code": "NXR-DATA-001",
                 "message": "La operación viola una restricción de datos (referencia inexistente o duplicada)",
                 "field": None,
-                "correlationId": str(uuid.uuid4()),
+                "correlationId": get_correlation_id(),
             }
         },
     )

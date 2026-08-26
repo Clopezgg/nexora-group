@@ -2501,3 +2501,76 @@ tool-based audit done and passing; manual screen-reader pass explicitly
 flagged as the one remaining human-only gap, not hidden. Tally now 105
 `IMPLEMENTED` (+1), 12 `IN_PROGRESS` (-1), 3 `NOT_STARTED`, 2
 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.
+
+## 2026-08-25 — Structured logging with a real correlation_id (NXR-REQ-0108 → IMPLEMENTED)
+
+Direct continuation, same session. Dispatched a research-only fork
+first to check whether `NXR-REQ-0107` (Security), `0108`
+(Observability), or `0114` (CI/CD) had the most cleanly local,
+non-Azure remaining scope before picking one — confirmed by direct code
+inspection (not guessed) that `0108` was cleanest: a `correlation_id`
+dependency already existed (`app/api/deps_correlation.py`) but was only
+ever written into the `AuditLog` DB table, never into an actual log
+line, and `app/main.py` had zero structured-logging setup at all.
+
+Investigating closer surfaced a real, separate inconsistency worth
+fixing at the same time: `error_handlers.py` and `csrf.py` each minted
+their own fresh `uuid.uuid4()` for an error response's `correlationId`,
+completely disconnected from whatever `Depends(get_correlation_id)`
+returned in the same request (which itself re-parsed the
+`X-Correlation-Id` header independently in each of 5 routes, so two
+different `Depends()` calls in the same request without a client
+header could legitimately mint two different random ids). None of this
+was wired into Python's `logging` module either.
+
+Built one shared source of truth: `app/core/logging.py` holds a
+`contextvars.ContextVar` for the current request's correlation id, a
+`logging.Filter` that injects it into every log record, and a JSON
+`Formatter`. `app/api/correlation.py`'s `CorrelationIdMiddleware` is
+deliberately **pure ASGI, not `BaseHTTPMiddleware`** — Starlette has a
+well-known gotcha where a `ContextVar` set inside `BaseHTTPMiddleware
+.dispatch()` before `call_next()` isn't always reliably visible
+downstream (an internal `anyio` task-group boundary); wrapping the ASGI
+callable directly avoids that class of bug entirely rather than risking
+it. The middleware reuses an incoming `X-Correlation-Id` header
+(distributed tracing) or mints a new one, sets the `ContextVar` before
+anything else runs, echoes it in the response header, and logs one
+structured line per request (method/path/status/duration_ms).
+
+Had to get middleware **registration order** right, which is
+non-obvious in Starlette: `add_middleware()` *prepends* to the internal
+list, and the stack is built by wrapping in `reversed()` order — so the
+middleware added **last** ends up **outermost** (runs first on the way
+in). `CorrelationIdMiddleware` is added after `register_csrf_guard()`
+specifically so the id exists before the CSRF guard's own 403 handler
+needs it. Verified this was actually correct via a real test
+(`test_csrf_rejection_correlation_id_matches_the_response_header`), not
+assumed from reading the Starlette source alone.
+
+`deps_correlation.py`'s `get_correlation_id()` (still used by the 5
+existing routes as a `Depends()`) now just reads the same `ContextVar`
+instead of re-parsing the header — same call signature, so no route
+changes needed. `error_handlers.py`/`csrf.py` now use the same shared
+value instead of a fresh random uuid.
+
+6 new tests (`test_observability.py`): client-supplied id is reused not
+replaced; a generated id is echoed in the response header; an error
+response's `correlationId` matches the response header (the exact bug
+this closes); the CSRF 403 does too; a real audited action
+(`treasury.remittance.create`) persists the same id into
+`AuditLog.correlation_id` as the request that triggered it (checked
+against the real DB row, not just the response); the JSON formatter
+output shape. Manually verified real JSON log lines on stdout against a
+live server, not just asserted in tests — confirmed the bootstrap log
+(no request context, `correlationId: "-"`) and per-request log lines
+both look right, and confirmed the Critical Journey E2E run shows real
+structured JSON lines in its own server output.
+
+Full verification: 303/303 backend pytest (up from 297), `tsc -b
+--noEmit` clean, `eslint .` clean, 91/91 frontend vitest, combined
+Critical Journey + Accessibility E2E 3/3 green with real structured
+logs visible in the run.
+
+Traceability: `NXR-REQ-0108` moved `IN_PROGRESS` → `IMPLEMENTED`. Tally
+now 106 `IMPLEMENTED` (+1), 11 `IN_PROGRESS` (-1), 3 `NOT_STARTED`, 2
+`BLOCKED_EXTERNAL`, 2 `VERIFIED`.

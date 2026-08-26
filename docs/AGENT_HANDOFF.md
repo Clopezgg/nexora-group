@@ -471,3 +471,44 @@ by the time it's read.
 Verification before this entry: 297/297 backend pytest, `tsc -b
 --noEmit` clean, `eslint .` clean, 91/91 frontend vitest, combined
 `npm run test:e2e` (Critical Journey + Accessibility) 3/3 green.
+
+## 2026-08-25 — Structured logging + real correlation_id (NXR-REQ-0108 → IMPLEMENTED)
+
+Direct continuation, same session. Dispatched a research-only fork to
+pick between `0107`/`0108`/`0114` (confirmed by direct code inspection:
+`0108` had the cleanest, purely-local remaining scope — `0107`/`0114`'s
+remaining pieces are more Azure-deployment-shaped). Full detail in
+`docs/PROGRESS.md`'s `2026-08-25 — Structured logging with a real
+correlation_id...` entry.
+
+`app/core/logging.py` (ContextVar + JSON formatter) +
+`app/api/correlation.py`'s `CorrelationIdMiddleware` (deliberately pure
+ASGI, not `BaseHTTPMiddleware` — avoids a known Starlette gotcha where a
+`ContextVar` set in `dispatch()` isn't reliably visible past
+`call_next()`). Along the way, fixed a real inconsistency:
+`error_handlers.py`/`csrf.py` used to mint their own random
+`uuid.uuid4()` for an error's `correlationId`, disconnected from
+whatever the 5 routes with `Depends(get_correlation_id)` used for audit
+logging. Now one shared `ContextVar` backs all of it: response header,
+error bodies, audit log rows, and actual log lines.
+
+**If you add new middleware to `app/main.py`**: registration order is
+non-obvious in Starlette (`add_middleware()` prepends internally, stack
+built in `reversed()` order, so the middleware added *last* ends up
+*outermost*/runs first). `CorrelationIdMiddleware` is added after
+`register_csrf_guard()` on purpose so the correlation id exists before
+CSRF's own error path needs it — don't reorder these without
+re-running `tests/test_observability.py`, which actually asserts on
+this (not just documents it).
+
+With this, the Observability half of what remained is done.
+`NXR-REQ-0107`'s narrower remaining piece (security headers middleware
+— CSP/X-Frame-Options/HSTS/etc., currently zero coverage, confirmed by
+grep) is the natural next candidate if continuing down this same
+local/non-Azure vein — same effort shape as the CSRF guard and this
+correlation-id middleware, no new infra needed.
+
+Verification before this entry: 303/303 backend pytest, `tsc -b
+--noEmit` clean, `eslint .` clean, 91/91 frontend vitest, combined
+Critical Journey + Accessibility E2E 3/3 green with real structured
+JSON logs visible in the run output.

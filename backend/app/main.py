@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.correlation import CorrelationIdMiddleware
 from app.api.csrf import register_csrf_guard
 from app.api.error_handlers import register_error_handlers
 from app.api.routes import (
@@ -38,6 +39,7 @@ from app.api.routes import (
 )
 from app.core.config import get_settings
 from app.core.database import SessionLocal
+from app.core.logging import configure_logging
 from app.services.bootstrap_service import bootstrap_admin_if_needed
 
 
@@ -53,6 +55,7 @@ async def lifespan(_app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    configure_logging()
 
     if settings.applicationinsights_connection_string:
         from azure.monitor.opentelemetry import configure_azure_monitor
@@ -69,6 +72,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     register_csrf_guard(app)
+    # Outermost middleware (added last -- see Starlette's add_middleware,
+    # que inserta al frente de la pila): el correlation_id debe existir
+    # ANTES que cualquier otro middleware pueda necesitarlo (p.ej. el
+    # error 403 de CsrfOriginGuardMiddleware ya lo usa).
+    app.add_middleware(CorrelationIdMiddleware)
 
     register_error_handlers(app)
 

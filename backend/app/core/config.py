@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     max_login_attempts: int = 5
     lockout_minutes: int = 15
 
+    # NXR-REQ-0107 (app-layer rate limiting, independiente de Azure Front
+    # Door/WAF). Por IP, no por cuenta -- el lockout de arriba ya protege
+    # una cuenta conocida; esto protege contra fuerza bruta distribuida
+    # entre muchas cuentas o ruido/DoS desde un mismo origen.
+    login_rate_limit_max_attempts: int = 20
+    login_rate_limit_window_seconds: int = 60
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"

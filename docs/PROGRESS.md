@@ -2908,3 +2908,64 @@ scratch database.
 Traceability: evidence for `NXR-REQ-0110` updated in place with all 4
 bugs (the migration doesn't get its own NXR-REQ row — it's part of the
 same concurrency-hardening unit of work already tracked there).
+
+## 2026-08-25 — Real app-layer rate limiting on login (NXR-REQ-0107 continued)
+
+Direct continuation, same session. The absolute-closure order was
+explicit and specific here: don't declare rate-limiting blocked on
+Azure Front Door/WAF without first proving an application-layer
+defense is genuinely impossible — it wasn't, so it got built.
+
+`app/services/rate_limit_service.check_and_increment` -- a real,
+PostgreSQL-backed fixed-window counter (`RateLimitBucket`: one row per
+`bucket_key`, reused/reset in place, never growing unbounded). Not
+in-memory: the backend is stateless (orden maestra §3) and may run
+multiple Container Apps replicas, so an in-process counter would be
+silently wrong under real concurrency; PostgreSQL is the one place
+this system is allowed to keep state. Wired as a FastAPI dependency
+(`app.api.deps.enforce_login_rate_limit`) on `/api/auth/login`, keyed
+by client IP (`X-Forwarded-For` first hop, falling back to
+`request.client.host` for local/no-proxy dev) — 20 attempts per 60s by
+default, both configurable via settings. This is a *separate* layer
+from the existing per-account lockout (`NXR-REQ-0008`): the lockout
+protects one already-identified account; this protects against an
+attacker rotating through many different accounts (or generating
+noise) from the same origin, which the lockout alone can't see.
+
+Same create-race shape as `numbering_service`/`idempotency_service`
+(first-ever request for a given IP has no row to lock yet) — reused
+the identical SAVEPOINT (`db.begin_nested()`) pattern proactively, and
+proved it holds under real concurrency with a new
+`test_concurrent_rate_limit_checks_for_the_same_bucket_never_error_or_
+undercount` in `test_concurrency.py` (10 threads, same bucket key,
+asserts zero errors and the count lands at exactly 10 — no lost
+update, no uncaught `IntegrityError`).
+
+Error response follows the app's existing standard (`{"error":
+{"code": "NXR-SECURITY-001", ...}}`, 429) via the same
+`RateLimitExceededError` → `_ERROR_CODES` registry pattern every other
+domain error already uses, not an ad-hoc `HTTPException`.
+
+2 new tests in `test_auth.py` (rate limit trips after N attempts from
+one IP; resets once the window expires) + 1 new concurrency test.
+Migration `f1efb082cb0e` (new `rate_limit_buckets` table, named unique
+constraint from the start — no repeat of the earlier unnamed-
+constraint migration bug).
+
+**Real, not simulated, end-to-end verification**: ran an actual
+uvicorn server against a scratch PostgreSQL database and fired 21 real
+`curl` requests at `/api/auth/login` — attempts 1-20 returned 401
+(bad credentials), attempt 21 returned 429 with the exact expected
+error body. This is the literal evidence CLAUDE.md requires ("curl
+real") before calling anything done.
+
+Verification: full backend suite 321/321 (was 318, +3); `test_
+concurrency.py` + `test_auth.py` 5/5 green × 5 consecutive runs;
+Alembic fresh-install + downgrade -1 + upgrade head round-trip on a
+scratch database; real uvicorn + curl smoke test as above.
+
+Still open in the §9 security checklist (not done here, tracked in
+the evidence row): brute force beyond account lockout, token
+expiration/revocation, cookie/CORS audit, IDOR, horizontal/vertical
+privilege escalation, file upload security, secrets handling,
+dependency vulnerabilities, error/log leakage.

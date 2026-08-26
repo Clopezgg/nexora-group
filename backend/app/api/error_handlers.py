@@ -38,6 +38,7 @@ from app.domain.errors import (
     NotAuthorizedError,
     OverpaymentError,
     ProcurementCurrencyMismatchError,
+    RateLimitExceededError,
     SegregationOfDutiesError,
     InvalidCashFlowActivityError,
     RoleNotFoundError,
@@ -97,6 +98,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     SegregationOfDutiesError: ("NXR-WORKFLOW-001", 422),
     InvalidApprovalStateError: ("NXR-WORKFLOW-002", 409),
     InvalidApprovalDecisionError: ("NXR-WORKFLOW-003", 422),
+    RateLimitExceededError: ("NXR-SECURITY-001", 429),
 }
 
 

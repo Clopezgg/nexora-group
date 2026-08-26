@@ -28,6 +28,7 @@ from app.services import (
     inventory_service,
     numbering_service,
     procurement_service,
+    rate_limit_service,
     treasury_service,
 )
 from tests.helpers import (
@@ -427,3 +428,37 @@ def test_concurrent_stock_issues_never_over_issue_beyond_on_hand_quantity(client
     assert Decimal(final_position) == Decimal("10.0000"), (
         f"expected 100 - (3 x 30) = 10 on hand, got {final_position} (lost update / over-issue)"
     )
+
+
+def test_concurrent_rate_limit_checks_for_the_same_bucket_never_error_or_undercount(client, db_session):
+    """The rate-limit bucket has the exact same first-call create-race
+    shape as `numbering_service`/`idempotency_service`: the bucket row
+    doesn't exist yet, so N concurrent callers can all see `bucket is
+    None` before any of them commits. Without the SAVEPOINT handling,
+    the loser of that race gets a raw uncaught `IntegrityError` instead
+    of simply being counted -- and every attempt must be counted
+    exactly once, or the rate limit itself becomes bypassable under
+    concurrent load."""
+    key = f"login-race:{uuid.uuid4()}"
+
+    def _attempt() -> str:
+        db = SessionLocal()
+        try:
+            rate_limit_service.check_and_increment(
+                db, bucket_key=key, limit=100, window_seconds=60
+            )
+            db.commit()
+            return "counted"
+        finally:
+            db.close()
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        outcomes = list(pool.map(lambda _: _attempt(), range(10)))
+
+    assert outcomes == ["counted"] * 10, f"no caller should error, got: {outcomes}"
+
+    db_session.expire_all()
+    final_count = db_session.execute(
+        text("SELECT count FROM rate_limit_buckets WHERE bucket_key = :key"), {"key": key}
+    ).scalar_one()
+    assert final_count == 10, f"expected all 10 concurrent attempts counted, got {final_count} (lost update)"

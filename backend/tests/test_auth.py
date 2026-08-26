@@ -76,6 +76,68 @@ def test_account_locks_after_max_failed_login_attempts(client, db_session):
     assert locked_even_with_correct_password.status_code == 423, locked_even_with_correct_password.text
 
 
+def test_login_rate_limited_after_too_many_attempts_from_same_ip(client, db_session):
+    """NXR-REQ-0107: defensa de rate-limiting de APLICACIÓN, real e
+    independiente de Azure Front Door/WAF -- el lockout de
+    NXR-REQ-0008 solo protege una cuenta ya conocida; esto protege
+    contra un atacante que prueba credenciales rotando de cuenta en
+    cuenta desde el mismo origen. `nadie@nexora.group` no existe, así
+    que estos intentos nunca disparan el lockout por cuenta (evita
+    confundir los dos guards en esta prueba)."""
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    for _ in range(settings.login_rate_limit_max_attempts):
+        response = client.post(
+            "/api/auth/login",
+            json={"email": "nadie@nexora.group", "password": "whatever"},
+        )
+        assert response.status_code == 401
+
+    limited = client.post(
+        "/api/auth/login",
+        json={"email": BOOTSTRAP_ADMIN_EMAIL, "password": BOOTSTRAP_ADMIN_PASSWORD},
+    )
+    assert limited.status_code == 429, limited.text
+    assert limited.json()["error"]["code"] == "NXR-SECURITY-001"
+
+
+def test_login_rate_limit_resets_after_the_window_expires(client, db_session):
+    """La ventana es fija y se resetea in-place -- no debe bloquear para
+    siempre tras superar el límite una vez."""
+    import uuid
+    from datetime import datetime, timedelta, timezone
+
+    from app.core.config import get_settings
+    from app.models.rate_limit import RateLimitBucket
+
+    settings = get_settings()
+    for _ in range(settings.login_rate_limit_max_attempts):
+        client.post(
+            "/api/auth/login",
+            json={"email": "nadie@nexora.group", "password": "whatever"},
+        )
+    limited = client.post(
+        "/api/auth/login",
+        json={"email": BOOTSTRAP_ADMIN_EMAIL, "password": BOOTSTRAP_ADMIN_PASSWORD},
+    )
+    assert limited.status_code == 429
+
+    db_session.expire_all()
+    bucket = db_session.query(RateLimitBucket).filter_by(bucket_key="login:testclient").one()
+    bucket.window_start = datetime.now(timezone.utc) - timedelta(
+        seconds=settings.login_rate_limit_window_seconds + 1
+    )
+    db_session.commit()
+
+    after_window = client.post(
+        "/api/auth/login",
+        json={"email": BOOTSTRAP_ADMIN_EMAIL, "password": BOOTSTRAP_ADMIN_PASSWORD},
+    )
+    assert after_window.status_code == 200, after_window.text
+    assert uuid.UUID(after_window.json()["id"])
+
+
 def test_successful_login_resets_failed_attempts(client, db_session):
     from app.models.user import User
 

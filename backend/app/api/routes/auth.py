@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import enforce_login_rate_limit, get_current_user, get_db
 from app.core.config import get_settings
 from app.domain.errors import AccountLockedError, InvalidCredentialsError
 from app.models.user import User
@@ -13,7 +13,7 @@ from app.services import auth_service
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=CurrentUserResponse)
+@router.post("/login", response_model=CurrentUserResponse, dependencies=[Depends(enforce_login_rate_limit)])
 def login(
     payload: LoginRequest,
     request: Request,

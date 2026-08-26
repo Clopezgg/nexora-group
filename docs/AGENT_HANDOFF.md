@@ -731,6 +731,48 @@ loop while root-causing #3); full backend suite 318/318 (was 316);
 Alembic fresh-install + downgrade -1 + upgrade head verified on a
 scratch DB.
 
+## 2026-08-25 — Real app-layer rate limiting on login (NXR-REQ-0107 continued)
+
+Direct continuation. Full detail in `docs/PROGRESS.md`'s `2026-08-25 —
+Real app-layer rate limiting on login...` entry. Built exactly what
+the order demanded: a real PostgreSQL-backed fixed-window rate limiter
+(`app/services/rate_limit_service.py`, `RateLimitBucket` model),
+wired as a FastAPI dependency (`enforce_login_rate_limit` in
+`app/api/deps.py`) on `/api/auth/login`, keyed by client IP
+(`X-Forwarded-For`/`request.client.host`), 20/60s default. Deliberately
+NOT in-memory -- backend is stateless and may run multiple replicas,
+so PostgreSQL is the only place allowed to hold this state. Separate
+layer from the per-account lockout (`NXR-REQ-0008`): this catches an
+attacker rotating across many accounts, which the lockout alone can't.
+
+Same create-race shape as numbering/idempotency (first-ever row for a
+new IP) -- reused the identical SAVEPOINT pattern proactively, with
+its own concurrency regression test. Error responses go through the
+existing `RateLimitExceededError` → `_ERROR_CODES` registry (429,
+`NXR-SECURITY-001`), same pattern as every other domain error --
+deliberately NOT an ad-hoc `HTTPException` (which would have broken
+the app's own `{"error": {...}}` response contract).
+
+**If you touch this again**: `enforce_login_rate_limit` always
+`db.commit()`s in a `finally`, even when it raises -- without that,
+`get_db()`'s session close would roll back the bucket increment and
+the rate limit would never actually advance. Keep that pattern if you
+add rate limiting to another endpoint.
+
+Real end-to-end verification, not just pytest: ran an actual uvicorn
+server against a scratch PostgreSQL DB, fired 21 real `curl` requests
+at `/api/auth/login` -- 1-20 returned 401, 21 returned 429 with the
+exact expected error body. Migration `f1efb082cb0e` verified
+fresh-install + downgrade -1 + upgrade head on a scratch DB.
+
+Verification: full backend suite 321/321 (was 318); `test_
+concurrency.py` + `test_auth.py` 5/5 green × 5 runs.
+
+Still open in §9 (not done here): brute force beyond account lockout,
+token expiration/revocation, cookie/CORS audit, IDOR, horizontal/
+vertical privilege escalation, file upload security, secrets handling,
+dependency vulnerabilities, error/log leakage.
+
 ## Live backlog re-check (2026-08-25, this entry)
 
 Re-verified against the live table: 108 `IMPLEMENTED`, 10
@@ -740,22 +782,20 @@ Re-verified against the live table: 108 `IMPLEMENTED`, 10
 absolute-closure order, next canonical gaps in priority order: the
 order's own §10 concurrency list is now substantially covered (AR
 receipt/reconciliation/approvals confirmed already-safe this pass;
-numbering/idempotency/AP-payment/goods-receipt/inventory all tested
-and fixed) — two completeness gaps were flagged but NOT fixed (out of
-scope for a concurrency regression, they're missing business-rule
-guards, not races): `treasury_service.register_transfer` has no
-negative-balance guard at all, and there is no budget-consumption
-guard anywhere in the codebase to check spend against remaining
-budget. Both should become their own gap (not a concurrency test) if
-in canonical 100% scope — check `docs/REQUIREMENTS_TRACEABILITY.md`
-for whether budget enforcement/overdraft prevention has an NXR-REQ row
-before building either. Next candidate work: the §9 security review
-checklist (app-layer rate limiting per the order's explicit
-instruction not to claim Azure-only without proving app-layer is
-insufficient first; brute force beyond existing lockout; session/token
-expiration+revocation; cookies; CORS; IDOR; horizontal/vertical
-privilege escalation; file upload security; secrets handling;
-dependency vulnerabilities; error/log leakage) — or `docs/AUDIT.md`
-backlog closure — before reassessing against
-`docs/PRODUCTION_READINESS.md` in full. Do not stop between these;
-continue automatically per the order.
+numbering/idempotency/AP-payment/goods-receipt/inventory/rate-limit
+all tested and fixed) — two completeness gaps were flagged but NOT
+fixed (out of scope for a concurrency regression, they're missing
+business-rule guards, not races): `treasury_service.register_transfer`
+has no negative-balance guard at all, and there is no
+budget-consumption guard anywhere in the codebase to check spend
+against remaining budget. Both should become their own gap (not a
+concurrency test) if in canonical 100% scope — check
+`docs/REQUIREMENTS_TRACEABILITY.md` for whether budget enforcement/
+overdraft prevention has an NXR-REQ row before building either. Next
+candidate work: continue the §9 security review checklist (brute force
+beyond existing lockout; session/token expiration+revocation; cookies;
+CORS; IDOR; horizontal/vertical privilege escalation; file upload
+security; secrets handling; dependency vulnerabilities; error/log
+leakage) — or `docs/AUDIT.md` backlog closure — before reassessing
+against `docs/PRODUCTION_READINESS.md` in full. Do not stop between
+these; continue automatically per the order.

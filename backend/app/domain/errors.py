@@ -225,3 +225,9 @@ class RoleNotFoundError(Exception):
 class InvalidCashFlowActivityError(Exception):
     """`cash_flow_activity` no es None ni uno de
     `app.models.chart_of_accounts.CASH_FLOW_ACTIVITIES`."""
+
+
+# NXR-REQ-0107, application-layer rate limiting.
+class RateLimitExceededError(Exception):
+    """Se superó el límite de intentos configurado para un `bucket_key`
+    (p.ej. IP en `/api/auth/login`) dentro de la ventana vigente."""

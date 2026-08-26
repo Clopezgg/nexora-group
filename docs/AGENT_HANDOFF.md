@@ -679,23 +679,83 @@ Verification: `test_concurrency.py` 5/5 green × 5 consecutive runs;
 full backend suite 316/316 (was 315), zero regressions. `NXR-REQ-0110`
 moved `IN_PROGRESS` → `VERIFIED`.
 
+## 2026-08-25 — Extended concurrency sweep: 3 more real bugs (NXR-REQ-0110 evidence extended)
+
+Direct continuation. Dispatched a research subagent to survey
+`ar_service`/`treasury_service`/`procurement_service`/
+`inventory_service`/`budget_service`/`approval_service` for unlocked
+read-then-write races. AR receipt, Treasury reconciliation, and
+approval decisions already lock correctly (no bug). Two real races
+found and fixed, plus one more latent bug found while fixing the
+second — full detail in `docs/PROGRESS.md`'s `2026-08-25 — Extended
+concurrency sweep...` entry:
+
+1. `procurement_service.record_goods_receipt` read `PurchaseOrderLine.
+   quantity_received` unlocked -- concurrent receipts could over-receive
+   beyond what was ordered. Fixed with `procurement_repository.
+   get_purchase_order_line_for_update`.
+2. `inventory_service._current_position` derived stock position from
+   the last (unlocked) `StockLedgerEntry` -- the ledger is genuinely
+   append-only (no mutable "current qty" row), so a plain
+   `SELECT...FOR UPDATE` can't actually block a concurrent INSERT
+   (phantom-row problem). Fixed with `pg_advisory_xact_lock` keyed by
+   `(company_id, item_id, warehouse_id)` in `_lock_stock_position`.
+   `transfer_stock` pre-locks both warehouses in canonical sorted
+   order to avoid a deadlock against an opposite-direction concurrent
+   transfer (advisory xact-locks are reentrant, safe to re-acquire).
+3. **Found while verifying #2** (not obvious from reading the code,
+   only surfaced via a raw-SQL reproduction outside the ORM): even
+   with the lock correctly serializing writers, `get_last_ledger_entry`
+   still intermittently returned the WRONG "last" row because it
+   ordered by `created_at DESC` -- PostgreSQL's `now()`/`created_at`
+   is the transaction's *start* time, not write time, so under lock
+   queueing an early-starting-but-slow transaction can write its row
+   *after* a later-starting-but-fast one, breaking `created_at`
+   ordering. The `id DESC` tiebreaker didn't help since `id` is a
+   random UUID. Fixed by adding `StockLedgerEntry.entry_seq` (a real
+   PostgreSQL `SEQUENCE`, `nextval()` evaluated at actual INSERT time
+   -- genuinely monotonic) via migration `20da9f0955af`.
+
+**If you touch `inventory_service` or the stock ledger again**:
+`get_last_ledger_entry` MUST keep ordering by `entry_seq DESC` alone
+-- never reintroduce `created_at`/`id` as the ordering key for "what's
+the current position," even as a tiebreaker. Any other query that
+needs "insertion order" for `StockLedgerEntry` has the same trap;
+`entry_seq` is the only column that means what it looks like it means.
+
+New tests in `test_concurrency.py` (now 7 total):
+`test_concurrent_goods_receipts_never_over_receive_beyond_ordered_
+quantity`, `test_concurrent_stock_issues_never_over_issue_beyond_on_
+hand_quantity`. Verification: 5/5 green × 5 runs (+ an isolated 20x
+loop while root-causing #3); full backend suite 318/318 (was 316);
+Alembic fresh-install + downgrade -1 + upgrade head verified on a
+scratch DB.
+
 ## Live backlog re-check (2026-08-25, this entry)
 
 Re-verified against the live table: 108 `IMPLEMENTED`, 10
 `IN_PROGRESS` (`NXR-REQ-0093/0107/0114/0115/0116/0117/0118/0119/0120/
 0121`), 1 `NOT_STARTED` (`NXR-REQ-0122`, OIDC — external GitHub config),
-2 `BLOCKED_EXTERNAL` (`0123/0124`), 3 `VERIFIED` (+`0110`). Per the
-absolute-closure order, next canonical gaps in priority order: extend
-concurrency coverage the order explicitly names but this pass didn't
-yet cover (AR receipt, additional Treasury transfer scenarios, bank
-reconciliation matching, PO/receipt races, inventory receive/transfer
-races, project issue races, approval races, budget consumption races)
-— or move to the §9 security review checklist (app-layer rate
-limiting per the order's explicit instruction not to claim Azure-only
-without proving app-layer is insufficient first; brute force beyond
-existing lockout; session/token expiration+revocation; cookies; CORS;
-IDOR; horizontal/vertical privilege escalation; file upload security;
-secrets handling; dependency vulnerabilities; error/log leakage) — or
-`docs/AUDIT.md` backlog closure — before reassessing against
+2 `BLOCKED_EXTERNAL` (`0123/0124`), 3 `VERIFIED`. Per the
+absolute-closure order, next canonical gaps in priority order: the
+order's own §10 concurrency list is now substantially covered (AR
+receipt/reconciliation/approvals confirmed already-safe this pass;
+numbering/idempotency/AP-payment/goods-receipt/inventory all tested
+and fixed) — two completeness gaps were flagged but NOT fixed (out of
+scope for a concurrency regression, they're missing business-rule
+guards, not races): `treasury_service.register_transfer` has no
+negative-balance guard at all, and there is no budget-consumption
+guard anywhere in the codebase to check spend against remaining
+budget. Both should become their own gap (not a concurrency test) if
+in canonical 100% scope — check `docs/REQUIREMENTS_TRACEABILITY.md`
+for whether budget enforcement/overdraft prevention has an NXR-REQ row
+before building either. Next candidate work: the §9 security review
+checklist (app-layer rate limiting per the order's explicit
+instruction not to claim Azure-only without proving app-layer is
+insufficient first; brute force beyond existing lockout; session/token
+expiration+revocation; cookies; CORS; IDOR; horizontal/vertical
+privilege escalation; file upload security; secrets handling;
+dependency vulnerabilities; error/log leakage) — or `docs/AUDIT.md`
+backlog closure — before reassessing against
 `docs/PRODUCTION_READINESS.md` in full. Do not stop between these;
 continue automatically per the order.

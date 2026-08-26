@@ -82,7 +82,7 @@ def get_last_ledger_entry(
             StockLedgerEntry.item_id == item_id,
             StockLedgerEntry.warehouse_id == warehouse_id,
         )
-        .order_by(StockLedgerEntry.created_at.desc(), StockLedgerEntry.id.desc())
+        .order_by(StockLedgerEntry.entry_seq.desc())
         .limit(1)
         .with_for_update()
     )

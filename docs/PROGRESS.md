@@ -2821,3 +2821,90 @@ Traceability: `NXR-REQ-0110` (Unit tests) moved `IN_PROGRESS` →
 `VERIFIED` — real command-execution evidence (5× stable + full suite),
 not just "tests exist". Tally now 108 `IMPLEMENTED`, 10 `IN_PROGRESS`
 (-1), 1 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 3 `VERIFIED` (+1).
+
+## 2026-08-25 — Extended concurrency sweep: 3 more real bugs (procurement over-receipt, inventory lost-update, stock ledger ordering)
+
+Direct continuation, same session, same §10 sweep. Dispatched a
+research-only subagent to survey `ar_service`, `treasury_service`,
+`procurement_service`, `inventory_service`, `budget_service`, and
+`approval_service` for unlocked read-then-write sequences on values
+that must never be double-counted. Confirmed safe: AR receipt
+(`collect_customer_receipt`), Treasury reconciliation matching, and
+approval decisions all already lock correctly. Confirmed NOT a
+concurrency finding (pre-existing completeness gaps, flagged
+separately, not fixed here): `treasury_service.register_transfer` has
+no negative-balance guard at all (single-threaded already permits it);
+there is no budget-consumption guard anywhere to race against.
+
+**2 real races found and fixed, plus 1 more latent bug found while
+fixing the second:**
+
+1. **`procurement_service.record_goods_receipt`** read
+   `PurchaseOrderLine.quantity_received` via a plain `db.get()` (no
+   lock) before checking it against the remaining ordered quantity —
+   N concurrent receipts against the same PO line could all read the
+   same stale value and all pass the guard, over-receiving beyond what
+   was actually ordered (and double-crediting `inventory_service.
+   receive_stock` for stock that was never really purchased). Fixed
+   with a new `procurement_repository.
+   get_purchase_order_line_for_update` (`SELECT...FOR UPDATE`), same
+   shape as `ap_service.pay_supplier_invoice`'s existing protection.
+
+2. **`inventory_service`'s stock position** (`_current_position`,
+   used by `_issue`/`_receive_stock_entry`, i.e. every issue/receive/
+   transfer) derives "current on-hand qty" from the LAST
+   `StockLedgerEntry` — but the ledger is genuinely append-only by
+   design (no mutable "current quantity" row, per the module's own
+   docstring). A plain `SELECT...FOR UPDATE` on "the last row" doesn't
+   actually block a concurrent transaction's NEW insert (classic
+   phantom-row problem: the row being locked never gets updated, so a
+   second transaction's blocked lock request unblocks holding a
+   *stale* "last row" once the first transaction's insert lands
+   *after* it). Fixed with a `pg_advisory_xact_lock` keyed by
+   `(company_id, item_id, warehouse_id)` in a new
+   `_lock_stock_position`, acquired before every read of the position
+   — a real mutex for a table that structurally has no row to lock.
+   `transfer_stock` (which touches two warehouses in one transaction)
+   pre-acquires both locks in a canonical sorted order up front to
+   rule out a deadlock against a concurrent transfer running in the
+   opposite direction between the same two warehouses (advisory
+   xact-locks are reentrant, so the internal re-acquisition inside
+   `_issue`/`_receive_stock_entry` is a safe no-op).
+
+3. **Found while verifying fix #2, a genuinely separate latent bug**:
+   even with the advisory lock correctly serializing writers, the
+   concurrency test for stock issues still failed intermittently
+   (~30% of runs). Root cause, confirmed with a minimal raw-SQL
+   reproduction outside the ORM entirely: `get_last_ledger_entry`
+   ordered by `StockLedgerEntry.created_at DESC` — but PostgreSQL's
+   `now()`/`created_at` reflects the *transaction's start time*, not
+   the time of the actual write. Under lock contention, a transaction
+   that begins early (and so is stamped with an early `now()`) can end
+   up writing its row *after* a later-starting transaction that didn't
+   have to wait — so `created_at DESC` silently returns the wrong "last"
+   row. The existing tiebreaker, `id DESC`, didn't help because
+   `StockLedgerEntry.id` is a random UUID (`UUIDPrimaryKeyMixin`), not
+   a sequential value. Fixed by adding `StockLedgerEntry.entry_seq`, a
+   real PostgreSQL `SEQUENCE` (`nextval()`, evaluated at actual INSERT
+   time — non-transactional, genuinely monotonic in true write order)
+   as the sole ordering key, via migration `20da9f0955af` (fresh
+   install + downgrade/upgrade verified). This is a correctness bug
+   that existed independently of the locking fix — it would have
+   caused the exact same "which row is current" ambiguity under any
+   sufficiently fast burst of writes, concurrency test or not, though
+   the advisory lock made it far easier to trigger reliably (removed
+   the OTHER race that was previously masking it).
+
+New tests: `test_concurrent_goods_receipts_never_over_receive_beyond_
+ordered_quantity`, `test_concurrent_stock_issues_never_over_issue_
+beyond_on_hand_quantity` in `test_concurrency.py` (now 7 tests total).
+
+Verification: `test_concurrency.py` 5/5 green × 5 consecutive runs
+(plus an isolated 20x loop specifically targeting the `entry_seq` fix
+while root-causing it); full backend suite 318/318 (was 316); Alembic
+fresh-install + downgrade -1 + upgrade head round-trip verified on a
+scratch database.
+
+Traceability: evidence for `NXR-REQ-0110` updated in place with all 4
+bugs (the migration doesn't get its own NXR-REQ row — it's part of the
+same concurrency-hardening unit of work already tracked there).

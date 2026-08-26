@@ -275,6 +275,16 @@ def get_purchase_order_line(db: Session, line_id: uuid.UUID) -> PurchaseOrderLin
     return db.get(PurchaseOrderLine, line_id)
 
 
+def get_purchase_order_line_for_update(db: Session, line_id: uuid.UUID) -> PurchaseOrderLine | None:
+    """Concurrency-safe read for `record_goods_receipt`: locks the row so two
+    concurrent receipts against the same PO line can never both read the
+    same stale `quantity_received` and both pass the remaining-quantity
+    check, over-receiving beyond what was actually ordered."""
+    return db.execute(
+        select(PurchaseOrderLine).where(PurchaseOrderLine.id == line_id).with_for_update()
+    ).scalar_one_or_none()
+
+
 def create_goods_receipt(
     db: Session,
     *,

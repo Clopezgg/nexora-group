@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Numeric, String
+from sqlalchemy import BigInteger, Date, ForeignKey, Numeric, Sequence, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,6 +17,8 @@ es una nueva entrada ADJUSTMENT. Todo movimiento pasa por
 STOCK_MOVEMENT_TYPES = ("RECEIPT", "TRANSFER", "ISSUE", "RETURN", "ADJUSTMENT", "PHYSICAL_COUNT")
 PHYSICAL_COUNT_STATUSES = ("DRAFT", "COUNTED", "APPROVED")
 
+stock_ledger_entry_seq = Sequence("stock_ledger_entries_seq")
+
 
 class StockLedgerEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "stock_ledger_entries"
@@ -29,6 +31,24 @@ class StockLedgerEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     warehouse_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("warehouses.id", ondelete="RESTRICT"), nullable=False
+    )
+    # `created_at` (TimestampMixin) es la hora de INICIO de la transacción
+    # de PostgreSQL (`now()`), no la hora real de escritura -- bajo el
+    # advisory lock que serializa `inventory_service._issue`/
+    # `_receive_stock_entry` (tests/test_concurrency.py), una transacción
+    # puede EMPEZAR (y fijar su `now()`) antes que otra pero terminar de
+    # escribir (tras esperar el lock) DESPUÉS, dejando `created_at`
+    # fuera de orden real de inserción. `id` (UUID aleatorio) tampoco sirve
+    # como desempate. `entry_seq` es un `nextval()` real de PostgreSQL,
+    # evaluado en el momento real de la escritura (no del inicio de
+    # transacción) y monotónico de verdad -- es la única columna segura
+    # para determinar "la última entrada" de `get_last_ledger_entry`.
+    entry_seq: Mapped[int] = mapped_column(
+        BigInteger,
+        stock_ledger_entry_seq,
+        server_default=stock_ledger_entry_seq.next_value(),
+        nullable=False,
+        unique=True,
     )
     movement_type: Mapped[str] = mapped_column(String(16), nullable=False)
     quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)

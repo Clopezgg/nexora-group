@@ -295,7 +295,14 @@ def record_goods_receipt(
     )
 
     for line in lines:
-        po_line = procurement_repository.get_purchase_order_line(db, line["purchase_order_line_id"])
+        # FOR UPDATE: dos recepciones concurrentes contra la MISMA línea de
+        # PO no deben poder leer el mismo `quantity_received` desactualizado
+        # y ambas pasar la validación de cantidad pendiente -- eso
+        # sobre-recibiría más de lo realmente ordenado (encontrado con
+        # `tests/test_concurrency.py`, mismo patrón que numbering/idempotency).
+        po_line = procurement_repository.get_purchase_order_line_for_update(
+            db, line["purchase_order_line_id"]
+        )
         if po_line is None:
             raise ValueError(f"PurchaseOrderLine {line['purchase_order_line_id']} no existe")
         remaining = po_line.quantity - po_line.quantity_received

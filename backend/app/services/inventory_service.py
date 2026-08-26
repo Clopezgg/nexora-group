@@ -1,6 +1,7 @@
 import uuid
 from decimal import Decimal
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.domain.errors import InsufficientStockError
@@ -13,9 +14,32 @@ desde un router ni se guarda "cantidad actual" en una columna mutable de
 Item/Warehouse. Valuación: moving average (orden maestra §54)."""
 
 
+def _lock_stock_position(
+    db: Session, *, company_id: uuid.UUID, item_id: uuid.UUID, warehouse_id: uuid.UUID
+) -> None:
+    """Advisory transaction lock (auto-liberado al hacer commit/rollback)
+    que serializa lectores/escritores concurrentes de la MISMA posición
+    (item, warehouse). El ledger es append-only por diseño -- no existe una
+    fila mutable de "cantidad actual" que un SELECT...FOR UPDATE normal
+    pudiera bloquear y que de verdad detuviera un INSERT concurrente: dos
+    llamadas concurrentes a `_issue`/`_receive_stock_entry` podían leer la
+    MISMA "última entrada" (ninguna de las dos había hecho commit todavía)
+    y ambas pasar el guard INV-INV-001 de stock disponible aunque juntas
+    excedieran el stock real -- encontrado con una prueba de concurrencia
+    real (`tests/test_concurrency.py`), no en teoría. `pg_advisory_xact_lock`
+    es reentrante dentro de la misma transacción, así que llamarlo más de
+    una vez para la misma clave (p.ej. `transfer_stock` bloqueando ambos
+    warehouses por adelantado y luego `_issue`/`_receive_stock_entry`
+    bloqueando de nuevo internamente) es un no-op seguro, nunca un
+    auto-deadlock."""
+    key = f"stock_position:{company_id}:{item_id}:{warehouse_id}"
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": key})
+
+
 def _current_position(
     db: Session, *, company_id: uuid.UUID, item_id: uuid.UUID, warehouse_id: uuid.UUID
 ) -> tuple[Decimal, Decimal]:
+    _lock_stock_position(db, company_id=company_id, item_id=item_id, warehouse_id=warehouse_id)
     last = inventory_repository.get_last_ledger_entry(
         db, company_id=company_id, item_id=item_id, warehouse_id=warehouse_id
     )
@@ -200,6 +224,19 @@ def transfer_stock(
     quantity: Decimal,
 ) -> tuple[StockLedgerEntry, StockLedgerEntry]:
     """Move stock in one database transaction or leave neither ledger leg."""
+    # Bloquea AMBAS posiciones por adelantado, en orden canónico (nunca en
+    # el orden from->to del parámetro), antes de tocar cualquiera de las
+    # dos -- una transferencia concurrente en dirección opuesta (to->from)
+    # para el mismo item/par de warehouses adquiriría las mismas dos claves
+    # en orden inverso si cada lado bloqueara solo la suya según su propio
+    # from/to; con orden canónico ambas transacciones piden las claves en
+    # la misma secuencia y ninguna puede quedar en deadlock esperando a la
+    # otra (pg_advisory_xact_lock es reentrante, así que _issue/
+    # _receive_stock_entry pueden volver a pedir la misma clave después
+    # sin bloquearse a sí mismos).
+    for warehouse_id in sorted((from_warehouse_id, to_warehouse_id), key=str):
+        _lock_stock_position(db, company_id=company_id, item_id=item_id, warehouse_id=warehouse_id)
+
     _, avg_cost = _current_position(
         db, company_id=company_id, item_id=item_id, warehouse_id=from_warehouse_id
     )

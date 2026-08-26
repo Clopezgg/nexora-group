@@ -7,6 +7,12 @@ archivo + `CLAUDE.md` + `docs/MASTER_PLAN.md` +
 `docs/REQUIREMENTS_TRACEABILITY.md` son la fuente de verdad — no se
 reinterpreta esta orden desde cero.
 
+**Estado actual (2026-08-26):** 113/124 requisitos completos (110
+IMPLEMENTED + 3 VERIFIED). 11 requisitos restantes: 8 IN_PROGRESS
+(Azure infrastructure, BLOCKED por §11.1), 1 NOT_STARTED (OIDC), 2
+BLOCKED_EXTERNAL (production). Ver `docs/REQUIREMENTS_TRACEABILITY.md`
+para el detalle fila por fila.
+
 **No aplicar todavía.** Esta orden gobierna la fase 90-100% (feature
 freeze → certificación de producción). Mientras el sistema esté en
 Build Width First (completando tracks funcionales, actualmente

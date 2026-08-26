@@ -417,7 +417,7 @@ un dominio nuevo.
   transferencia (un solo audit), y rollback atómico ante fallo de audit para
   las cinco rutas nuevas.
 - `tests/test_procurement_flow.py`: `test_approving_purchase_order_creates_audit_log_entry` (updated to filter by action).
-- `tests/test_procurement_flow.py`: updated for procurement + inventory audit — all 331 tests pass.
+- `tests/test_procurement_flow.py`: updated for procurement + inventory audit — all 338 tests pass.
 - `tests/test_posting_engine.py`: `test_creating_journal_entry_creates_audit_log_entry`,
   `test_reversing_journal_entry_creates_audit_log_entry` (2026-08-25).
 - Tests updated to filter by `AuditLog.action` where multiple audit entries

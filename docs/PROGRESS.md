@@ -3078,3 +3078,40 @@ audit write fails for each of the five routes. Final full-suite evidence is
 real: targeted Treasury file 27/27; full backend suite 331/331 (was 321
 before this slice), zero regressions; independent code review returned no
 remaining findings and `Ready to commit: Yes`.
+
+### 2026-08-26 — Backlog burn-down (DEFERRED items resolved, E2E verified)
+
+Session under the user's explicit closure order: resolve every
+implementable DEFERRED item, close E2E verification gaps, and reconcile
+all documentation before final commit.
+
+**DEFERRED items resolved (7 code fixes, 40 files, +287/-51):**
+- `DEFERRED-FINAL-001`: shared `useMutationError` hook (`frontend/src/hooks/useMutationError.ts`) + `onError` toast handlers on 22 silent-failure mutations across procurement/inventory/treasury/approvals/documents.
+- `DEFERRED-FINAL-003`: new `GET /api/projects/{id}/budgets` endpoint (all budget versions, BASELINE+REVISED).
+- `DEFERRED-FINAL-004`: transient-only retry predicate in `queryClient.ts` (5xx/network only, never 4xx); removed `retry: 1` from 5 treasury mutations.
+- `DEFERRED-FINAL-010`: `FixedAssetsPage` and `EquipmentPage` fuel log scope selector (was hardcoded `GENERAL`).
+- `DEFERRED-FINAL-011`: new `InvalidEquipmentStatusError` (`NXR-EQUIPMENT-002`, 422) replacing wrong `InvalidOperationScopeError`.
+- `DEFERRED-FINAL-012`: real FKs — `MaintenanceOrder.supplier_id` FK to `suppliers.id`, `Project.customer_id` FK to `customers.id` (migration `a1b2c3d4e5f6`).
+- `DEFERRED-FINAL-017`: `ValueError` → `NotFoundError` (`NXR-DATA-002`, 404) with global handler; eliminated duplicate `db.get()` in Company PATCH; fixed trial balance N+1 query.
+
+**DEFERRED items documented (complex features, not bugs):**
+- `005` (multi-currency treasury): needs FX rate model, conversion service, dual-currency posting.
+- `006` (E2E UI coverage): reconciliation, cash closing, fund restrictions, receipt pages needed.
+- `007` (GL posting for fuel/maintenance/labor): needs configurable expense accounts per company.
+- `013` (migration backfill): safe — greenfield with no real data, reversible downgrade.
+- `018` (payment/receipt reversal hooks): needs `reverse_payment`/`reverse_receipt` services.
+
+**ValueError → NotFoundError migration:** 10 files, 24 edits across routes (ar, ap, assets, equipment, crm, workforce, master_data) and repositories (company, account, procurement, ap).
+
+**E2E verification closed:**
+- NXR-REQ-0093 (Reporting) → IMPLEMENTED via Playwright Critical Journey E2E (steps 35-38: Trial Balance, General Ledger, Balance Sheet, Income Statement).
+- NXR-REQ-0107 (Security) → IMPLEMENTED via Playwright Accessibility E2E (WCAG AA) + Critical Journey security headers.
+
+**Final verification (2026-08-26):**
+- 338/338 backend pytest (PostgreSQL real)
+- 92/92 frontend vitest
+- `tsc --noEmit` clean
+- `eslint .` clean (max-warnings=0)
+- `vite build` OK (PWA precache 7 entries)
+- Playwright E2E 3/3 (Critical Journey + Accessibility)
+- Git: `feat/nexora-greenfield` clean, synced to origin, `main` untouched

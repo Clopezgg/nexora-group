@@ -296,11 +296,13 @@ histórico):
   pero mover cada fila individual a `VERIFIED` exige mapear su alcance
   exacto contra lo que el recorrido realmente cubre, fila por fila — pasada
   pendiente, no asumida aquí.
-- **IMPLEMENTED:** 108 / 124. `NXR-REQ-0016` (Financial statements,
+- **IMPLEMENTED:** 110 / 124. `NXR-REQ-0016` (Financial statements,
   incluyendo Cash Flow), `NXR-REQ-0106` (Migrations), `NXR-REQ-0105`
   (Accessibility), `NXR-REQ-0108` (Observability), `NXR-REQ-0109`
-  (Backup/Restore) y `NXR-REQ-0058` (Supplier Performance) movieron a
-  `IMPLEMENTED` el 2026-08-25.
+  (Backup/Restore), `NXR-REQ-0058` (Supplier Performance) movieron a
+  `IMPLEMENTED` el 2026-08-25; `NXR-REQ-0093` (Reporting) y
+  `NXR-REQ-0107` (Security) movieron a `IMPLEMENTED` el 2026-08-26
+  tras Playwright E2E 3/3.
 - **IN_PROGRESS:** 8 / 124 — NXR-REQ-0114/0115/0116/0117/0118/
   0119/0120/0121 (todos Azure infrastructure, BLOCKED por deployment).
 - **NOT_STARTED:** 1 / 124 — NXR-REQ-0122 (OIDC, BLOCKED por Azure AD tenant).

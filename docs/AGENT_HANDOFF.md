@@ -810,7 +810,7 @@ Non-blocking, noted not chased: pytest now emits one
 being deprecated in favor of a not-yet-stable `httpx2`. Test-tooling
 only, doesn't affect production code.
 
-## Live backlog re-check (2026-08-25, this entry)
+## 2026-08-25 — Live backlog re-check
 
 Re-verified against the live table: 108 `IMPLEMENTED`, 10
 `IN_PROGRESS` (`NXR-REQ-0093/0107/0114/0115/0116/0117/0118/0119/0120/
@@ -837,3 +837,48 @@ privilege escalation; file upload security; secrets handling;
 error/log leakage) — or `docs/AUDIT.md` backlog closure — before
 reassessing against `docs/PRODUCTION_READINESS.md` in full. Do not
 stop between these; continue automatically per the order.
+
+## 2026-08-26 — Backlog burn-down: 7 DEFERRED items resolved, E2E gaps closed
+
+Final closure session under the user's explicit order. HEAD: `ea8591c`
+(`feat/nexora-greenfield`, clean, synced to origin, `main` untouched).
+
+**DEFERRED items resolved (7 code fixes, 40 files, +287/-51):**
+`001` (error feedback — 22 mutations across 5 pages), `003` (budget
+endpoint), `004` (retry predicate), `010` (scope selector), `011`
+(error family), `012` (FK patterns — supplier_id + customer_id),
+`017` (ValueError→NotFoundError + duplicate db.get + N+1). All 7
+committed as `e837e92` and pushed.
+
+**DEFERRED items documented (complex features, not bugs):** `005`
+(multi-currency — needs FX model), `006` (E2E UI coverage — needs
+reconciliation/closing pages), `007` (GL posting for fuel/maintenance/
+labor — needs configurable expense accounts), `013` (migration backfill
+— safe, greenfield), `018` (reversal hooks — needs
+reverse_payment/reverse_receipt). Updated in `docs/DEFERRED.md`
+(`ab50908`).
+
+**E2E verification closed:** NXR-REQ-0093 (Reporting) and NXR-REQ-0107
+(Security) moved from IN_PROGRESS → IMPLEMENTED after Playwright E2E
+3/3 pass (Critical Journey covers reporting steps 35-38 + audit trail
+step 39; Accessibility E2E covers WCAG AA).
+
+**Final verification (this session, real commands, real PostgreSQL):**
+- 338/338 backend pytest, 92/92 frontend vitest
+- `tsc --noEmit` clean, `eslint .` clean, `vite build` OK
+- Playwright E2E 3/3 green
+- Git: `feat/nexora-greenfield` clean, synced, `main` untouched
+
+**Traceability recount (this session, grep-verified):**
+110 IMPLEMENTED + 3 VERIFIED + 8 IN_PROGRESS + 1 NOT_STARTED + 2
+BLOCKED_EXTERNAL = 124.
+
+The 8 IN_PROGRESS are all Azure infrastructure (NXR-REQ-0114–0121),
+blocked by deployment authorization (CLAUDE.md §11.1). The 1
+NOT_STARTED is NXR-REQ-0122 (OIDC, needs Azure AD tenant). The 2
+BLOCKED_EXTERNAL are NXR-REQ-0123/0124 (production smoke/E2E, depend
+on real deployment). DOCKER-001 is EXTERNAL-BLOCKER (Docker not installed).
+
+**All local implementable work is complete.** The domain-logic backlog
+is fully closed. What remains is exclusively Azure provisioning +
+OIDC + production deployment — all gated by external authorization.

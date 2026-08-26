@@ -2969,3 +2969,72 @@ the evidence row): brute force beyond account lockout, token
 expiration/revocation, cookie/CORS audit, IDOR, horizontal/vertical
 privilege escalation, file upload security, secrets handling,
 dependency vulnerabilities, error/log leakage.
+
+## 2026-08-25 — Closed real dependency vulnerabilities: fastapi/starlette upgrade
+
+Direct continuation, same session, next item off the §9 checklist:
+dependency vulnerabilities. Ran `pip-audit -r requirements.txt` — not
+a hypothetical check, it found 8 real, currently-known CVEs in
+`starlette==0.48.0` (the version `fastapi>=0.118,<0.119` was pinned
+to, itself 23 minor releases behind latest):
+
+- **PYSEC-2026-161 / PYSEC-2026-248**: `request.url` was reconstructed
+  by concatenating the raw `Host` header (or an unvalidated request
+  path) into a URL string and re-parsing it, without validating it
+  against the actual RFC grammar. A crafted `Host` header or a path
+  not starting with `/` could make `request.url.path` /
+  `request.url.hostname` lie about what was actually requested —
+  exactly the kind of thing that breaks any path- or host-based
+  authorization decision built on `request.url` instead of the raw
+  ASGI scope.
+- **PYSEC-2026-1942**: a crafted `Range` header against any
+  `FileResponse`/`StaticFiles` endpoint triggers O(n²) parsing — an
+  unauthenticated single-request CPU-exhaustion DoS.
+- **PYSEC-2026-2281**: `StaticFiles` on Windows follows UNC paths
+  (`\\attacker.com\share`), triggering an outbound SMB connection and
+  leaking the service account's NTLMv2 credentials before returning a
+  404 — SSRF via path traversal.
+- **PYSEC-2026-2280**: `HTTPEndpoint` dispatches HTTP methods via
+  `getattr(self, method.lower())` without restricting to real HTTP
+  verbs, so a non-standard method whose name happens to match an
+  internal helper method gets invoked as if it were a real handler.
+
+None of these are exploitable in THIS codebase's current routes today
+(no `HTTPEndpoint` subclasses, no `StaticFiles`/`FileResponse` usage —
+evidence goes through Azure Blob, not local static serving; no
+security decision reads `request.url` directly rather than the raw
+scope) — but "not exploitable today, given how the code happens to be
+written" is not the same as "not vulnerable," and this is exactly the
+class of latent risk that turns into a real incident the day someone
+adds a file-serving route or a `request.url`-based check without
+knowing the framework underneath them is unsafe. Fixed at the source
+rather than working around it in application code.
+
+`fastapi` bumped `>=0.118,<0.119` → `>=0.141,<0.142` (which drops its
+own `starlette` upper-bound pin from 0.135+ onward), plus an explicit
+`starlette>=1.3.1` floor added directly to `requirements.txt` with a
+comment naming the CVEs — so a fresh install can never silently
+regress back to the vulnerable range even if fastapi's own transitive
+pin changes again later. `pip-audit` clean afterward (0 vulnerabilities).
+
+This is a *major* Starlette version bump (0.48 → 1.6), so it got real
+verification, not a rubber stamp: full backend suite 321/321 with zero
+regressions, plus a real end-to-end smoke test — an actual uvicorn
+server against a scratch database, confirming login, the
+`X-Correlation-Id` header, all the security response headers, and a
+real CORS preflight all still work identically. This specifically
+exercises `CorrelationIdMiddleware`, the one piece of this codebase
+written as pure ASGI (not `BaseHTTPMiddleware`) specifically to work
+around a known Starlette `ContextVar` propagation quirk — the part
+most likely to behave differently across a major Starlette version,
+confirmed unaffected.
+
+Also ran `npm audit` on the frontend (prod and dev dependencies) while
+in a dependency-audit mindset: 0 vulnerabilities, no action needed
+there.
+
+Noted but not chased (non-blocking, test-tooling only): pytest now
+emits one `StarletteDeprecationWarning` — `httpx` with
+`starlette.testclient` is deprecated in favor of a future `httpx2`.
+Doesn't affect production code or test correctness; revisit when
+`httpx2` actually ships as a stable package.

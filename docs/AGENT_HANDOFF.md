@@ -773,6 +773,43 @@ token expiration/revocation, cookie/CORS audit, IDOR, horizontal/
 vertical privilege escalation, file upload security, secrets handling,
 dependency vulnerabilities, error/log leakage.
 
+## 2026-08-25 — Closed real dependency vulnerabilities (fastapi/starlette upgrade)
+
+Direct continuation. Full detail in `docs/PROGRESS.md`'s `2026-08-25 —
+Closed real dependency vulnerabilities...` entry. `pip-audit -r
+requirements.txt` found 8 real CVEs in `starlette==0.48.0` (pinned via
+`fastapi>=0.118,<0.119`, 23 minors behind): Host/path-based
+`request.url` reconstruction bypass (auth-decision risk for any code
+that trusts `request.url` over the raw ASGI scope), a `Range`-header
+O(n²) DoS on `FileResponse`/`StaticFiles`, Windows UNC-path SSRF on
+`StaticFiles`, and an `HTTPEndpoint` method-dispatch bypass. None
+exploitable in this codebase's CURRENT routes, but latent risk that
+becomes real the moment someone adds a file-serving route or a
+`request.url`-based check. Bumped `fastapi` to `>=0.141,<0.142` +
+explicit `starlette>=1.3.1` floor in `requirements.txt` (with the CVE
+IDs in a comment, so a fresh install can't silently regress). `pip-audit`
+clean afterward.
+
+**If you touch dependency pins again**: `starlette` has no upper bound
+via `fastapi>=0.135`, so a routine `pip install -r requirements.txt`
+on a fresh environment will keep pulling the latest compatible
+starlette going forward -- don't add an upper bound back without a
+specific reason, it would silently reintroduce this exact drift.
+
+Major Starlette version bump (0.x -> 1.x), verified for real: full
+backend suite 321/321, zero regressions; real end-to-end smoke test
+with an actual uvicorn server (login, `X-Correlation-Id`, security
+headers, CORS preflight all confirmed working) -- specifically
+exercising `CorrelationIdMiddleware`, the one pure-ASGI middleware in
+this codebase and the piece most likely to behave differently across
+a major Starlette version. `npm audit` on the frontend also run while
+in a dependency-audit mindset: 0 vulnerabilities, no action needed.
+
+Non-blocking, noted not chased: pytest now emits one
+`StarletteDeprecationWarning` about `httpx`/`starlette.testclient`
+being deprecated in favor of a not-yet-stable `httpx2`. Test-tooling
+only, doesn't affect production code.
+
 ## Live backlog re-check (2026-08-25, this entry)
 
 Re-verified against the live table: 108 `IMPLEMENTED`, 10
@@ -792,10 +829,11 @@ against remaining budget. Both should become their own gap (not a
 concurrency test) if in canonical 100% scope — check
 `docs/REQUIREMENTS_TRACEABILITY.md` for whether budget enforcement/
 overdraft prevention has an NXR-REQ row before building either. Next
-candidate work: continue the §9 security review checklist (brute force
-beyond existing lockout; session/token expiration+revocation; cookies;
-CORS; IDOR; horizontal/vertical privilege escalation; file upload
-security; secrets handling; dependency vulnerabilities; error/log
-leakage) — or `docs/AUDIT.md` backlog closure — before reassessing
-against `docs/PRODUCTION_READINESS.md` in full. Do not stop between
-these; continue automatically per the order.
+candidate work: continue the §9 security review checklist (dependency
+vulnerabilities now closed — see the entry directly above; remaining:
+brute force beyond existing lockout; session/token
+expiration+revocation; cookies; CORS; IDOR; horizontal/vertical
+privilege escalation; file upload security; secrets handling;
+error/log leakage) — or `docs/AUDIT.md` backlog closure — before
+reassessing against `docs/PRODUCTION_READINESS.md` in full. Do not
+stop between these; continue automatically per the order.

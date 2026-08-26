@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.domain.errors import IdempotencyConflictError
@@ -21,30 +22,59 @@ class IdempotencyOutcome:
     is_replay: bool
 
 
+def _resolve_existing(existing: IdempotencyRecord, *, key: str, payload_hash: str) -> IdempotencyOutcome:
+    if existing.payload_hash != payload_hash:
+        raise IdempotencyConflictError(
+            f"Idempotency-Key '{key}' ya se usó con un payload distinto"
+        )
+    return IdempotencyOutcome(record=existing, is_replay=existing.status == "COMPLETED")
+
+
 def begin(
     db: Session, *, key: str, command: str, payload: dict[str, Any]
 ) -> IdempotencyOutcome:
     """INV-IDEM-001/002. Misma key + mismo payload -> replay del resultado ya
     completado. Misma key + payload distinto -> IdempotencyConflictError
     (mapeado a 409 en la capa API). Key nueva -> crea un registro PENDING que
-    el caller debe completar con `complete()`."""
+    el caller debe completar con `complete()`.
+
+    Dos requests concurrentes con la MISMA key pueden ambas ver
+    `existing is None` antes de que cualquiera haga commit de su INSERT
+    -- `key` es `unique=True` (constraint real), así que la segunda
+    inserción siempre choca, pero sin manejar esa colisión el caller que
+    pierde la carrera recibía un `IntegrityError` sin capturar en vez
+    del replay esperado (el punto entero de una idempotency key es que
+    un caller concurrente/reintentado reciba la MISMA respuesta exitosa,
+    nunca un error de integridad de datos) -- encontrado con una prueba
+    de concurrencia real (`tests/test_concurrency.py`). Se resuelve
+    igual que `numbering_service.next_document_number`: SAVEPOINT
+    alrededor del INSERT, y si choca, un SELECT ... FOR UPDATE sobre la
+    key ya existente -- eso bloquea hasta que la transacción del
+    ganador termine (commit libera el lock), momento en el que su
+    registro ya está COMPLETED de verdad, no a medio terminar."""
     payload_hash = _hash_payload(payload)
     existing = db.execute(
         select(IdempotencyRecord).where(IdempotencyRecord.key == key)
     ).scalar_one_or_none()
 
     if existing is not None:
-        if existing.payload_hash != payload_hash:
-            raise IdempotencyConflictError(
-                f"Idempotency-Key '{key}' ya se usó con un payload distinto"
-            )
-        return IdempotencyOutcome(record=existing, is_replay=existing.status == "COMPLETED")
+        return _resolve_existing(existing, key=key, payload_hash=payload_hash)
 
-    record = IdempotencyRecord(
-        key=key, command=command, payload_hash=payload_hash, status="PENDING"
-    )
-    db.add(record)
-    db.flush()
+    savepoint = db.begin_nested()
+    try:
+        record = IdempotencyRecord(
+            key=key, command=command, payload_hash=payload_hash, status="PENDING"
+        )
+        db.add(record)
+        db.flush()
+        savepoint.commit()
+    except IntegrityError:
+        savepoint.rollback()
+        existing = db.execute(
+            select(IdempotencyRecord).where(IdempotencyRecord.key == key).with_for_update()
+        ).scalar_one()
+        return _resolve_existing(existing, key=key, payload_hash=payload_hash)
+
     return IdempotencyOutcome(record=record, is_replay=False)
 
 

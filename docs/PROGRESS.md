@@ -2744,3 +2744,80 @@ E2E 3/3 green.
 Traceability: `NXR-REQ-0058` moved `NOT_STARTED` → `IMPLEMENTED`. Tally
 now 108 `IMPLEMENTED` (+1), 11 `IN_PROGRESS`, 1 `NOT_STARTED` (-1), 2
 `BLOCKED_EXTERNAL`, 2 `VERIFIED`.
+
+## 2026-08-25 — Real concurrency/race testing (master order §10): 2 production bugs found and fixed (NXR-REQ-0110 → VERIFIED)
+
+Direct continuation, same session, under the absolute-closure order's
+§10 (Concurrency/Idempotency): run real concurrent tests over
+numbering, GL posting, AP payment, Treasury transfer, idempotency
+replay, looking specifically for double posting, lost updates,
+duplicate document numbers, and duplicate money — fix every bug found
+with a real regression test, never a sequential test that couldn't
+have caught it.
+
+New `backend/tests/test_concurrency.py`, 5 tests. Every test uses
+genuinely independent threads (`concurrent.futures.ThreadPoolExecutor`),
+each with its OWN `SessionLocal()` against the SAME live PostgreSQL
+test database — deliberately not the shared `db_session` pytest
+fixture, which is bound to one non-thread-safe `Session` and cannot
+reproduce a real multi-request race:
+
+- Numbering create-race (sequence row doesn't exist yet, 10 threads)
+  and steady-state (20 threads against an already-seeded row).
+- Idempotency replay (5 threads, same key: exactly 1 real execution,
+  4 replays, 0 errors).
+- Concurrent CENTRAL remittances into the same treasury account (10 ×
+  L100.00, asserts the reported GL balance is exactly L1000.00 — a
+  lost update here means real money vanishing from the reported
+  position while the GL still shows it posted).
+- Concurrent full payments against the same supplier invoice (5
+  threads, each trying to pay the full L1000.00 balance): exactly 1
+  must succeed, `amount_paid`/`status` verified via raw SQL after the
+  race, not just via in-memory return values.
+
+**Found 2 real, previously undetected production bugs**, both the
+same root cause: `numbering_service.next_document_number` and
+`idempotency_service.begin` both do "check if the row exists, if not
+INSERT it" without a lock (there is nothing to `SELECT ... FOR UPDATE`
+yet on the very first call for a given key). Two concurrent callers
+can both observe "doesn't exist yet" before either commits, so the
+loser's INSERT hits the real PostgreSQL unique constraint
+(`uq_number_sequences_scope` / the implicit unique index on
+`IdempotencyRecord.key`) and raised a raw, uncaught `IntegrityError`
+instead of the correct behavior (get its number; get the replayed
+result). This is a real bug an actual production race could trigger —
+two POs submitted at the same instant for a company's very first
+purchase order, or two retried requests with the same brand-new
+Idempotency-Key — not a theoretical one; it only surfaced because the
+test used real independent threads/sessions instead of sequential
+calls.
+
+**Fix**: wrap the INSERT in a SQLAlchemy `SAVEPOINT` (`db.begin_nested()`),
+catch `IntegrityError`, roll back only the savepoint — never the
+caller's outer transaction, since higher-level services (e.g.
+`posting_service.post_manual`) may already have staged other pending
+work before calling into numbering/idempotency — then re-`SELECT`
+the winner's row `... FOR UPDATE`. For idempotency specifically, the
+`FOR UPDATE` re-fetch must *block* until the winner's transaction
+commits, so the loser observes the winner's final `COMPLETED` status
+rather than a still-`PENDING` one (otherwise the loser would wrongly
+conclude it also needs to execute the real side effect).
+
+The AP-payment test found no bug — `pay_supplier_invoice`'s existing
+`SELECT ... FOR UPDATE` on the invoice row already serializes callers
+correctly, so it was kept as a regression test confirming that
+protection holds under a real 5-way race (the losing callers correctly
+raise either `OverpaymentError` or `InvalidInvoiceStateError` depending
+on whether their stale in-memory `status` read trips the state guard
+before the balance guard — both are correct rejections of a duplicate
+payment).
+
+Verification: `test_concurrency.py` run 5× consecutively, 5/5 green
+every time; full backend suite 316/316 (up from 315, +1 new test),
+zero regressions from the `numbering_service.py`/`idempotency_service.py`
+fix.
+
+Traceability: `NXR-REQ-0110` (Unit tests) moved `IN_PROGRESS` →
+`VERIFIED` — real command-execution evidence (5× stable + full suite),
+not just "tests exist". Tally now 108 `IMPLEMENTED`, 10 `IN_PROGRESS`
+(-1), 1 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`, 3 `VERIFIED` (+1).

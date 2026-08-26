@@ -637,3 +637,65 @@ access, before reassessing against `docs/PRODUCTION_READINESS.md` in
 full. Azure subscription (UNAH) is `ReadOnlyDisabledSubscription` as of
 this entry — `az bicep build` stays available, `what-if`/deploy do not
 until it's re-enabled externally.
+
+## 2026-08-25 — Concurrency/idempotency race testing (master order §10): 2 real bugs found and fixed (NXR-REQ-0110 → VERIFIED)
+
+Direct continuation, same session. Full detail in `docs/PROGRESS.md`'s
+`2026-08-25 — Real concurrency/race testing...` entry. New
+`backend/tests/test_concurrency.py`: 5 tests, each using independent
+`SessionLocal()` per thread via `ThreadPoolExecutor` against the same
+live PostgreSQL test DB (never the shared `db_session` fixture, which
+isn't thread-safe and can't reproduce a real race) — numbering
+create-race + steady-state, idempotency replay, concurrent remittances
+(lost-update check on reported GL balance), concurrent full payments
+on one invoice.
+
+**2 real production bugs found**: `numbering_service.
+next_document_number` and `idempotency_service.begin` both raised an
+uncaught `sqlalchemy.exc.IntegrityError` when two concurrent callers
+raced to INSERT the very first `NumberSequence`/`IdempotencyRecord`
+row for a given key (nothing exists yet to `SELECT ... FOR UPDATE`).
+**Fixed** in both with the same pattern: `db.begin_nested()`
+(SAVEPOINT) around the INSERT, catch `IntegrityError`, roll back only
+the savepoint (never the caller's outer transaction — callers like
+`posting_service.post_manual` may have other pending work staged
+already), then re-`SELECT ... FOR UPDATE` the winner's row. For
+idempotency specifically the re-fetch must *block* on the winner's
+commit so the loser sees `COMPLETED`, not a stale `PENDING`.
+
+**If you touch either service again**: preserve the SAVEPOINT pattern
+exactly — a plain re-`SELECT` without `begin_nested()` would either
+lose the outer transaction's other pending work on rollback, or (for
+idempotency) risk the loser reading a not-yet-committed `PENDING`
+record and wrongly re-executing the real side effect.
+
+The AP-payment race test found no bug: `pay_supplier_invoice`'s
+existing `SELECT ... FOR UPDATE` on the invoice row already serializes
+correctly (losers correctly get `OverpaymentError` or
+`InvalidInvoiceStateError` depending on which guard their stale
+in-memory status trips first — both are correct rejections).
+
+Verification: `test_concurrency.py` 5/5 green × 5 consecutive runs;
+full backend suite 316/316 (was 315), zero regressions. `NXR-REQ-0110`
+moved `IN_PROGRESS` → `VERIFIED`.
+
+## Live backlog re-check (2026-08-25, this entry)
+
+Re-verified against the live table: 108 `IMPLEMENTED`, 10
+`IN_PROGRESS` (`NXR-REQ-0093/0107/0114/0115/0116/0117/0118/0119/0120/
+0121`), 1 `NOT_STARTED` (`NXR-REQ-0122`, OIDC — external GitHub config),
+2 `BLOCKED_EXTERNAL` (`0123/0124`), 3 `VERIFIED` (+`0110`). Per the
+absolute-closure order, next canonical gaps in priority order: extend
+concurrency coverage the order explicitly names but this pass didn't
+yet cover (AR receipt, additional Treasury transfer scenarios, bank
+reconciliation matching, PO/receipt races, inventory receive/transfer
+races, project issue races, approval races, budget consumption races)
+— or move to the §9 security review checklist (app-layer rate
+limiting per the order's explicit instruction not to claim Azure-only
+without proving app-layer is insufficient first; brute force beyond
+existing lockout; session/token expiration+revocation; cookies; CORS;
+IDOR; horizontal/vertical privilege escalation; file upload security;
+secrets handling; dependency vulnerabilities; error/log leakage) — or
+`docs/AUDIT.md` backlog closure — before reassessing against
+`docs/PRODUCTION_READINESS.md` in full. Do not stop between these;
+continue automatically per the order.

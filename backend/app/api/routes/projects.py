@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
+from app.api.deps_correlation import get_correlation_id
 from app.models.project import Project
 from app.repositories import (
     budget_repository,
@@ -29,7 +30,7 @@ from app.schemas.project_control import (
     WBSNodeCreateRequest,
     WBSNodeResponse,
 )
-from app.services import budget_service, forecast_service
+from app.services import audit_service, budget_service, forecast_service
 from app.services.financial_validation_service import assert_evidence_belongs_to_company
 from app.services.permission_service import assert_company_access, require_permission
 
@@ -83,6 +84,7 @@ def create_project(
     payload: ProjectCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("project", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> ProjectResponse:
     assert_company_access(
         db, user_id=user.id, resource="project", action="create", company_id=payload.company_id
@@ -99,6 +101,19 @@ def create_project(
         planned_start=payload.planned_start,
         planned_end=payload.planned_end,
         description=payload.description,
+    )
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="project.create",
+        entity_type="project",
+        entity_id=project.id,
+        company_id=project.company_id,
+        project_id=project.id,
+        before=None,
+        after={"name": project.name, "code": project.code},
+        correlation_id=correlation_id,
     )
     db.commit()
     db.refresh(project)
@@ -138,6 +153,7 @@ def create_wbs_node(
     payload: WBSNodeCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("project.wbs", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> WBSNodeResponse:
     project = _get_project_or_404(db, project_id)
     assert_company_access(
@@ -152,6 +168,19 @@ def create_wbs_node(
         manager=payload.manager,
         planned_start=payload.planned_start,
         planned_finish=payload.planned_finish,
+    )
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="project.wbs.create",
+        entity_type="project.wbs",
+        entity_id=node.id,
+        company_id=project.company_id,
+        project_id=project_id,
+        before=None,
+        after={"code": node.code, "name": node.name},
+        correlation_id=correlation_id,
     )
     db.commit()
     db.refresh(node)
@@ -178,6 +207,7 @@ def create_task(
     payload: TaskCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("project.planning", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> TaskResponse:
     project = _get_project_or_404(db, project_id)
     assert_company_access(
@@ -192,6 +222,19 @@ def create_task(
         planned_start=payload.planned_start,
         planned_end=payload.planned_end,
         depends_on_task_id=payload.depends_on_task_id,
+    )
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="project.task.create",
+        entity_type="project.task",
+        entity_id=task.id,
+        company_id=project.company_id,
+        project_id=project_id,
+        before=None,
+        after={"name": task.name},
+        correlation_id=correlation_id,
     )
     db.commit()
     db.refresh(task)
@@ -218,6 +261,7 @@ def create_milestone(
     payload: MilestoneCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("project.planning", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> MilestoneResponse:
     project = _get_project_or_404(db, project_id)
     assert_company_access(
@@ -225,6 +269,19 @@ def create_milestone(
     )
     milestone = project_control_repository.create_milestone(
         db, project_id=project_id, name=payload.name, due_date=payload.due_date, wbs_node_id=payload.wbs_node_id
+    )
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="project.milestone.create",
+        entity_type="project.milestone",
+        entity_id=milestone.id,
+        company_id=project.company_id,
+        project_id=project_id,
+        before=None,
+        after={"name": milestone.name, "dueDate": str(milestone.due_date)},
+        correlation_id=correlation_id,
     )
     db.commit()
     db.refresh(milestone)
@@ -237,6 +294,7 @@ def create_budget_baseline(
     payload: BudgetBaselineCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("project.budget", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> BudgetResponse:
     project = _get_project_or_404(db, project_id)
     assert_company_access(
@@ -257,7 +315,22 @@ def create_budget_baseline(
             for line in payload.lines
         ],
         notes=payload.notes,
+        commit=False,
     )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="project.budget.create",
+        entity_type="project.budget",
+        entity_id=budget.id,
+        company_id=project.company_id,
+        project_id=project_id,
+        before=None,
+        after={"version": budget.version, "status": budget.status, "currencyCode": budget.currency_code},
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    db.refresh(budget)
     return _budget_to_response(db, budget)
 
 
@@ -342,6 +415,7 @@ def create_change_order(
     db: Session = Depends(get_db),
     current=Depends(get_current_user),
     _user=Depends(require_permission("project.change_order", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> ChangeOrderResponse:
     user, _roles = current
     project = _get_project_or_404(db, project_id)
@@ -358,6 +432,19 @@ def create_change_order(
         budget_change_amount=payload.budget_change_amount,
         schedule_change_days=payload.schedule_change_days,
     )
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="project.change_order.create",
+        entity_type="project.change_order",
+        entity_id=change_order.id,
+        company_id=project.company_id,
+        project_id=project_id,
+        before=None,
+        after={"status": change_order.status, "reason": change_order.reason},
+        correlation_id=correlation_id,
+    )
     db.commit()
     db.refresh(change_order)
     return ChangeOrderResponse.model_validate(change_order, from_attributes=True)
@@ -368,6 +455,7 @@ def submit_change_order(
     change_order_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("project.change_order", "submit")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> ChangeOrderResponse:
     change_order = project_control_repository.get_change_order(db, change_order_id)
     if change_order is None:
@@ -378,7 +466,20 @@ def submit_change_order(
     )
     if change_order.status != "DRAFT":
         raise HTTPException(status_code=409, detail=f"Solo se puede enviar una ChangeOrder en DRAFT (actual: {change_order.status})")
+    before_status = change_order.status
     change_order.status = "SUBMITTED"
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="project.change_order.submit",
+        entity_type="project.change_order",
+        entity_id=change_order.id,
+        company_id=project.company_id,
+        project_id=change_order.project_id,
+        before={"status": before_status},
+        after={"status": change_order.status},
+        correlation_id=correlation_id,
+    )
     db.commit()
     db.refresh(change_order)
     return ChangeOrderResponse.model_validate(change_order, from_attributes=True)
@@ -389,6 +490,7 @@ def approve_change_order(
     change_order_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("project.change_order", "approve")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> BudgetResponse:
     change_order = project_control_repository.get_change_order(db, change_order_id)
     if change_order is None:
@@ -397,7 +499,22 @@ def approve_change_order(
     assert_company_access(
         db, user_id=user.id, resource="project.change_order", action="approve", company_id=project.company_id
     )
-    budget = budget_service.approve_change_order(db, change_order_id=change_order_id, approved_by=user.id)
+    before_status = change_order.status
+    budget = budget_service.approve_change_order(db, change_order_id=change_order_id, approved_by=user.id, commit=False)
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="project.change_order.approve",
+        entity_type="project.change_order",
+        entity_id=change_order.id,
+        company_id=project.company_id,
+        project_id=change_order.project_id,
+        before={"status": before_status},
+        after={"status": "APPROVED", "budgetId": str(budget.id)},
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    db.refresh(budget)
     return _budget_to_response(db, budget)
 
 
@@ -421,6 +538,7 @@ def create_progress(
     payload: ProgressRecordCreateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("project.progress", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> ProgressRecordResponse:
     project = _get_project_or_404(db, project_id)
     assert_company_access(
@@ -439,6 +557,22 @@ def create_progress(
         description=payload.description,
         responsible=payload.responsible,
         evidence_id=payload.evidence_id,
+    )
+    db.flush()
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="project.progress.create",
+        entity_type="project.progress",
+        entity_id=record.id,
+        company_id=project.company_id,
+        project_id=project_id,
+        before=None,
+        after={
+            "recordDate": str(record.record_date),
+            "actualPercent": str(record.actual_percent),
+        },
+        correlation_id=correlation_id,
     )
     db.commit()
     db.refresh(record)

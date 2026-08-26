@@ -65,6 +65,7 @@ def create_baseline(
     currency_code: str,
     lines: list[BudgetLineInput],
     notes: str | None = None,
+    commit: bool = True,
 ) -> Budget:
     if budget_repository.get_baseline_budget(db, project_id) is not None:
         raise BudgetBaselineExistsError(
@@ -105,12 +106,15 @@ def create_baseline(
                 authorized_amount=line.authorized_amount,
             )
         )
-    db.commit()
-    db.refresh(budget)
+    if commit:
+        db.commit()
+        db.refresh(budget)
+    else:
+        db.flush()
     return budget
 
 
-def approve_change_order(db: Session, *, change_order_id: uuid.UUID, approved_by: uuid.UUID) -> Budget:
+def approve_change_order(db: Session, *, change_order_id: uuid.UUID, approved_by: uuid.UUID, commit: bool = True) -> Budget:
     """Aprueba la ChangeOrder y, si tiene impacto de presupuesto (monto
     distinto de 0), crea el Budget REVISED correspondiente. El BASELINE (y
     cualquier REVISED anterior) nunca se modifica -- queda en status
@@ -165,8 +169,11 @@ def approve_change_order(db: Session, *, change_order_id: uuid.UUID, approved_by
     previous.status = "SUPERSEDED"
     change_order.status = "APPROVED"
     change_order.approved_by = approved_by
-    db.commit()
-    db.refresh(revised)
+    if commit:
+        db.commit()
+        db.refresh(revised)
+    else:
+        db.flush()
     return revised
 
 

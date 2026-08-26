@@ -262,7 +262,7 @@ endpoint added in this slice (`POST /api/ap/supplier-invoices/{id}/cancel`).
 | Inventory | `inventory.stock.receive` | `POST /api/inventory/stock/receive` |
 | Inventory | `inventory.stock.issue_to_project` | `POST /api/inventory/stock/issue-to-project` |
 | Inventory | `inventory.stock.transfer` | `POST /api/inventory/stock/transfer` |
-| Inventory | `inventory.stock.return_to_supplier` | `POST /api/procurement/stock/return-to-supplier` |
+| Inventory | `inventory.stock.return_to_supplier` | `POST /api/inventory/stock/return-to-supplier` |
 | Inventory | `inventory.physical_count.create` | `POST /api/inventory/physical-counts` |
 | Inventory | `inventory.physical_count.approve` | `POST /api/inventory/physical-counts/{id}/approve` |
 
@@ -271,6 +271,25 @@ routes use `commit=False` + single `db.commit()` for atomic business+audit
 transactions. The `approve_purchase_order` route was already audited and now
 also uses `commit=False`. UUIDs in `before`/`after` dicts are converted to
 strings for JSONB serialization.
+
+## Dominios instrumentados (2026-08-26, backlog burn-down — Project Control: WBS, Budgets, Change Orders, Progress)
+
+| Dominio | Acción | Ruta |
+|---------|--------|------|
+| Project | `project.create` | `POST /api/projects` |
+| Project | `project.wbs.create` | `POST /api/projects/{id}/wbs` |
+| Project | `project.task.create` | `POST /api/projects/{id}/tasks` |
+| Project | `project.milestone.create` | `POST /api/projects/{id}/milestones` |
+| Project | `project.budget.create` | `POST /api/projects/{id}/budgets/baseline` |
+| Project | `project.change_order.create` | `POST /api/projects/{id}/change-orders` |
+| Project | `project.change_order.submit` | `POST /api/projects/change-orders/{id}/submit` |
+| Project | `project.change_order.approve` | `POST /api/projects/change-orders/{id}/approve` |
+| Project | `project.progress.create` | `POST /api/projects/{id}/progress` |
+
+All 9 routes instrumented. Repository-calling routes use `db.flush()` +
+audit + single `db.commit()`. Service-calling routes (`create_budget_baseline`,
+`approve_change_order`) use `commit=False` on the service + audit + single
+`db.commit()`.
 
 ## Dominios NO instrumentados todavía (backlog honesto)
 
@@ -282,7 +301,7 @@ completitud:
   cotizaciones, creación/envío de PO, recepciones, entradas de servicio,
   three-way match e inventario — `CLOSED` (2026-08-26, ver arriba).
 - **Project Control** (WBS, Presupuestos, Órdenes de cambio, Avances) —
-  `NOT_STARTED`.
+  `CLOSED` (2026-08-26, ver arriba).
 - **Enterprise Resources** (Fixed Assets, Equipment, Workforce) —
   `NOT_STARTED`.
 - **Commercial** (CRM: Leads, Oportunidades, Cotizaciones, Contratos de
@@ -291,8 +310,8 @@ completitud:
   Site Reports, Quality, Safety) — `NOT_STARTED`.
 - **Platform** — Company create/update, User create — `NOT_STARTED`.
 
-Los diez gaps de Treasury, los gaps de creación de AP/AR, y los gaps de
-Supply Chain (Procurement + Inventory) de este y los slices anteriores:
+Los diez gaps de Treasury, los gaps de creación de AP/AR, los gaps de
+Supply Chain (Procurement + Inventory), y los gaps de Project Control:
 **cerrados** (2026-08-26, ver arriba).
 
 Un futuro task puede cerrar estos dominios uno por uno reutilizando

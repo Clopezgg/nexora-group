@@ -10,8 +10,12 @@ import re
 _worktree_slug = re.sub(
     r"[^a-z0-9]+", "_", os.path.basename(os.path.dirname(os.getcwd())).lower()
 ).strip("_") or "default"
-os.environ["DATABASE_URL"] = (
-    f"postgresql+psycopg://nexora@localhost:5432/nexora_test_{_worktree_slug}"
+
+_base_db_url = os.environ.get(
+    "DATABASE_URL", "postgresql+psycopg://nexora:nexora@localhost:5432/nexora_test"
+)
+os.environ["DATABASE_URL"] = re.sub(
+    r"/([^/]+)$", rf"/\1_{_worktree_slug}", _base_db_url
 )
 os.environ["BOOTSTRAP_ADMIN_EMAIL"] = "admin@nexora.group"
 os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "NexoraAdmin123!"

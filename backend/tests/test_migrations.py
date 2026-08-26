@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -8,19 +9,30 @@ _worktree_slug = re.sub(
     r"[^a-z0-9]+", "_", os.path.basename(os.path.dirname(os.getcwd())).lower()
 ).strip("_") or "default"
 _DB_NAME = f"nexora_migrations_test_{_worktree_slug}"
+_PG_USER = "nexora"
+_PG_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "nexora")
+_PG_HOST = "localhost"
+_PG_PORT = "5432"
+
+
+_ALEMBIC_BIN = shutil.which("alembic") or str(_BACKEND_DIR / ".venv" / "bin" / "alembic")
+
+
+def _pg_env() -> dict:
+    return {**os.environ, "PGPASSWORD": _PG_PASSWORD, "PGHOST": _PG_HOST, "PGPORT": _PG_PORT, "PGUSER": _PG_USER}
 
 
 def _run_alembic(*args: str) -> subprocess.CompletedProcess:
     env = {
         **os.environ,
-        "DATABASE_URL": f"postgresql+psycopg://nexora@localhost:5432/{_DB_NAME}",
+        "DATABASE_URL": f"postgresql+psycopg://{_PG_USER}:{_PG_PASSWORD}@{_PG_HOST}:{_PG_PORT}/{_DB_NAME}",
         "BOOTSTRAP_ADMIN_EMAIL": "",
         "BOOTSTRAP_ADMIN_PASSWORD": "",
         "FRONTEND_URL": "http://localhost:5173",
         "APP_ENV": "test",
     }
     return subprocess.run(
-        [str(_BACKEND_DIR / ".venv" / "bin" / "alembic"), *args],
+        [str(_ALEMBIC_BIN), *args],
         cwd=_BACKEND_DIR,
         env=env,
         capture_output=True,
@@ -44,8 +56,8 @@ def test_fresh_install_then_full_downgrade_then_upgrade_roundtrip_succeeds():
     database (not `Base.metadata.create_all`, which every other test in
     this suite uses and which would never have exercised `downgrade()`
     or the real migration chain at all)."""
-    subprocess.run(["dropdb", "--if-exists", _DB_NAME], check=True)
-    subprocess.run(["createdb", _DB_NAME], check=True)
+    subprocess.run(["dropdb", "--if-exists", _DB_NAME], check=True, env=_pg_env())
+    subprocess.run(["createdb", _DB_NAME], check=True, env=_pg_env())
     try:
         upgrade_to_head = _run_alembic("upgrade", "head")
         assert upgrade_to_head.returncode == 0, upgrade_to_head.stderr
@@ -60,4 +72,4 @@ def test_fresh_install_then_full_downgrade_then_upgrade_roundtrip_succeeds():
         assert current.returncode == 0, current.stderr
         assert "(head)" in current.stdout
     finally:
-        subprocess.run(["dropdb", "--if-exists", _DB_NAME], check=True)
+        subprocess.run(["dropdb", "--if-exists", _DB_NAME], check=True, env=_pg_env())

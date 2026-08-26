@@ -35,6 +35,10 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: pip install -r requirements-dev.txt
+      - name: Create test database for worktree slug
+        run: |
+          SLUG=$(python3 -c "import re,os; print(re.sub(r'[^a-z0-9]+','_',os.path.basename(os.path.dirname(os.path.join('${{ github.workspace }}','backend'))).lower()).strip('_') or 'default')")
+          PGPASSWORD=nexora createdb -h localhost -U nexora -O nexora "nexora_test_${SLUG}" || true
       - name: Run alembic migrations
         working-directory: backend
         run: alembic upgrade head

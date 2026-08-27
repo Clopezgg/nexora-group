@@ -1,0 +1,33 @@
+name: Patch treasury E2E submit selector
+
+on:
+  push:
+    branches:
+      - fix/treasury-financial-flows
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/treasury-financial-flows
+          fetch-depth: 0
+      - name: Scope remittance submit button to modal
+        run: python scripts/patch_treasury_e2e_submit.py
+      - name: Remove temporary patch artifacts
+        run: |
+          rm scripts/patch_treasury_e2e_submit.py
+          rm .github/workflows/patch-treasury-e2e-submit.yml
+      - name: Commit and push
+        run: |
+          git config user.name "Nexora Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "test(e2e): scope remittance submit selector"
+          git push origin HEAD:fix/treasury-financial-flows

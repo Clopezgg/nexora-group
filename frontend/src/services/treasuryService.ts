@@ -24,6 +24,7 @@ export interface CreateRemittancePayload {
   reference?: string | null
   currencyCode: string
   originalAmount: string
+  fxRate?: string
   remittanceDate: string
   notes?: string | null
 }

@@ -37,6 +37,40 @@ const EMPTY_FORM = {
   isPostable: true,
 }
 
+type AccountTreeRow = Account & { treeDepth: number }
+
+function buildAccountTree(accounts: Account[]): AccountTreeRow[] {
+  const childrenByParent = new Map<string | null, Account[]>()
+  for (const account of accounts) {
+    const siblings = childrenByParent.get(account.parentId) ?? []
+    siblings.push(account)
+    childrenByParent.set(account.parentId, siblings)
+  }
+  for (const siblings of childrenByParent.values()) {
+    siblings.sort((left, right) => left.code.localeCompare(right.code, undefined, { numeric: true }))
+  }
+
+  const ordered: AccountTreeRow[] = []
+  const visited = new Set<string>()
+  const visit = (parentId: string | null, depth: number) => {
+    for (const account of childrenByParent.get(parentId) ?? []) {
+      if (visited.has(account.id)) continue
+      visited.add(account.id)
+      ordered.push({ ...account, treeDepth: depth })
+      visit(account.id, depth + 1)
+    }
+  }
+
+  visit(null, 0)
+  // Defensive fallback for legacy/orphaned rows. New writes cannot create
+  // cross-catalog parents and parent deletion uses SET NULL, but the catalog
+  // should still render deterministically if historical data is imperfect.
+  for (const account of [...accounts].sort((left, right) => left.code.localeCompare(right.code))) {
+    if (!visited.has(account.id)) ordered.push({ ...account, treeDepth: 0 })
+  }
+  return ordered
+}
+
 export function AccountCatalogPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
@@ -94,14 +128,30 @@ export function AccountCatalogPage() {
 
   const accounts = accountsQuery.data ?? []
   const accountById = new Map(accounts.map((account) => [account.id, account]))
-  const parentOptions = accounts.filter(
-    (account) => !account.isPostable && account.accountType === form.accountType,
-  )
+  const treeRows = buildAccountTree(accounts)
+  const parentOptions = accounts
+    .filter((account) => !account.isPostable && account.accountType === form.accountType)
+    .sort((left, right) => left.code.localeCompare(right.code, undefined, { numeric: true }))
   const canCreateAccount = Boolean(user?.roles.some((role) => CREATE_ACCOUNT_ROLES.has(role)))
 
-  const columns: TableColumn<Account>[] = [
+  const columns: TableColumn<AccountTreeRow>[] = [
     { key: 'code', header: 'Código', render: (account) => account.code },
-    { key: 'name', header: 'Nombre', render: (account) => account.name },
+    {
+      key: 'name',
+      header: 'Nombre / jerarquía',
+      render: (account) => (
+        <span
+          data-account-depth={account.treeDepth}
+          style={{
+            display: 'inline-block',
+            paddingInlineStart: `${account.treeDepth * 1.25}rem`,
+            fontWeight: account.isPostable ? 400 : 600,
+          }}
+        >
+          {account.name}
+        </span>
+      ),
+    },
     {
       key: 'accountType',
       header: 'Tipo',
@@ -145,7 +195,9 @@ export function AccountCatalogPage() {
       <header className="nx-page__header">
         <div>
           <h1 className="nx-dashboard__title">Catálogo de cuentas</h1>
-          <p className="nx-field__hint">Estructura contable de la compañía seleccionada.</p>
+          <p className="nx-field__hint">
+            Estructura contable jerárquica de la compañía seleccionada.
+          </p>
         </div>
         {canCreateAccount ? <Button onClick={() => setModalOpen(true)}>Nueva cuenta</Button> : null}
       </header>
@@ -168,7 +220,7 @@ export function AccountCatalogPage() {
         ) : (
           <Table
             columns={columns}
-            rows={accounts}
+            rows={treeRows}
             getRowKey={(account) => account.id}
             emptyMessage="Aún no hay cuentas en el catálogo de esta compañía."
           />

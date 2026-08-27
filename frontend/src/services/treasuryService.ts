@@ -19,9 +19,13 @@ export interface CreateRemittancePayload {
   treasuryAccountId: string
   counterAccountId: string
   sender: string
+  provider?: string | null
+  channel?: string | null
+  reference?: string | null
   currencyCode: string
   originalAmount: string
   remittanceDate: string
+  notes?: string | null
 }
 
 export interface CreateGeneralExpensePayload {
@@ -76,9 +80,9 @@ export const treasuryService = {
         body: JSON.stringify(payload),
       }),
     ),
-  listRemittances: async (companyId: string) =>
+  listRemittances: async (companyId: string, offset = 0, limit = 25) =>
     (await apiFetch<RemittanceWire[]>(
-      `/treasury/remittances?companyId=${encodeURIComponent(companyId)}`,
+      `/treasury/remittances?companyId=${encodeURIComponent(companyId)}&offset=${offset}&limit=${limit}`,
     )).map(normalizeRemittance),
   createRemittance: (payload: CreateRemittancePayload, idempotencyKey: string) =>
     apiFetch<Remittance>('/treasury/remittances', {

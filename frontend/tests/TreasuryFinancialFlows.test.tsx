@@ -96,7 +96,7 @@ describe('Treasury financial flow corrections', () => {
     await userEvent.selectOptions(await screen.findByLabelText(/^proyecto$/i), 'p1')
     await userEvent.type(screen.getByLabelText(/descripción/i), 'Gasolina de la obra')
     await userEvent.type(screen.getByLabelText(/monto/i), '750')
-    await userEvent.click(screen.getByRole('button', { name: /registrar salida/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^registrar salida$/i }))
 
     await waitFor(() => expect(posted).toMatchObject({ scope: 'PROJECT', projectId: 'p1', treasuryAccountId: 't-atl' }))
   })
@@ -110,7 +110,7 @@ describe('Treasury financial flow corrections', () => {
       if (base !== undefined) return Promise.resolve({ ok: true, status: 200, json: async () => base } as Response)
       if (url.includes('/master-data/accounts')) return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
       if (url.includes('/procurement/suppliers')) return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 's1', companyId: 'c1', legalName: 'Proveedor', status: 'ACTIVE' }] } as Response)
-      if (url.includes('/ap/supplier-invoices/ap1/pay')) {
+      if (url.includes('/ap/supplier-invoices/ap1/payments')) {
         paymentPayload = JSON.parse(String(init?.body))
         return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response)
       }
@@ -135,7 +135,7 @@ describe('Treasury financial flow corrections', () => {
       if (base !== undefined) return Promise.resolve({ ok: true, status: 200, json: async () => base } as Response)
       if (url.includes('/master-data/accounts')) return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
       if (url.includes('/crm/customers')) return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 'cu1', companyId: 'c1', legalName: 'Cliente', status: 'ACTIVE' }] } as Response)
-      if (url.includes('/ar/customer-invoices/ar1/collect')) {
+      if (url.includes('/ar/customer-invoices/ar1/receipts')) {
         collectionPayload = JSON.parse(String(init?.body))
         return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response)
       }

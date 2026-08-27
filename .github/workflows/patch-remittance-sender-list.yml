@@ -1,0 +1,58 @@
+name: Patch remittance sender list
+
+on:
+  push:
+    branches:
+      - fix/remittance-sender-list
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[remittance-sender-list-patch]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/remittance-sender-list
+      - name: Add remittance senders
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          page_path = Path('frontend/src/features/treasury/TreasuryPage.tsx')
+          text = page_path.read_text()
+          old = "const KNOWN_REMITTANCE_SENDERS = ['Karen Vannessa Lopez Gonzalez'] as const"
+          new = """const KNOWN_REMITTANCE_SENDERS = [
+            'Karen Vannessa Lopez Gonzalez',
+            'Maria del Rosario Lopez Gonzalez',
+            'Davie Morales Rodriguez',
+            'Mavel Griselda Tejada',
+          ] as const"""
+          if old not in text:
+              raise SystemExit('known sender list not found')
+          text = text.replace(old, new, 1)
+          page_path.write_text(text)
+
+          test_path = Path('frontend/tests/TreasuryFinancialFlows.test.tsx')
+          text = test_path.read_text()
+          old = "    expect(screen.getByRole('option', { name: 'Karen Vannessa Lopez Gonzalez' })).toBeInTheDocument()\n"
+          new = old + """    expect(screen.getByRole('option', { name: 'Maria del Rosario Lopez Gonzalez' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Davie Morales Rodriguez' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Mavel Griselda Tejada' })).toBeInTheDocument()
+          """
+          if old not in text:
+              raise SystemExit('sender test assertion not found')
+          text = text.replace(old, new, 1)
+          test_path.write_text(text)
+
+          Path('.github/workflows/patch-remittance-sender-list.yml').unlink()
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "NEXORA Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add frontend/src/features/treasury/TreasuryPage.tsx frontend/tests/TreasuryFinancialFlows.test.tsx .github/workflows/patch-remittance-sender-list.yml
+          git commit -m "fix(treasury): expand remittance sender list [remittance-sender-list-patch]"
+          git push origin HEAD:fix/remittance-sender-list

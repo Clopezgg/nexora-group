@@ -194,26 +194,29 @@ jobs:
           set -euo pipefail
           COOKIE_JAR="$RUNNER_TEMP/nexora-production-cookies.txt"
 
-          wait_for_200() {
+          wait_for_status() {
             local url="$1"
-            local label="$2"
+            local expected="$2"
+            local label="$3"
             local code=""
             for attempt in $(seq 1 24); do
               code="$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' "$url" || true)"
-              if [ "$code" = "200" ]; then
+              if [ "$code" = "$expected" ]; then
                 return 0
               fi
-              echo "$label not ready yet (HTTP $code), attempt $attempt/24"
+              echo "$label not ready yet (HTTP $code, expected $expected), attempt $attempt/24"
               sleep 10
             done
-            echo "::error::$label did not become healthy"
+            echo "::error::$label did not return HTTP $expected"
             return 1
           }
 
-          wait_for_200 "$FRONTEND_URL/" "Frontend"
-          wait_for_200 "$BACKEND_URL/healthz" "Backend direct health"
-          wait_for_200 "$FRONTEND_URL/api/healthz" "Same-origin API health"
-          wait_for_200 "$FRONTEND_URL/api/readyz" "Database readiness"
+          wait_for_status "$FRONTEND_URL/" "200" "Frontend"
+          # The linked Container App intentionally requires Azure's bearer token
+          # on its direct ingress. Public API traffic must use the SWA /api route.
+          wait_for_status "$BACKEND_URL/healthz" "401" "Backend direct ingress protection"
+          wait_for_status "$FRONTEND_URL/api/healthz" "200" "Same-origin API health"
+          wait_for_status "$FRONTEND_URL/api/readyz" "200" "Database readiness"
 
           HEALTH_TIME="$(curl --fail --silent --show-error --output /dev/null --write-out '%{time_total}' "$FRONTEND_URL/api/healthz")"
           READY_TIME="$(curl --fail --silent --show-error --output /dev/null --write-out '%{time_total}' "$FRONTEND_URL/api/readyz")"

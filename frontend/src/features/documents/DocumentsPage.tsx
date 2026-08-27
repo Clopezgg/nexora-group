@@ -64,7 +64,7 @@ export function DocumentsPage() {
   if (!activeCompanyId) {
     return (
       <EmptyState
-        icon="🗂️"
+        icon="folder"
         title="Configura una compañía primero"
         description="No hay compañías registradas todavía."
       />

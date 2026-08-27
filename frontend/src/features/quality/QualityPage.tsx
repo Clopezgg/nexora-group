@@ -95,7 +95,7 @@ function InspectionsTab({ projectId }: { projectId: string }) {
         ) : inspectionsQuery.isError ? (
           <ErrorState onRetry={() => inspectionsQuery.refetch()} />
         ) : inspections.length === 0 ? (
-          <EmptyState icon="🔍" title="Sin inspecciones" description="Registra la primera inspección de calidad de este proyecto." />
+          <EmptyState icon="search" title="Sin inspecciones" description="Registra la primera inspección de calidad de este proyecto." />
         ) : (
           <Table columns={columns} rows={inspections} getRowKey={(row) => row.id} emptyMessage="Aún no hay inspecciones." />
         )}
@@ -206,7 +206,7 @@ function NonConformancesTab({ projectId }: { projectId: string }) {
         ) : nonConformancesQuery.isError ? (
           <ErrorState onRetry={() => nonConformancesQuery.refetch()} />
         ) : nonConformances.length === 0 ? (
-          <EmptyState icon="⚠️" title="Sin no conformidades" description="Registra la primera no conformidad de este proyecto." />
+          <EmptyState icon="warning" title="Sin no conformidades" description="Registra la primera no conformidad de este proyecto." />
         ) : (
           <Table columns={columns} rows={nonConformances} getRowKey={(row) => row.id} emptyMessage="Aún no hay no conformidades." />
         )}

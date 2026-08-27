@@ -143,7 +143,7 @@ function DailyReportsList({ projectId }: { projectId: string }) {
           <ErrorState onRetry={() => reportsQuery.refetch()} />
         ) : reports.length === 0 ? (
           <EmptyState
-            icon="📔"
+            icon="notebook"
             title="Sin reportes diarios"
             description="Registra el primer reporte diario de este proyecto."
           />

@@ -118,7 +118,7 @@ function RfiList({ projectId, companyId }: { projectId: string; companyId: strin
       </Card>
 
       {rfis.length === 0 ? (
-        <EmptyState icon="📝" title="Sin RFI registrados" description="Todavía no se ha levantado ningún RFI en este proyecto." />
+        <EmptyState icon="file" title="Sin RFI registrados" description="Todavía no se ha levantado ningún RFI en este proyecto." />
       ) : (
         <Table columns={columns} rows={rfis} getRowKey={(row) => row.id} />
       )}

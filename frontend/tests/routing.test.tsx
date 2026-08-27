@@ -44,7 +44,7 @@ describe('routing', () => {
               periodIncome: 0,
               periodExpense: 0,
               activeProjects: 0,
-              currency: 'MXN',
+              currency: 'HNL',
             }),
           } as Response)
         }
@@ -57,7 +57,7 @@ describe('routing', () => {
     expect(await screen.findByRole('heading', { name: /inicio — finanzas/i })).toBeInTheDocument()
   })
 
-  it('renders every grouped nav route without crashing (placeholder or home)', async () => {
+  it('renders an implemented grouped navigation route', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((input: RequestInfo | URL) => {
@@ -78,8 +78,8 @@ describe('routing', () => {
       }),
     )
 
-    render(renderApp('/abastecimiento/rfq'))
+    render(renderApp('/finanzas/tesoreria'))
 
-    expect(await screen.findByRole('heading', { name: /^rfq$/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /^tesorería$/i })).toBeInTheDocument()
   })
 })

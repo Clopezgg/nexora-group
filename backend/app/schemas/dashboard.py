@@ -6,4 +6,4 @@ class DashboardSummaryResponse(CamelModel):
     period_income: float
     period_expense: float
     active_projects: int
-    currency: str = "MXN"
+    currency: str = "HNL"

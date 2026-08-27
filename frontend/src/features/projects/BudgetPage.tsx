@@ -95,7 +95,7 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
           </div>
           {forecast.pv === null ? (
             <EmptyState
-              icon="📈"
+              icon="chart"
               title="Forecast incompleto"
               description="Registra un avance de proyecto en Avances para calcular PV/EV/CPI/SPI."
             />

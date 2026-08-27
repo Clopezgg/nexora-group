@@ -5,6 +5,7 @@ export type HomeKey = 'finance' | 'project' | 'procurement' | 'warehouse' | 'aud
 export interface HomeSection {
   title: string
   description: string
+  path: string
 }
 
 export interface HomeConfig {
@@ -22,9 +23,9 @@ const homeConfigs: Record<HomeKey, HomeConfig> = {
     subtitle: 'Caja, contabilidad y cuentas por pagar/cobrar.',
     showTreasurySummary: true,
     sections: [
-      { title: 'Aprobaciones pendientes', description: 'Se conectará cuando el motor de workflow (NXR-REQ-0087/0088) esté disponible.' },
-      { title: 'Cuentas por pagar próximas a vencer', description: 'Se conectará cuando el módulo de Cuentas por Pagar (NXR-REQ-0023) esté disponible.' },
-      { title: 'Conciliación bancaria', description: 'Se conectará cuando la conciliación bancaria (NXR-REQ-0021) esté disponible.' },
+      { title: 'Aprobaciones pendientes', description: 'Revisa y resuelve solicitudes según tus permisos.', path: '/inicio/aprobaciones' },
+      { title: 'Cuentas por pagar', description: 'Consulta facturas, vencimientos y pagos a proveedores.', path: '/finanzas/cuentas-por-pagar' },
+      { title: 'Reportes financieros', description: 'Consulta balances, resultados, flujo de efectivo y libro mayor.', path: '/control/reportes' },
     ],
   },
   project: {
@@ -33,10 +34,10 @@ const homeConfigs: Record<HomeKey, HomeConfig> = {
     subtitle: 'Presupuesto, compromisos, avance y abastecimiento de tus proyectos.',
     showTreasurySummary: false,
     sections: [
-      { title: 'Presupuesto vs. actual', description: 'Se conectará cuando Budget/Controlling (NXR-REQ-0031) esté disponible.' },
-      { title: 'Compromisos y órdenes de compra', description: 'Se conectará cuando Procurement (NXR-REQ-0040-0048) esté disponible.' },
-      { title: 'Avance de obra', description: 'Se conectará cuando Progress (NXR-REQ-0039) esté disponible.' },
-      { title: 'RFI / Submittals abiertos', description: 'Se conectará cuando RFI/Submittals (NXR-REQ-0085/0086) esté disponible.' },
+      { title: 'Presupuesto vs. actual', description: 'Consulta presupuesto autorizado, ejecutado y disponible.', path: '/proyectos/presupuestos' },
+      { title: 'Compromisos y órdenes de compra', description: 'Gestiona órdenes y compromisos reales del proyecto.', path: '/abastecimiento/ordenes-de-compra' },
+      { title: 'Avance de obra', description: 'Registra y consulta avance planeado frente al real.', path: '/proyectos/avances' },
+      { title: 'RFI / Submittals abiertos', description: 'Gestiona consultas técnicas y entregables del proyecto.', path: '/proyectos/rfi-submittals' },
     ],
   },
   procurement: {
@@ -45,10 +46,10 @@ const homeConfigs: Record<HomeKey, HomeConfig> = {
     subtitle: 'Solicitudes, RFQ, órdenes de compra y proveedores.',
     showTreasurySummary: false,
     sections: [
-      { title: 'Solicitudes de compra pendientes', description: 'Se conectará cuando Purchase Requisition (NXR-REQ-0040) esté disponible.' },
-      { title: 'RFQ activas', description: 'Se conectará cuando RFQ (NXR-REQ-0042) esté disponible.' },
-      { title: 'Órdenes de compra en curso', description: 'Se conectará cuando Purchase Order (NXR-REQ-0045) esté disponible.' },
-      { title: 'Estado de proveedores', description: 'Se conectará cuando Supplier Performance (NXR-REQ-0058) esté disponible.' },
+      { title: 'Solicitudes de compra pendientes', description: 'Gestiona solicitudes de compra reales.', path: '/abastecimiento/solicitudes' },
+      { title: 'RFQ activas', description: 'Compara ofertas de proveedores registradas.', path: '/abastecimiento/comparativos' },
+      { title: 'Órdenes de compra en curso', description: 'Consulta y gestiona órdenes de compra.', path: '/abastecimiento/ordenes-de-compra' },
+      { title: 'Estado de proveedores', description: 'Consulta el desempeño calculado de proveedores.', path: '/control/reportes' },
     ],
   },
   warehouse: {
@@ -57,9 +58,9 @@ const homeConfigs: Record<HomeKey, HomeConfig> = {
     subtitle: 'Existencias, recepciones, salidas y conteos.',
     showTreasurySummary: false,
     sections: [
-      { title: 'Existencias por almacén', description: 'Se conectará cuando Stock Ledger (NXR-REQ-0051) esté disponible.' },
-      { title: 'Recepciones pendientes', description: 'Se conectará cuando Goods Receipt (NXR-REQ-0046) esté disponible.' },
-      { title: 'Alertas de stock bajo', description: 'Se conectará cuando Inventory (NXR-REQ-0049-0056) esté disponible.' },
+      { title: 'Existencias por almacén', description: 'Consulta existencias y movimientos registrados.', path: '/abastecimiento/inventario' },
+      { title: 'Recepciones pendientes', description: 'Registra y consulta recepciones de compra.', path: '/abastecimiento/recepciones' },
+      { title: 'Alertas de stock bajo', description: 'Administra inventario y almacenes.', path: '/abastecimiento/almacenes' },
     ],
   },
   auditor: {
@@ -68,9 +69,9 @@ const homeConfigs: Record<HomeKey, HomeConfig> = {
     subtitle: 'Trazabilidad, excepciones y reversos.',
     showTreasurySummary: false,
     sections: [
-      { title: 'Excepciones recientes', description: 'Se conectará cuando Audit (NXR-REQ-0090) esté disponible.' },
-      { title: 'Correcciones y anulaciones', description: 'Se conectará cuando Corrections/Annulments (NXR-REQ-0025/0026) esté disponible.' },
-      { title: 'Aprobaciones y segregación de funciones', description: 'Se conectará cuando SoD (NXR-REQ-0089) esté disponible.' },
+      { title: 'Excepciones recientes', description: 'Consulta el historial inmutable de auditoría.', path: '/control/auditoria' },
+      { title: 'Correcciones y anulaciones', description: 'Revisa movimientos contables y sus reversos.', path: '/control/reportes' },
+      { title: 'Aprobaciones y segregación de funciones', description: 'Revisa aprobaciones y controles de segregación.', path: '/inicio/aprobaciones' },
     ],
   },
   default: {
@@ -79,7 +80,7 @@ const homeConfigs: Record<HomeKey, HomeConfig> = {
     subtitle: 'Resumen general de Nexora Group.',
     showTreasurySummary: false,
     sections: [
-      { title: 'Indicadores de tu rol', description: 'Aún no hay indicadores configurados para este rol.' },
+      { title: 'Indicadores de tu rol', description: 'Accede a los módulos habilitados para tu perfil.', path: '/inicio' },
     ],
   },
 }

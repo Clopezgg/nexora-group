@@ -26,7 +26,7 @@ def test_dashboard_summary_returns_real_zeroed_values_on_fresh_db(client):
         "periodIncome": 0.0,
         "periodExpense": 0.0,
         "activeProjects": 0,
-        "currency": "MXN",
+        "currency": "HNL",
     }
 
 

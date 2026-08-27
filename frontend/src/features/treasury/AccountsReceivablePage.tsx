@@ -65,7 +65,7 @@ export function AccountsReceivablePage() {
   if (companies.length === 0) {
     return (
       <EmptyState
-        icon="🧾"
+        icon="receipt"
         title="Aún no hay compañías configuradas"
         description="Crea una compañía desde Tesorería antes de registrar facturas de cliente."
       />

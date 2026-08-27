@@ -91,7 +91,7 @@ function ChangeOrdersList({ projectId }: { projectId: string }) {
       </Card>
 
       {orders.length === 0 ? (
-        <EmptyState icon="🔀" title="Sin órdenes de cambio" description="Todavía no se ha solicitado ningún cambio de alcance/presupuesto." />
+        <EmptyState icon="shuffle" title="Sin órdenes de cambio" description="Todavía no se ha solicitado ningún cambio de alcance/presupuesto." />
       ) : (
         <Table columns={columns} rows={orders} getRowKey={(row) => row.id} />
       )}

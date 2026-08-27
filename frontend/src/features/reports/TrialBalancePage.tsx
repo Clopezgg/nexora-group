@@ -37,7 +37,7 @@ export function TrialBalancePage() {
   if (!activeCompanyId) {
     return (
       <EmptyState
-        icon="📗"
+        icon="book"
         title="Configura una compañía primero"
         description="No hay compañías registradas todavía."
       />

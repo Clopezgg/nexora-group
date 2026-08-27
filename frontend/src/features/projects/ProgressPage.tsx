@@ -62,7 +62,7 @@ function ProgressList({ projectId }: { projectId: string }) {
       </Card>
 
       {records.length === 0 ? (
-        <EmptyState icon="📈" title="Sin avances registrados" description="Registra el primer avance planeado vs. real de este proyecto." />
+        <EmptyState icon="chart" title="Sin avances registrados" description="Registra el primer avance planeado vs. real de este proyecto." />
       ) : (
         <Table columns={columns} rows={records} getRowKey={(row) => row.id} />
       )}

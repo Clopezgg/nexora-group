@@ -104,7 +104,7 @@ export function TreasuryPage() {
     return (
       <div className="nx-treasury">
         <EmptyState
-          icon="🏦"
+          icon="bank"
           title="Aún no hay ninguna compañía configurada"
           description="Crea la primera compañía y su catálogo mínimo de cuentas para empezar a operar Tesorería (NXR-REQ-0002)."
         />

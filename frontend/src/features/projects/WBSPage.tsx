@@ -52,7 +52,7 @@ function WBSTree({ projectId }: { projectId: string }) {
       </Card>
 
       {nodes.length === 0 ? (
-        <EmptyState icon="🧩" title="Sin WBS todavía" description="Agrega el primer nodo de la estructura de desglose de trabajo." />
+        <EmptyState icon="grid" title="Sin WBS todavía" description="Agrega el primer nodo de la estructura de desglose de trabajo." />
       ) : (
         <ul className="nx-field__label" style={{ listStyle: 'none', padding: 0 }}>
           {nodes.map((node) => (

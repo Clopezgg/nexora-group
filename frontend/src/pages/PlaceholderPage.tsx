@@ -10,7 +10,7 @@ export function PlaceholderPage({ title, description }: PlaceholderPageProps) {
     <div>
       <h1 className="nx-dashboard__title">{title}</h1>
       <EmptyState
-        icon="🚧"
+        icon="tool"
         title="Módulo en construcción"
         description={
           description ??

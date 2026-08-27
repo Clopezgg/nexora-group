@@ -42,7 +42,7 @@ export function LoginPage() {
       await login(values)
       const redirectTo =
         (location.state as { from?: { pathname: string } } | null)?.from?.pathname ??
-        '/dashboard'
+        '/inicio'
       navigate(redirectTo, { replace: true })
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {

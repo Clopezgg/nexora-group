@@ -55,7 +55,7 @@ export function ProjectsPage() {
       header: 'Proyecto activo',
       render: (row) =>
         context.activeProjectId === row.id ? (
-          <span aria-label="Proyecto activo">✅ Activo</span>
+          <span aria-label="Proyecto activo">Activo</span>
         ) : (
           <Button variant="secondary" onClick={() => setActiveProject(row.id)}>
             Usar como activo
@@ -148,7 +148,7 @@ export function ProjectsPage() {
             />
           ) : (
             <EmptyState
-              icon="🏗️"
+              icon="project"
               title="Sin proyectos"
               description="Crea el primer proyecto de esta compañía para empezar."
             />

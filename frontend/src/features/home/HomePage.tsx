@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { dashboardService } from '../../services/dashboardService'
 import { ApiError } from '../../services/httpClient'
 import { useAuth } from '../auth/auth-context'
 import { resolveHomeConfig } from './roleHomes'
-import { EmptyState, ErrorState, LoadingState, StatCard } from '../../design-system'
+import { Card, ErrorState, LoadingState, StatCard } from '../../design-system'
 import './HomePage.css'
 
 const currencyFormatter = new Intl.NumberFormat('es-HN', {
@@ -53,14 +54,16 @@ export function HomePage() {
         )
       ) : null}
 
-      <div className="nx-home__sections">
+      <section className="nx-home__sections" aria-label="Accesos principales">
         {config.sections.map((section) => (
-          <div key={section.title} className="nx-home__section">
-            <h2 className="nx-home__section-title">{section.title}</h2>
-            <EmptyState title="Módulo en desarrollo" description={section.description} />
-          </div>
+          <Link key={section.title} className="nx-home__quick-link" to={section.path}>
+            <Card title={section.title}>
+              <p>{section.description}</p>
+              <span className="nx-home__quick-action">Abrir módulo</span>
+            </Card>
+          </Link>
         ))}
-      </div>
+      </section>
     </div>
   )
 }

@@ -39,7 +39,7 @@ export function EquipmentPage() {
   if (loadingCompanies) return <LoadingState label="Cargando compañías…" />
   if (!activeCompanyId) {
     return (
-      <EmptyState icon="🚜" title="Configura una compañía primero" description="No hay compañías registradas todavía." />
+      <EmptyState icon="equipment" title="Configura una compañía primero" description="No hay compañías registradas todavía." />
     )
   }
 

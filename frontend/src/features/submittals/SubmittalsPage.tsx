@@ -133,7 +133,7 @@ function SubmittalsList({ projectId, companyId }: { projectId: string; companyId
       </Card>
 
       {submittals.length === 0 ? (
-        <EmptyState icon="📋" title="Sin submittals registrados" description="Todavía no se ha enviado ningún submittal en este proyecto." />
+        <EmptyState icon="clipboard" title="Sin submittals registrados" description="Todavía no se ha enviado ningún submittal en este proyecto." />
       ) : (
         <Table columns={columns} rows={submittals} getRowKey={(row) => row.id} />
       )}

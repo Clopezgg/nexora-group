@@ -74,7 +74,8 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
   const authorized = Number(summary?.authorized ?? 0)
   const accrued = Number(summary?.accrued ?? 0)
   const executedPercent = authorized > 0 ? `${((accrued / authorized) * 100).toFixed(1)}%` : '—'
-  const wbsById = new Map((wbsQuery.data ?? []).map((node) => [node.id, `${node.code} — ${node.name}`]))
+  const wbsNodes = Array.isArray(wbsQuery.data) ? wbsQuery.data : []
+  const wbsById = new Map(wbsNodes.map((node) => [node.id, `${node.code} — ${node.name}`]))
   const authorizedByWbs = new Map<string, BudgetBreakdownRow>()
 
   for (const line of activeBudget?.lines ?? []) {

@@ -62,6 +62,10 @@ describe('Treasury financial flow corrections', () => {
     expect(screen.queryByLabelText(/^proyecto$/i)).not.toBeInTheDocument()
     expect(screen.getByRole('option', { name: /3101 · Capital y aportaciones/i })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: /Gastos administrativos/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Karen Vannessa Lopez Gonzalez' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Remesa' })).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText(/^Remitente$/i), '__OTHER__')
+    expect(screen.getByLabelText(/nombre completo del remitente/i)).toBeInTheDocument()
 
     await userEvent.selectOptions(screen.getByLabelText(/origen \/ naturaleza/i), 'FINANCING')
     expect(screen.getByRole('option', { name: /2201 · Préstamos recibidos/i })).toBeInTheDocument()

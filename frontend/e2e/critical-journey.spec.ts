@@ -102,7 +102,9 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     // cuenta GL del banco -- eso anularía el movimiento neto (INV-TRE bug
     // real encontrado por este mismo test, corregido en treasury_service).
     await page.getByLabel('Cuenta contable de origen').selectOption({ label: '3100 · Aportes E2E' })
-    await page.getByLabel('Remitente').fill('Socio fundador E2E')
+    await page.getByLabel('Remitente').selectOption('__OTHER__')
+    await page.getByLabel('Nombre completo del remitente').fill('Socio fundador E2E')
+    await page.getByLabel('Método / canal').selectOption('REMITTANCE')
     await page.getByLabel(/Monto/).fill('100000')
     await page.getByLabel('Registrar remesa').getByRole('button', { name: 'Registrar remesa', exact: true }).click()
     await expect(page.getByText('L 100,000.00').first()).toBeVisible({ timeout: 10_000 })

@@ -52,7 +52,10 @@ export function AccountCatalogPage() {
   const [form, setForm] = useState(EMPTY_FORM)
 
   const accountsQuery = useQuery({
-    queryKey: ['master-data', 'accounts', activeCompanyId],
+    // El catálogo incluye agrupadoras; usa una key distinta a los selectores
+    // operativos para que React Query nunca reutilice ese conjunto completo
+    // en AP/AR/Tesorería, donde solo deben aparecer cuentas registrables.
+    queryKey: ['master-data', 'accounts', 'catalog', activeCompanyId],
     queryFn: () =>
       masterDataService.listAccounts(activeCompanyId as string, { includeNonPostable: true }),
     enabled: Boolean(activeCompanyId),
@@ -69,9 +72,9 @@ export function AccountCatalogPage() {
         isPostable: form.isPostable,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['master-data', 'accounts', activeCompanyId],
-      })
+      // Invalida tanto la vista completa del catálogo como cualquier selector
+      // operativo ya cacheado para que una nueva cuenta registrable aparezca.
+      queryClient.invalidateQueries({ queryKey: ['master-data', 'accounts'] })
       setModalOpen(false)
       setForm(EMPTY_FORM)
     },

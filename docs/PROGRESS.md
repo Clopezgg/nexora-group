@@ -1,5 +1,22 @@
 # NEXORA GROUP — Progress Log
 
+## 2026-08-27 — Final product execution (PR #11, in progress)
+
+Remote continuity branch: `work/nexora-final-product`. Permanent PR: https://github.com/Clopezgg/nexora-group/pull/11.
+
+Implemented and pushed in this pass:
+
+- all operating-system emoji icons in `frontend/src` were replaced by typed SVG icons;
+- visible navigation now resolves only to working screens; the obsolete `PlaceholderPage` was removed;
+- role homes link to implemented modules instead of rendering “Módulo en desarrollo” panels;
+- dashboard now computes HNL treasury balance, accounting income/expense, six-month series, expense scope, AP overdue, AR outstanding and assigned approvals from real database records with RBAC/company isolation;
+- Treasury exposes a real paginated remittance list and the frontend renders its operational table;
+- AP and AR creation require an explicit `CENTRAL | GENERAL | PROJECT` scope and a real project only for `PROJECT`;
+- HNL formatting is centralized in `frontend/src/utils/currency.ts`.
+
+Production baseline before PR #11 is healthy: Deploy Azure run #21 passed; the same-origin SWA endpoints `/api/healthz` and `/api/readyz` both returned HTTP 200 on 2026-08-27. PR #11 CI and post-merge production verification remain required before this entry can be marked final.
+
+
 Bitácora viva de integración. Cada entrada corresponde a un track
 integrado a `feat/nexora-greenfield`, con evidencia real, nunca
 aspiracional. No se reemplazan entradas anteriores, se agregan.

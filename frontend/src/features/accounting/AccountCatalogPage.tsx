@@ -34,6 +34,7 @@ const EMPTY_FORM = {
   name: '',
   accountType: 'ASSET',
   parentId: '',
+  isPostable: true,
 }
 
 export function AccountCatalogPage() {
@@ -52,7 +53,8 @@ export function AccountCatalogPage() {
 
   const accountsQuery = useQuery({
     queryKey: ['master-data', 'accounts', activeCompanyId],
-    queryFn: () => masterDataService.listAccounts(activeCompanyId as string),
+    queryFn: () =>
+      masterDataService.listAccounts(activeCompanyId as string, { includeNonPostable: true }),
     enabled: Boolean(activeCompanyId),
   })
 
@@ -64,6 +66,7 @@ export function AccountCatalogPage() {
         name: form.name.trim(),
         accountType: form.accountType,
         ...(form.parentId ? { parentId: form.parentId } : {}),
+        isPostable: form.isPostable,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -88,6 +91,9 @@ export function AccountCatalogPage() {
 
   const accounts = accountsQuery.data ?? []
   const accountById = new Map(accounts.map((account) => [account.id, account]))
+  const parentOptions = accounts.filter(
+    (account) => !account.isPostable && account.accountType === form.accountType,
+  )
   const canCreateAccount = Boolean(user?.roles.some((role) => CREATE_ACCOUNT_ROLES.has(role)))
 
   const columns: TableColumn<Account>[] = [
@@ -113,7 +119,7 @@ export function AccountCatalogPage() {
       header: 'Estado',
       render: (account) => (
         <Badge tone={account.isPostable ? 'success' : 'neutral'}>
-          {account.isPostable ? 'Registrable' : 'No registrable'}
+          {account.isPostable ? 'Registrable' : 'Agrupadora'}
         </Badge>
       ),
     },
@@ -196,7 +202,11 @@ export function AccountCatalogPage() {
             label="Tipo de cuenta"
             value={form.accountType}
             onChange={(event) =>
-              setForm((current) => ({ ...current, accountType: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                accountType: event.target.value,
+                parentId: '',
+              }))
             }
             required
           >
@@ -207,6 +217,25 @@ export function AccountCatalogPage() {
             ))}
           </Select>
           <Select
+            name="isPostable"
+            label="Uso de la cuenta"
+            value={form.isPostable ? 'postable' : 'grouping'}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                isPostable: event.target.value === 'postable',
+              }))
+            }
+            required
+          >
+            <option value="postable">Registrable — permite movimientos</option>
+            <option value="grouping">Agrupadora — no permite movimientos</option>
+          </Select>
+          <p className="nx-field__hint">
+            Usa “Agrupadora” para cuentas padre como 1000 ACTIVOS o 2000 PASIVOS. Las cuentas
+            agrupadoras nunca aparecerán como opción para registrar facturas, pagos o asientos.
+          </p>
+          <Select
             name="parentId"
             label="Cuenta padre"
             value={form.parentId}
@@ -215,12 +244,17 @@ export function AccountCatalogPage() {
             }
           >
             <option value="">Sin cuenta padre</option>
-            {accounts.map((account) => (
+            {parentOptions.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.code} · {account.name}
               </option>
             ))}
           </Select>
+          {parentOptions.length === 0 ? (
+            <p className="nx-field__hint">
+              Para usar una cuenta padre, crea primero una cuenta agrupadora del mismo tipo contable.
+            </p>
+          ) : null}
 
           {createMutation.isError ? (
             <p className="nx-field__error" role="alert">

@@ -1,0 +1,1 @@
+Next: inspect current main files, apply infrastructure and code performance fixes, validate CI and production.

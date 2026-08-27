@@ -1,13 +1,29 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Card, EmptyState, ErrorState, LoadingState, MoneyInput, StatCard } from '../../design-system'
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  MoneyInput,
+  StatCard,
+  Table,
+  type TableColumn,
+} from '../../design-system'
 import { projectService } from '../../services/projectService'
 import { formatMoney } from '../../utils/currency'
 import { RequiresActiveProject } from './RequiresActiveProject'
 
-function formatAmount(value: string | null): string {
+function formatAmount(value: string | null, currencyCode = 'HNL'): string {
   if (value === null) return '—'
-  return formatMoney(Number(value))
+  return formatMoney(Number(value), currencyCode)
+}
+
+interface BudgetBreakdownRow {
+  key: string
+  wbs: string
+  authorized: number
 }
 
 function BudgetAndForecast({ projectId }: { projectId: string }) {
@@ -22,6 +38,10 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
     queryKey: ['budget-active', projectId],
     queryFn: () => projectService.getActiveBudget(projectId),
     retry: false,
+  })
+  const wbsQuery = useQuery({
+    queryKey: ['wbs', projectId],
+    queryFn: () => projectService.listWbs(projectId),
   })
   const forecastQuery = useQuery({
     queryKey: ['forecast', projectId],
@@ -48,7 +68,34 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
 
   const summary = summaryQuery.data
   const forecast = forecastQuery.data
-  const showCreateBaseline = !activeBudgetQuery.isLoading && !activeBudgetQuery.data
+  const activeBudget = activeBudgetQuery.data
+  const showCreateBaseline = !activeBudgetQuery.isLoading && !activeBudget
+  const currencyCode = activeBudget?.currencyCode ?? 'HNL'
+  const authorized = Number(summary?.authorized ?? 0)
+  const accrued = Number(summary?.accrued ?? 0)
+  const executedPercent = authorized > 0 ? `${((accrued / authorized) * 100).toFixed(1)}%` : '—'
+  const wbsById = new Map((wbsQuery.data ?? []).map((node) => [node.id, `${node.code} — ${node.name}`]))
+  const authorizedByWbs = new Map<string, BudgetBreakdownRow>()
+
+  for (const line of activeBudget?.lines ?? []) {
+    const key = line.wbsNodeId ?? 'unassigned'
+    const current = authorizedByWbs.get(key)
+    authorizedByWbs.set(key, {
+      key,
+      wbs: line.wbsNodeId ? (wbsById.get(line.wbsNodeId) ?? 'WBS no disponible') : 'Sin WBS asignado',
+      authorized: (current?.authorized ?? 0) + Number(line.authorizedAmount),
+    })
+  }
+
+  const breakdownRows = [...authorizedByWbs.values()]
+  const breakdownColumns: TableColumn<BudgetBreakdownRow>[] = [
+    { key: 'wbs', header: 'WBS', render: (row) => row.wbs },
+    {
+      key: 'authorized',
+      header: 'Autorizado',
+      render: (row) => formatMoney(row.authorized, currencyCode),
+    },
+  ]
 
   return (
     <div>
@@ -71,26 +118,44 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
 
       {summary ? (
         <div className="nx-home__grid">
-          <StatCard label="Autorizado" value={formatAmount(summary.authorized)} />
-          <StatCard label="Comprometido" value={formatAmount(summary.committed)} />
-          <StatCard label="Devengado" value={formatAmount(summary.accrued)} />
-          <StatCard label="Pagado" value={formatAmount(summary.paid)} />
-          <StatCard label="Disponible" value={formatAmount(summary.available)} />
+          <StatCard label="Autorizado" value={formatAmount(summary.authorized, currencyCode)} />
+          <StatCard label="Comprometido" value={formatAmount(summary.committed, currencyCode)} />
+          <StatCard label="Devengado" value={formatAmount(summary.accrued, currencyCode)} />
+          <StatCard label="Pagado" value={formatAmount(summary.paid, currencyCode)} />
+          <StatCard label="Disponible" value={formatAmount(summary.available, currencyCode)} />
+          <StatCard label="Ejecutado" value={executedPercent} />
         </div>
+      ) : null}
+
+      {activeBudget ? (
+        <Card title="Detalle autorizado por WBS">
+          {wbsQuery.isLoading ? (
+            <LoadingState label="Cargando detalle WBS…" />
+          ) : wbsQuery.isError ? (
+            <ErrorState description="No se pudo cargar el detalle WBS." onRetry={() => wbsQuery.refetch()} />
+          ) : (
+            <Table
+              columns={breakdownColumns}
+              rows={breakdownRows}
+              getRowKey={(row) => row.key}
+              emptyMessage="El presupuesto activo todavía no tiene líneas autorizadas."
+            />
+          )}
+        </Card>
       ) : null}
 
       {forecast ? (
         <Card title="Forecast (Earned Value)">
           <div className="nx-home__grid">
-            <StatCard label="BAC" value={formatAmount(forecast.bac)} />
-            <StatCard label="PV" value={formatAmount(forecast.pv)} />
-            <StatCard label="EV" value={formatAmount(forecast.ev)} />
-            <StatCard label="AC" value={formatAmount(forecast.ac)} />
+            <StatCard label="BAC" value={formatAmount(forecast.bac, currencyCode)} />
+            <StatCard label="PV" value={formatAmount(forecast.pv, currencyCode)} />
+            <StatCard label="EV" value={formatAmount(forecast.ev, currencyCode)} />
+            <StatCard label="AC" value={formatAmount(forecast.ac, currencyCode)} />
             <StatCard label="CPI" value={forecast.cpi ?? '—'} />
             <StatCard label="SPI" value={forecast.spi ?? '—'} />
-            <StatCard label="ETC" value={formatAmount(forecast.etc)} />
-            <StatCard label="EAC" value={formatAmount(forecast.eac)} />
-            <StatCard label="VAC" value={formatAmount(forecast.vac)} />
+            <StatCard label="ETC" value={formatAmount(forecast.etc, currencyCode)} />
+            <StatCard label="EAC" value={formatAmount(forecast.eac, currencyCode)} />
+            <StatCard label="VAC" value={formatAmount(forecast.vac, currencyCode)} />
           </div>
           {forecast.pv === null ? (
             <EmptyState

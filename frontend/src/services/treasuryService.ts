@@ -20,6 +20,7 @@ export interface CreateRemittancePayload {
   companyId: string
   treasuryAccountId: string
   counterAccountId: string
+  // The backend also enforces the matching GL account type for every origin.
   originType: 'CAPITAL_CONTRIBUTION' | 'FINANCING' | 'OTHER_INCOME'
   sender: string
   provider?: string | null

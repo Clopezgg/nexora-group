@@ -141,9 +141,10 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'backend'
           image: backendImage
           resources: {
-            // Mínimo permitido por Container Apps: mantiene el consumption plan en el costo más bajo.
-            cpu: json('0.25')
-            memory: '0.5Gi'
+            // Producción interactiva: evita starvation del API durante cargas simultáneas
+            // de dashboard, contexto, notificaciones y módulos financieros.
+            cpu: json('0.5')
+            memory: '1Gi'
           }
           env: [
             { name: 'APP_ENV', value: 'production' }
@@ -161,8 +162,9 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        // scale-to-zero: costo cero en reposo, propio del consumption plan.
-        minReplicas: 0
+        // Mantener una réplica caliente elimina el cold start visible al usuario.
+        // La segunda réplica sigue disponible para picos sin sobredimensionar el entorno.
+        minReplicas: 1
         maxReplicas: 2
       }
     }

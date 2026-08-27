@@ -16,6 +16,7 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { masterDataService } from '../../services/masterDataService'
+import { projectService } from '../../services/projectService'
 import {
   treasuryService,
   type CreateGeneralExpensePayload,
@@ -35,6 +36,18 @@ const TREASURY_KIND_LABELS: Record<TreasuryAccount['kind'], string> = {
   BANK: 'Banco',
   CASH: 'Caja',
   OTHER: 'Otra',
+}
+
+type RemittanceOriginType = 'CAPITAL_CONTRIBUTION' | 'FINANCING' | 'OTHER_INCOME'
+const REMITTANCE_ORIGIN_LABELS: Record<RemittanceOriginType, string> = {
+  CAPITAL_CONTRIBUTION: 'Aporte de capital — Patrimonio',
+  FINANCING: 'Préstamo / financiamiento — Pasivo',
+  OTHER_INCOME: 'Otro ingreso — Ingreso',
+}
+const REMITTANCE_ORIGIN_ACCOUNT_TYPES: Record<RemittanceOriginType, string> = {
+  CAPITAL_CONTRIBUTION: 'EQUITY',
+  FINANCING: 'LIABILITY',
+  OTHER_INCOME: 'REVENUE',
 }
 
 export function TreasuryPage() {
@@ -200,7 +213,10 @@ export function TreasuryPage() {
   const hnlBalance = balancesByCurrency.get('HNL') ?? 0
   const secondaryBalances = [...balancesByCurrency.entries()].filter(([currency]) => currency !== 'HNL')
   const remittanceCounterAccounts = glAccounts.filter(
-    (account) => account.isPostable && !assignedGlAccountIds.has(account.id),
+    (account) =>
+      account.isPostable &&
+      !assignedGlAccountIds.has(account.id) &&
+      ['EQUITY', 'LIABILITY', 'REVENUE'].includes(account.accountType),
   )
   const remittancePage = Math.floor(remittanceOffset / REMITTANCE_PAGE_SIZE) + 1
 
@@ -238,7 +254,7 @@ export function TreasuryPage() {
             Registrar remesa
           </Button>
           <Button variant="secondary" onClick={() => setOpenModal('expense')}>
-            Registrar gasto general
+            Registrar salida / gasto
           </Button>
           <Button
             variant="secondary"
@@ -491,12 +507,16 @@ function RemittanceModal({
 }: {
   companyId: string
   treasuryAccounts: TreasuryAccount[]
-  counterAccounts: { id: string; name: string }[]
+  counterAccounts: Account[]
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
   const [treasuryAccountId, setTreasuryAccountId] = useState(treasuryAccounts[0]?.id ?? '')
-  const [counterAccountId, setCounterAccountId] = useState(counterAccounts[0]?.id ?? '')
+  const [originType, setOriginType] = useState<RemittanceOriginType>('CAPITAL_CONTRIBUTION')
+  const initialCounter = counterAccounts.find(
+    (account) => account.accountType === REMITTANCE_ORIGIN_ACCOUNT_TYPES.CAPITAL_CONTRIBUTION,
+  )
+  const [counterAccountId, setCounterAccountId] = useState(initialCounter?.id ?? '')
   const [sender, setSender] = useState('')
   const [provider, setProvider] = useState('')
   const [channel, setChannel] = useState('TRANSFER')
@@ -508,6 +528,9 @@ function RemittanceModal({
 
   const selectedTreasuryAccount = treasuryAccounts.find((account) => account.id === treasuryAccountId)
   const selectedCurrency = selectedTreasuryAccount?.currencyCode ?? 'HNL'
+  const eligibleCounterAccounts = counterAccounts.filter(
+    (account) => account.accountType === REMITTANCE_ORIGIN_ACCOUNT_TYPES[originType],
+  )
 
   const mutation = useMutation({
     mutationFn: ({
@@ -529,7 +552,7 @@ function RemittanceModal({
       <Modal open title="Registrar remesa" onClose={onClose}>
         <EmptyState
           title="Faltan cuentas para registrar la remesa"
-          description="Configura una cuenta de Tesorería y una cuenta contable de contrapartida distinta antes de continuar."
+          description="Configura una cuenta de Tesorería y una cuenta registrable de Patrimonio, Pasivo o Ingreso antes de continuar."
         />
       </Modal>
     )
@@ -546,6 +569,7 @@ function RemittanceModal({
               companyId,
               treasuryAccountId,
               counterAccountId,
+              originType,
               sender,
               provider: provider || null,
               channel: channel || null,
@@ -560,14 +584,18 @@ function RemittanceModal({
           })
         }}
       >
+        <p className="nx-field__hint">
+          Las remesas son entradas de Tesorería CENTRAL y nunca piden proyecto. Cobros de clientes se registran en Cuentas por cobrar y movimientos entre bancos en Transferencia entre cuentas.
+        </p>
         <Select
           name="treasuryAccountId"
-          label="Cuenta de tesorería"
+          label="Cuenta receptora"
           value={treasuryAccountId}
           onChange={(event) => {
             setTreasuryAccountId(event.target.value)
             setFxRate(1)
           }}
+          required
         >
           {treasuryAccounts.map((account) => (
             <option key={account.id} value={account.id}>
@@ -576,14 +604,38 @@ function RemittanceModal({
           ))}
         </Select>
         <Select
+          name="originType"
+          label="Origen / naturaleza de la entrada"
+          value={originType}
+          onChange={(event) => {
+            const next = event.target.value as RemittanceOriginType
+            setOriginType(next)
+            const firstMatching = counterAccounts.find(
+              (account) => account.accountType === REMITTANCE_ORIGIN_ACCOUNT_TYPES[next],
+            )
+            setCounterAccountId(firstMatching?.id ?? '')
+          }}
+          required
+        >
+          {Object.entries(REMITTANCE_ORIGIN_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </Select>
+        <Select
           name="counterAccountId"
-          label="Cuenta contrapartida"
+          label="Cuenta contable de origen"
           value={counterAccountId}
           onChange={(event) => setCounterAccountId(event.target.value)}
+          required
         >
-          {counterAccounts.map((account) => (
+          {eligibleCounterAccounts.length === 0 ? (
+            <option value="">No hay cuentas compatibles configuradas</option>
+          ) : null}
+          {eligibleCounterAccounts.map((account) => (
             <option key={account.id} value={account.id}>
-              {account.name}
+              {account.code} · {account.name}
             </option>
           ))}
         </Select>
@@ -603,7 +655,7 @@ function RemittanceModal({
             className="nx-input"
             value={reference}
             onChange={(event) => setReference(event.target.value)}
-            placeholder="Ej. REM-2026-001"
+            placeholder="Ej. transferencia o comprobante bancario"
           />
         </label>
         <label className="nx-field">
@@ -616,7 +668,7 @@ function RemittanceModal({
           />
         </label>
         <label className="nx-field">
-          <span className="nx-field__label">Banco / proveedor</span>
+          <span className="nx-field__label">Banco / proveedor del envío</span>
           <input
             className="nx-input"
             value={provider}
@@ -659,6 +711,11 @@ function RemittanceModal({
             placeholder="Opcional"
           />
         </label>
+        {eligibleCounterAccounts.length === 0 ? (
+          <p className="nx-field__error">
+            Crea primero una cuenta registrable compatible con la naturaleza seleccionada.
+          </p>
+        ) : null}
         {mutation.isError ? (
           <p className="nx-field__error">{(mutation.error as Error).message}</p>
         ) : null}
@@ -675,7 +732,7 @@ function RemittanceModal({
             (selectedCurrency !== 'HNL' && fxRate <= 0)
           }
         >
-          Registrar
+          Registrar remesa
         </Button>
       </form>
     </Modal>
@@ -694,11 +751,22 @@ function GeneralExpenseModal({
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
+  const [scope, setScope] = useState<'GENERAL' | 'PROJECT'>('GENERAL')
+  const [projectId, setProjectId] = useState('')
   const [treasuryAccountId, setTreasuryAccountId] = useState(treasuryAccounts[0]?.id ?? '')
   const [expenseAccountId, setExpenseAccountId] = useState(expenseAccounts[0]?.id ?? '')
-  const [category, setCategory] = useState('papeleria')
+  const [category, setCategory] = useState('administracion')
   const [description, setDescription] = useState('')
+  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10))
   const [amount, setAmount] = useState<number | null>(null)
+
+  const projectsQuery = useQuery({
+    queryKey: ['projects', companyId],
+    queryFn: () => projectService.list(companyId),
+  })
+  const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : []
+  const selectedTreasuryAccount = treasuryAccounts.find((account) => account.id === treasuryAccountId)
+  const selectedCurrency = selectedTreasuryAccount?.currencyCode ?? 'HNL'
 
   const mutation = useMutation({
     mutationFn: ({
@@ -714,16 +782,16 @@ function GeneralExpenseModal({
     },
   })
 
-  if (expenseAccounts.length === 0) {
+  if (expenseAccounts.length === 0 || treasuryAccounts.length === 0) {
     return (
-      <Modal open title="Registrar gasto general" onClose={onClose}>
-        <EmptyState title="No hay cuentas de gasto configuradas todavía." />
+      <Modal open title="Registrar salida / gasto" onClose={onClose}>
+        <EmptyState title="Falta una cuenta de Tesorería o una cuenta registrable de gasto." />
       </Modal>
     )
   }
 
   return (
-    <Modal open title="Registrar gasto general" onClose={onClose}>
+    <Modal open title="Registrar salida / gasto" onClose={onClose}>
       <form
         className="nx-treasury__form"
         onSubmit={(event) => {
@@ -733,10 +801,12 @@ function GeneralExpenseModal({
               companyId,
               treasuryAccountId,
               expenseAccountId,
+              scope,
+              projectId: scope === 'PROJECT' ? projectId : null,
               category,
               amount: String(amount ?? 0),
-              currencyCode: 'HNL',
-              expenseDate: new Date().toISOString().slice(0, 10),
+              currencyCode: selectedCurrency,
+              expenseDate,
               description,
             },
             idempotencyKey: crypto.randomUUID(),
@@ -744,14 +814,45 @@ function GeneralExpenseModal({
         }}
       >
         <Select
+          name="expenseScope"
+          label="Alcance del gasto"
+          value={scope}
+          onChange={(event) => {
+            const next = event.target.value as 'GENERAL' | 'PROJECT'
+            setScope(next)
+            if (next !== 'PROJECT') setProjectId('')
+          }}
+          required
+        >
+          <option value="GENERAL">General — Sin proyecto</option>
+          <option value="PROJECT">Proyecto — Atribuible a una obra</option>
+        </Select>
+        {scope === 'PROJECT' ? (
+          <Select
+            name="projectId"
+            label="Proyecto"
+            value={projectId}
+            onChange={(event) => setProjectId(event.target.value)}
+            required
+          >
+            <option value="">Selecciona un proyecto…</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.code ? `${project.code} — ` : ''}{project.name}
+              </option>
+            ))}
+          </Select>
+        ) : null}
+        <Select
           name="treasuryAccountId"
-          label="Cuenta de tesorería"
+          label="Cuenta pagadora"
           value={treasuryAccountId}
-          onChange={(e) => setTreasuryAccountId(e.target.value)}
+          onChange={(event) => setTreasuryAccountId(event.target.value)}
+          required
         >
           {treasuryAccounts.map((account) => (
             <option key={account.id} value={account.id}>
-              {account.name}
+              {account.name} — {account.currencyCode}
             </option>
           ))}
         </Select>
@@ -759,7 +860,8 @@ function GeneralExpenseModal({
           name="expenseAccountId"
           label="Cuenta de gasto"
           value={expenseAccountId}
-          onChange={(e) => setExpenseAccountId(e.target.value)}
+          onChange={(event) => setExpenseAccountId(event.target.value)}
+          required
         >
           {expenseAccounts.map((account) => (
             <option key={account.id} value={account.id}>
@@ -767,12 +869,30 @@ function GeneralExpenseModal({
             </option>
           ))}
         </Select>
+        <Select
+          name="category"
+          label="Categoría"
+          value={category}
+          onChange={(event) => setCategory(event.target.value)}
+          required
+        >
+          <option value="combustible">Combustible / gasolina</option>
+          <option value="alimentacion">Alimentación / comida</option>
+          <option value="materiales">Materiales / compras menores</option>
+          <option value="mano_de_obra">Mano de obra</option>
+          <option value="honorarios">Honorarios / servicios personales</option>
+          <option value="transporte">Transporte</option>
+          <option value="herramientas">Herramientas</option>
+          <option value="administracion">Administración</option>
+          <option value="otros">Otros gastos</option>
+        </Select>
         <label className="nx-field">
-          <span className="nx-field__label">Categoría</span>
+          <span className="nx-field__label">Fecha</span>
           <input
             className="nx-input"
-            value={category}
-            onChange={(event) => setCategory(event.target.value)}
+            type="date"
+            value={expenseDate}
+            onChange={(event) => setExpenseDate(event.target.value)}
             required
           />
         </label>
@@ -785,12 +905,27 @@ function GeneralExpenseModal({
             required
           />
         </label>
-        <MoneyInput label="Monto" value={amount} onChange={setAmount} />
+        <MoneyInput label={`Monto (${selectedCurrency})`} value={amount} onChange={setAmount} />
+        <p className="nx-field__hint">
+          Retiros de socios, préstamos y reembolsos no deben clasificarse automáticamente como gasto: usa el flujo y la cuenta contable que corresponda a su naturaleza.
+        </p>
         {mutation.isError ? (
           <p className="nx-field__error">{(mutation.error as Error).message}</p>
         ) : null}
-        <Button type="submit" loading={mutation.isPending} disabled={!amount}>
-          Registrar
+        <Button
+          type="submit"
+          loading={mutation.isPending}
+          disabled={
+            !amount ||
+            amount <= 0 ||
+            !description.trim() ||
+            !expenseDate ||
+            !treasuryAccountId ||
+            !expenseAccountId ||
+            (scope === 'PROJECT' && !projectId)
+          }
+        >
+          Registrar salida
         </Button>
       </form>
     </Modal>

@@ -154,14 +154,15 @@ def test_remittance_is_always_central_scope_and_increases_treasury_balance(clien
 def test_general_expense_never_carries_project_id(client):
     """Orden maestra §28: scope=GENERAL, project_id=NULL, no consume budget."""
     login_admin(client)
-    company, bank, _cash, _contributions, expense = _setup(client)
+    company, bank, _cash, contributions, expense = _setup(client)
 
     client.post(
         "/api/treasury/remittances",
         json={
             "companyId": company["id"],
             "treasuryAccountId": bank["id"],
-            "counterAccountId": expense["id"],
+            "counterAccountId": contributions["id"],
+            "originType": "CAPITAL_CONTRIBUTION",
             "sender": "Aporte inicial",
             "currencyCode": "HNL",
             "originalAmount": "10000.00",

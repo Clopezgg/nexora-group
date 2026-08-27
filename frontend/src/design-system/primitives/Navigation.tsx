@@ -93,8 +93,12 @@ export function Tabs({ items, defaultKey }: { items: TabItem[]; defaultKey?: str
   const [active, setActive] = useState(defaultKey ?? items[0]?.key)
   const activeItem = items.find((item) => item.key === active)
   return (
-    <div className="nx-tabs">
-      <div role="tablist" className="nx-tabs__list">
+    <div className="nx-tabs" style={{ minWidth: 0, maxWidth: '100%' }}>
+      <div
+        role="tablist"
+        className="nx-tabs__list"
+        style={{ overflowX: 'auto', maxWidth: '100%', scrollbarWidth: 'thin' }}
+      >
         {items.map((item) => (
           <button
             key={item.key}
@@ -104,13 +108,14 @@ export function Tabs({ items, defaultKey }: { items: TabItem[]; defaultKey?: str
             className={['nx-tabs__tab', active === item.key ? 'nx-tabs__tab--active' : '']
               .filter(Boolean)
               .join(' ')}
+            style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}
             onClick={() => setActive(item.key)}
           >
             {item.label}
           </button>
         ))}
       </div>
-      <div className="nx-tabs__panel" role="tabpanel">
+      <div className="nx-tabs__panel" role="tabpanel" style={{ minWidth: 0, maxWidth: '100%' }}>
         {activeItem?.content}
       </div>
     </div>

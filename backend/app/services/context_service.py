@@ -7,8 +7,13 @@ from app.schemas.context import ActiveUIContextResponse
 
 
 def get_active_context(db: Session, user_id: uuid.UUID) -> ActiveUIContextResponse:
-    context = user_context_repository.get_or_create(db, user_id)
-    db.commit()
+    # Reading the topbar context must remain a read-only request. Previously
+    # this path called get_or_create() and committed on every GET, adding a DB
+    # write/transaction to every authenticated shell load.
+    context = user_context_repository.get(db, user_id)
+    if context is None:
+        return ActiveUIContextResponse(active_project_id=None, active_project_name=None)
+
     project = (
         project_repository.get_by_id(db, context.active_project_id)
         if context.active_project_id

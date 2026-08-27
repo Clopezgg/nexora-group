@@ -3,7 +3,7 @@ from collections import defaultdict
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import case, extract, func, select
 from sqlalchemy.orm import Session
 
 from app.models.accounting import AccountingDocument, JournalLine
@@ -48,6 +48,7 @@ def _apply_company_scope(statement, column, company_ids: list[uuid.UUID] | None)
 def get_summary(db: Session, *, user_id: uuid.UUID) -> DashboardSummaryResponse:
     today = datetime.now(timezone.utc).date()
     month_start = date(today.year, today.month, 1)
+    month_starts = _month_starts(today)
 
     # The executive project count is a dashboard aggregate. It remains
     # company-scoped even for finance roles that do not have project-detail
@@ -94,13 +95,22 @@ def get_summary(db: Session, *, user_id: uuid.UUID) -> DashboardSummaryResponse:
         balance_stmt = _apply_company_scope(balance_stmt, TreasuryAccount.company_id, company_ids)
         treasury_balance = Decimal(db.execute(balance_stmt).scalar_one())
 
+        year_expr = extract("year", AccountingDocument.posted_at)
+        month_expr = extract("month", AccountingDocument.posted_at)
+        movement_amount = case(
+            (
+                Account.account_type == "REVENUE",
+                JournalLine.credit_amount - JournalLine.debit_amount,
+            ),
+            else_=JournalLine.debit_amount - JournalLine.credit_amount,
+        )
         movement_stmt = (
             select(
-                AccountingDocument.posted_at,
+                year_expr.label("year"),
+                month_expr.label("month"),
                 AccountingDocument.scope,
                 Account.account_type,
-                JournalLine.debit_amount,
-                JournalLine.credit_amount,
+                func.coalesce(func.sum(movement_amount), 0).label("amount"),
             )
             .join(
                 AccountingDocument,
@@ -111,28 +121,41 @@ def get_summary(db: Session, *, user_id: uuid.UUID) -> DashboardSummaryResponse:
                 AccountingDocument.status == "POSTED",
                 AccountingDocument.currency_code == "HNL",
                 AccountingDocument.posted_at.is_not(None),
-                AccountingDocument.posted_at >= _month_starts(today)[0],
+                AccountingDocument.posted_at >= month_starts[0],
                 Account.account_type.in_(("REVENUE", "EXPENSE")),
+            )
+            .group_by(
+                year_expr,
+                month_expr,
+                AccountingDocument.scope,
+                Account.account_type,
             )
         )
         movement_stmt = _apply_company_scope(
             movement_stmt, AccountingDocument.company_id, company_ids
         )
+
+        # PostgreSQL now performs the heavy aggregation. Python only receives
+        # a bounded set of monthly/scope/account-type rows instead of every
+        # journal line from the last six months.
         monthly: dict[str, dict[str, Decimal]] = defaultdict(
             lambda: {"income": Decimal("0"), "expense": Decimal("0")}
         )
         scope_totals: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
-        for posted_at, scope, account_type, debit, credit in db.execute(movement_stmt):
-            key = posted_at.date().strftime("%Y-%m")
+        for year, month, scope, account_type, raw_amount in db.execute(movement_stmt):
+            year_value = int(year)
+            month_value = int(month)
+            amount = Decimal(raw_amount)
+            key = f"{year_value:04d}-{month_value:02d}"
+            current_month = year_value == month_start.year and month_value == month_start.month
+
             if account_type == "REVENUE":
-                amount = Decimal(credit) - Decimal(debit)
                 monthly[key]["income"] += amount
-                if posted_at.date() >= month_start:
+                if current_month:
                     period_income += amount
             else:
-                amount = Decimal(debit) - Decimal(credit)
                 monthly[key]["expense"] += amount
-                if posted_at.date() >= month_start:
+                if current_month:
                     period_expense += amount
                     scope_totals[scope] += amount
 
@@ -142,7 +165,7 @@ def get_summary(db: Session, *, user_id: uuid.UUID) -> DashboardSummaryResponse:
                 income=float(monthly[start.strftime("%Y-%m")]["income"]),
                 expense=float(monthly[start.strftime("%Y-%m")]["expense"]),
             )
-            for start in _month_starts(today)
+            for start in month_starts
         ]
         expenses_by_scope = [
             ScopeAmountResponse(scope=scope, amount=float(scope_totals.get(scope, 0)))

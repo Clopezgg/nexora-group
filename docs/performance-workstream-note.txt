@@ -1,0 +1,1 @@
+Performance hardening is being applied incrementally on main with CI/Azure verification after each logical unit.

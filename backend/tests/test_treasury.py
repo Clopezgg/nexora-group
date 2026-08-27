@@ -391,3 +391,30 @@ def test_database_rejects_duplicate_treasury_gl_mapping(client, db_session):
     with pytest.raises(IntegrityError):
         db_session.commit()
     db_session.rollback()
+
+
+def test_remittances_can_be_listed_for_their_company(client):
+    login_admin(client)
+    company, bank, _cash, contributions, _expense = _setup(client)
+    created = client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank["id"],
+            "counterAccountId": contributions["id"],
+            "sender": "Cliente real",
+            "provider": "Banco",
+            "channel": "TRANSFER",
+            "reference": "REM-TEST-001",
+            "currencyCode": "HNL",
+            "originalAmount": "1250.00",
+            "remittanceDate": "2026-08-27",
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    response = client.get(f"/api/treasury/remittances?companyId={company['id']}")
+    assert response.status_code == 200, response.text
+    assert len(response.json()) == 1
+    assert response.json()[0]["reference"] == "REM-TEST-001"
+    assert response.json()[0]["sender"] == "Cliente real"

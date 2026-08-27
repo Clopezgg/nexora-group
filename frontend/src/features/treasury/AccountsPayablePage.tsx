@@ -19,6 +19,7 @@ import { masterDataService } from '../../services/masterDataService'
 import { procurementService } from '../../services/procurementService'
 import { treasuryService } from '../../services/treasuryService'
 import { apService, type SupplierInvoice } from '../../services/apArService'
+import { formatMoney } from '../../utils/currency'
 import './TreasuryPage.css'
 
 export function AccountsPayablePage() {
@@ -93,9 +94,9 @@ export function AccountsPayablePage() {
     {
       key: 'amount',
       header: 'Monto',
-      render: (row) => `${row.currencyCode} ${row.amount.toFixed(2)}`,
+      render: (row) => formatMoney(row.amount, row.currencyCode),
     },
-    { key: 'amountPaid', header: 'Pagado', render: (row) => row.amountPaid.toFixed(2) },
+    { key: 'amountPaid', header: 'Pagado', render: (row) => formatMoney(row.amountPaid, row.currencyCode) },
     { key: 'status', header: 'Estado', render: (row) => row.status },
     {
       key: 'actions',

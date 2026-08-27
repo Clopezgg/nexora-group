@@ -17,6 +17,7 @@ import { masterDataService } from '../../services/masterDataService'
 import { treasuryService } from '../../services/treasuryService'
 import { useMutationError } from '../../hooks/useMutationError'
 import { arService, type CustomerInvoice } from '../../services/apArService'
+import { formatMoney } from '../../utils/currency'
 import './TreasuryPage.css'
 
 export function AccountsReceivablePage() {
@@ -89,9 +90,9 @@ export function AccountsReceivablePage() {
     {
       key: 'amount',
       header: 'Monto',
-      render: (row) => `${row.currencyCode} ${row.amount.toFixed(2)}`,
+      render: (row) => formatMoney(row.amount, row.currencyCode),
     },
-    { key: 'amountCollected', header: 'Cobrado', render: (row) => row.amountCollected.toFixed(2) },
+    { key: 'amountCollected', header: 'Cobrado', render: (row) => formatMoney(row.amountCollected, row.currencyCode) },
     { key: 'status', header: 'Estado', render: (row) => row.status },
     {
       key: 'actions',

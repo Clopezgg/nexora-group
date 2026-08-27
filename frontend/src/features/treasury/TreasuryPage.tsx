@@ -23,12 +23,6 @@ import {
 import type { TreasuryAccount } from '../../types/treasury'
 import './TreasuryPage.css'
 
-const currencyFormatter = new Intl.NumberFormat('es-HN', {
-  style: 'currency',
-  currency: 'HNL',
-  maximumFractionDigits: 2,
-})
-
 type ModalKind = 'remittance' | 'expense' | 'transfer' | null
 
 export function TreasuryPage() {
@@ -125,7 +119,7 @@ export function TreasuryPage() {
     {
       key: 'balance',
       header: 'Saldo',
-      render: (row) => currencyFormatter.format(row.balance),
+      render: (row) => formatMoney(row.balance, row.currencyCode),
     },
   ]
 
@@ -149,7 +143,7 @@ export function TreasuryPage() {
       </header>
 
       <div className="nx-treasury__grid">
-        <StatCard label="Saldo total de Tesorería" value={currencyFormatter.format(totalBalance)} />
+        <StatCard label="Saldo total de Tesorería" value={formatMoney(totalBalance)} />
         <StatCard label="Cuentas de tesorería" value={treasuryAccounts.length} />
       </div>
 

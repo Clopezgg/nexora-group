@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Cell, Legend, Line, LineChart, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts'
 import { dashboardService } from '../../services/dashboardService'
+import { formatMoney } from '../../utils/currency'
 import { ApiError } from '../../services/httpClient'
 import { useAuth } from '../auth/auth-context'
 import { resolveHomeConfig } from './roleHomes'
@@ -17,15 +18,6 @@ const scopeColors: Record<string, string> = {
   CENTRAL: '#2563eb',
   GENERAL: '#0f766e',
   PROJECT: '#7c3aed',
-}
-
-function formatMoney(value: number, currency = 'HNL') {
-  return new Intl.NumberFormat('es-HN', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
 }
 
 export function HomePage() {

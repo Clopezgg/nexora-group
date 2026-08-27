@@ -2,13 +2,12 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Card, EmptyState, ErrorState, LoadingState, MoneyInput, StatCard } from '../../design-system'
 import { projectService } from '../../services/projectService'
+import { formatMoney } from '../../utils/currency'
 import { RequiresActiveProject } from './RequiresActiveProject'
-
-const currencyFormatter = new Intl.NumberFormat('es-HN', { minimumFractionDigits: 2 })
 
 function formatAmount(value: string | null): string {
   if (value === null) return '—'
-  return currencyFormatter.format(Number(value))
+  return formatMoney(Number(value))
 }
 
 function BudgetAndForecast({ projectId }: { projectId: string }) {

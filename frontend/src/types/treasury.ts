@@ -16,6 +16,9 @@ export interface Remittance {
   companyId: string
   treasuryAccountId: string
   sender: string
+  provider: string | null
+  channel: string | null
+  reference: string | null
   currencyCode: string
   originalAmount: number
   fxRate: number

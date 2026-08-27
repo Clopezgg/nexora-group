@@ -120,28 +120,32 @@ const PARENT_ACCOUNT: StubAccount = {
 }
 
 describe('AccountCatalogPage', () => {
-  it('lists the active company accounts with translated type, parent and posting status', async () => {
-    stubCatalogFetch({
-      accounts: [
-        PARENT_ACCOUNT,
-        {
-          id: 'a-child',
-          code: '1101',
-          name: 'Cuentas por cobrar',
-          accountType: 'ASSET',
-          parentId: 'a-parent',
-          isPostable: true,
-          cashFlowActivity: null,
-        },
-      ],
-    })
+  it('renders parent/child accounts as an ordered visual hierarchy with posting status', async () => {
+    const child: StubAccount = {
+      id: 'a-child',
+      code: '1101',
+      name: 'Cuentas por cobrar',
+      accountType: 'ASSET',
+      parentId: 'a-parent',
+      isPostable: true,
+      cashFlowActivity: null,
+    }
+    // Deliberately return the child first: the UI must build the hierarchy
+    // from parentId rather than trusting API array order.
+    stubCatalogFetch({ accounts: [child, PARENT_ACCOUNT] })
 
     render(renderApp('/finanzas/contabilidad'))
 
     expect(await screen.findByRole('heading', { name: /catálogo de cuentas/i })).toBeInTheDocument()
     const parentRow = await screen.findByRole('row', { name: /1100 activo corriente/i })
-    expect(within(parentRow).getByText('Agrupadora')).toBeInTheDocument()
     const childRow = await screen.findByRole('row', { name: /1101 cuentas por cobrar/i })
+    const parentName = within(parentRow).getByText('Activo corriente')
+    const childName = within(childRow).getByText('Cuentas por cobrar')
+
+    expect(parentName).toHaveAttribute('data-account-depth', '0')
+    expect(childName).toHaveAttribute('data-account-depth', '1')
+    expect(parentRow.compareDocumentPosition(childRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(parentRow).getByText('Agrupadora')).toBeInTheDocument()
     expect(within(childRow).getByText('Activo')).toBeInTheDocument()
     expect(within(childRow).getByText('1100 · Activo corriente')).toBeInTheDocument()
     expect(within(childRow).getByText('Registrable')).toBeInTheDocument()

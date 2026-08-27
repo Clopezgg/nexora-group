@@ -1,5 +1,10 @@
 # NEXORA GROUP — Requirements Traceability Matrix
 
+## 2026-08-27 final-product verification overlay
+
+PR #11 (`work/nexora-final-product`) adds current evidence for the product-facing portions of the matrix: SVG icon consistency, implemented-only navigation, HNL formatting, real dashboard aggregates/charts, remittance operations, explicit AP/AR `OperationScope`, responsive role-home shortcuts and same-origin Azure health. These items remain **IN PROGRESS** until PR CI, merge and production smoke are complete; this overlay does not rewrite historical evidence or mark unrelated deferred capabilities VERIFIED.
+
+
 Cada capacidad de la ORDEN MAESTRA (sección "Definición de NEXORA 100%")
 tiene un `NXR-REQ-XXXX` estable. Un requisito es `VERIFIED` únicamente
 cuando **todas** las piezas aplicables existen: dominio, base de datos,

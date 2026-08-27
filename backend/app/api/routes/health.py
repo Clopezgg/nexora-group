@@ -8,11 +8,13 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/healthz")
+@router.get("/api/healthz", include_in_schema=False)
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @router.get("/readyz")
+@router.get("/api/readyz", include_in_schema=False)
 def readyz(db: Session = Depends(get_db)) -> dict[str, str]:
     try:
         db.execute(text("SELECT 1"))

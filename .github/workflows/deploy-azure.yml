@@ -109,13 +109,23 @@ jobs:
               bootstrapAdminEmail='${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}' \
               backendImage='${{ env.IMAGE }}'
 
+      - name: Configure frontend backend URL
+        run: |
+          backend_fqdn="$(az deployment sub show \
+            --name nexora-deploy-${{ github.run_number }} \
+            --query properties.outputs.backendFqdn.value \
+            --output tsv)"
+          if [ -z "$backend_fqdn" ] || [ "$backend_fqdn" = "null" ]; then
+            echo "::error::Bicep deployment did not return the backend FQDN"
+            exit 1
+          fi
+          echo "VITE_API_BASE_URL=https://$backend_fqdn/api" >> "$GITHUB_ENV"
+
       - name: Build frontend
         run: |
           cd frontend
           npm ci
           npm run build
-        env:
-          VITE_API_BASE_URL: /api
 
       - name: Get Static Web Apps deployment token
         id: swa-token

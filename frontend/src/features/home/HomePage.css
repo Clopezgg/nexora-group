@@ -1,5 +1,17 @@
 .nx-home__header {
+  align-items: flex-end;
+  display: flex;
+  justify-content: space-between;
   margin-bottom: var(--nx-space-6);
+}
+
+.nx-home__eyebrow {
+  color: var(--nx-blue-700);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 0 0 var(--nx-space-2);
+  text-transform: uppercase;
 }
 
 .nx-home__subtitle {
@@ -12,6 +24,20 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--nx-space-4);
+}
+
+.nx-home__charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr);
+  gap: var(--nx-space-4);
+  margin-top: var(--nx-space-4);
+}
+
+.nx-home__operations {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--nx-space-4);
+  margin-top: var(--nx-space-4);
 }
 
 .nx-home__sections {
@@ -29,19 +55,22 @@
 }
 
 @media (max-width: 1024px) {
-  .nx-home__grid {
+  .nx-home__grid,
+  .nx-home__operations {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 768px) {
+  .nx-home__charts,
   .nx-home__sections {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 430px) {
-  .nx-home__grid {
+  .nx-home__grid,
+  .nx-home__operations {
     grid-template-columns: 1fr;
   }
 }

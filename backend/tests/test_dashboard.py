@@ -21,13 +21,17 @@ def test_dashboard_summary_returns_real_zeroed_values_on_fresh_db(client):
     response = client.get("/api/dashboard/summary")
     assert response.status_code == 200
     body = response.json()
-    assert body == {
-        "treasuryBalance": 0.0,
-        "periodIncome": 0.0,
-        "periodExpense": 0.0,
-        "activeProjects": 0,
-        "currency": "HNL",
-    }
+    assert body["treasuryBalance"] == 0.0
+    assert body["periodIncome"] == 0.0
+    assert body["periodExpense"] == 0.0
+    assert body["activeProjects"] == 0
+    assert body["pendingApprovals"] == 0
+    assert body["overduePayables"] == 0
+    assert body["overduePayablesAmount"] == 0.0
+    assert body["receivablesOutstanding"] == 0.0
+    assert len(body["cashFlow"]) == 6
+    assert body["expensesByScope"] == []
+    assert body["currency"] == "HNL"
 
 
 def test_dashboard_active_projects_never_counts_another_companys_projects(client, db_session):

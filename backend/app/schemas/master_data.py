@@ -39,6 +39,9 @@ class AccountCreateRequest(CamelModel):
     name: str = Field(min_length=1, max_length=255)
     account_type: Literal["ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE"]
     parent_id: uuid.UUID | None = None
+    # Las cuentas agrupadoras (p.ej. 1000 ACTIVOS) forman la jerarquía,
+    # pero nunca deben recibir movimientos directamente.
+    is_postable: bool = True
 
     @field_validator("code", "name", mode="before")
     @classmethod

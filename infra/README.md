@@ -1,5 +1,10 @@
 # Infraestructura Azure (Bicep)
 
+
+Recursos verificados en `nexora-rg-dev`: Azure Static Web Apps Standard, Container Apps, Azure Database for PostgreSQL, Storage Account/Blob, Key Vault, Log Analytics y Application Insights. Static Web Apps enlaza el Container App como backend de mismo origen bajo `/api`; el ingreso directo del Container App queda protegido por esa integración.
+
+Última evidencia antes de PR #11: Deploy Azure run #21 en verde; `/api/healthz` y `/api/readyz` respondieron HTTP 200 desde el dominio público.
+
 Infraestructura como código para Nexora Group. Ningún recurso ha sido
 provisionado todavía — este directorio se validó únicamente con
 `az bicep build` (compila) y `az deployment sub what-if` (simula el plan de

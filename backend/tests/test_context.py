@@ -1,3 +1,4 @@
+from app.models.user_context import UserContext
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
 
 
@@ -18,6 +19,17 @@ def test_get_context_defaults_to_no_active_project(client):
     response = client.get("/api/context")
     assert response.status_code == 200
     assert response.json() == {"activeProjectId": None, "activeProjectName": None}
+
+
+def test_get_context_does_not_create_context_row(client, db_session):
+    _login(client)
+    assert db_session.query(UserContext).count() == 0
+
+    response = client.get("/api/context")
+
+    assert response.status_code == 200
+    assert response.json() == {"activeProjectId": None, "activeProjectName": None}
+    assert db_session.query(UserContext).count() == 0
 
 
 def test_set_context_with_unknown_project_returns_400(client):

@@ -1,6 +1,6 @@
 import { useAuth } from '../features/auth/auth-context'
 import { useActiveContext } from '../features/context/useActiveContext'
-import { Badge, IconButton, Select, Tooltip } from '../design-system'
+import { Badge, Icon, IconButton, Select, Tooltip } from '../design-system'
 import { NotificationBell } from '../components/NotificationBell'
 
 interface TopbarProps {
@@ -17,7 +17,7 @@ export function Topbar({ onOpenNav }: TopbarProps) {
       <div className="nx-topbar__left">
         <IconButton
           label="Abrir navegación"
-          icon="☰"
+          icon={<Icon name="menu" />}
           className="nx-topbar__nav-toggle"
           onClick={onOpenNav}
         />
@@ -47,14 +47,14 @@ export function Topbar({ onOpenNav }: TopbarProps) {
         <Tooltip label="Búsqueda global (Cmd/Ctrl + K)">
           <IconButton
             label="Búsqueda global"
-            icon="🔍"
+            icon={<Icon name="search" />}
             onClick={() => {
               document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
             }}
           />
         </Tooltip>
         <Tooltip label="Aprobaciones — se activará con el motor de workflow (NXR-REQ-0088)">
-          <IconButton label="Aprobaciones" icon="📥" disabled />
+          <IconButton label="Aprobaciones" icon={<Icon name="inbox" />} disabled />
         </Tooltip>
         <NotificationBell />
         <div className="nx-topbar__user">

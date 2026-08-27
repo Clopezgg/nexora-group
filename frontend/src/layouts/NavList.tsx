@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { navGroups } from '../app/navigation'
+import { Icon } from '../design-system'
 
 export function NavList({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -19,7 +20,7 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
                       .join(' ')
                   }
                 >
-                  <span aria-hidden="true">{item.icon}</span>
+                  <Icon name={item.icon} />
                   {item.label}
                 </NavLink>
               </li>

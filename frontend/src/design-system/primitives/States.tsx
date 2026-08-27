@@ -1,10 +1,13 @@
+import type { ReactNode } from 'react'
+import { Icon } from './Icon'
+
 interface EmptyStateProps {
-  icon?: string
+  icon?: ReactNode
   title: string
   description?: string
 }
 
-export function EmptyState({ icon = '📋', title, description }: EmptyStateProps) {
+export function EmptyState({ icon = <Icon name="clipboard" />, title, description }: EmptyStateProps) {
   return (
     <div className="nx-state" role="status">
       <span className="nx-state__icon" aria-hidden="true">
@@ -39,7 +42,7 @@ export function ErrorState({
   return (
     <div className="nx-state nx-state--error" role="alert">
       <span className="nx-state__icon" aria-hidden="true">
-        ⚠️
+        <Icon name="warning" />
       </span>
       <p className="nx-state__title">{title}</p>
       {description ? <p className="nx-state__description">{description}</p> : null}

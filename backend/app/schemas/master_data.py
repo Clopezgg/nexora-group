@@ -1,4 +1,7 @@
 import uuid
+from typing import Literal
+
+from pydantic import Field, field_validator
 
 from app.schemas.base import CamelModel
 
@@ -32,10 +35,15 @@ class CompanyResponse(CamelModel):
 
 class AccountCreateRequest(CamelModel):
     company_id: uuid.UUID
-    code: str
-    name: str
-    account_type: str
+    code: str = Field(min_length=1, max_length=32)
+    name: str = Field(min_length=1, max_length=255)
+    account_type: Literal["ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE"]
     parent_id: uuid.UUID | None = None
+
+    @field_validator("code", "name", mode="before")
+    @classmethod
+    def strip_account_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class AccountUpdateRequest(CamelModel):

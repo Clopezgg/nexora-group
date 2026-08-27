@@ -11,7 +11,7 @@ type LazyRoute = NonNullable<RouteObject['lazy']>
 // the entire ERP (reports, procurement, inventory, workforce, etc.) up front.
 const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
   '/finanzas/contabilidad': async () => ({
-    Component: (await import('../features/reports/ReportsPage')).ReportsPage,
+    Component: (await import('../features/accounting/AccountingPage')).AccountingPage,
   }),
   '/finanzas/tesoreria': async () => ({
     Component: (await import('../features/treasury/TreasuryPage')).TreasuryPage,

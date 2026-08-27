@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Tabs } from '../../design-system'
 import { BalanceSheetPage } from './BalanceSheetPage'
 import { BudgetVsActualPage } from './BudgetVsActualPage'
@@ -13,17 +14,36 @@ import { TrialBalancePage } from './TrialBalancePage'
  * Un único slot de navegación aloja los reportes de esta fase
  * (NXR-REQ-0093) como tabs, mismo patrón que EquipmentPage ya usa para
  * Equipos/Combustible/Mantenimiento bajo distintas entradas de nav. */
-export function ReportsPage() {
+export function ReportsPage({ accountCatalog }: { accountCatalog?: ReactNode }) {
   return (
     <Tabs
       items={[
-        { key: 'balance-comprobacion', label: 'Balance de Comprobación', content: <TrialBalancePage /> },
-        { key: 'presupuesto-vs-real', label: 'Presupuesto vs. Real', content: <BudgetVsActualPage /> },
+        ...(accountCatalog
+          ? [{ key: 'catalogo-cuentas', label: 'Catálogo de cuentas', content: accountCatalog }]
+          : []),
+        {
+          key: 'balance-comprobacion',
+          label: 'Balance de Comprobación',
+          content: <TrialBalancePage />,
+        },
+        {
+          key: 'presupuesto-vs-real',
+          label: 'Presupuesto vs. Real',
+          content: <BudgetVsActualPage />,
+        },
         { key: 'libro-mayor', label: 'Libro Mayor', content: <GeneralLedgerPage /> },
         { key: 'balance-general', label: 'Balance General', content: <BalanceSheetPage /> },
-        { key: 'estado-resultados', label: 'Estado de Resultados', content: <IncomeStatementPage /> },
+        {
+          key: 'estado-resultados',
+          label: 'Estado de Resultados',
+          content: <IncomeStatementPage />,
+        },
         { key: 'flujo-de-efectivo', label: 'Flujo de Efectivo', content: <CashFlowPage /> },
-        { key: 'desempeno-proveedores', label: 'Desempeño de Proveedores', content: <SupplierPerformancePage /> },
+        {
+          key: 'desempeno-proveedores',
+          label: 'Desempeño de Proveedores',
+          content: <SupplierPerformancePage />,
+        },
       ]}
     />
   )

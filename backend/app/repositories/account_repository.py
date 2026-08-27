@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.errors import NotFoundError
+from app.domain.errors import InvalidFinancialReferenceError, NotFoundError
 from app.models.chart_of_accounts import Account, ChartOfAccount
 
 
@@ -32,6 +32,12 @@ def create_account(
     chart = get_chart_of_account_for_company(db, company_id)
     if chart is None:
         raise NotFoundError(f"La company {company_id} no tiene chart of accounts")
+    if parent_id is not None:
+        parent = db.get(Account, parent_id)
+        if parent is None or parent.chart_of_account_id != chart.id:
+            raise InvalidFinancialReferenceError(
+                "parent_id debe pertenecer al catálogo contable de la compañía propietaria"
+            )
     account = Account(
         chart_of_account_id=chart.id,
         code=code,

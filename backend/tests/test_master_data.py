@@ -1,3 +1,5 @@
+import pytest
+
 from app.models.permission import UserCompanyAccess
 from tests.helpers import create_company, create_user_with_role, login_admin, login_as
 
@@ -59,3 +61,61 @@ def test_user_without_company_access_cannot_update_company(client, db_session):
         json={"legalName": "Constructora A Actualizada S.A."},
     )
     assert allowed.status_code == 200, allowed.text
+
+
+def test_account_parent_must_belong_to_the_same_company(client):
+    """INV-COMP-001: la jerarquía contable nunca puede enlazar catálogos
+    pertenecientes a compañías distintas."""
+    login_admin(client)
+    company_a = create_company(client, name="Constructora A")
+    company_b = create_company(client, name="Constructora B")
+
+    parent_b = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company_b["id"],
+            "code": "1100",
+            "name": "Activo corriente B",
+            "accountType": "ASSET",
+        },
+    ).json()
+
+    response = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company_a["id"],
+            "code": "1101",
+            "name": "Cuentas por cobrar A",
+            "accountType": "ASSET",
+            "parentId": parent_b["id"],
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+    assert client.get(f"/api/master-data/accounts?companyId={company_a['id']}").json() == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("code", "   "),
+        ("name", "   "),
+        ("accountType", "NOT_A_REAL_ACCOUNT_TYPE"),
+    ],
+)
+def test_account_create_rejects_invalid_domain_values_without_inserting(client, field, value):
+    login_admin(client)
+    company = create_company(client)
+    payload = {
+        "companyId": company["id"],
+        "code": "1100",
+        "name": "Activo corriente",
+        "accountType": "ASSET",
+    }
+    payload[field] = value
+
+    response = client.post("/api/master-data/accounts", json=payload)
+
+    assert response.status_code == 422, response.text
+    assert client.get(f"/api/master-data/accounts?companyId={company['id']}").json() == []

@@ -26,6 +26,7 @@ export const masterDataService = {
     code: string
     name: string
     accountType: string
+    parentId?: string
   }) =>
     apiFetch<Account>('/master-data/accounts', { method: 'POST', body: JSON.stringify(payload) }),
 }

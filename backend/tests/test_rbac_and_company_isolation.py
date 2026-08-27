@@ -56,6 +56,59 @@ def test_company_listing_includes_all_companies_for_any_scope(client):
     assert {company["id"] for company in response.json()} == {company_a["id"], company_b["id"]}
 
 
+def test_account_catalog_read_and_create_are_isolated_by_company(client, db_session):
+    login_admin(client)
+    company_a = create_company(client, name="Constructora A")
+    company_b = create_company(client, name="Constructora B")
+    create_account(
+        client,
+        company_id=company_b["id"],
+        code="1100",
+        name="Cuenta exclusiva B",
+        account_type="ASSET",
+    )
+
+    finance_user = create_user_with_role(
+        db_session,
+        email="finance-catalog@nexora.group",
+        role_name="Finance Manager",
+    )
+    db_session.add(UserCompanyAccess(user_id=finance_user.id, company_id=company_a["id"]))
+    db_session.commit()
+    login_as(client, email="finance-catalog@nexora.group")
+
+    allowed_create = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company_a["id"],
+            "code": "1100",
+            "name": "Cuenta exclusiva A",
+            "accountType": "ASSET",
+        },
+    )
+    assert allowed_create.status_code == 201, allowed_create.text
+
+    allowed_list = client.get(f"/api/master-data/accounts?companyId={company_a['id']}")
+    assert allowed_list.status_code == 200, allowed_list.text
+    assert [account["name"] for account in allowed_list.json()] == ["Cuenta exclusiva A"]
+
+    denied_list = client.get(f"/api/master-data/accounts?companyId={company_b['id']}")
+    assert denied_list.status_code == 403
+    assert denied_list.json()["error"]["code"] == "NXR-PERM-001"
+
+    denied_create = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company_b["id"],
+            "code": "1200",
+            "name": "Intento ajeno",
+            "accountType": "ASSET",
+        },
+    )
+    assert denied_create.status_code == 403
+    assert denied_create.json()["error"]["code"] == "NXR-PERM-001"
+
+
 def test_accountant_without_company_access_is_denied(client, db_session):
     """INV-COMP-001: Accountant tiene company_scope=OWN -- sin
     UserCompanyAccess explícito, no puede contabilizar en ninguna company."""

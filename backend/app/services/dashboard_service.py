@@ -49,13 +49,11 @@ def get_summary(db: Session, *, user_id: uuid.UUID) -> DashboardSummaryResponse:
     today = datetime.now(timezone.utc).date()
     month_start = date(today.year, today.month, 1)
 
-    can_view_projects = permission_service.user_has_permission(
-        db, user_id=user_id, resource="project", action="read"
-    )
+    # The executive project count is a dashboard aggregate. It remains
+    # company-scoped even for finance roles that do not have project-detail
+    # permission, without granting access to project records themselves.
     project_company_ids = _visible_companies(db, user_id=user_id, resource="project")
-    if not can_view_projects:
-        active_projects = 0
-    elif project_company_ids is None:
+    if project_company_ids is None:
         active_projects = project_repository.count_active_projects(db)
     else:
         active_projects = project_repository.count_active_projects_for_companies(

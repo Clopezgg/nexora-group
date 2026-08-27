@@ -6,8 +6,8 @@ name: Deploy Azure
 #     -> federated credential (OIDC) apuntando a este repo/rama, sin client secret.
 #   POSTGRES_ADMIN_PASSWORD, BACKEND_SECRET_KEY, BOOTSTRAP_ADMIN_PASSWORD, BOOTSTRAP_ADMIN_EMAIL
 #     -> GitHub Secrets, nunca en este archivo ni en el repo.
-#   AZURE_SWA_DEPLOYMENT_TOKEN
-#     -> token de deployment de la Static Web App (se obtiene del recurso ya creado).
+# El token de despliegue de Static Web Apps se obtiene en tiempo de ejecución
+# mediante la sesión OIDC y se enmascara; no se almacena como secret del repo.
 #
 # El job "deploy" tiene `environment: production` con protection rules (aprobación
 # manual) configurables en Settings > Environments del repo. No se activa solo.
@@ -117,10 +117,25 @@ jobs:
         env:
           VITE_API_BASE_URL: /api
 
+      - name: Get Static Web Apps deployment token
+        id: swa-token
+        run: |
+          token="$(az staticwebapp secrets list \
+            --name nexora-frontend-dev \
+            --resource-group nexora-rg-dev \
+            --query properties.apiKey \
+            --output tsv)"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "::error::Azure did not return a Static Web Apps deployment token"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
       - name: Deploy frontend a Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
+          azure_static_web_apps_api_token: ${{ steps.swa-token.outputs.token }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: frontend/dist

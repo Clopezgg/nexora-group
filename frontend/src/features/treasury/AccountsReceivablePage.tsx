@@ -14,6 +14,7 @@ import {
 } from '../../design-system'
 import { crmService } from '../../services/crmService'
 import { masterDataService } from '../../services/masterDataService'
+import { projectService } from '../../services/projectService'
 import { treasuryService } from '../../services/treasuryService'
 import { useMutationError } from '../../hooks/useMutationError'
 import { arService, type CustomerInvoice } from '../../services/apArService'
@@ -204,9 +205,17 @@ function CreateCustomerInvoiceModal({
   const [customerId, setCustomerId] = useState<string | null>(null)
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [amount, setAmount] = useState<number | null>(null)
+  const [scope, setScope] = useState<'CENTRAL' | 'GENERAL' | 'PROJECT'>('GENERAL')
+  const [projectId, setProjectId] = useState('')
   const [revenueAccountId, setRevenueAccountId] = useState(revenueAccounts[0]?.id ?? '')
   const [receivableAccountId, setReceivableAccountId] = useState(receivableAccounts[0]?.id ?? '')
   const handleMutationError = useMutationError()
+
+  const projectsQuery = useQuery({
+    queryKey: ['projects', companyId],
+    queryFn: () => projectService.list(companyId),
+  })
+  const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : []
 
   const customerOptions = customers.map((c) => ({ id: c.id, label: c.legalName }))
 
@@ -216,7 +225,8 @@ function CreateCustomerInvoiceModal({
         companyId,
         customerId,
         invoiceNumber,
-        scope: 'GENERAL',
+        scope,
+        projectId: scope === 'PROJECT' ? projectId : null,
         revenueAccountId,
         receivableAccountId,
         currencyCode: 'HNL',
@@ -240,6 +250,34 @@ function CreateCustomerInvoiceModal({
           mutation.mutate()
         }}
       >
+        <Select
+          label="Alcance de la operación"
+          value={scope}
+          onChange={(event) => {
+            const next = event.target.value as 'CENTRAL' | 'GENERAL' | 'PROJECT'
+            setScope(next)
+            if (next !== 'PROJECT') setProjectId('')
+          }}
+        >
+          <option value="CENTRAL">Central — Tesorería corporativa</option>
+          <option value="GENERAL">General — Sin proyecto</option>
+          <option value="PROJECT">Proyecto — Operación atribuible</option>
+        </Select>
+        {scope === 'PROJECT' ? (
+          <Select
+            label="Proyecto"
+            value={projectId}
+            onChange={(event) => setProjectId(event.target.value)}
+            required
+          >
+            <option value="">Selecciona un proyecto…</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.code ? `${project.code} — ` : ''}{project.name}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         <CustomerSelector options={customerOptions} value={customerId} onChange={setCustomerId} />
         <label className="nx-field">
           <span className="nx-field__label">Número de factura</span>
@@ -279,7 +317,7 @@ function CreateCustomerInvoiceModal({
         <Button
           type="submit"
           loading={mutation.isPending}
-          disabled={!amount || !customerId || !invoiceNumber}
+          disabled={!amount || !customerId || !invoiceNumber || (scope === 'PROJECT' && !projectId)}
         >
           Registrar
         </Button>

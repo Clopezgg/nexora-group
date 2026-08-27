@@ -16,6 +16,7 @@ import { useAuth } from '../auth/auth-context'
 import { useCompanyUsers } from '../../hooks/useCompanyUsers'
 import { useMutationError } from '../../hooks/useMutationError'
 import { masterDataService } from '../../services/masterDataService'
+import { projectService } from '../../services/projectService'
 import { procurementService } from '../../services/procurementService'
 import { treasuryService } from '../../services/treasuryService'
 import { apService, type SupplierInvoice } from '../../services/apArService'
@@ -291,9 +292,17 @@ function CreateSupplierInvoiceModal({
   const [supplierId, setSupplierId] = useState<string | null>(null)
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [amount, setAmount] = useState<number | null>(null)
+  const [scope, setScope] = useState<'CENTRAL' | 'GENERAL' | 'PROJECT'>('GENERAL')
+  const [projectId, setProjectId] = useState('')
   const [expenseAccountId, setExpenseAccountId] = useState(expenseAccounts[0]?.id ?? '')
   const [payableAccountId, setPayableAccountId] = useState(payableAccounts[0]?.id ?? '')
   const handleMutationError = useMutationError()
+
+  const projectsQuery = useQuery({
+    queryKey: ['projects', companyId],
+    queryFn: () => projectService.list(companyId),
+  })
+  const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : []
 
   const supplierOptions = suppliers.map((s) => ({ id: s.id, label: s.legalName }))
 
@@ -303,7 +312,8 @@ function CreateSupplierInvoiceModal({
         companyId,
         supplierId,
         invoiceNumber,
-        scope: 'GENERAL',
+        scope,
+        projectId: scope === 'PROJECT' ? projectId : null,
         expenseAccountId,
         payableAccountId,
         currencyCode: 'HNL',
@@ -327,6 +337,34 @@ function CreateSupplierInvoiceModal({
           mutation.mutate()
         }}
       >
+        <Select
+          label="Alcance de la operación"
+          value={scope}
+          onChange={(event) => {
+            const next = event.target.value as 'CENTRAL' | 'GENERAL' | 'PROJECT'
+            setScope(next)
+            if (next !== 'PROJECT') setProjectId('')
+          }}
+        >
+          <option value="CENTRAL">Central — Tesorería corporativa</option>
+          <option value="GENERAL">General — Sin proyecto</option>
+          <option value="PROJECT">Proyecto — Operación atribuible</option>
+        </Select>
+        {scope === 'PROJECT' ? (
+          <Select
+            label="Proyecto"
+            value={projectId}
+            onChange={(event) => setProjectId(event.target.value)}
+            required
+          >
+            <option value="">Selecciona un proyecto…</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.code ? `${project.code} — ` : ''}{project.name}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         <SupplierSelector options={supplierOptions} value={supplierId} onChange={setSupplierId} />
         <label className="nx-field">
           <span className="nx-field__label">Número de factura</span>
@@ -366,7 +404,7 @@ function CreateSupplierInvoiceModal({
         <Button
           type="submit"
           loading={mutation.isPending}
-          disabled={!amount || !supplierId || !invoiceNumber}
+          disabled={!amount || !supplierId || !invoiceNumber || (scope === 'PROJECT' && !projectId)}
         >
           Registrar
         </Button>

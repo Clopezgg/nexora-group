@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Badge,
   Button,
   Card,
   EmptyState,
@@ -20,7 +21,8 @@ import {
   type CreateRemittancePayload,
   type CreateTransferPayload,
 } from '../../services/treasuryService'
-import type { TreasuryAccount } from '../../types/treasury'
+import type { Remittance, TreasuryAccount } from '../../types/treasury'
+import { formatMoney } from '../../utils/currency'
 import './TreasuryPage.css'
 
 type ModalKind = 'remittance' | 'expense' | 'transfer' | null
@@ -45,6 +47,11 @@ export function TreasuryPage() {
   const treasuryAccountsQuery = useQuery({
     queryKey: ['treasury', 'accounts', activeCompanyId],
     queryFn: () => treasuryService.listAccounts(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const remittancesQuery = useQuery({
+    queryKey: ['treasury', 'remittances', activeCompanyId],
+    queryFn: () => treasuryService.listRemittances(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
 
@@ -123,6 +130,37 @@ export function TreasuryPage() {
     },
   ]
 
+  const accountNameById = new Map(treasuryAccounts.map((account) => [account.id, account.name]))
+  const remittanceColumns: TableColumn<Remittance>[] = [
+    { key: 'date', header: 'Fecha', render: (row) => row.remittanceDate },
+    {
+      key: 'document',
+      header: 'Documento',
+      render: (row) => row.reference ?? row.accountingDocumentId.slice(0, 8).toUpperCase(),
+    },
+    { key: 'sender', header: 'Remitente', render: (row) => row.sender },
+    {
+      key: 'account',
+      header: 'Cuenta',
+      render: (row) => accountNameById.get(row.treasuryAccountId) ?? 'Cuenta de tesorería',
+    },
+    {
+      key: 'amount',
+      header: 'Importe',
+      render: (row) => formatMoney(row.baseAmount, row.currencyCode),
+    },
+    {
+      key: 'method',
+      header: 'Método',
+      render: (row) => row.channel ?? row.provider ?? '—',
+    },
+    {
+      key: 'status',
+      header: 'Estado',
+      render: () => <Badge tone="success">Contabilizada</Badge>,
+    },
+  ]
+
   const totalBalance = treasuryAccounts.reduce((sum, account) => sum + account.balance, 0)
 
   return (
@@ -165,16 +203,36 @@ export function TreasuryPage() {
         </div>
       </Card>
 
-      {treasuryAccountsQuery.isLoading ? (
-        <LoadingState label="Cargando cuentas de tesorería…" />
-      ) : (
-        <Table
-          columns={columns}
-          rows={treasuryAccounts}
-          getRowKey={(row) => row.id}
-          emptyMessage="Aún no hay cuentas de tesorería para esta compañía."
-        />
-      )}
+      <Card title="Cuentas de Tesorería">
+        {treasuryAccountsQuery.isLoading ? (
+          <LoadingState label="Cargando cuentas de tesorería…" />
+        ) : (
+          <Table
+            columns={columns}
+            rows={treasuryAccounts}
+            getRowKey={(row) => row.id}
+            emptyMessage="No hay cuentas de tesorería para esta compañía."
+          />
+        )}
+      </Card>
+
+      <Card title="Remesas recientes">
+        {remittancesQuery.isLoading ? (
+          <LoadingState label="Cargando remesas…" />
+        ) : remittancesQuery.isError ? (
+          <ErrorState
+            title="No se pudieron cargar las remesas"
+            onRetry={() => remittancesQuery.refetch()}
+          />
+        ) : (
+          <Table
+            columns={remittanceColumns}
+            rows={remittancesQuery.data ?? []}
+            getRowKey={(row) => row.id}
+            emptyMessage="No hay remesas registradas para esta compañía."
+          />
+        )}
+      </Card>
 
       {openModal === 'remittance' && activeCompanyId ? (
         <RemittanceModal
@@ -230,6 +288,7 @@ function RemittanceModal({
     }) => treasuryService.createRemittance(payload, idempotencyKey),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['treasury', 'remittances'] })
       onClose()
     },
   })

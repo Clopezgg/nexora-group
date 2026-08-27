@@ -63,6 +63,103 @@ def test_user_without_company_access_cannot_update_company(client, db_session):
     assert allowed.status_code == 200, allowed.text
 
 
+def test_grouping_account_can_be_parent_for_same_type_child(client):
+    login_admin(client)
+    company = create_company(client)
+
+    parent_response = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company["id"],
+            "code": "1000",
+            "name": "ACTIVOS",
+            "accountType": "ASSET",
+            "isPostable": False,
+        },
+    )
+    assert parent_response.status_code == 201, parent_response.text
+    parent = parent_response.json()
+    assert parent["isPostable"] is False
+
+    child_response = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company["id"],
+            "code": "1101",
+            "name": "Caja y efectivo",
+            "accountType": "ASSET",
+            "parentId": parent["id"],
+            "isPostable": True,
+        },
+    )
+    assert child_response.status_code == 201, child_response.text
+    child = child_response.json()
+    assert child["parentId"] == parent["id"]
+    assert child["isPostable"] is True
+
+
+def test_postable_account_cannot_be_used_as_parent(client):
+    login_admin(client)
+    company = create_company(client)
+
+    parent = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company["id"],
+            "code": "1100",
+            "name": "Caja operativa",
+            "accountType": "ASSET",
+            "isPostable": True,
+        },
+    ).json()
+
+    response = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company["id"],
+            "code": "1101",
+            "name": "Caja menor",
+            "accountType": "ASSET",
+            "parentId": parent["id"],
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+    assert "agrupadora" in response.json()["error"]["message"].lower()
+
+
+def test_account_parent_and_child_must_have_same_type(client):
+    login_admin(client)
+    company = create_company(client)
+
+    parent = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company["id"],
+            "code": "1000",
+            "name": "ACTIVOS",
+            "accountType": "ASSET",
+            "isPostable": False,
+        },
+    ).json()
+
+    response = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company["id"],
+            "code": "2101",
+            "name": "Cuentas por pagar",
+            "accountType": "LIABILITY",
+            "parentId": parent["id"],
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+    assert "mismo tipo" in response.json()["error"]["message"].lower()
+
+
 def test_account_parent_must_belong_to_the_same_company(client):
     """INV-COMP-001: la jerarquía contable nunca puede enlazar catálogos
     pertenecientes a compañías distintas."""
@@ -77,6 +174,7 @@ def test_account_parent_must_belong_to_the_same_company(client):
             "code": "1100",
             "name": "Activo corriente B",
             "accountType": "ASSET",
+            "isPostable": False,
         },
     ).json()
 

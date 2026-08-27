@@ -28,6 +28,7 @@ def create_account(
     name: str,
     account_type: str,
     parent_id: uuid.UUID | None = None,
+    is_postable: bool = True,
 ) -> Account:
     chart = get_chart_of_account_for_company(db, company_id)
     if chart is None:
@@ -38,12 +39,21 @@ def create_account(
             raise InvalidFinancialReferenceError(
                 "parent_id debe pertenecer al catálogo contable de la compañía propietaria"
             )
+        if parent.account_type != account_type:
+            raise InvalidFinancialReferenceError(
+                "La cuenta padre y la cuenta hija deben tener el mismo tipo contable"
+            )
+        if parent.is_postable:
+            raise InvalidFinancialReferenceError(
+                "La cuenta padre debe ser una cuenta agrupadora no registrable"
+            )
     account = Account(
         chart_of_account_id=chart.id,
         code=code,
         name=name,
         account_type=account_type,
         parent_id=parent_id,
+        is_postable=is_postable,
     )
     db.add(account)
     db.flush()

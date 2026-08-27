@@ -34,6 +34,41 @@ const EMPTY_FORM = {
   name: '',
   accountType: 'ASSET',
   parentId: '',
+  isPostable: true,
+}
+
+type AccountTreeRow = Account & { treeDepth: number }
+
+function buildAccountTree(accounts: Account[]): AccountTreeRow[] {
+  const childrenByParent = new Map<string | null, Account[]>()
+  for (const account of accounts) {
+    const siblings = childrenByParent.get(account.parentId) ?? []
+    siblings.push(account)
+    childrenByParent.set(account.parentId, siblings)
+  }
+  for (const siblings of childrenByParent.values()) {
+    siblings.sort((left, right) => left.code.localeCompare(right.code, undefined, { numeric: true }))
+  }
+
+  const ordered: AccountTreeRow[] = []
+  const visited = new Set<string>()
+  const visit = (parentId: string | null, depth: number) => {
+    for (const account of childrenByParent.get(parentId) ?? []) {
+      if (visited.has(account.id)) continue
+      visited.add(account.id)
+      ordered.push({ ...account, treeDepth: depth })
+      visit(account.id, depth + 1)
+    }
+  }
+
+  visit(null, 0)
+  // Defensive fallback for legacy/orphaned rows. New writes cannot create
+  // cross-catalog parents and parent deletion uses SET NULL, but the catalog
+  // should still render deterministically if historical data is imperfect.
+  for (const account of [...accounts].sort((left, right) => left.code.localeCompare(right.code))) {
+    if (!visited.has(account.id)) ordered.push({ ...account, treeDepth: 0 })
+  }
+  return ordered
 }
 
 export function AccountCatalogPage() {
@@ -51,8 +86,12 @@ export function AccountCatalogPage() {
   const [form, setForm] = useState(EMPTY_FORM)
 
   const accountsQuery = useQuery({
-    queryKey: ['master-data', 'accounts', activeCompanyId],
-    queryFn: () => masterDataService.listAccounts(activeCompanyId as string),
+    // El catálogo incluye agrupadoras; usa una key distinta a los selectores
+    // operativos para que React Query nunca reutilice ese conjunto completo
+    // en AP/AR/Tesorería, donde solo deben aparecer cuentas registrables.
+    queryKey: ['master-data', 'accounts', 'catalog', activeCompanyId],
+    queryFn: () =>
+      masterDataService.listAccounts(activeCompanyId as string, { includeNonPostable: true }),
     enabled: Boolean(activeCompanyId),
   })
 
@@ -64,11 +103,12 @@ export function AccountCatalogPage() {
         name: form.name.trim(),
         accountType: form.accountType,
         ...(form.parentId ? { parentId: form.parentId } : {}),
+        isPostable: form.isPostable,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['master-data', 'accounts', activeCompanyId],
-      })
+      // Invalida tanto la vista completa del catálogo como cualquier selector
+      // operativo ya cacheado para que una nueva cuenta registrable aparezca.
+      queryClient.invalidateQueries({ queryKey: ['master-data', 'accounts'] })
       setModalOpen(false)
       setForm(EMPTY_FORM)
     },
@@ -88,11 +128,30 @@ export function AccountCatalogPage() {
 
   const accounts = accountsQuery.data ?? []
   const accountById = new Map(accounts.map((account) => [account.id, account]))
+  const treeRows = buildAccountTree(accounts)
+  const parentOptions = accounts
+    .filter((account) => !account.isPostable && account.accountType === form.accountType)
+    .sort((left, right) => left.code.localeCompare(right.code, undefined, { numeric: true }))
   const canCreateAccount = Boolean(user?.roles.some((role) => CREATE_ACCOUNT_ROLES.has(role)))
 
-  const columns: TableColumn<Account>[] = [
+  const columns: TableColumn<AccountTreeRow>[] = [
     { key: 'code', header: 'Código', render: (account) => account.code },
-    { key: 'name', header: 'Nombre', render: (account) => account.name },
+    {
+      key: 'name',
+      header: 'Nombre / jerarquía',
+      render: (account) => (
+        <span
+          data-account-depth={account.treeDepth}
+          style={{
+            display: 'inline-block',
+            paddingInlineStart: `${account.treeDepth * 1.25}rem`,
+            fontWeight: account.isPostable ? 400 : 600,
+          }}
+        >
+          {account.name}
+        </span>
+      ),
+    },
     {
       key: 'accountType',
       header: 'Tipo',
@@ -113,7 +172,7 @@ export function AccountCatalogPage() {
       header: 'Estado',
       render: (account) => (
         <Badge tone={account.isPostable ? 'success' : 'neutral'}>
-          {account.isPostable ? 'Registrable' : 'No registrable'}
+          {account.isPostable ? 'Registrable' : 'Agrupadora'}
         </Badge>
       ),
     },
@@ -136,7 +195,9 @@ export function AccountCatalogPage() {
       <header className="nx-page__header">
         <div>
           <h1 className="nx-dashboard__title">Catálogo de cuentas</h1>
-          <p className="nx-field__hint">Estructura contable de la compañía seleccionada.</p>
+          <p className="nx-field__hint">
+            Estructura contable jerárquica de la compañía seleccionada.
+          </p>
         </div>
         {canCreateAccount ? <Button onClick={() => setModalOpen(true)}>Nueva cuenta</Button> : null}
       </header>
@@ -159,7 +220,7 @@ export function AccountCatalogPage() {
         ) : (
           <Table
             columns={columns}
-            rows={accounts}
+            rows={treeRows}
             getRowKey={(account) => account.id}
             emptyMessage="Aún no hay cuentas en el catálogo de esta compañía."
           />
@@ -196,7 +257,11 @@ export function AccountCatalogPage() {
             label="Tipo de cuenta"
             value={form.accountType}
             onChange={(event) =>
-              setForm((current) => ({ ...current, accountType: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                accountType: event.target.value,
+                parentId: '',
+              }))
             }
             required
           >
@@ -207,6 +272,25 @@ export function AccountCatalogPage() {
             ))}
           </Select>
           <Select
+            name="isPostable"
+            label="Uso de la cuenta"
+            value={form.isPostable ? 'postable' : 'grouping'}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                isPostable: event.target.value === 'postable',
+              }))
+            }
+            required
+          >
+            <option value="postable">Registrable — permite movimientos</option>
+            <option value="grouping">Agrupadora — no permite movimientos</option>
+          </Select>
+          <p className="nx-field__hint">
+            Usa “Agrupadora” para cuentas padre como 1000 ACTIVOS o 2000 PASIVOS. Las cuentas
+            agrupadoras nunca aparecerán como opción para registrar facturas, pagos o asientos.
+          </p>
+          <Select
             name="parentId"
             label="Cuenta padre"
             value={form.parentId}
@@ -215,12 +299,17 @@ export function AccountCatalogPage() {
             }
           >
             <option value="">Sin cuenta padre</option>
-            {accounts.map((account) => (
+            {parentOptions.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.code} · {account.name}
               </option>
             ))}
           </Select>
+          {parentOptions.length === 0 ? (
+            <p className="nx-field__hint">
+              Para usar una cuenta padre, crea primero una cuenta agrupadora del mismo tipo contable.
+            </p>
+          ) : null}
 
           {createMutation.isError ? (
             <p className="nx-field__error" role="alert">

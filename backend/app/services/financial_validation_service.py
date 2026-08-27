@@ -39,6 +39,10 @@ def assert_account_belongs_to_company(
         raise InvalidFinancialReferenceError(
             f"{field_name} debe pertenecer a la compañía propietaria"
         )
+    if not account.is_postable:
+        raise InvalidFinancialReferenceError(
+            f"{field_name} es una cuenta agrupadora no registrable y no admite movimientos"
+        )
     return account
 
 

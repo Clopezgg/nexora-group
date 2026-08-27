@@ -1,4 +1,11 @@
 {
+  "routes": [
+    {
+      "route": "/api/*",
+      "allowedRoles": ["anonymous"],
+      "backend": "nexora-api"
+    }
+  ],
   "navigationFallback": {
     "rewrite": "/index.html"
   }

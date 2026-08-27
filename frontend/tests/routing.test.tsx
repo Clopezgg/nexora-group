@@ -48,7 +48,7 @@ describe('routing', () => {
             }),
           } as Response)
         }
-        return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response)
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
       }),
     )
 
@@ -74,7 +74,7 @@ describe('routing', () => {
             }),
           } as Response)
         }
-        return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response)
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
       }),
     )
 

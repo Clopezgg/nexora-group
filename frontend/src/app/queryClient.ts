@@ -13,7 +13,10 @@ export const queryClient = new QueryClient({
         if (failureCount >= 2) return false
         return isTransientError(error)
       },
-      staleTime: 30_000,
+      // Keep recently loaded ERP data warm across short navigation bursts.
+      // Mutations still invalidate their affected queries immediately, so this
+      // avoids redundant GETs without hiding newly written financial data.
+      staleTime: 60_000,
       refetchOnWindowFocus: false,
     },
     mutations: {

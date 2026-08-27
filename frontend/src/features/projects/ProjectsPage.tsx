@@ -55,7 +55,7 @@ export function ProjectsPage() {
       header: 'Proyecto activo',
       render: (row) =>
         context.activeProjectId === row.id ? (
-          <span aria-label="Proyecto activo">Activo</span>
+          <span aria-label="Estado del proyecto: activo">Activo</span>
         ) : (
           <Button variant="secondary" onClick={() => setActiveProject(row.id)}>
             Usar como activo

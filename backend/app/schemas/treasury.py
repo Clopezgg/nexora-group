@@ -51,6 +51,9 @@ class RemittanceResponse(CamelModel):
     company_id: uuid.UUID
     treasury_account_id: uuid.UUID
     sender: str
+    provider: str | None = None
+    channel: str | None = None
+    reference: str | None = None
     currency_code: str
     original_amount: Decimal
     fx_rate: Decimal

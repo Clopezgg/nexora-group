@@ -156,6 +156,7 @@ def create_account(
             name=payload.name,
             account_type=payload.account_type,
             parent_id=payload.parent_id,
+            is_postable=payload.is_postable,
         )
         db.flush()
         audit_service.record(
@@ -167,7 +168,13 @@ def create_account(
             company_id=payload.company_id,
             project_id=None,
             before=None,
-            after={"code": account.code, "name": account.name, "type": account.account_type},
+            after={
+                "code": account.code,
+                "name": account.name,
+                "type": account.account_type,
+                "parentId": str(account.parent_id) if account.parent_id else None,
+                "isPostable": account.is_postable,
+            },
             correlation_id=correlation_id,
         )
         db.commit()

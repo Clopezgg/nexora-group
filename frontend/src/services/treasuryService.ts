@@ -9,9 +9,11 @@ import type {
 export interface CreateTreasuryAccountPayload {
   companyId: string
   name: string
-  kind: string
+  kind: TreasuryAccount['kind']
   currencyCode: string
   glAccountId: string
+  institution?: string | null
+  accountReference?: string | null
 }
 
 export interface CreateRemittancePayload {

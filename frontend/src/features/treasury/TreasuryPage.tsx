@@ -6,6 +6,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  Input,
   LoadingState,
   Modal,
   MoneyInput,
@@ -21,14 +22,23 @@ import {
   type CreateRemittancePayload,
   type CreateTransferPayload,
 } from '../../services/treasuryService'
+import type { Account } from '../../types/masterData'
 import type { Remittance, TreasuryAccount } from '../../types/treasury'
 import { formatMoney } from '../../utils/currency'
+import { useAuth } from '../auth/auth-context'
 import './TreasuryPage.css'
 
-type ModalKind = 'remittance' | 'expense' | 'transfer' | null
+type ModalKind = 'account' | 'remittance' | 'expense' | 'transfer' | null
 const REMITTANCE_PAGE_SIZE = 25
+const CREATE_TREASURY_ACCOUNT_ROLES = new Set(['Administrator', 'Finance Manager'])
+const TREASURY_KIND_LABELS: Record<TreasuryAccount['kind'], string> = {
+  BANK: 'Banco',
+  CASH: 'Caja',
+  OTHER: 'Otra',
+}
 
 export function TreasuryPage() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [openModal, setOpenModal] = useState<ModalKind>(null)
@@ -130,10 +140,20 @@ export function TreasuryPage() {
   const glAccounts = accountsQuery.data ?? []
   const treasuryAccounts = treasuryAccountsQuery.data ?? []
   const remittances = remittancesQuery.data ?? []
+  const assignedGlAccountIds = new Set(treasuryAccounts.map((account) => account.glAccountId))
+  const availableTreasuryGlAccounts = glAccounts.filter(
+    (account) =>
+      account.isPostable &&
+      account.accountType === 'ASSET' &&
+      !assignedGlAccountIds.has(account.id),
+  )
+  const canCreateTreasuryAccount = Boolean(
+    user?.roles.some((role) => CREATE_TREASURY_ACCOUNT_ROLES.has(role)),
+  )
 
   const columns: TableColumn<TreasuryAccount>[] = [
     { key: 'name', header: 'Cuenta', render: (row) => row.name },
-    { key: 'kind', header: 'Tipo', render: (row) => row.kind },
+    { key: 'kind', header: 'Tipo', render: (row) => TREASURY_KIND_LABELS[row.kind] ?? row.kind },
     { key: 'currency', header: 'Moneda', render: (row) => row.currencyCode },
     {
       key: 'balance',
@@ -180,7 +200,7 @@ export function TreasuryPage() {
   const hnlBalance = balancesByCurrency.get('HNL') ?? 0
   const secondaryBalances = [...balancesByCurrency.entries()].filter(([currency]) => currency !== 'HNL')
   const remittanceCounterAccounts = glAccounts.filter(
-    (account) => !treasuryAccounts.some((treasuryAccount) => treasuryAccount.glAccountId === account.id),
+    (account) => account.isPostable && !assignedGlAccountIds.has(account.id),
   )
   const remittancePage = Math.floor(remittanceOffset / REMITTANCE_PAGE_SIZE) + 1
 
@@ -231,6 +251,11 @@ export function TreasuryPage() {
       </Card>
 
       <Card title="Cuentas de Tesorería">
+        {canCreateTreasuryAccount ? (
+          <div className="nx-treasury__actions">
+            <Button onClick={() => setOpenModal('account')}>Nueva cuenta de Tesorería</Button>
+          </div>
+        ) : null}
         {treasuryAccountsQuery.isLoading ? (
           <LoadingState label="Cargando cuentas de tesorería…" />
         ) : treasuryAccountsQuery.isError ? (
@@ -289,6 +314,13 @@ export function TreasuryPage() {
         )}
       </Card>
 
+      {openModal === 'account' && activeCompanyId ? (
+        <TreasuryAccountModal
+          companyId={activeCompanyId}
+          glAccounts={availableTreasuryGlAccounts}
+          onClose={() => setOpenModal(null)}
+        />
+      ) : null}
       {openModal === 'remittance' && activeCompanyId ? (
         <RemittanceModal
           companyId={activeCompanyId}
@@ -301,7 +333,7 @@ export function TreasuryPage() {
         <GeneralExpenseModal
           companyId={activeCompanyId}
           treasuryAccounts={treasuryAccounts}
-          expenseAccounts={glAccounts.filter((a) => a.accountType === 'EXPENSE')}
+          expenseAccounts={glAccounts.filter((a) => a.isPostable && a.accountType === 'EXPENSE')}
           onClose={() => setOpenModal(null)}
         />
       ) : null}
@@ -313,6 +345,141 @@ export function TreasuryPage() {
         />
       ) : null}
     </div>
+  )
+}
+
+
+function TreasuryAccountModal({
+  companyId,
+  glAccounts,
+  onClose,
+}: {
+  companyId: string
+  glAccounts: Account[]
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [name, setName] = useState('')
+  const [kind, setKind] = useState<TreasuryAccount['kind']>('BANK')
+  const [currencyCode, setCurrencyCode] = useState('HNL')
+  const [glAccountId, setGlAccountId] = useState(glAccounts[0]?.id ?? '')
+  const [institution, setInstitution] = useState('')
+  const [accountReference, setAccountReference] = useState('')
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      treasuryService.createAccount({
+        companyId,
+        name: name.trim(),
+        kind,
+        currencyCode,
+        glAccountId,
+        institution: institution.trim() || null,
+        accountReference: accountReference.trim() || null,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts', companyId] })
+      onClose()
+    },
+  })
+
+  if (glAccounts.length === 0) {
+    return (
+      <Modal open title="Nueva cuenta de Tesorería" onClose={onClose}>
+        <EmptyState
+          icon="bank"
+          title="No hay cuentas contables disponibles"
+          description="Crea primero una cuenta contable registrable de tipo Activo, como 1102 Bancos — HNL o 1101 Caja y efectivo. Las cuentas agrupadoras no pueden vincularse a Tesorería."
+        />
+      </Modal>
+    )
+  }
+
+  return (
+    <Modal open title="Nueva cuenta de Tesorería" onClose={onClose}>
+      <form
+        className="nx-treasury__form"
+        onSubmit={(event) => {
+          event.preventDefault()
+          mutation.mutate()
+        }}
+      >
+        <Input
+          name="treasuryAccountName"
+          label="Nombre de la cuenta"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder={kind === 'CASH' ? 'Ej. Caja general' : 'Ej. Banco principal HNL'}
+          required
+        />
+        <Select
+          name="treasuryAccountKind"
+          label="Tipo de cuenta"
+          value={kind}
+          onChange={(event) => setKind(event.target.value as TreasuryAccount['kind'])}
+          required
+        >
+          {Object.entries(TREASURY_KIND_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </Select>
+        <Select
+          name="currencyCode"
+          label="Moneda"
+          value={currencyCode}
+          onChange={(event) => setCurrencyCode(event.target.value)}
+          required
+        >
+          <option value="HNL">HNL — Lempira hondureño</option>
+          <option value="USD">USD — Dólar estadounidense</option>
+        </Select>
+        <Select
+          name="glAccountId"
+          label="Cuenta contable vinculada"
+          value={glAccountId}
+          onChange={(event) => setGlAccountId(event.target.value)}
+          required
+        >
+          {glAccounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.code} · {account.name}
+            </option>
+          ))}
+        </Select>
+        <p className="nx-field__hint">
+          Solo aparecen cuentas registrables de tipo Activo que todavía no están vinculadas a otra
+          cuenta de Tesorería.
+        </p>
+        <Input
+          name="institution"
+          label="Institución"
+          value={institution}
+          onChange={(event) => setInstitution(event.target.value)}
+          placeholder="Opcional, ej. Banco de Occidente"
+        />
+        <Input
+          name="accountReference"
+          label="Referencia / número de cuenta"
+          value={accountReference}
+          onChange={(event) => setAccountReference(event.target.value)}
+          placeholder="Opcional"
+        />
+        {mutation.isError ? (
+          <p className="nx-field__error" role="alert">
+            {(mutation.error as Error).message}
+          </p>
+        ) : null}
+        <Button
+          type="submit"
+          loading={mutation.isPending}
+          disabled={!name.trim() || !glAccountId || !currencyCode}
+        >
+          Crear cuenta de Tesorería
+        </Button>
+      </form>
+    </Modal>
   )
 }
 

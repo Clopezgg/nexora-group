@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderApp } from './testUtils'
@@ -271,4 +271,94 @@ describe('TreasuryPage', () => {
       expect.objectContaining({ method: 'POST' }),
     )
   })
+
+  it('creates a Treasury account from an available postable ASSET account', async () => {
+    let createdPayload: Record<string, unknown> | null = null
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              id: 'u1',
+              email: 'admin@nexora.group',
+              fullName: 'Admin',
+              roles: ['Administrator'],
+            }),
+          } as Response)
+        }
+        if (url.includes('/master-data/companies')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                id: 'c1',
+                name: 'NEXORA GROUP',
+                code: null,
+                legalName: null,
+                functionalCurrencyCode: 'HNL',
+                country: null,
+                fiscalId: null,
+              },
+            ],
+          } as Response)
+        }
+        if (url.includes('/master-data/accounts')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              { id: 'a-bank', code: '1102', name: 'Bancos — HNL', accountType: 'ASSET', parentId: 'a-assets', isPostable: true },
+              { id: 'a-assets', code: '1000', name: 'ACTIVOS', accountType: 'ASSET', parentId: null, isPostable: false },
+              { id: 'a-expense', code: '6101', name: 'Gastos administrativos generales', accountType: 'EXPENSE', parentId: null, isPostable: true },
+            ],
+          } as Response)
+        }
+        if (url.includes('/treasury/accounts')) {
+          if (init?.method === 'POST') {
+            createdPayload = JSON.parse(String(init.body)) as Record<string, unknown>
+            return Promise.resolve({
+              ok: true,
+              status: 201,
+              json: async () => ({
+                id: 't1', companyId: 'c1', name: 'Banco principal HNL', kind: 'BANK', institution: 'Banco de Occidente', accountReference: null, currencyCode: 'HNL', glAccountId: 'a-bank', status: 'ACTIVE', balance: '0.00',
+              }),
+            } as Response)
+          }
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
+        }
+        if (url.includes('/treasury/remittances')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
+      }),
+    )
+
+    render(renderApp('/finanzas/tesoreria'))
+    await userEvent.click(await screen.findByRole('button', { name: /nueva cuenta de tesorería/i }))
+
+    expect(screen.getByRole('option', { name: '1102 · Bancos — HNL' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /1000 · ACTIVOS/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /6101 · Gastos administrativos/i })).not.toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText(/nombre de la cuenta/i), 'Banco principal HNL')
+    await userEvent.type(screen.getByLabelText(/^institución$/i), 'Banco de Occidente')
+    await userEvent.click(screen.getByRole('button', { name: /crear cuenta de tesorería/i }))
+
+    await waitFor(() =>
+      expect(createdPayload).toMatchObject({
+        companyId: 'c1',
+        name: 'Banco principal HNL',
+        kind: 'BANK',
+        currencyCode: 'HNL',
+        glAccountId: 'a-bank',
+        institution: 'Banco de Occidente',
+      }),
+    )
+  })
+
 })

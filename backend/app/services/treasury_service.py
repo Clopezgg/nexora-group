@@ -11,6 +11,7 @@ from app.domain.errors import (
     InvalidTransferError,
 )
 from app.models.accounting import AccountingDocument, JournalLine
+from app.models.chart_of_accounts import Account
 from app.models.treasury import (
     BankStatement,
     BankStatementLine,
@@ -70,6 +71,17 @@ def create_treasury_account(
         company_id=company_id,
         field_name="gl_account_id",
     )
+    gl_account = db.get(Account, gl_account_id)
+    if gl_account is None:
+        raise InvalidFinancialReferenceError("gl_account_id no existe")
+    if not gl_account.is_postable:
+        raise InvalidFinancialReferenceError(
+            "gl_account_id debe ser una cuenta registrable; las cuentas agrupadoras no pueden vincularse a Tesorería"
+        )
+    if gl_account.account_type != "ASSET":
+        raise InvalidFinancialReferenceError(
+            "gl_account_id debe ser una cuenta contable de tipo ASSET para Tesorería"
+        )
     existing_mapping = db.execute(
         select(TreasuryAccount.id).where(TreasuryAccount.gl_account_id == gl_account_id)
     ).scalar_one_or_none()

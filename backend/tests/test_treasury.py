@@ -26,6 +26,60 @@ def _setup(client):
     return company, bank, cash, contributions, expense
 
 
+
+def test_treasury_account_rejects_grouping_gl_account(client):
+    login_admin(client)
+    company = create_company(client)
+    grouping = client.post(
+        "/api/master-data/accounts",
+        json={
+            "companyId": company["id"],
+            "code": "1000",
+            "name": "ACTIVOS",
+            "accountType": "ASSET",
+            "isPostable": False,
+        },
+    )
+    assert grouping.status_code == 201, grouping.text
+
+    response = client.post(
+        "/api/treasury/accounts",
+        json={
+            "companyId": company["id"],
+            "name": "Cuenta inválida",
+            "kind": "BANK",
+            "currencyCode": "HNL",
+            "glAccountId": grouping.json()["id"],
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_treasury_account_rejects_non_asset_gl_account(client):
+    login_admin(client)
+    company = create_company(client)
+    expense = create_account(
+        client,
+        company_id=company["id"],
+        code="6101",
+        name="Gastos administrativos generales",
+        account_type="EXPENSE",
+    )
+
+    response = client.post(
+        "/api/treasury/accounts",
+        json={
+            "companyId": company["id"],
+            "name": "Cuenta inválida",
+            "kind": "OTHER",
+            "currencyCode": "HNL",
+            "glAccountId": expense["id"],
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
 def test_remittance_rejects_counter_account_equal_to_treasury_gl_account(client):
     """Un remesa cuya cuenta contrapartida es la misma cuenta GL de la
     cuenta de tesorería anularía el movimiento neto (debit y credit al

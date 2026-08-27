@@ -116,6 +116,43 @@ jobs:
               bootstrapAdminEmail='${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}' \
               backendImage='${{ env.IMAGE }}'
 
+      - name: Capture deployed endpoints and performance settings
+        run: |
+          DEPLOYMENT_NAME="nexora-deploy-${{ github.run_number }}"
+          FRONTEND_HOSTNAME="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.frontendHostname.value --output tsv)"
+          BACKEND_FQDN="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.backendFqdn.value --output tsv)"
+          DEPLOYED_IMAGE="$(az containerapp show --resource-group nexora-rg-dev --name nexora-backend-dev --query 'properties.template.containers[0].image' --output tsv)"
+          MIN_REPLICAS="$(az containerapp show --resource-group nexora-rg-dev --name nexora-backend-dev --query 'properties.template.scale.minReplicas' --output tsv)"
+          CPU="$(az containerapp show --resource-group nexora-rg-dev --name nexora-backend-dev --query 'properties.template.containers[0].resources.cpu' --output tsv)"
+          MEMORY="$(az containerapp show --resource-group nexora-rg-dev --name nexora-backend-dev --query 'properties.template.containers[0].resources.memory' --output tsv)"
+
+          if [ -z "$FRONTEND_HOSTNAME" ] || [ -z "$BACKEND_FQDN" ]; then
+            echo "::error::Deployment did not return frontend/backend endpoints"
+            exit 1
+          fi
+          if [[ "$DEPLOYED_IMAGE" != *"${{ github.sha }}"* ]]; then
+            echo "::error::Container App is not running the expected Git SHA"
+            exit 1
+          fi
+          if [ "$MIN_REPLICAS" != "1" ]; then
+            echo "::error::Container App minReplicas is $MIN_REPLICAS, expected 1"
+            exit 1
+          fi
+          if [ "$CPU" != "0.5" ] && [ "$CPU" != ".5" ]; then
+            echo "::error::Container App CPU is $CPU, expected 0.5"
+            exit 1
+          fi
+
+          echo "FRONTEND_URL=https://$FRONTEND_HOSTNAME" >> "$GITHUB_ENV"
+          echo "BACKEND_URL=https://$BACKEND_FQDN" >> "$GITHUB_ENV"
+          {
+            echo "### Azure runtime"
+            echo "- SHA: ${{ github.sha }}"
+            echo "- Frontend: https://$FRONTEND_HOSTNAME"
+            echo "- Backend: https://$BACKEND_FQDN"
+            echo "- Container: $CPU CPU / $MEMORY / minReplicas=$MIN_REPLICAS"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Configure same-origin API route
         run: echo "VITE_API_BASE_URL=/api" >> "$GITHUB_ENV"
 
@@ -148,3 +185,71 @@ jobs:
           action: upload
           app_location: frontend/dist
           skip_app_build: true
+
+      - name: Verify production health, login and warm dashboard latency
+        env:
+          ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          COOKIE_JAR="$RUNNER_TEMP/nexora-production-cookies.txt"
+
+          wait_for_200() {
+            local url="$1"
+            local label="$2"
+            local code=""
+            for attempt in $(seq 1 24); do
+              code="$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' "$url" || true)"
+              if [ "$code" = "200" ]; then
+                return 0
+              fi
+              echo "$label not ready yet (HTTP $code), attempt $attempt/24"
+              sleep 10
+            done
+            echo "::error::$label did not become healthy"
+            return 1
+          }
+
+          wait_for_200 "$FRONTEND_URL/" "Frontend"
+          wait_for_200 "$BACKEND_URL/healthz" "Backend direct health"
+          wait_for_200 "$FRONTEND_URL/api/healthz" "Same-origin API health"
+          wait_for_200 "$FRONTEND_URL/api/readyz" "Database readiness"
+
+          HEALTH_TIME="$(curl --fail --silent --show-error --output /dev/null --write-out '%{time_total}' "$FRONTEND_URL/api/healthz")"
+          READY_TIME="$(curl --fail --silent --show-error --output /dev/null --write-out '%{time_total}' "$FRONTEND_URL/api/readyz")"
+
+          LOGIN_PAYLOAD="$(jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email:$email,password:$password}')"
+          curl --fail --silent --show-error \
+            --cookie-jar "$COOKIE_JAR" \
+            --header 'Content-Type: application/json' \
+            --data "$LOGIN_PAYLOAD" \
+            "$FRONTEND_URL/api/auth/login" >/dev/null
+
+          # Warm the authenticated route once, then measure a second request so
+          # the performance budget represents normal interactive navigation,
+          # not deployment startup/bootstrap work.
+          curl --fail --silent --show-error --cookie "$COOKIE_JAR" "$FRONTEND_URL/api/dashboard/summary" >/dev/null
+          DASHBOARD_TIME="$(curl --fail --silent --show-error \
+            --cookie "$COOKIE_JAR" \
+            --output "$RUNNER_TEMP/dashboard-summary.json" \
+            --write-out '%{time_total}' \
+            "$FRONTEND_URL/api/dashboard/summary")"
+
+          jq -e '.currency == "HNL"' "$RUNNER_TEMP/dashboard-summary.json" >/dev/null
+
+          if ! awk -v value="$READY_TIME" 'BEGIN { exit !(value < 3.0) }'; then
+            echo "::error::Warm readyz latency ${READY_TIME}s exceeds 3.0s budget"
+            exit 1
+          fi
+          if ! awk -v value="$DASHBOARD_TIME" 'BEGIN { exit !(value < 3.0) }'; then
+            echo "::error::Warm dashboard latency ${DASHBOARD_TIME}s exceeds 3.0s budget"
+            exit 1
+          fi
+
+          {
+            echo "### Production smoke and latency"
+            echo "- healthz: ${HEALTH_TIME}s"
+            echo "- readyz: ${READY_TIME}s"
+            echo "- authenticated dashboard warm: ${DASHBOARD_TIME}s"
+            echo "- HNL contract: verified"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -37,9 +37,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableRbacAuthorization: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 7
-    // Sin purge protection: entorno de bajo costo / desarrollo, permite eliminar
-    // el vault limpiamente si el proyecto se descarta. Revisar en hardening final.
-    enablePurgeProtection: false
+    enablePurgeProtection: true
     publicNetworkAccess: 'Enabled'
   }
   tags: {

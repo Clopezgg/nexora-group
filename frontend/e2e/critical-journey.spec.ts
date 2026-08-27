@@ -101,10 +101,10 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     // Contrapartida debe ser Aportes de socios (equity), nunca la misma
     // cuenta GL del banco -- eso anularía el movimiento neto (INV-TRE bug
     // real encontrado por este mismo test, corregido en treasury_service).
-    await page.getByLabel('Cuenta contrapartida').selectOption({ label: 'Aportes E2E' })
+    await page.getByLabel('Cuenta contable de origen').selectOption({ label: '3100 · Aportes E2E' })
     await page.getByLabel('Remitente').fill('Socio fundador E2E')
     await page.getByLabel(/Monto/).fill('100000')
-    await page.getByRole('button', { name: 'Registrar', exact: true }).click()
+    await page.getByLabel('Registrar remesa').getByRole('button', { name: 'Registrar remesa', exact: true }).click()
     await expect(page.getByText('L 100,000.00').first()).toBeVisible({ timeout: 10_000 })
 
     const trialBalance = await api<any>(page.request, 'get', `/reports/trial-balance?companyId=${companyId}`)

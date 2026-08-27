@@ -188,8 +188,9 @@ class Remittance(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 class GeneralExpense(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Siempre scope=GENERAL, project_id=NULL. NO consume Project Budget
-    (orden maestra §28) -- se paga de inmediato contra Treasury."""
+    """Salida inmediata pagada desde Treasury. Su alcance/proyecto vive en el
+    AccountingDocument y JournalLine asociados; TreasuryAccount sigue siendo
+    estrictamente central y nunca pertenece a un proyecto."""
 
     __tablename__ = "general_expenses"
     __table_args__ = (

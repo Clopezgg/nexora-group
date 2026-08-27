@@ -35,6 +35,7 @@ class RemittanceCreateRequest(CamelModel):
     company_id: uuid.UUID
     treasury_account_id: uuid.UUID
     counter_account_id: uuid.UUID
+    origin_type: Literal["CAPITAL_CONTRIBUTION", "FINANCING", "OTHER_INCOME"] = "CAPITAL_CONTRIBUTION"
     sender: str
     provider: str | None = None
     channel: str | None = None
@@ -66,6 +67,8 @@ class GeneralExpenseCreateRequest(CamelModel):
     company_id: uuid.UUID
     treasury_account_id: uuid.UUID
     expense_account_id: uuid.UUID
+    scope: Literal["GENERAL", "PROJECT"] = "GENERAL"
+    project_id: uuid.UUID | None = None
     category: str
     amount: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
     currency_code: str

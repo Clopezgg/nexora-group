@@ -20,6 +20,8 @@ export interface CreateRemittancePayload {
   companyId: string
   treasuryAccountId: string
   counterAccountId: string
+  // The backend enforces the matching postable GL account type for every remittance origin.
+  originType: 'CAPITAL_CONTRIBUTION' | 'FINANCING' | 'OTHER_INCOME'
   sender: string
   provider?: string | null
   channel?: string | null
@@ -35,6 +37,8 @@ export interface CreateGeneralExpensePayload {
   companyId: string
   treasuryAccountId: string
   expenseAccountId: string
+  scope: 'GENERAL' | 'PROJECT'
+  projectId?: string | null
   category: string
   amount: string
   currencyCode: string

@@ -26,6 +26,7 @@ from app.models.treasury import (
 from app.services import posting_service
 from app.services.financial_validation_service import (
     assert_account_belongs_to_company,
+    assert_operation_scope,
     assert_project_belongs_to_company,
     assert_user_belongs_to_company,
 )
@@ -145,6 +146,7 @@ def register_remittance(
     company_id: uuid.UUID,
     treasury_account_id: uuid.UUID,
     counter_account_id: uuid.UUID,
+    origin_type: str = "CAPITAL_CONTRIBUTION",
     sender: str,
     provider: str | None,
     channel: str | None,
@@ -181,6 +183,26 @@ def register_remittance(
         raise InvalidFinancialReferenceError(
             "counter_account_id no puede ser la misma cuenta GL de la cuenta de tesorería "
             "(anularía el movimiento neto de la remesa)"
+        )
+
+    counter_account = db.get(Account, counter_account_id)
+    if counter_account is None:
+        raise InvalidFinancialReferenceError("counter_account_id no existe")
+    if not counter_account.is_postable:
+        raise InvalidFinancialReferenceError(
+            "counter_account_id debe ser una cuenta registrable; las cuentas agrupadoras no admiten remesas"
+        )
+    expected_account_type = {
+        "CAPITAL_CONTRIBUTION": "EQUITY",
+        "FINANCING": "LIABILITY",
+        "OTHER_INCOME": "REVENUE",
+    }.get(origin_type)
+    if expected_account_type is None:
+        raise InvalidFinancialReferenceError("origin_type de remesa no soportado")
+    if counter_account.account_type != expected_account_type:
+        raise InvalidFinancialReferenceError(
+            f"La naturaleza {origin_type} requiere una cuenta {expected_account_type}; "
+            f"la contrapartida seleccionada es {counter_account.account_type}"
         )
 
     base_amount = (original_amount * fx_rate).quantize(Decimal("0.01"))
@@ -240,6 +262,8 @@ def register_general_expense(
     company_id: uuid.UUID,
     treasury_account_id: uuid.UUID,
     expense_account_id: uuid.UUID,
+    scope: str = "GENERAL",
+    project_id: uuid.UUID | None = None,
     category: str,
     amount: Decimal,
     currency_code: str,
@@ -247,8 +271,15 @@ def register_general_expense(
     description: str,
     commit: bool = True,
 ) -> GeneralExpense:
-    """Siempre scope=GENERAL, project_id=None. NO consume Project Budget;
-    se paga de inmediato contra Treasury (orden maestra §28)."""
+    """Salida inmediata de Tesorería. Puede ser GENERAL (sin proyecto) o
+    PROJECT (atribuible a una obra). El proyecto nunca posee el dinero: solo
+    dimensiona el gasto en el documento/línea contable."""
+    if scope not in ("GENERAL", "PROJECT"):
+        raise InvalidFinancialReferenceError(
+            "Los gastos inmediatos solo admiten scope GENERAL o PROJECT"
+        )
+    assert_operation_scope(scope, project_id)
+    assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
     if amount <= 0:
         raise InvalidFinancialReferenceError("El gasto requiere amount > 0")
     treasury_account = db.get(TreasuryAccount, treasury_account_id)
@@ -278,11 +309,16 @@ def register_general_expense(
         db,
         company_id=company_id,
         document_type_code="GGE",
-        scope="GENERAL",
-        project_id=None,
+        scope=scope,
+        project_id=project_id,
         currency_code=currency_code,
         lines=[
-            JournalLineInput(account_id=expense_account_id, debit_amount=amount, description=description),
+            JournalLineInput(
+                account_id=expense_account_id,
+                debit_amount=amount,
+                project_id=project_id,
+                description=description,
+            ),
             JournalLineInput(
                 account_id=treasury_account.gl_account_id, credit_amount=amount, description=description
             ),

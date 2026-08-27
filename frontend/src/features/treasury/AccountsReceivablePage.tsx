@@ -19,6 +19,7 @@ import { treasuryService } from '../../services/treasuryService'
 import { useMutationError } from '../../hooks/useMutationError'
 import { arService, type CustomerInvoice } from '../../services/apArService'
 import { formatMoney } from '../../utils/currency'
+import type { TreasuryAccount } from '../../types/treasury'
 import './TreasuryPage.css'
 
 export function AccountsReceivablePage() {
@@ -113,7 +114,8 @@ export function AccountsReceivablePage() {
           treasuryAccounts.length > 0 ? (
             <CollectButton
               invoiceId={row.id}
-              treasuryAccountId={treasuryAccounts[0].id}
+              treasuryAccounts={treasuryAccounts}
+              currencyCode={row.currencyCode}
               remaining={row.amount - row.amountCollected}
             />
           ) : null}
@@ -328,15 +330,25 @@ function CreateCustomerInvoiceModal({
 
 function CollectButton({
   invoiceId,
-  treasuryAccountId,
+  treasuryAccounts,
+  currencyCode,
   remaining,
 }: {
   invoiceId: string
-  treasuryAccountId: string
+  treasuryAccounts: TreasuryAccount[]
+  currencyCode: string
   remaining: number
 }) {
   const queryClient = useQueryClient()
   const handleMutationError = useMutationError()
+  const eligibleTreasuryAccounts = treasuryAccounts.filter(
+    (account) => account.status === 'ACTIVE' && account.currencyCode === currencyCode,
+  )
+  const [open, setOpen] = useState(false)
+  const [treasuryAccountId, setTreasuryAccountId] = useState(eligibleTreasuryAccounts[0]?.id ?? '')
+  const [amount, setAmount] = useState<number | null>(remaining)
+  const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10))
+
   const mutation = useMutation({
     mutationFn: async ({
       payload,
@@ -351,26 +363,76 @@ function CollectButton({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ar', 'customer-invoices'] })
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
+      setOpen(false)
     },
     onError: (error) => handleMutationError(error, 'Cobrar factura de cliente'),
   })
 
   return (
-    <Button
-      variant="ghost"
-      loading={mutation.isPending}
-      onClick={() =>
-        mutation.mutate({
-          payload: {
-            treasuryAccountId,
-            amount: String(remaining),
-            receiptDate: new Date().toISOString().slice(0, 10),
-          },
-          idempotencyKey: crypto.randomUUID(),
-        })
-      }
-    >
-      Cobrar saldo ({remaining.toFixed(2)})
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        onClick={() => setOpen(true)}
+        disabled={eligibleTreasuryAccounts.length === 0}
+      >
+        Cobrar saldo ({remaining.toFixed(2)})
+      </Button>
+      {open ? (
+        <Modal open title="Registrar cobro de cliente" onClose={() => setOpen(false)}>
+          <form
+            className="nx-treasury__form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              mutation.mutate({
+                payload: {
+                  treasuryAccountId,
+                  amount: String(amount ?? 0),
+                  receiptDate,
+                },
+                idempotencyKey: crypto.randomUUID(),
+              })
+            }}
+          >
+            <Select
+              name="collectionTreasuryAccountId"
+              label="Cuenta receptora"
+              value={treasuryAccountId}
+              onChange={(event) => setTreasuryAccountId(event.target.value)}
+              required
+            >
+              {eligibleTreasuryAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name} — {account.currencyCode}
+                </option>
+              ))}
+            </Select>
+            <MoneyInput label={`Monto a cobrar (${currencyCode})`} value={amount} onChange={setAmount} />
+            <label className="nx-field">
+              <span className="nx-field__label">Fecha de cobro</span>
+              <input
+                className="nx-input"
+                type="date"
+                value={receiptDate}
+                onChange={(event) => setReceiptDate(event.target.value)}
+                required
+              />
+            </label>
+            <p className="nx-field__hint">
+              El alcance/proyecto ya viene de la factura; selecciona el banco o caja donde realmente entró el dinero.
+            </p>
+            {mutation.isError ? (
+              <p className="nx-field__error">{(mutation.error as Error).message}</p>
+            ) : null}
+            <Button
+              type="submit"
+              loading={mutation.isPending}
+              disabled={!treasuryAccountId || !amount || amount <= 0 || amount > remaining || !receiptDate}
+            >
+              Confirmar cobro
+            </Button>
+          </form>
+        </Modal>
+      ) : null}
+    </>
   )
 }

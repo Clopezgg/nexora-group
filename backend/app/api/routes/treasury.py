@@ -179,6 +179,7 @@ def create_remittance(
             company_id=payload.company_id,
             treasury_account_id=payload.treasury_account_id,
             counter_account_id=payload.counter_account_id,
+            origin_type=payload.origin_type,
             sender=payload.sender,
             provider=payload.provider,
             channel=payload.channel,
@@ -198,7 +199,11 @@ def create_remittance(
             entity_id=remittance.id,
             company_id=remittance.company_id,
             before=None,
-            after={"baseAmount": str(remittance.base_amount), "sender": remittance.sender},
+            after={
+                "baseAmount": str(remittance.base_amount),
+                "sender": remittance.sender,
+                "originType": payload.origin_type,
+            },
             correlation_id=correlation_id,
         )
         response = RemittanceResponse.model_validate(remittance, from_attributes=True)
@@ -248,6 +253,8 @@ def create_general_expense(
             company_id=payload.company_id,
             treasury_account_id=payload.treasury_account_id,
             expense_account_id=payload.expense_account_id,
+            scope=payload.scope,
+            project_id=payload.project_id,
             category=payload.category,
             amount=payload.amount,
             currency_code=payload.currency_code,
@@ -263,7 +270,12 @@ def create_general_expense(
             entity_id=expense.id,
             company_id=expense.company_id,
             before=None,
-            after={"amount": str(expense.amount), "category": expense.category},
+            after={
+                "amount": str(expense.amount),
+                "category": expense.category,
+                "scope": payload.scope,
+                "projectId": str(payload.project_id) if payload.project_id else None,
+            },
             correlation_id=correlation_id,
         )
         response = GeneralExpenseResponse.model_validate(expense, from_attributes=True)

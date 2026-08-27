@@ -4,7 +4,8 @@ import { Badge, Icon, IconButton } from '../design-system'
 import { notificationService } from '../services/notificationService'
 import './NotificationBell.css'
 
-const POLL_INTERVAL_MS = 30000
+const IDLE_POLL_INTERVAL_MS = 60000
+const OPEN_POLL_INTERVAL_MS = 15000
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false)
@@ -14,7 +15,11 @@ export function NotificationBell() {
   const notificationsQuery = useQuery({
     queryKey: ['notifications'],
     queryFn: () => notificationService.list(),
-    refetchInterval: POLL_INTERVAL_MS,
+    // Poll less aggressively while the panel is closed so background traffic
+    // does not compete with interactive finance/project requests. When the
+    // user is actively viewing notifications, keep the panel fresher.
+    refetchInterval: open ? OPEN_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS,
+    refetchIntervalInBackground: false,
   })
 
   const markReadMutation = useMutation({

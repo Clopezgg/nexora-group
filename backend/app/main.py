@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.correlation import CorrelationIdMiddleware
 from app.api.csrf import register_csrf_guard
@@ -72,6 +73,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Tables, reports and dashboard payloads can become sizeable as the ERP
+    # accumulates data. Compress them on the API boundary to reduce transfer
+    # latency while leaving small responses untouched.
+    app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
     register_csrf_guard(app)
     # Outermost middleware (added last -- see Starlette's add_middleware,
     # que inserta al frente de la pila): el correlation_id debe existir

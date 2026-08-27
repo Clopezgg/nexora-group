@@ -33,13 +33,15 @@ const ORDER_STATUS_TONE: Record<MaintenanceOrder['status'], 'success' | 'warning
   CANCELLED: 'neutral',
 }
 
-export function EquipmentPage() {
+type EquipmentTabKey = 'equipos' | 'combustible' | 'mantenimiento'
+
+export function EquipmentPage({ defaultTab = 'equipos' }: { defaultTab?: EquipmentTabKey }) {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
 
   if (loadingCompanies) return <LoadingState label="Cargando compañías…" />
   if (!activeCompanyId) {
     return (
-      <EmptyState icon="🚜" title="Configura una compañía primero" description="No hay compañías registradas todavía." />
+      <EmptyState icon="equipment" title="Configura una compañía primero" description="No hay compañías registradas todavía." />
     )
   }
 
@@ -49,6 +51,8 @@ export function EquipmentPage() {
         <h1 className="nx-dashboard__title">Equipos y mantenimiento</h1>
       </header>
       <Tabs
+        key={defaultTab}
+        defaultKey={defaultTab}
         items={[
           { key: 'equipos', label: 'Equipos', content: <EquipmentTab companyId={activeCompanyId} /> },
           { key: 'combustible', label: 'Combustible', content: <FuelTab companyId={activeCompanyId} /> },
@@ -197,6 +201,8 @@ function FuelTab({ companyId }: { companyId: string }) {
         <EmptyState title="Selecciona un equipo" description="Elige un equipo para ver su historial de combustible." />
       ) : fuelLogsQuery.isLoading ? (
         <LoadingState label="Cargando…" />
+      ) : fuelLogsQuery.isError ? (
+        <ErrorState onRetry={() => fuelLogsQuery.refetch()} />
       ) : (
         <Table columns={columns} rows={fuelLogsQuery.data ?? []} getRowKey={(row) => row.id} emptyMessage="Sin registros de combustible." />
       )}
@@ -231,6 +237,9 @@ function FuelTab({ companyId }: { companyId: string }) {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </Select>
+          ) : null}
+          {createMutation.isError ? (
+            <p className="nx-field__error">{(createMutation.error as Error).message}</p>
           ) : null}
           <Button type="submit" loading={createMutation.isPending}>
             Guardar
@@ -314,6 +323,8 @@ function MaintenanceTab({ companyId }: { companyId: string }) {
         <EmptyState title="Selecciona un equipo" description="Elige un equipo para ver sus órdenes de mantenimiento." />
       ) : ordersQuery.isLoading ? (
         <LoadingState label="Cargando…" />
+      ) : ordersQuery.isError ? (
+        <ErrorState onRetry={() => ordersQuery.refetch()} />
       ) : (
         <Table columns={columns} rows={ordersQuery.data ?? []} getRowKey={(row) => row.id} emptyMessage="Sin órdenes de mantenimiento." />
       )}
@@ -335,6 +346,9 @@ function MaintenanceTab({ companyId }: { companyId: string }) {
           </Select>
           <Input label="Fecha de apertura" type="date" value={form.openedAt} onChange={(e) => setForm({ ...form, openedAt: e.target.value })} required />
           <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          {createMutation.isError ? (
+            <p className="nx-field__error">{(createMutation.error as Error).message}</p>
+          ) : null}
           <Button type="submit" loading={createMutation.isPending}>
             Guardar
           </Button>

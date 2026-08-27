@@ -200,7 +200,7 @@ export function TimeEntriesPage() {
   if (!activeCompanyId) {
     return (
       <EmptyState
-        icon="⏱️"
+        icon="clock"
         title="Configura una compañía primero"
         description="No hay compañías registradas todavía."
       />

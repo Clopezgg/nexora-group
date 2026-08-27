@@ -62,7 +62,7 @@ export function WorkersPage() {
   if (!activeCompanyId) {
     return (
       <EmptyState
-        icon="🧑‍💼"
+        icon="users"
         title="Configura una compañía primero"
         description="No hay compañías registradas todavía."
       />

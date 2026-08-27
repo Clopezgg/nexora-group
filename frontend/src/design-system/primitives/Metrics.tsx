@@ -70,7 +70,7 @@ export function ChartCard({
           </ResponsiveContainer>
         </div>
       ) : (
-        <EmptyState icon="📈" title={emptyMessage} />
+        <EmptyState icon="chart" title={emptyMessage} />
       )}
     </div>
   )

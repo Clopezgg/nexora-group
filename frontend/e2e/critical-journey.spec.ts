@@ -49,7 +49,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await page.getByRole('button', { name: 'Crear compañía' }).click()
     await expect(page.getByText('Nuevo proyecto')).toBeVisible({ timeout: 10_000 })
 
-    await page.getByLabel('Nombre').fill('Torre Critical Journey')
+    await page.getByLabel('Nombre', { exact: true }).fill('Torre Critical Journey')
     await page.getByLabel('Código (opcional)').fill('CJ-001')
     await page.getByRole('button', { name: 'Crear proyecto' }).click()
     await expect(page.getByText('Torre Critical Journey')).toBeVisible({ timeout: 10_000 })
@@ -103,7 +103,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     // real encontrado por este mismo test, corregido en treasury_service).
     await page.getByLabel('Cuenta contrapartida').selectOption({ label: 'Aportes E2E' })
     await page.getByLabel('Remitente').fill('Socio fundador E2E')
-    await page.getByLabel('Monto').fill('100000')
+    await page.getByLabel(/Monto/).fill('100000')
     await page.getByRole('button', { name: 'Registrar', exact: true }).click()
     await expect(page.getByText('L 100,000.00').first()).toBeVisible({ timeout: 10_000 })
 

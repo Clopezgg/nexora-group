@@ -1,17 +1,16 @@
-import type { ReactNode } from 'react'
-import { Icon } from './Icon'
+import { Icon, type IconName } from './Icon'
 
 interface EmptyStateProps {
-  icon?: ReactNode
+  icon?: IconName
   title: string
   description?: string
 }
 
-export function EmptyState({ icon = <Icon name="clipboard" />, title, description }: EmptyStateProps) {
+export function EmptyState({ icon = 'clipboard', title, description }: EmptyStateProps) {
   return (
     <div className="nx-state" role="status">
       <span className="nx-state__icon" aria-hidden="true">
-        {icon}
+        <Icon name={icon} />
       </span>
       <p className="nx-state__title">{title}</p>
       {description ? <p className="nx-state__description">{description}</p> : null}

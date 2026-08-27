@@ -130,7 +130,7 @@ function ObservationsTab({ projectId }: { projectId: string }) {
         ) : observationsQuery.isError ? (
           <ErrorState onRetry={() => observationsQuery.refetch()} />
         ) : observations.length === 0 ? (
-          <EmptyState icon="🦺" title="Sin observaciones" description="Registra la primera observación de seguridad de este proyecto." />
+          <EmptyState icon="shield" title="Sin observaciones" description="Registra la primera observación de seguridad de este proyecto." />
         ) : (
           <Table columns={columns} rows={observations} getRowKey={(row) => row.id} emptyMessage="Aún no hay observaciones." />
         )}
@@ -294,7 +294,7 @@ function IncidentsTab({ projectId }: { projectId: string }) {
         ) : incidentsQuery.isError ? (
           <ErrorState onRetry={() => incidentsQuery.refetch()} />
         ) : incidents.length === 0 ? (
-          <EmptyState icon="🚨" title="Sin incidentes" description="Registra el primer incidente de seguridad de este proyecto." />
+          <EmptyState icon="warning" title="Sin incidentes" description="Registra el primer incidente de seguridad de este proyecto." />
         ) : (
           <Table columns={columns} rows={incidents} getRowKey={(row) => row.id} emptyMessage="Aún no hay incidentes." />
         )}

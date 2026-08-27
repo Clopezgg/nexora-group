@@ -53,7 +53,7 @@ export function CompanySettingsPage() {
   if (companies.length === 0) {
     return (
       <EmptyState
-        icon="🛠️"
+        icon="tool"
         title="No hay compañías registradas"
         description="Crea una compañía antes de editar su perfil."
       />

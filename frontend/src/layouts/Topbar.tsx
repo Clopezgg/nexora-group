@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/auth-context'
 import { useActiveContext } from '../features/context/useActiveContext'
 import { Badge, Icon, IconButton, Select, Tooltip } from '../design-system'
@@ -10,6 +11,7 @@ interface TopbarProps {
 export function Topbar({ onOpenNav }: TopbarProps) {
   const { user, logout } = useAuth()
   const { context, isLoading, setActiveProject } = useActiveContext()
+  const navigate = useNavigate()
   const primaryRole = user?.roles?.[0]
 
   return (
@@ -38,8 +40,8 @@ export function Topbar({ onOpenNav }: TopbarProps) {
             ) : null}
           </Select>
         </div>
-        <Tooltip label="El periodo fiscal aún no está configurado (NXR-REQ-0004)">
-          <Badge tone="neutral">Periodo: no configurado</Badge>
+        <Tooltip label="El período fiscal no está configurado para esta instancia">
+          <Badge tone="neutral">Período: no configurado</Badge>
         </Tooltip>
       </div>
 
@@ -53,8 +55,12 @@ export function Topbar({ onOpenNav }: TopbarProps) {
             }}
           />
         </Tooltip>
-        <Tooltip label="Aprobaciones — se activará con el motor de workflow (NXR-REQ-0088)">
-          <IconButton label="Aprobaciones" icon={<Icon name="inbox" />} disabled />
+        <Tooltip label="Abrir aprobaciones pendientes">
+          <IconButton
+            label="Aprobaciones"
+            icon={<Icon name="inbox" />}
+            onClick={() => navigate('/inicio/aprobaciones')}
+          />
         </Tooltip>
         <NotificationBell />
         <div className="nx-topbar__user">

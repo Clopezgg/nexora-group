@@ -18,7 +18,6 @@ export const navGroups: NavGroup[] = [
     label: 'Inicio',
     items: [
       { path: '/inicio', label: 'Inicio', icon: 'home' },
-      { path: '/inicio/mis-tareas', label: 'Mis tareas', icon: 'check' },
       { path: '/inicio/aprobaciones', label: 'Aprobaciones', icon: 'inbox' },
     ],
   },
@@ -30,7 +29,6 @@ export const navGroups: NavGroup[] = [
       { path: '/finanzas/tesoreria', label: 'Tesorería', icon: 'bank' },
       { path: '/finanzas/cuentas-por-pagar', label: 'Cuentas por pagar', icon: 'card' },
       { path: '/finanzas/cuentas-por-cobrar', label: 'Cuentas por cobrar', icon: 'receipt' },
-      { path: '/finanzas/conciliacion', label: 'Conciliación', icon: 'refresh' },
       { path: '/finanzas/activos', label: 'Activos', icon: 'tag' },
     ],
   },
@@ -41,7 +39,6 @@ export const navGroups: NavGroup[] = [
       { path: '/proyectos', label: 'Proyectos', icon: 'project' },
       { path: '/proyectos/wbs', label: 'WBS', icon: 'grid' },
       { path: '/proyectos/presupuestos', label: 'Presupuestos', icon: 'ruler' },
-      { path: '/proyectos/planeacion', label: 'Planeación', icon: 'calendar' },
       { path: '/proyectos/avances', label: 'Avances', icon: 'chart' },
       { path: '/proyectos/ordenes-de-cambio', label: 'Órdenes de cambio', icon: 'shuffle' },
       { path: '/proyectos/diario-de-obra', label: 'Diario de obra', icon: 'notebook' },
@@ -55,8 +52,6 @@ export const navGroups: NavGroup[] = [
     label: 'Abastecimiento',
     items: [
       { path: '/abastecimiento/solicitudes', label: 'Solicitudes', icon: 'receipt' },
-      { path: '/abastecimiento/rfq', label: 'RFQ', icon: 'send' },
-      { path: '/abastecimiento/cotizaciones', label: 'Cotizaciones', icon: 'message' },
       { path: '/abastecimiento/comparativos', label: 'Comparativos', icon: 'scale' },
       { path: '/abastecimiento/ordenes-de-compra', label: 'Órdenes de compra', icon: 'package' },
       { path: '/abastecimiento/recepciones', label: 'Recepciones', icon: 'truck' },

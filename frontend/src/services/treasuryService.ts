@@ -19,9 +19,14 @@ export interface CreateRemittancePayload {
   treasuryAccountId: string
   counterAccountId: string
   sender: string
+  provider?: string | null
+  channel?: string | null
+  reference?: string | null
   currencyCode: string
   originalAmount: string
+  fxRate?: string
   remittanceDate: string
+  notes?: string | null
 }
 
 export interface CreateGeneralExpensePayload {
@@ -45,9 +50,23 @@ export interface CreateTransferPayload {
 }
 
 type TreasuryAccountWire = Omit<TreasuryAccount, 'balance'> & { balance: number | string }
+type RemittanceWire = Omit<Remittance, 'originalAmount' | 'fxRate' | 'baseAmount'> & {
+  originalAmount: number | string
+  fxRate: number | string
+  baseAmount: number | string
+}
 
 function normalizeTreasuryAccount(account: TreasuryAccountWire): TreasuryAccount {
   return { ...account, balance: Number(account.balance) }
+}
+
+function normalizeRemittance(item: RemittanceWire): Remittance {
+  return {
+    ...item,
+    originalAmount: Number(item.originalAmount),
+    fxRate: Number(item.fxRate),
+    baseAmount: Number(item.baseAmount),
+  }
 }
 
 export const treasuryService = {
@@ -62,6 +81,10 @@ export const treasuryService = {
         body: JSON.stringify(payload),
       }),
     ),
+  listRemittances: async (companyId: string, offset = 0, limit = 25) =>
+    (await apiFetch<RemittanceWire[]>(
+      `/treasury/remittances?companyId=${encodeURIComponent(companyId)}&offset=${offset}&limit=${limit}`,
+    )).map(normalizeRemittance),
   createRemittance: (payload: CreateRemittancePayload, idempotencyKey: string) =>
     apiFetch<Remittance>('/treasury/remittances', {
       method: 'POST',

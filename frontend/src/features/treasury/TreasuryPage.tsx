@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Badge,
   Button,
   Card,
   EmptyState,
@@ -20,21 +21,18 @@ import {
   type CreateRemittancePayload,
   type CreateTransferPayload,
 } from '../../services/treasuryService'
-import type { TreasuryAccount } from '../../types/treasury'
+import type { Remittance, TreasuryAccount } from '../../types/treasury'
+import { formatMoney } from '../../utils/currency'
 import './TreasuryPage.css'
 
-const currencyFormatter = new Intl.NumberFormat('es-HN', {
-  style: 'currency',
-  currency: 'HNL',
-  maximumFractionDigits: 2,
-})
-
 type ModalKind = 'remittance' | 'expense' | 'transfer' | null
+const REMITTANCE_PAGE_SIZE = 25
 
 export function TreasuryPage() {
   const queryClient = useQueryClient()
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [openModal, setOpenModal] = useState<ModalKind>(null)
+  const [remittanceOffset, setRemittanceOffset] = useState(0)
 
   const companiesQuery = useQuery({
     queryKey: ['master-data', 'companies'],
@@ -51,6 +49,16 @@ export function TreasuryPage() {
   const treasuryAccountsQuery = useQuery({
     queryKey: ['treasury', 'accounts', activeCompanyId],
     queryFn: () => treasuryService.listAccounts(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const remittancesQuery = useQuery({
+    queryKey: ['treasury', 'remittances', activeCompanyId, remittanceOffset],
+    queryFn: () =>
+      treasuryService.listRemittances(
+        activeCompanyId as string,
+        remittanceOffset,
+        REMITTANCE_PAGE_SIZE,
+      ),
     enabled: Boolean(activeCompanyId),
   })
 
@@ -89,6 +97,7 @@ export function TreasuryPage() {
     },
     onSuccess: (company) => {
       setCompanyId(company.id)
+      setRemittanceOffset(0)
       queryClient.invalidateQueries({ queryKey: ['master-data', 'companies'] })
     },
   })
@@ -103,10 +112,13 @@ export function TreasuryPage() {
   if (companies.length === 0) {
     return (
       <div className="nx-treasury">
+        <header className="nx-treasury__header">
+          <h1 className="nx-dashboard__title">Tesorería</h1>
+        </header>
         <EmptyState
-          icon="🏦"
+          icon="bank"
           title="Aún no hay ninguna compañía configurada"
-          description="Crea la primera compañía y su catálogo mínimo de cuentas para empezar a operar Tesorería (NXR-REQ-0002)."
+          description="Crea la primera compañía y su catálogo mínimo de cuentas para empezar a operar Tesorería."
         />
         <Button loading={quickStart.isPending} onClick={() => quickStart.mutate()}>
           Crear compañía y cuentas de inicio
@@ -117,6 +129,7 @@ export function TreasuryPage() {
 
   const glAccounts = accountsQuery.data ?? []
   const treasuryAccounts = treasuryAccountsQuery.data ?? []
+  const remittances = remittancesQuery.data ?? []
 
   const columns: TableColumn<TreasuryAccount>[] = [
     { key: 'name', header: 'Cuenta', render: (row) => row.name },
@@ -125,11 +138,51 @@ export function TreasuryPage() {
     {
       key: 'balance',
       header: 'Saldo',
-      render: (row) => currencyFormatter.format(row.balance),
+      render: (row) => formatMoney(row.balance, row.currencyCode),
     },
   ]
 
-  const totalBalance = treasuryAccounts.reduce((sum, account) => sum + account.balance, 0)
+  const accountNameById = new Map(treasuryAccounts.map((account) => [account.id, account.name]))
+  const remittanceColumns: TableColumn<Remittance>[] = [
+    { key: 'date', header: 'Fecha', render: (row) => row.remittanceDate },
+    {
+      key: 'document',
+      header: 'Documento',
+      render: (row) => row.reference ?? row.accountingDocumentId.slice(0, 8).toUpperCase(),
+    },
+    { key: 'sender', header: 'Remitente', render: (row) => row.sender },
+    {
+      key: 'account',
+      header: 'Cuenta',
+      render: (row) => accountNameById.get(row.treasuryAccountId) ?? 'Cuenta de tesorería',
+    },
+    {
+      key: 'amount',
+      header: 'Importe',
+      render: (row) => formatMoney(row.originalAmount, row.currencyCode),
+    },
+    {
+      key: 'method',
+      header: 'Método / canal',
+      render: (row) => row.channel ?? row.provider ?? '—',
+    },
+    {
+      key: 'status',
+      header: 'Estado',
+      render: () => <Badge tone="success">Contabilizada</Badge>,
+    },
+  ]
+
+  const balancesByCurrency = treasuryAccounts.reduce<Map<string, number>>((totals, account) => {
+    totals.set(account.currencyCode, (totals.get(account.currencyCode) ?? 0) + account.balance)
+    return totals
+  }, new Map())
+  const hnlBalance = balancesByCurrency.get('HNL') ?? 0
+  const secondaryBalances = [...balancesByCurrency.entries()].filter(([currency]) => currency !== 'HNL')
+  const remittanceCounterAccounts = glAccounts.filter(
+    (account) => !treasuryAccounts.some((treasuryAccount) => treasuryAccount.glAccountId === account.id),
+  )
+  const remittancePage = Math.floor(remittanceOffset / REMITTANCE_PAGE_SIZE) + 1
 
   return (
     <div className="nx-treasury">
@@ -138,7 +191,10 @@ export function TreasuryPage() {
         <Select
           aria-label="Compañía activa"
           value={activeCompanyId ?? ''}
-          onChange={(event) => setCompanyId(event.target.value)}
+          onChange={(event) => {
+            setCompanyId(event.target.value)
+            setRemittanceOffset(0)
+          }}
         >
           {companies.map((company) => (
             <option key={company.id} value={company.id}>
@@ -149,8 +205,11 @@ export function TreasuryPage() {
       </header>
 
       <div className="nx-treasury__grid">
-        <StatCard label="Saldo total de Tesorería" value={currencyFormatter.format(totalBalance)} />
+        <StatCard label="Saldo total HNL" value={formatMoney(hnlBalance)} />
         <StatCard label="Cuentas de tesorería" value={treasuryAccounts.length} />
+        {secondaryBalances.map(([currency, balance]) => (
+          <StatCard key={currency} label={`Saldo ${currency}`} value={formatMoney(balance, currency)} />
+        ))}
       </div>
 
       <Card title="Acciones">
@@ -171,22 +230,70 @@ export function TreasuryPage() {
         </div>
       </Card>
 
-      {treasuryAccountsQuery.isLoading ? (
-        <LoadingState label="Cargando cuentas de tesorería…" />
-      ) : (
-        <Table
-          columns={columns}
-          rows={treasuryAccounts}
-          getRowKey={(row) => row.id}
-          emptyMessage="Aún no hay cuentas de tesorería para esta compañía."
-        />
-      )}
+      <Card title="Cuentas de Tesorería">
+        {treasuryAccountsQuery.isLoading ? (
+          <LoadingState label="Cargando cuentas de tesorería…" />
+        ) : treasuryAccountsQuery.isError ? (
+          <ErrorState
+            title="No se pudieron cargar las cuentas de Tesorería"
+            onRetry={() => treasuryAccountsQuery.refetch()}
+          />
+        ) : (
+          <Table
+            columns={columns}
+            rows={treasuryAccounts}
+            getRowKey={(row) => row.id}
+            emptyMessage="No hay cuentas de tesorería para esta compañía."
+          />
+        )}
+      </Card>
+
+      <Card title="Remesas">
+        {remittancesQuery.isLoading ? (
+          <LoadingState label="Cargando remesas…" />
+        ) : remittancesQuery.isError ? (
+          <ErrorState
+            title="No se pudieron cargar las remesas"
+            onRetry={() => remittancesQuery.refetch()}
+          />
+        ) : (
+          <>
+            <Table
+              columns={remittanceColumns}
+              rows={remittances}
+              getRowKey={(row) => row.id}
+              emptyMessage="No hay remesas registradas para esta compañía."
+            />
+            <div className="nx-treasury__actions" aria-label="Paginación de remesas">
+              <Button
+                variant="secondary"
+                disabled={remittanceOffset === 0}
+                onClick={() =>
+                  setRemittanceOffset((current) => Math.max(0, current - REMITTANCE_PAGE_SIZE))
+                }
+              >
+                Anterior
+              </Button>
+              <span>Página {remittancePage}</span>
+              <Button
+                variant="secondary"
+                disabled={remittances.length < REMITTANCE_PAGE_SIZE}
+                onClick={() =>
+                  setRemittanceOffset((current) => current + REMITTANCE_PAGE_SIZE)
+                }
+              >
+                Siguiente
+              </Button>
+            </div>
+          </>
+        )}
+      </Card>
 
       {openModal === 'remittance' && activeCompanyId ? (
         <RemittanceModal
           companyId={activeCompanyId}
           treasuryAccounts={treasuryAccounts}
-          counterAccounts={glAccounts}
+          counterAccounts={remittanceCounterAccounts}
           onClose={() => setOpenModal(null)}
         />
       ) : null}
@@ -224,7 +331,16 @@ function RemittanceModal({
   const [treasuryAccountId, setTreasuryAccountId] = useState(treasuryAccounts[0]?.id ?? '')
   const [counterAccountId, setCounterAccountId] = useState(counterAccounts[0]?.id ?? '')
   const [sender, setSender] = useState('')
+  const [provider, setProvider] = useState('')
+  const [channel, setChannel] = useState('TRANSFER')
+  const [reference, setReference] = useState('')
+  const [notes, setNotes] = useState('')
+  const [remittanceDate, setRemittanceDate] = useState(new Date().toISOString().slice(0, 10))
   const [amount, setAmount] = useState<number | null>(null)
+  const [fxRate, setFxRate] = useState(1)
+
+  const selectedTreasuryAccount = treasuryAccounts.find((account) => account.id === treasuryAccountId)
+  const selectedCurrency = selectedTreasuryAccount?.currencyCode ?? 'HNL'
 
   const mutation = useMutation({
     mutationFn: ({
@@ -236,9 +352,21 @@ function RemittanceModal({
     }) => treasuryService.createRemittance(payload, idempotencyKey),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['treasury', 'remittances'] })
       onClose()
     },
   })
+
+  if (treasuryAccounts.length === 0 || counterAccounts.length === 0) {
+    return (
+      <Modal open title="Registrar remesa" onClose={onClose}>
+        <EmptyState
+          title="Faltan cuentas para registrar la remesa"
+          description="Configura una cuenta de Tesorería y una cuenta contable de contrapartida distinta antes de continuar."
+        />
+      </Modal>
+    )
+  }
 
   return (
     <Modal open title="Registrar remesa" onClose={onClose}>
@@ -252,9 +380,14 @@ function RemittanceModal({
               treasuryAccountId,
               counterAccountId,
               sender,
-              currencyCode: 'HNL',
+              provider: provider || null,
+              channel: channel || null,
+              reference: reference || null,
+              currencyCode: selectedCurrency,
               originalAmount: String(amount ?? 0),
-              remittanceDate: new Date().toISOString().slice(0, 10),
+              fxRate: String(selectedCurrency === 'HNL' ? 1 : fxRate),
+              remittanceDate,
+              notes: notes || null,
             },
             idempotencyKey: crypto.randomUUID(),
           })
@@ -264,11 +397,14 @@ function RemittanceModal({
           name="treasuryAccountId"
           label="Cuenta de tesorería"
           value={treasuryAccountId}
-          onChange={(e) => setTreasuryAccountId(e.target.value)}
+          onChange={(event) => {
+            setTreasuryAccountId(event.target.value)
+            setFxRate(1)
+          }}
         >
           {treasuryAccounts.map((account) => (
             <option key={account.id} value={account.id}>
-              {account.name}
+              {account.name} — {account.currencyCode}
             </option>
           ))}
         </Select>
@@ -276,7 +412,7 @@ function RemittanceModal({
           name="counterAccountId"
           label="Cuenta contrapartida"
           value={counterAccountId}
-          onChange={(e) => setCounterAccountId(e.target.value)}
+          onChange={(event) => setCounterAccountId(event.target.value)}
         >
           {counterAccounts.map((account) => (
             <option key={account.id} value={account.id}>
@@ -284,6 +420,25 @@ function RemittanceModal({
             </option>
           ))}
         </Select>
+        <label className="nx-field">
+          <span className="nx-field__label">Fecha</span>
+          <input
+            className="nx-input"
+            type="date"
+            value={remittanceDate}
+            onChange={(event) => setRemittanceDate(event.target.value)}
+            required
+          />
+        </label>
+        <label className="nx-field">
+          <span className="nx-field__label">Documento / referencia</span>
+          <input
+            className="nx-input"
+            value={reference}
+            onChange={(event) => setReference(event.target.value)}
+            placeholder="Ej. REM-2026-001"
+          />
+        </label>
         <label className="nx-field">
           <span className="nx-field__label">Remitente</span>
           <input
@@ -293,14 +448,65 @@ function RemittanceModal({
             required
           />
         </label>
-        <MoneyInput label="Monto" value={amount} onChange={setAmount} />
+        <label className="nx-field">
+          <span className="nx-field__label">Banco / proveedor</span>
+          <input
+            className="nx-input"
+            value={provider}
+            onChange={(event) => setProvider(event.target.value)}
+            placeholder="Opcional"
+          />
+        </label>
+        <Select
+          name="channel"
+          label="Método / canal"
+          value={channel}
+          onChange={(event) => setChannel(event.target.value)}
+        >
+          <option value="TRANSFER">Transferencia</option>
+          <option value="CASH">Efectivo</option>
+          <option value="CHECK">Cheque</option>
+          <option value="OTHER">Otro</option>
+        </Select>
+        <MoneyInput label={`Monto (${selectedCurrency})`} value={amount} onChange={setAmount} />
+        {selectedCurrency !== 'HNL' ? (
+          <label className="nx-field">
+            <span className="nx-field__label">Tipo de cambio a HNL</span>
+            <input
+              className="nx-input"
+              type="number"
+              min="0.000001"
+              step="0.000001"
+              value={fxRate}
+              onChange={(event) => setFxRate(Number(event.target.value))}
+              required
+            />
+          </label>
+        ) : null}
+        <label className="nx-field">
+          <span className="nx-field__label">Notas</span>
+          <input
+            className="nx-input"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Opcional"
+          />
+        </label>
         {mutation.isError ? (
           <p className="nx-field__error">{(mutation.error as Error).message}</p>
         ) : null}
         <Button
           type="submit"
           loading={mutation.isPending}
-          disabled={!treasuryAccountId || !counterAccountId || !amount}
+          disabled={
+            !treasuryAccountId ||
+            !counterAccountId ||
+            !sender.trim() ||
+            !remittanceDate ||
+            !amount ||
+            amount <= 0 ||
+            (selectedCurrency !== 'HNL' && fxRate <= 0)
+          }
         >
           Registrar
         </Button>
@@ -344,7 +550,7 @@ function GeneralExpenseModal({
   if (expenseAccounts.length === 0) {
     return (
       <Modal open title="Registrar gasto general" onClose={onClose}>
-        <EmptyState title="No hay cuentas de gasto (EXPENSE) configuradas todavía." />
+        <EmptyState title="No hay cuentas de gasto configuradas todavía." />
       </Modal>
     )
   }

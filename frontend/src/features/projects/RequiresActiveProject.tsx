@@ -19,7 +19,7 @@ export function RequiresActiveProject({ children }: RequiresActiveProjectProps) 
   if (!context.activeProjectId) {
     return (
       <EmptyState
-        icon="🏗️"
+        icon="project"
         title="Selecciona un proyecto activo"
         description="Ve a Proyectos y marca uno como activo para ver esta información."
       />

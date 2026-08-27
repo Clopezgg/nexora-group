@@ -34,7 +34,7 @@ export function EntitySelector({
   emptyLabel,
 }: EntitySelectorProps) {
   if (options.length === 0) {
-    return <EmptyState icon="🗂️" title={emptyLabel} />
+    return <EmptyState icon="folder" title={emptyLabel} />
   }
   const comboOptions: ComboboxOption[] = options.map((option) => ({
     value: option.id,

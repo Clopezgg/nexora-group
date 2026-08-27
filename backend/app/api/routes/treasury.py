@@ -7,7 +7,12 @@ from app.api.deps import get_current_user_id, get_db
 from app.api.deps_correlation import get_correlation_id
 from app.domain.errors import InvalidFinancialReferenceError
 from app.models.accounting import AccountingDocument
-from app.models.treasury import BankStatementLine, FundRestriction, TreasuryAccount
+from app.models.treasury import (
+    BankStatementLine,
+    FundRestriction,
+    Remittance,
+    TreasuryAccount,
+)
 from app.schemas.treasury import (
     BankStatementCreateRequest,
     BankStatementLineCreateRequest,
@@ -123,6 +128,28 @@ def list_accounts(
         db.query(TreasuryAccount).filter(TreasuryAccount.company_id == company_id).all()
     )
     return [_account_to_response(db, account) for account in accounts]
+
+
+@router.get("/remittances", response_model=list[RemittanceResponse])
+def list_remittances(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("treasury.remittance", "read")),
+) -> list[RemittanceResponse]:
+    assert_company_access(
+        db, user_id=user.id, resource="treasury.remittance", action="read", company_id=company_id
+    )
+    rows = (
+        db.query(Remittance)
+        .filter(Remittance.company_id == company_id)
+        .order_by(Remittance.remittance_date.desc(), Remittance.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return [RemittanceResponse.model_validate(row, from_attributes=True) for row in rows]
 
 
 @router.post("/remittances", response_model=RemittanceResponse, status_code=201)

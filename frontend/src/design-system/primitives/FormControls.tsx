@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from 'react'
+import { Icon } from './Icon'
 
 interface FieldWrapProps {
   label?: string
@@ -76,7 +77,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           </label>
         ) : null}
         <span className="nx-search-input__icon" aria-hidden="true">
-          🔍
+          <Icon name="search" />
         </span>
         <input
           ref={ref}

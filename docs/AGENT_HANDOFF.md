@@ -1,4 +1,15 @@
 Agent: Claude Code recovery controller (took over from two parallel Codex
+
+## 2026-08-27 — Active final-product mission
+
+Canonical remote branch: `work/nexora-final-product`
+Permanent draft PR: https://github.com/Clopezgg/nexora-group/pull/11
+Base main when opened: `ed3d3822247bd7f8447bd965d06b6e72313d66bf`
+
+Current work is fully pushed. The branch removes emoji/placeholder UX, connects every visible route, adds a real financial/operational dashboard, centralizes HNL formatting, lists remittances, and makes AP/AR operation scope explicit. Continue on this branch and PR; do not recreate the work locally or revive old Azure/OIDC diagnoses.
+
+Production baseline is healthy through Deploy Azure run #21, and same-origin `/api/healthz` plus `/api/readyz` respond 200. PR #11 still requires green CI, final browser review, merge, main deployment and authenticated production smoke before declaring completion.
+
 sessions on 2026-08-25; see `.recovery/git-state.txt` for the raw recovery
 evidence)
 Repository: Clopezgg/nexora-group

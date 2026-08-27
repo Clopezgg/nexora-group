@@ -87,7 +87,7 @@ export function SupplierContractsPage() {
   if (!activeCompanyId) {
     return (
       <EmptyState
-        icon="📃"
+        icon="file"
         title="Configura una compañía primero"
         description="No hay compañías registradas todavía."
       />

@@ -42,7 +42,7 @@ export function LoginPage() {
       await login(values)
       const redirectTo =
         (location.state as { from?: { pathname: string } } | null)?.from?.pathname ??
-        '/dashboard'
+        '/inicio'
       navigate(redirectTo, { replace: true })
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
@@ -122,9 +122,8 @@ export function LoginPage() {
         onClose={() => setForgotPasswordOpen(false)}
       >
         <p>
-          El flujo de autoservicio para restablecer contraseña todavía no está disponible
-          (NXR-REQ-0008, arquitectura de reseteo pendiente). Mientras tanto, contacta a un
-          administrador de Nexora Group para que restablezca tu acceso.
+          El restablecimiento de contraseña por autoservicio no está habilitado en esta instancia.
+          Solicita a un administrador de Nexora Group el restablecimiento de tu acceso.
         </p>
         <Button variant="secondary" onClick={() => setForgotPasswordOpen(false)}>
           Entendido

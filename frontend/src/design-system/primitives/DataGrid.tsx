@@ -37,7 +37,7 @@ export function DataGrid<T>({
   }, [rows, sortKey, sortValue, direction])
 
   if (rows.length === 0) {
-    return <EmptyState icon="🗒️" title={emptyMessage ?? 'Sin datos disponibles.'} />
+    return <EmptyState icon="clipboard" title={emptyMessage ?? 'Sin datos disponibles.'} />
   }
 
   const toggleSort = (key: string) => {

@@ -29,17 +29,17 @@ describe('HomePage', () => {
       periodIncome: 5000,
       periodExpense: 2000,
       activeProjects: 3,
-      currency: 'MXN',
+      currency: 'HNL',
     })
 
     render(renderApp('/inicio'))
 
     expect(await screen.findByRole('heading', { name: /inicio — finanzas/i })).toBeInTheDocument()
-    expect(await screen.findByText('Saldo Tesorería')).toBeInTheDocument()
+    expect(await screen.findByText('Saldo disponible de Tesorería')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 
-  it('shows the project home with empty-state sections (no fabricated data) for Project Manager', async () => {
+  it('shows the project home with real module shortcuts for Project Manager', async () => {
     stubAuthenticatedFetch(['Project Manager'])
 
     render(renderApp('/inicio'))

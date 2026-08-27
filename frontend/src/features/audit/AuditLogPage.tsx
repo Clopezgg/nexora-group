@@ -64,7 +64,7 @@ export function AuditLogPage() {
   if (!activeCompanyId) {
     return (
       <EmptyState
-        icon="🔍"
+        icon="search"
         title="Configura una compañía primero"
         description="No hay compañías registradas todavía."
       />

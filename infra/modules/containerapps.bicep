@@ -170,5 +170,6 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
 }
 
 output backendFqdn string = backendApp.properties.configuration.ingress.fqdn
+output backendResourceId string = backendApp.id
 output backendPrincipalId string = backendIdentity.properties.principalId
 output containerAppsEnvironmentId string = containerAppsEnvironment.id

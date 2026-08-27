@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { dashboardService } from '../../services/dashboardService'
+import { ApiError } from '../../services/httpClient'
 import { useAuth } from '../auth/auth-context'
 import { resolveHomeConfig } from './roleHomes'
 import { EmptyState, ErrorState, LoadingState, StatCard } from '../../design-system'
 import './HomePage.css'
 
-const currencyFormatter = new Intl.NumberFormat('es-MX', {
+const currencyFormatter = new Intl.NumberFormat('es-HN', {
   style: 'currency',
-  currency: 'MXN',
+  currency: 'HNL',
   maximumFractionDigits: 0,
 })
 
@@ -15,11 +16,12 @@ export function HomePage() {
   const { user } = useAuth()
   const config = resolveHomeConfig(user?.roles ?? [])
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, error, isLoading, isError, refetch } = useQuery({
     queryKey: ['dashboard', 'summary'],
     queryFn: dashboardService.getSummary,
     enabled: config.showTreasurySummary,
   })
+  const sessionExpired = error instanceof ApiError && error.status === 401
 
   return (
     <div>
@@ -33,8 +35,12 @@ export function HomePage() {
           <LoadingState label="Cargando indicadores…" />
         ) : isError || !data ? (
           <ErrorState
-            title="No se pudo cargar el dashboard"
-            description="Verifica tu conexión con el servidor e intenta de nuevo."
+            title={sessionExpired ? 'Tu sesión necesita renovarse' : 'No se pudo cargar el dashboard'}
+            description={
+              sessionExpired
+                ? 'Cierra sesión y vuelve a ingresar para continuar.'
+                : 'No fue posible comunicarse con el servidor. Intenta de nuevo.'
+            }
             onRetry={() => refetch()}
           />
         ) : (
@@ -51,7 +57,7 @@ export function HomePage() {
         {config.sections.map((section) => (
           <div key={section.title} className="nx-home__section">
             <h2 className="nx-home__section-title">{section.title}</h2>
-            <EmptyState title="Aún no disponible" description={section.description} />
+            <EmptyState title="Módulo en desarrollo" description={section.description} />
           </div>
         ))}
       </div>

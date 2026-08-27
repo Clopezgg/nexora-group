@@ -11,14 +11,12 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   name: '${namePrefix}-frontend-${environmentName}'
   location: location
   sku: {
-    name: 'Free'
-    tier: 'Free'
+    name: 'Standard'
+    tier: 'Standard'
   }
   properties: {
-    // Sin repositoryUrl/branch/buildProperties: no se liga el repo aquí para no
-    // requerir un GitHub PAT en el template. El deploy real se hace vía el
-    // Azure/static-web-apps-deploy-action en CI, usando el deployment token
-    // (ver output deploymentTokenHint y el workflow de deploy).
+    // Standard habilita el backend enlazado de Container Apps. El repositorio
+    // no se liga aquí: el frontend se publica con el token obtenido por OIDC.
     stagingEnvironmentPolicy: 'Enabled'
     allowConfigFileUpdates: true
   }

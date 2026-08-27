@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, IconButton } from '../design-system'
+import { Badge, Icon, IconButton } from '../design-system'
 import { notificationService } from '../services/notificationService'
 import './NotificationBell.css'
 
@@ -11,10 +11,6 @@ export function NotificationBell() {
   const rootRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
 
-  // Se consulta la lista completa (no solo unreadOnly) para poder mostrar
-  // notificaciones recientes ya leídas en el dropdown; el badge de conteo
-  // se calcula filtrando localmente por `readAt == null` sobre la misma
-  // respuesta -- una sola query real, sin duplicar el polling.
   const notificationsQuery = useQuery({
     queryKey: ['notifications'],
     queryFn: () => notificationService.list(),
@@ -45,11 +41,6 @@ export function NotificationBell() {
     }
   }, [])
 
-  // Defensivo: en producción la API siempre responde con un array (ver
-  // app/api/routes/notifications.py::list_my_notifications), pero algunos
-  // tests de otras páginas usan un stub de fetch genérico que no conoce
-  // esta ruta y cae en su fallback `{}` -- no se debe romper toda la app
-  // por eso.
   const notifications = Array.isArray(notificationsQuery.data) ? notificationsQuery.data : []
   const unreadCount = notifications.filter((note) => note.readAt === null).length
 
@@ -58,7 +49,7 @@ export function NotificationBell() {
       <div className="nx-notification-bell__trigger-wrap">
         <IconButton
           label={unreadCount > 0 ? `Notificaciones (${unreadCount} sin leer)` : 'Notificaciones'}
-          icon="🔔"
+          icon={<Icon name="bell" />}
           active={open}
           onClick={() => setOpen((current) => !current)}
         />

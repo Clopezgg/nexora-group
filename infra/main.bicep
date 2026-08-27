@@ -129,6 +129,16 @@ module containerApps 'modules/containerapps.bicep' = {
   }
 }
 
+module linkedBackend 'modules/linkedbackend.bicep' = {
+  name: 'linkedbackend'
+  scope: rg
+  params: {
+    staticWebAppName: staticWebApp.outputs.staticWebAppName
+    backendResourceId: containerApps.outputs.backendResourceId
+    backendRegion: location
+  }
+}
+
 output resourceGroupName string = rg.name
 output backendFqdn string = containerApps.outputs.backendFqdn
 output frontendHostname string = staticWebApp.outputs.defaultHostname

@@ -3,6 +3,8 @@ import './primitives/Button.css'
 import './primitives/primitives.css'
 
 export { Button } from './primitives/Button'
+export { Icon } from './primitives/Icon'
+export type { IconName } from './primitives/Icon'
 export { IconButton } from './primitives/IconButton'
 export { Input } from './primitives/Input'
 export { Select } from './primitives/Select'

@@ -104,6 +104,9 @@ export function TreasuryPage() {
   if (companies.length === 0) {
     return (
       <div className="nx-treasury">
+        <header className="nx-treasury__header">
+          <h1 className="nx-dashboard__title">Tesorería</h1>
+        </header>
         <EmptyState
           icon="bank"
           title="Aún no hay ninguna compañía configurada"

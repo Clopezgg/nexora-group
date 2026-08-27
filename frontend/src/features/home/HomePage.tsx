@@ -1,24 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Cell, Legend, Line, LineChart, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts'
 import { dashboardService } from '../../services/dashboardService'
 import { formatMoney } from '../../utils/currency'
 import { ApiError } from '../../services/httpClient'
 import { useAuth } from '../auth/auth-context'
 import { resolveHomeConfig } from './roleHomes'
-import { Card, ChartCard, ErrorState, LoadingState, StatCard } from '../../design-system'
+import { Card, ErrorState, LoadingState, StatCard } from '../../design-system'
 import './HomePage.css'
 
-const scopeLabels: Record<string, string> = {
-  CENTRAL: 'Central',
-  GENERAL: 'General',
-  PROJECT: 'Proyecto',
-}
-const scopeColors: Record<string, string> = {
-  CENTRAL: '#2563eb',
-  GENERAL: '#0f766e',
-  PROJECT: '#7c3aed',
-}
+const FinancialCharts = lazy(() => import('./FinancialCharts'))
 
 export function HomePage() {
   const { user } = useAuth()
@@ -30,12 +21,6 @@ export function HomePage() {
     enabled: config.showTreasurySummary,
   })
   const sessionExpired = error instanceof ApiError && error.status === 401
-  const cashFlow = data?.cashFlow ?? []
-  const scopeData = (data?.expensesByScope ?? []).map((item) => ({
-    ...item,
-    label: scopeLabels[item.scope] ?? item.scope,
-  }))
-  const hasCashFlow = cashFlow.some((item) => item.income !== 0 || item.expense !== 0)
 
   return (
     <div className="nx-home">
@@ -69,29 +54,13 @@ export function HomePage() {
               <StatCard label="Proyectos activos" value={data.activeProjects} />
             </section>
 
-            <section className="nx-home__charts" aria-label="Visualizaciones financieras">
-              <ChartCard title="Ingresos vs. gastos" subtitle="Últimos seis meses" hasData={hasCashFlow}>
-                <LineChart data={cashFlow} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
-                  <XAxis dataKey="period" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} width={72} />
-                  <Tooltip formatter={(value) => formatMoney(Number(value), data.currency)} />
-                  <Legend />
-                  <Line type="monotone" dataKey="income" name="Ingresos" stroke="#0f9f6e" strokeWidth={2.5} dot={false} />
-                  <Line type="monotone" dataKey="expense" name="Gastos" stroke="#dc3f50" strokeWidth={2.5} dot={false} />
-                </LineChart>
-              </ChartCard>
-              <ChartCard title="Gastos por alcance" subtitle="Período actual" hasData={scopeData.length > 0}>
-                <PieChart>
-                  <Pie data={scopeData} dataKey="amount" nameKey="label" innerRadius={54} outerRadius={86} paddingAngle={2}>
-                    {scopeData.map((item) => (
-                      <Cell key={item.scope} fill={scopeColors[item.scope] ?? '#64748b'} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatMoney(Number(value), data.currency)} />
-                  <Legend />
-                </PieChart>
-              </ChartCard>
-            </section>
+            <Suspense fallback={<LoadingState label="Preparando gráficos…" />}>
+              <FinancialCharts
+                cashFlow={data.cashFlow ?? []}
+                expensesByScope={data.expensesByScope ?? []}
+                currency={data.currency}
+              />
+            </Suspense>
 
             <section className="nx-home__operations" aria-label="Información operativa">
               <StatCard label="Aprobaciones pendientes" value={data.pendingApprovals} />

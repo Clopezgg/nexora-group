@@ -35,7 +35,7 @@ describe('HomePage', () => {
     render(renderApp('/inicio'))
 
     expect(await screen.findByRole('heading', { name: /inicio — finanzas/i })).toBeInTheDocument()
-    expect(await screen.findByText('Saldo Tesorería')).toBeInTheDocument()
+    expect(await screen.findByText('Saldo disponible de Tesorería')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 

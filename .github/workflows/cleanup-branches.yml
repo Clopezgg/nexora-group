@@ -1,0 +1,63 @@
+name: Cleanup obsolete branches
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cleanup-branches.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Delete verified obsolete branches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branches=(
+            "feat/nexora-greenfield"
+            "fix/account-postability"
+            "fix/ci-backend-db"
+            "fix/deploy-fail-fast"
+            "fix/frontend-api-url"
+            "fix/ghcr-lowercase"
+            "fix/ghcr-packages-permission"
+            "fix/keyvault-purge-protection"
+            "fix/same-origin-health"
+            "fix/same-origin-session-icons"
+            "fix/swa-spa-fallback"
+            "track/b-project-control"
+            "track/d-rfi-submittals"
+            "track/d-site-quality-safety"
+            "track/f-experience"
+            "track/1-foundation"
+            "work/nexora-final-product"
+          )
+
+          for branch in "${branches[@]}"; do
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              echo "Deleting $branch"
+              git push origin --delete "$branch"
+            else
+              echo "$branch already absent"
+            fi
+          done
+
+          remaining="$(git ls-remote --heads origin | awk '{print $2}' | sed 's#refs/heads/##' | grep -v '^main$' || true)"
+          if [ -n "$remaining" ]; then
+            echo "::error::Unexpected branches remain after cleanup:"
+            echo "$remaining"
+            exit 1
+          fi
+
+          echo "Only main remains."

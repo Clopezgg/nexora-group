@@ -1,5 +1,19 @@
 # NEXORA GROUP — Production Readiness Gate (Definición Absoluta de 100%)
 
+## Live production evidence — 2026-08-27
+
+The earlier Azure authorization/provisioning blocker is no longer current.
+
+- Production main before PR #11: `ed3d3822247bd7f8447bd965d06b6e72313d66bf`.
+- Deploy Azure run #21: PASS (Bicep what-if, OIDC login, backend image build/push, Bicep deployment, frontend build and Static Web Apps deployment).
+- Frontend: `https://jolly-plant-0d6bf700f.7.azurestaticapps.net/`.
+- Same-origin API probes: `/api/healthz` and `/api/readyz` returned `{"status":"ok"}` on 2026-08-27.
+- Container App direct ingress is intentionally protected by the Static Web Apps linked-backend integration.
+- PR #11 (`work/nexora-final-product`) contains the final product/UI pass and is not production evidence until CI, merge, Deploy Azure and authenticated smoke tests complete.
+
+Do not interpret historical BLOCKED/NOT_STARTED language below as the current Azure state; it is retained as chronology.
+
+
 Este documento registra la ORDEN MAESTRA de extensión final recibida
 2026-08-25: la definición de "100%" que prevalece sobre cualquier
 definición anterior. Si el contexto de una sesión se pierde, este

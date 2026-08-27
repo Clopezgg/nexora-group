@@ -2,107 +2,171 @@ import type { RouteObject } from 'react-router-dom'
 import { Navigate } from 'react-router-dom'
 import { AppLayout } from '../layouts/AppLayout'
 import { ProtectedRoute } from '../features/auth/ProtectedRoute'
-import { LoginPage } from '../pages/LoginPage'
-import { HomePage } from '../features/home/HomePage'
-import { TreasuryPage } from '../features/treasury/TreasuryPage'
-import { AccountsPayablePage } from '../features/treasury/AccountsPayablePage'
-import { AccountsReceivablePage } from '../features/treasury/AccountsReceivablePage'
-import { GoodsReceiptsPage } from '../features/procurement/GoodsReceiptsPage'
-import { PurchaseOrdersPage } from '../features/procurement/PurchaseOrdersPage'
-import { RequisitionsPage } from '../features/procurement/RequisitionsPage'
-import { SuppliersPage } from '../features/procurement/SuppliersPage'
-import { SupplierContractsPage } from '../features/procurement/SupplierContractsPage'
-import { BidComparisonPage } from '../features/procurement/BidComparisonPage'
-import { InventoryPage } from '../features/inventory/InventoryPage'
-import { WarehousesPage } from '../features/inventory/WarehousesPage'
-import { BudgetPage } from '../features/projects/BudgetPage'
-import { ChangeOrdersPage } from '../features/projects/ChangeOrdersPage'
-import { ProgressPage } from '../features/projects/ProgressPage'
-import { ProjectsPage } from '../features/projects/ProjectsPage'
-import { WBSPage } from '../features/projects/WBSPage'
-import { FixedAssetsPage } from '../features/assets/FixedAssetsPage'
-import { EquipmentPage } from '../features/equipment/EquipmentPage'
-import { WorkersPage } from '../features/workforce/WorkersPage'
-import { CrewsPage } from '../features/workforce/CrewsPage'
-import { TimeEntriesPage } from '../features/workforce/TimeEntriesPage'
-import { DocumentsPage } from '../features/documents/DocumentsPage'
-import { AuditLogPage } from '../features/audit/AuditLogPage'
-import { ReportsPage } from '../features/reports/ReportsPage'
-import { ApprovalInboxPage } from '../features/approvals/ApprovalInboxPage'
-import { RfiSubmittalsPage } from '../features/rfi/RfiSubmittalsPage'
-import { DailyReportsPage } from '../features/site/DailyReportsPage'
-import { QualityPage } from '../features/quality/QualityPage'
-import { SafetyPage } from '../features/safety/SafetyPage'
-import { CustomersPage } from '../features/commercial/CustomersPage'
-import { LeadsPage } from '../features/commercial/LeadsPage'
-import { OpportunitiesPage } from '../features/commercial/OpportunitiesPage'
-import { QuotationsPage } from '../features/commercial/QuotationsPage'
-import { SalesContractsPage } from '../features/commercial/SalesContractsPage'
-import { CompanySettingsPage } from '../features/settings/CompanySettingsPage'
 import { navItems } from './navigation'
 
-// Every visible navigation item resolves to a working screen. Capabilities that
-// still lack a complete UI stay out of navigation until their route is ready.
-const IMPLEMENTED_ROUTES: Record<string, RouteObject['element']> = {
-  '/finanzas/contabilidad': <ReportsPage />,
-  '/finanzas/tesoreria': <TreasuryPage />,
-  '/finanzas/cuentas-por-pagar': <AccountsPayablePage />,
-  '/finanzas/cuentas-por-cobrar': <AccountsReceivablePage />,
-  '/finanzas/activos': <FixedAssetsPage />,
-  '/proyectos': <ProjectsPage />,
-  '/proyectos/wbs': <WBSPage />,
-  '/proyectos/presupuestos': <BudgetPage />,
-  '/proyectos/ordenes-de-cambio': <ChangeOrdersPage />,
-  '/proyectos/avances': <ProgressPage />,
-  '/proyectos/rfi-submittals': <RfiSubmittalsPage />,
-  '/abastecimiento/solicitudes': <RequisitionsPage />,
-  '/abastecimiento/ordenes-de-compra': <PurchaseOrdersPage />,
-  '/abastecimiento/recepciones': <GoodsReceiptsPage />,
-  '/abastecimiento/inventario': <InventoryPage />,
-  '/abastecimiento/almacenes': <WarehousesPage />,
-  '/abastecimiento/proveedores': <SuppliersPage />,
-  '/abastecimiento/contratos': <SupplierContractsPage />,
-  '/abastecimiento/comparativos': <BidComparisonPage />,
-  '/recursos/personal': <WorkersPage />,
-  '/recursos/cuadrillas': <CrewsPage />,
-  '/recursos/tiempo': <TimeEntriesPage />,
-  '/recursos/equipos': <EquipmentPage defaultTab="equipos" />,
-  '/recursos/combustible': <EquipmentPage defaultTab="combustible" />,
-  '/recursos/mantenimiento': <EquipmentPage defaultTab="mantenimiento" />,
-  '/control/documentos': <DocumentsPage />,
-  '/control/evidencias': <DocumentsPage />,
-  '/control/auditoria': <AuditLogPage />,
-  '/control/configuracion': <CompanySettingsPage />,
-  '/control/reportes': <ReportsPage />,
-  '/inicio/aprobaciones': <ApprovalInboxPage />,
-  '/proyectos/diario-de-obra': <DailyReportsPage />,
-  '/proyectos/calidad': <QualityPage />,
-  '/proyectos/seguridad': <SafetyPage />,
-  '/comercial/leads': <LeadsPage />,
-  '/comercial/oportunidades': <OpportunitiesPage />,
-  '/comercial/clientes': <CustomersPage />,
-  '/comercial/cotizaciones': <QuotationsPage />,
-  '/comercial/contratos': <SalesContractsPage />,
-  '/comercial/facturacion': <AccountsReceivablePage />,
-  '/comercial/cobros': <AccountsReceivablePage />,
+type LazyRoute = NonNullable<RouteObject['lazy']>
+
+// Keep the authenticated shell eager, but split every business module into its
+// own route chunk. This prevents Login/Inicio from downloading and evaluating
+// the entire ERP (reports, procurement, inventory, workforce, etc.) up front.
+const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
+  '/finanzas/contabilidad': async () => ({
+    Component: (await import('../features/reports/ReportsPage')).ReportsPage,
+  }),
+  '/finanzas/tesoreria': async () => ({
+    Component: (await import('../features/treasury/TreasuryPage')).TreasuryPage,
+  }),
+  '/finanzas/cuentas-por-pagar': async () => ({
+    Component: (await import('../features/treasury/AccountsPayablePage')).AccountsPayablePage,
+  }),
+  '/finanzas/cuentas-por-cobrar': async () => ({
+    Component: (await import('../features/treasury/AccountsReceivablePage')).AccountsReceivablePage,
+  }),
+  '/finanzas/activos': async () => ({
+    Component: (await import('../features/assets/FixedAssetsPage')).FixedAssetsPage,
+  }),
+  '/proyectos': async () => ({
+    Component: (await import('../features/projects/ProjectsPage')).ProjectsPage,
+  }),
+  '/proyectos/wbs': async () => ({
+    Component: (await import('../features/projects/WBSPage')).WBSPage,
+  }),
+  '/proyectos/presupuestos': async () => ({
+    Component: (await import('../features/projects/BudgetPage')).BudgetPage,
+  }),
+  '/proyectos/ordenes-de-cambio': async () => ({
+    Component: (await import('../features/projects/ChangeOrdersPage')).ChangeOrdersPage,
+  }),
+  '/proyectos/avances': async () => ({
+    Component: (await import('../features/projects/ProgressPage')).ProgressPage,
+  }),
+  '/proyectos/rfi-submittals': async () => ({
+    Component: (await import('../features/rfi/RfiSubmittalsPage')).RfiSubmittalsPage,
+  }),
+  '/abastecimiento/solicitudes': async () => ({
+    Component: (await import('../features/procurement/RequisitionsPage')).RequisitionsPage,
+  }),
+  '/abastecimiento/ordenes-de-compra': async () => ({
+    Component: (await import('../features/procurement/PurchaseOrdersPage')).PurchaseOrdersPage,
+  }),
+  '/abastecimiento/recepciones': async () => ({
+    Component: (await import('../features/procurement/GoodsReceiptsPage')).GoodsReceiptsPage,
+  }),
+  '/abastecimiento/inventario': async () => ({
+    Component: (await import('../features/inventory/InventoryPage')).InventoryPage,
+  }),
+  '/abastecimiento/almacenes': async () => ({
+    Component: (await import('../features/inventory/WarehousesPage')).WarehousesPage,
+  }),
+  '/abastecimiento/proveedores': async () => ({
+    Component: (await import('../features/procurement/SuppliersPage')).SuppliersPage,
+  }),
+  '/abastecimiento/contratos': async () => ({
+    Component: (await import('../features/procurement/SupplierContractsPage')).SupplierContractsPage,
+  }),
+  '/abastecimiento/comparativos': async () => ({
+    Component: (await import('../features/procurement/BidComparisonPage')).BidComparisonPage,
+  }),
+  '/recursos/personal': async () => ({
+    Component: (await import('../features/workforce/WorkersPage')).WorkersPage,
+  }),
+  '/recursos/cuadrillas': async () => ({
+    Component: (await import('../features/workforce/CrewsPage')).CrewsPage,
+  }),
+  '/recursos/tiempo': async () => ({
+    Component: (await import('../features/workforce/TimeEntriesPage')).TimeEntriesPage,
+  }),
+  '/recursos/equipos': async () => {
+    const { EquipmentPage } = await import('../features/equipment/EquipmentPage')
+    return { Component: () => <EquipmentPage defaultTab="equipos" /> }
+  },
+  '/recursos/combustible': async () => {
+    const { EquipmentPage } = await import('../features/equipment/EquipmentPage')
+    return { Component: () => <EquipmentPage defaultTab="combustible" /> }
+  },
+  '/recursos/mantenimiento': async () => {
+    const { EquipmentPage } = await import('../features/equipment/EquipmentPage')
+    return { Component: () => <EquipmentPage defaultTab="mantenimiento" /> }
+  },
+  '/control/documentos': async () => ({
+    Component: (await import('../features/documents/DocumentsPage')).DocumentsPage,
+  }),
+  '/control/evidencias': async () => ({
+    Component: (await import('../features/documents/DocumentsPage')).DocumentsPage,
+  }),
+  '/control/auditoria': async () => ({
+    Component: (await import('../features/audit/AuditLogPage')).AuditLogPage,
+  }),
+  '/control/configuracion': async () => ({
+    Component: (await import('../features/settings/CompanySettingsPage')).CompanySettingsPage,
+  }),
+  '/control/reportes': async () => ({
+    Component: (await import('../features/reports/ReportsPage')).ReportsPage,
+  }),
+  '/inicio/aprobaciones': async () => ({
+    Component: (await import('../features/approvals/ApprovalInboxPage')).ApprovalInboxPage,
+  }),
+  '/proyectos/diario-de-obra': async () => ({
+    Component: (await import('../features/site/DailyReportsPage')).DailyReportsPage,
+  }),
+  '/proyectos/calidad': async () => ({
+    Component: (await import('../features/quality/QualityPage')).QualityPage,
+  }),
+  '/proyectos/seguridad': async () => ({
+    Component: (await import('../features/safety/SafetyPage')).SafetyPage,
+  }),
+  '/comercial/leads': async () => ({
+    Component: (await import('../features/commercial/LeadsPage')).LeadsPage,
+  }),
+  '/comercial/oportunidades': async () => ({
+    Component: (await import('../features/commercial/OpportunitiesPage')).OpportunitiesPage,
+  }),
+  '/comercial/clientes': async () => ({
+    Component: (await import('../features/commercial/CustomersPage')).CustomersPage,
+  }),
+  '/comercial/cotizaciones': async () => ({
+    Component: (await import('../features/commercial/QuotationsPage')).QuotationsPage,
+  }),
+  '/comercial/contratos': async () => ({
+    Component: (await import('../features/commercial/SalesContractsPage')).SalesContractsPage,
+  }),
+  '/comercial/facturacion': async () => ({
+    Component: (await import('../features/treasury/AccountsReceivablePage')).AccountsReceivablePage,
+  }),
+  '/comercial/cobros': async () => ({
+    Component: (await import('../features/treasury/AccountsReceivablePage')).AccountsReceivablePage,
+  }),
 }
 
 const applicationRoutes: RouteObject[] = navItems
   .filter((item) => item.path !== '/inicio')
-  .map((item) => ({
-    path: item.path.replace(/^\//, ''),
-    element: IMPLEMENTED_ROUTES[item.path] ?? <Navigate to="/inicio" replace />,
-  }))
+  .map((item) => {
+    const lazy = IMPLEMENTED_ROUTES[item.path]
+    return lazy
+      ? { path: item.path.replace(/^\//, ''), lazy }
+      : { path: item.path.replace(/^\//, ''), element: <Navigate to="/inicio" replace /> }
+  })
 
 export const routes: RouteObject[] = [
   { path: '/', element: <Navigate to="/inicio" replace /> },
-  { path: '/login', element: <LoginPage /> },
+  {
+    path: '/login',
+    lazy: async () => ({ Component: (await import('../pages/LoginPage')).LoginPage }),
+  },
   {
     element: <ProtectedRoute />,
     children: [
       {
         element: <AppLayout />,
-        children: [{ path: 'inicio', element: <HomePage /> }, ...applicationRoutes],
+        children: [
+          {
+            path: 'inicio',
+            lazy: async () => ({
+              Component: (await import('../features/home/HomePage')).HomePage,
+            }),
+          },
+          ...applicationRoutes,
+        ],
       },
     ],
   },

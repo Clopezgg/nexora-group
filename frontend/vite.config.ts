@@ -33,11 +33,27 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Only shell/static metadata is precached. Route JS/CSS chunks are
+        // cached on demand so the service worker does not download the whole
+        // ERP immediately after login and compete with interactive API calls.
+        globPatterns: ['**/*.{html,svg,png,webmanifest}'],
+        cleanupOutdatedCaches: true,
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /\/api\//,
             handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /\/assets\/.*\.(?:js|css)$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'nexora-static-assets',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+            },
           },
         ],
       },

@@ -31,6 +31,13 @@ permissions:
   contents: read
   packages: write
 
+# Never let two main deployments race. A newer revision must wait for the
+# current infrastructure/app rollout to finish instead of potentially being
+# overwritten by an older run that completes later.
+concurrency:
+  group: nexora-azure-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   validate:
     name: Bicep what-if

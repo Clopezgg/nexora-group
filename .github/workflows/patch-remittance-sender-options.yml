@@ -1,0 +1,169 @@
+name: Patch remittance sender options
+
+on:
+  push:
+    branches:
+      - fix/remittance-sender-options
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[remittance-sender-patch]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/remittance-sender-options
+      - name: Apply UI and test changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          page_path = Path('frontend/src/features/treasury/TreasuryPage.tsx')
+          text = page_path.read_text()
+
+          old = """const REMITTANCE_ORIGIN_ACCOUNT_TYPES: Record<RemittanceOriginType, string> = {
+            CAPITAL_CONTRIBUTION: 'EQUITY',
+            FINANCING: 'LIABILITY',
+            OTHER_INCOME: 'REVENUE',
+          }
+          """
+          new = old + """const KNOWN_REMITTANCE_SENDERS = ['Karen Vannessa Lopez Gonzalez'] as const
+          const OTHER_REMITTANCE_SENDER = '__OTHER__'
+          """
+          if old not in text:
+              raise SystemExit('origin account type block not found')
+          text = text.replace(old, new, 1)
+
+          old = "  const [sender, setSender] = useState('')\n"
+          new = "  const [senderOption, setSenderOption] = useState('')\n  const [customSender, setCustomSender] = useState('')\n"
+          if old not in text:
+              raise SystemExit('sender state not found')
+          text = text.replace(old, new, 1)
+
+          old = """  const selectedTreasuryAccount = treasuryAccounts.find((account) => account.id === treasuryAccountId)
+            const selectedCurrency = selectedTreasuryAccount?.currencyCode ?? 'HNL'
+            const eligibleCounterAccounts = counterAccounts.filter(
+          """
+          new = """  const selectedTreasuryAccount = treasuryAccounts.find((account) => account.id === treasuryAccountId)
+            const selectedCurrency = selectedTreasuryAccount?.currencyCode ?? 'HNL'
+            const sender =
+              senderOption === OTHER_REMITTANCE_SENDER ? customSender.trim() : senderOption
+            const eligibleCounterAccounts = counterAccounts.filter(
+          """
+          if old not in text:
+              raise SystemExit('selected currency block not found')
+          text = text.replace(old, new, 1)
+
+          old = """        <label className=\"nx-field\">
+                    <span className=\"nx-field__label\">Remitente</span>
+                    <input
+                      className=\"nx-input\"
+                      value={sender}
+                      onChange={(event) => setSender(event.target.value)}
+                      required
+                    />
+                  </label>
+          """
+          new = """        <Select
+                    name=\"senderOption\"
+                    label=\"Remitente\"
+                    value={senderOption}
+                    onChange={(event) => {
+                      setSenderOption(event.target.value)
+                      if (event.target.value !== OTHER_REMITTANCE_SENDER) setCustomSender('')
+                    }}
+                    required
+                  >
+                    <option value=\"\">Selecciona el remitente</option>
+                    {KNOWN_REMITTANCE_SENDERS.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                    <option value={OTHER_REMITTANCE_SENDER}>Otro — ingresar nombre completo</option>
+                  </Select>
+                  {senderOption === OTHER_REMITTANCE_SENDER ? (
+                    <Input
+                      name=\"customSender\"
+                      label=\"Nombre completo del remitente\"
+                      value={customSender}
+                      onChange={(event) => setCustomSender(event.target.value)}
+                      placeholder=\"Escribe el nombre completo\"
+                      required
+                    />
+                  ) : null}
+          """
+          if old not in text:
+              raise SystemExit('sender input block not found')
+          text = text.replace(old, new, 1)
+
+          old = """        >
+                    <option value=\"TRANSFER\">Transferencia</option>
+                    <option value=\"CASH\">Efectivo</option>
+                    <option value=\"CHECK\">Cheque</option>
+                    <option value=\"OTHER\">Otro</option>
+                  </Select>
+          """
+          new = """        >
+                    <option value=\"REMITTANCE\">Remesa</option>
+                    <option value=\"TRANSFER\">Transferencia</option>
+                    <option value=\"CASH\">Efectivo</option>
+                    <option value=\"CHECK\">Cheque</option>
+                    <option value=\"OTHER\">Otro</option>
+                  </Select>
+          """
+          if old not in text:
+              raise SystemExit('channel options block not found')
+          text = text.replace(old, new, 1)
+          page_path.write_text(text)
+
+          test_path = Path('frontend/tests/TreasuryFinancialFlows.test.tsx')
+          text = test_path.read_text()
+          old = """    expect(screen.getByRole('option', { name: /3101 · Capital y aportaciones/i })).toBeInTheDocument()
+              expect(screen.queryByRole('option', { name: /Gastos administrativos/i })).not.toBeInTheDocument()
+
+              await userEvent.selectOptions(screen.getByLabelText(/origen \\/ naturaleza/i), 'FINANCING')
+          """
+          new = """    expect(screen.getByRole('option', { name: /3101 · Capital y aportaciones/i })).toBeInTheDocument()
+              expect(screen.queryByRole('option', { name: /Gastos administrativos/i })).not.toBeInTheDocument()
+              expect(screen.getByRole('option', { name: 'Karen Vannessa Lopez Gonzalez' })).toBeInTheDocument()
+              expect(screen.getByRole('option', { name: 'Remesa' })).toBeInTheDocument()
+              await userEvent.selectOptions(screen.getByLabelText(/^Remitente$/i), '__OTHER__')
+              expect(screen.getByLabelText(/nombre completo del remitente/i)).toBeInTheDocument()
+
+              await userEvent.selectOptions(screen.getByLabelText(/origen \\/ naturaleza/i), 'FINANCING')
+          """
+          if old not in text:
+              raise SystemExit('unit test insertion point not found')
+          text = text.replace(old, new, 1)
+          test_path.write_text(text)
+
+          e2e_path = Path('frontend/e2e/critical-journey.spec.ts')
+          text = e2e_path.read_text()
+          old = """    await page.getByLabel('Cuenta contable de origen').selectOption({ label: '3100 · Aportes E2E' })
+              await page.getByLabel('Remitente').fill('Socio fundador E2E')
+              await page.getByLabel(/Monto/).fill('100000')
+          """
+          new = """    await page.getByLabel('Cuenta contable de origen').selectOption({ label: '3100 · Aportes E2E' })
+              await page.getByLabel('Remitente').selectOption('__OTHER__')
+              await page.getByLabel('Nombre completo del remitente').fill('Socio fundador E2E')
+              await page.getByLabel('Método / canal').selectOption('REMITTANCE')
+              await page.getByLabel(/Monto/).fill('100000')
+          """
+          if old not in text:
+              raise SystemExit('e2e sender block not found')
+          text = text.replace(old, new, 1)
+          e2e_path.write_text(text)
+
+          Path('.github/workflows/patch-remittance-sender-options.yml').unlink()
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "NEXORA Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add frontend/src/features/treasury/TreasuryPage.tsx frontend/tests/TreasuryFinancialFlows.test.tsx frontend/e2e/critical-journey.spec.ts .github/workflows/patch-remittance-sender-options.yml
+          git commit -m "fix(treasury): add remittance sender options [remittance-sender-patch]"
+          git push origin HEAD:fix/remittance-sender-options

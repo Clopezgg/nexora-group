@@ -49,7 +49,12 @@ const REMITTANCE_ORIGIN_ACCOUNT_TYPES: Record<RemittanceOriginType, string> = {
   FINANCING: 'LIABILITY',
   OTHER_INCOME: 'REVENUE',
 }
-const KNOWN_REMITTANCE_SENDERS = ['Karen Vannessa Lopez Gonzalez'] as const
+const KNOWN_REMITTANCE_SENDERS = [
+  'Karen Vannessa Lopez Gonzalez',
+  'Maria del Rosario Lopez Gonzalez',
+  'Davie Morales Rodriguez',
+  'Mavel Griselda Tejada',
+] as const
 const OTHER_REMITTANCE_SENDER = '__OTHER__'
 
 export function TreasuryPage() {

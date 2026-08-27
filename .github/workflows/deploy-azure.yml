@@ -6,8 +6,8 @@ name: Deploy Azure
 #     -> federated credential (OIDC) apuntando a este repo/rama, sin client secret.
 #   POSTGRES_ADMIN_PASSWORD, BACKEND_SECRET_KEY, BOOTSTRAP_ADMIN_PASSWORD, BOOTSTRAP_ADMIN_EMAIL
 #     -> GitHub Secrets, nunca en este archivo ni en el repo.
-#   AZURE_SWA_DEPLOYMENT_TOKEN
-#     -> token de deployment de la Static Web App (se obtiene del recurso ya creado).
+# El token de despliegue de Static Web Apps se obtiene en tiempo de ejecución
+# mediante la sesión OIDC y se enmascara; no se almacena como secret del repo.
 #
 # El job "deploy" tiene `environment: production` con protection rules (aprobación
 # manual) configurables en Settings > Environments del repo. No se activa solo.
@@ -39,27 +39,20 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check Azure OIDC secrets
-        id: check-secrets
         run: |
-          if [ -n "${{ secrets.AZURE_CLIENT_ID }}" ] && [ -n "${{ secrets.AZURE_TENANT_ID }}" ] && [ -n "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Azure OIDC secrets not configured — skipping Bicep what-if"
+          if [ -z "${{ secrets.AZURE_CLIENT_ID }}" ] || [ -z "${{ secrets.AZURE_TENANT_ID }}" ] || [ -z "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
+            echo "::error::Required Azure OIDC secrets are not configured"
+            exit 1
           fi
 
       - name: Azure login (OIDC)
-        id: azure-login
-        if: steps.check-secrets.outputs.configured == 'true'
         uses: azure/login@v2
-        continue-on-error: true
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: What-if (no crea recursos)
-        if: steps.check-secrets.outputs.configured == 'true' && steps.azure-login.outcome == 'success'
         run: |
           az deployment sub what-if \
             --name nexora-ci-whatif \
@@ -81,18 +74,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check Azure OIDC secrets
-        id: check-secrets-deploy
         run: |
-          if [ -n "${{ secrets.AZURE_CLIENT_ID }}" ] && [ -n "${{ secrets.AZURE_TENANT_ID }}" ] && [ -n "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Azure OIDC secrets not configured — skipping deploy"
+          if [ -z "${{ secrets.AZURE_CLIENT_ID }}" ] || [ -z "${{ secrets.AZURE_TENANT_ID }}" ] || [ -z "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
+            echo "::error::Required Azure OIDC secrets are not configured"
             exit 1
           fi
 
       - name: Azure login (OIDC)
-        if: steps.check-secrets-deploy.outputs.configured == 'true'
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -129,10 +117,25 @@ jobs:
         env:
           VITE_API_BASE_URL: /api
 
+      - name: Get Static Web Apps deployment token
+        id: swa-token
+        run: |
+          token="$(az staticwebapp secrets list \
+            --name nexora-frontend-dev \
+            --resource-group nexora-rg-dev \
+            --query properties.apiKey \
+            --output tsv)"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "::error::Azure did not return a Static Web Apps deployment token"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
       - name: Deploy frontend a Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
+          azure_static_web_apps_api_token: ${{ steps.swa-token.outputs.token }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: frontend/dist

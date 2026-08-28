@@ -2,7 +2,8 @@
 
 This is intentionally *not* an authentication replacement. Every protected
 route still performs the normal session/RBAC/company checks. The capability is
-an additional short-lived confirmation required for PUT/PATCH/DELETE requests.
+an additional short-lived confirmation required for PUT/PATCH/DELETE requests
+and is cryptographically bound to the authenticated session that requested it.
 """
 
 from __future__ import annotations
@@ -29,6 +30,14 @@ def _restore_padding(value: str) -> str:
     return value + "=" * (-len(value) % 4)
 
 
+def _session_fingerprint(session_token: str, settings: Settings) -> str:
+    return hmac.new(
+        settings.secret_key.encode("utf-8"),
+        session_token.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
 def verify_pin(pin: str, settings: Settings) -> bool:
     if not pin or len(pin) > 32:
         return False
@@ -43,10 +52,13 @@ def verify_pin(pin: str, settings: Settings) -> bool:
     return hmac.compare_digest(candidate, expected)
 
 
-def issue_capability(*, user_id: uuid.UUID, settings: Settings) -> tuple[str, int]:
+def issue_capability(
+    *, user_id: uuid.UUID, session_token: str, settings: Settings
+) -> tuple[str, int]:
     expires_at = int(time.time()) + settings.edit_access_ttl_seconds
     payload = {
         "sub": str(user_id),
+        "sid": _session_fingerprint(session_token, settings),
         "exp": expires_at,
         "purpose": "edit-access",
     }
@@ -60,8 +72,10 @@ def issue_capability(*, user_id: uuid.UUID, settings: Settings) -> tuple[str, in
     return f"{encoded_payload}.{_b64encode(signature)}", expires_at
 
 
-def verify_capability(token: str | None, settings: Settings) -> bool:
-    if not token or "." not in token:
+def verify_capability(
+    token: str | None, *, session_token: str | None, settings: Settings
+) -> bool:
+    if not token or not session_token or "." not in token:
         return False
     encoded_payload, encoded_signature = token.split(".", 1)
     expected_signature = hmac.new(
@@ -82,6 +96,12 @@ def verify_capability(token: str | None, settings: Settings) -> bool:
     try:
         expires_at = int(payload["exp"])
         uuid.UUID(str(payload["sub"]))
+        supplied_session_fingerprint = str(payload["sid"])
     except (KeyError, TypeError, ValueError):
+        return False
+    if not hmac.compare_digest(
+        supplied_session_fingerprint,
+        _session_fingerprint(session_token, settings),
+    ):
         return False
     return expires_at >= int(time.time())

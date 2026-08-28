@@ -31,6 +31,7 @@ from app.api.routes import (
     notifications,
     procurement,
     project_budget_management,
+    project_extended_control,
     project_management,
     projects,
     quality,
@@ -128,6 +129,7 @@ def create_app() -> FastAPI:
     app.include_router(projects.router, prefix="/api")
     app.include_router(project_management.router, prefix="/api")
     app.include_router(project_budget_management.router, prefix="/api")
+    app.include_router(project_extended_control.router, prefix="/api")
     app.include_router(treasury.router, prefix="/api")
     app.include_router(ap.router, prefix="/api")
     app.include_router(ar.router, prefix="/api")

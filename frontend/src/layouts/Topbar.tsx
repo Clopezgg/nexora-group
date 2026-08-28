@@ -133,7 +133,7 @@ export function Topbar({ onOpenNav }: TopbarProps) {
             <span className="nx-topbar__user-name">{user?.fullName ?? user?.email}</span>
             {primaryRole ? <span className="nx-topbar__user-role">{primaryRole}</span> : null}
           </div>
-          <button className="nx-topbar__logout" onClick={logout}>
+          <button className="nx-topbar__logout" aria-label="Cerrar sesión" onClick={logout}>
             Salir
           </button>
         </div>

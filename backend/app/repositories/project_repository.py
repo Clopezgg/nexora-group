@@ -64,3 +64,37 @@ def create_project(
     db.add(project)
     db.flush()
     return project
+
+
+def update_project(db: Session, *, project: Project, values: dict) -> Project:
+    editable = {
+        "name",
+        "code",
+        "customer_id",
+        "customer_ref",
+        "manager",
+        "currency_code",
+        "cost_center_id",
+        "planned_start",
+        "planned_end",
+        "description",
+    }
+    for key, value in values.items():
+        if key in editable:
+            setattr(project, key, value)
+    db.flush()
+    return project
+
+
+def set_project_status(
+    db: Session,
+    *,
+    project: Project,
+    status: str,
+    actual_end: date | None = None,
+) -> Project:
+    project.status = status
+    if actual_end is not None:
+        project.actual_end = actual_end
+    db.flush()
+    return project

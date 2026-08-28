@@ -25,7 +25,12 @@ def register_edit_access_guard(app: FastAPI) -> None:
             and request.url.path.startswith("/api/")
         ):
             capability = request.headers.get("x-nexora-edit-access")
-            if not edit_access_service.verify_capability(capability, settings):
+            session_token = request.cookies.get(settings.session_cookie_name)
+            if not edit_access_service.verify_capability(
+                capability,
+                session_token=session_token,
+                settings=settings,
+            ):
                 return JSONResponse(
                     status_code=status.HTTP_428_PRECONDITION_REQUIRED,
                     content={

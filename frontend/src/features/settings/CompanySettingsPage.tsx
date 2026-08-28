@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Badge,
@@ -20,55 +20,25 @@ import type { FiscalPeriod, FiscalPeriodStatus, FiscalYear } from '../../types/f
 import type { Company } from '../../types/masterData'
 import { statusLabel } from '../../utils/statusLabels'
 
-const EMPTY_COMPANY_FORM = {
-  name: '',
-  code: '',
-  legalName: '',
-  fiscalId: '',
-  country: 'HN',
-  functionalCurrencyCode: 'HNL',
-}
-
-export function CompanySettingsPage() {
-  const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
+function CompanyProfileForm({ company }: { company: Company }) {
   const queryClient = useQueryClient()
-  const selectedCompany = companies.find((company) => company.id === activeCompanyId) ?? null
-  const [form, setForm] = useState(EMPTY_COMPANY_FORM)
-
-  useEffect(() => {
-    if (!selectedCompany) {
-      setForm(EMPTY_COMPANY_FORM)
-      return
-    }
-    setForm({
-      name: selectedCompany.name,
-      code: selectedCompany.code ?? '',
-      legalName: selectedCompany.legalName ?? '',
-      fiscalId: selectedCompany.fiscalId ?? '',
-      country: selectedCompany.country ?? 'HN',
-      functionalCurrencyCode: selectedCompany.functionalCurrencyCode ?? 'HNL',
-    })
-  }, [selectedCompany])
-
-  const yearsQuery = useQuery({
-    queryKey: ['fiscal', 'years', activeCompanyId],
-    queryFn: () => fiscalService.listYears(activeCompanyId as string),
-    enabled: Boolean(activeCompanyId),
-  })
-  const periodsQuery = useQuery({
-    queryKey: ['fiscal', 'periods', activeCompanyId],
-    queryFn: () => fiscalService.listPeriods(activeCompanyId as string),
-    enabled: Boolean(activeCompanyId),
+  const [form, setForm] = useState({
+    name: company.name,
+    code: company.code ?? '',
+    legalName: company.legalName ?? '',
+    fiscalId: company.fiscalId ?? '',
+    country: company.country ?? 'HN',
+    functionalCurrencyCode: company.functionalCurrencyCode ?? 'HNL',
   })
 
   const updateMutation = useMutation({
-    mutationFn: () => masterDataService.updateCompany(selectedCompany!.id, {
+    mutationFn: () => masterDataService.updateCompany(company.id, {
       name: form.name,
-      code: selectedCompany?.code ? undefined : form.code || undefined,
+      code: company.code ? undefined : form.code || undefined,
       legalName: form.legalName,
       fiscalId: form.fiscalId,
       country: form.country,
-      functionalCurrencyCode: selectedCompany?.functionalCurrencyCode ? undefined : form.functionalCurrencyCode,
+      functionalCurrencyCode: company.functionalCurrencyCode ? undefined : form.functionalCurrencyCode,
     }),
     onSuccess: (updatedCompany: Company) => {
       queryClient.invalidateQueries({ queryKey: ['master-data', 'companies'] })
@@ -81,6 +51,53 @@ export function CompanySettingsPage() {
         functionalCurrencyCode: updatedCompany.functionalCurrencyCode ?? 'HNL',
       })
     },
+  })
+
+  return (
+    <form onSubmit={(event) => { event.preventDefault(); updateMutation.mutate() }}>
+      <Input label="Nombre" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+      <Input
+        label={company.code ? 'Código · inmutable' : 'Código · se asigna una sola vez'}
+        value={form.code}
+        onChange={(event) => setForm({ ...form, code: event.target.value })}
+        disabled={Boolean(company.code)}
+        required={!company.code}
+      />
+      <Input label="Razón social" value={form.legalName} onChange={(event) => setForm({ ...form, legalName: event.target.value })} />
+      <Input label="Identificación fiscal / RTN" value={form.fiscalId} onChange={(event) => setForm({ ...form, fiscalId: event.target.value })} />
+      <Select label="País" value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })}>
+        <option value="HN">HN — Honduras</option>
+      </Select>
+      <Select
+        label={company.functionalCurrencyCode ? 'Moneda funcional · inmutable' : 'Moneda funcional · se asigna una sola vez'}
+        value={form.functionalCurrencyCode}
+        onChange={(event) => setForm({ ...form, functionalCurrencyCode: event.target.value })}
+        disabled={Boolean(company.functionalCurrencyCode)}
+      >
+        <option value="HNL">HNL — Lempira hondureño</option>
+        <option value="USD">USD — Dólar estadounidense</option>
+      </Select>
+      <Button type="submit" loading={updateMutation.isPending} disabled={!form.name.trim() || (!company.code && !form.code.trim())}>Guardar cambios</Button>
+      {updateMutation.isSuccess ? <p className="nx-field__hint" role="status">Cambios guardados.</p> : null}
+      {updateMutation.isError ? <p className="nx-field__error" role="alert">{(updateMutation.error as Error).message}</p> : null}
+    </form>
+  )
+}
+
+export function CompanySettingsPage() {
+  const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
+  const queryClient = useQueryClient()
+  const selectedCompany = companies.find((company) => company.id === activeCompanyId) ?? null
+
+  const yearsQuery = useQuery({
+    queryKey: ['fiscal', 'years', activeCompanyId],
+    queryFn: () => fiscalService.listYears(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const periodsQuery = useQuery({
+    queryKey: ['fiscal', 'periods', activeCompanyId],
+    queryFn: () => fiscalService.listPeriods(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
   })
 
   const [yearForm, setYearForm] = useState({ code: '', startDate: '', endDate: '' })
@@ -150,33 +167,7 @@ export function CompanySettingsPage() {
 
       {selectedCompany ? (
         <Card title="Perfil de la compañía">
-          <form onSubmit={(event) => { event.preventDefault(); updateMutation.mutate() }}>
-            <Input label="Nombre" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-            <Input
-              label={selectedCompany.code ? 'Código · inmutable' : 'Código · se asigna una sola vez'}
-              value={form.code}
-              onChange={(event) => setForm({ ...form, code: event.target.value })}
-              disabled={Boolean(selectedCompany.code)}
-              required={!selectedCompany.code}
-            />
-            <Input label="Razón social" value={form.legalName} onChange={(event) => setForm({ ...form, legalName: event.target.value })} />
-            <Input label="Identificación fiscal / RTN" value={form.fiscalId} onChange={(event) => setForm({ ...form, fiscalId: event.target.value })} />
-            <Select label="País" value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })}>
-              <option value="HN">HN — Honduras</option>
-            </Select>
-            <Select
-              label={selectedCompany.functionalCurrencyCode ? 'Moneda funcional · inmutable' : 'Moneda funcional · se asigna una sola vez'}
-              value={form.functionalCurrencyCode}
-              onChange={(event) => setForm({ ...form, functionalCurrencyCode: event.target.value })}
-              disabled={Boolean(selectedCompany.functionalCurrencyCode)}
-            >
-              <option value="HNL">HNL — Lempira hondureño</option>
-              <option value="USD">USD — Dólar estadounidense</option>
-            </Select>
-            <Button type="submit" loading={updateMutation.isPending} disabled={!form.name.trim() || (!selectedCompany.code && !form.code.trim())}>Guardar cambios</Button>
-            {updateMutation.isSuccess ? <p className="nx-field__hint" role="status">Cambios guardados.</p> : null}
-            {updateMutation.isError ? <p className="nx-field__error" role="alert">{(updateMutation.error as Error).message}</p> : null}
-          </form>
+          <CompanyProfileForm key={selectedCompany.id} company={selectedCompany} />
         </Card>
       ) : null}
 

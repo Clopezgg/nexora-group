@@ -9,8 +9,8 @@ name: Deploy Azure
 # El token de despliegue de Static Web Apps se obtiene en tiempo de ejecución
 # mediante la sesión OIDC y se enmascara; no se almacena como secret del repo.
 #
-# El job "deploy" tiene `environment: production` con protection rules (aprobación
-# manual) configurables en Settings > Environments del repo. No se activa solo.
+# El job "deploy" solo puede ejecutarse mediante workflow_dispatch con el
+# booleano `deploy` confirmado. Los pushes y pull requests nunca despliegan.
 
 on:
   pull_request:
@@ -24,7 +24,17 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/deploy-azure.yml"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Confirmo que este run puede desplegar recursos Azure DEV"
+        required: true
+        type: boolean
+        default: false
+      reason:
+        description: "Motivo o cambio que autoriza este despliegue"
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -74,11 +84,22 @@ jobs:
   deploy:
     name: Deploy infra + apps
     needs: validate
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy
     runs-on: ubuntu-latest
-    environment: production
+    environment: development
     steps:
       - uses: actions/checkout@v4
+
+      - name: Record deployment authorization
+        env:
+          DEPLOY_REASON: ${{ inputs.reason }}
+        run: |
+          {
+            echo "### Manual deployment authorization"
+            echo "- Requested by: ${{ github.actor }}"
+            echo "- Reason: $DEPLOY_REASON"
+            echo "- Target: Azure DEV (nexora-rg-dev)"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check Azure OIDC secrets
         run: |

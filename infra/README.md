@@ -1,14 +1,19 @@
 # Infraestructura Azure (Bicep)
 
 
-Recursos verificados en `nexora-rg-dev`: Azure Static Web Apps Standard, Container Apps, Azure Database for PostgreSQL, Storage Account/Blob, Key Vault, Log Analytics y Application Insights. Static Web Apps enlaza el Container App como backend de mismo origen bajo `/api`; el ingreso directo del Container App queda protegido por esa integración.
+Recursos DEV observados en `nexora-rg-dev`: Azure Static Web Apps Standard,
+Container Apps, Azure Database for PostgreSQL, Storage Account/Blob, Key
+Vault, Log Analytics y Application Insights. Static Web Apps enlaza el
+Container App como backend de mismo origen bajo `/api`; el ingreso directo del
+Container App queda protegido por esa integración.
 
-Última evidencia antes de PR #11: Deploy Azure run #21 en verde; `/api/healthz` y `/api/readyz` respondieron HTTP 200 desde el dominio público.
+El run `33134425882` desplegó y verificó este entorno DEV. Esa evidencia no
+certifica un entorno PROD ni autoriza despliegues posteriores.
 
-Infraestructura como código para Nexora Group. Ningún recurso ha sido
-provisionado todavía — este directorio se validó únicamente con
-`az bicep build` (compila) y `az deployment sub what-if` (simula el plan de
-despliegue sin crear nada, costo cero).
+Infraestructura como código para Nexora Group. `az bicep build` compila los
+templates sin crear recursos y `az deployment sub what-if` muestra el cambio
+propuesto. El workflow valida automáticamente; un despliegue real exige un
+`workflow_dispatch` manual con `deploy=true` y una razón explícita.
 
 ## Recursos
 
@@ -18,8 +23,8 @@ despliegue sin crear nada, costo cero).
 | `modules/keyvault.bicep` | Key Vault (RBAC) | Standard |
 | `modules/storage.bicep` | Storage Account + contenedor `evidence` | Standard_LRS, tier Cool |
 | `modules/postgres.bicep` | PostgreSQL Flexible Server 16 | Burstable B1ms, 32GB |
-| `modules/containerapps.bicep` | Container Apps Environment + Container App (backend) + identidad administrada | Consumption, scale-to-zero |
-| `modules/staticwebapp.bicep` | Static Web App (frontend) | Free |
+| `modules/containerapps.bicep` | Container Apps Environment + Container App (backend) + identidad administrada | Consumption, mínimo 1 réplica |
+| `modules/staticwebapp.bicep` | Static Web App (frontend) | Standard |
 
 `main.bicep` orquesta todo a nivel de suscripción (crea el resource group
 `nexora-rg-<environment>` y despliega los módulos dentro).
@@ -60,7 +65,7 @@ az deployment sub what-if \
                bootstrapAdminEmail='admin@nexora.group'
 ```
 
-## Desplegar de verdad (crea recursos facturables)
+## Desplegar de verdad (crea o modifica recursos facturables)
 
 Requiere decisión explícita del usuario — no se ejecuta automáticamente.
 
@@ -84,5 +89,6 @@ pasar los secretos por línea de comandos/CI secrets como en el ejemplo.
 
 Para el deploy vía CI, ver `.github/workflows/deploy-azure.yml`: requiere
 configurar `AZURE_CLIENT_ID`/`AZURE_TENANT_ID`/`AZURE_SUBSCRIPTION_ID` (OIDC,
-sin client secret) y los secrets de aplicación en GitHub, y aprobar el
-environment `production`.
+sin client secret) y los secrets de aplicación en GitHub. Solo un dispatch
+manual con `deploy=true` ejecuta el job; los eventos `push` y `pull_request`
+se limitan a validación.

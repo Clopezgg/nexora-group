@@ -20,6 +20,39 @@ def list_wbs_for_project(db: Session, project_id: uuid.UUID) -> list[WBSNode]:
     return list(db.execute(stmt).scalars())
 
 
+def get_wbs_node(db: Session, node_id: uuid.UUID) -> WBSNode | None:
+    return db.get(WBSNode, node_id)
+
+
+def _validated_parent(
+    db: Session,
+    *,
+    project_id: uuid.UUID,
+    parent_id: uuid.UUID | None,
+    node_id: uuid.UUID | None = None,
+) -> WBSNode | None:
+    if parent_id is None:
+        return None
+    if node_id is not None and parent_id == node_id:
+        raise ValueError("Un nodo WBS no puede ser su propio padre")
+    parent = db.get(WBSNode, parent_id)
+    if parent is None:
+        raise ValueError(f"WBSNode padre {parent_id} no existe")
+    if parent.project_id != project_id:
+        raise ValueError("El nodo padre debe pertenecer al mismo proyecto")
+    if node_id is not None:
+        cursor: WBSNode | None = parent
+        visited: set[uuid.UUID] = set()
+        while cursor is not None:
+            if cursor.id == node_id:
+                raise ValueError("La jerarquía WBS no puede contener ciclos")
+            if cursor.id in visited:
+                raise ValueError("La jerarquía WBS existente contiene un ciclo")
+            visited.add(cursor.id)
+            cursor = db.get(WBSNode, cursor.parent_id) if cursor.parent_id else None
+    return parent
+
+
 def create_wbs_node(
     db: Session,
     *,
@@ -31,17 +64,13 @@ def create_wbs_node(
     planned_start: date | None = None,
     planned_finish: date | None = None,
 ) -> WBSNode:
-    level = 0
-    if parent_id is not None:
-        parent = db.get(WBSNode, parent_id)
-        if parent is None:
-            raise ValueError(f"WBSNode padre {parent_id} no existe")
-        level = parent.level + 1
+    parent = _validated_parent(db, project_id=project_id, parent_id=parent_id)
+    level = parent.level + 1 if parent is not None else 0
     node = WBSNode(
         project_id=project_id,
         parent_id=parent_id,
-        code=code,
-        name=name,
+        code=code.strip(),
+        name=name.strip(),
         level=level,
         manager=manager,
         planned_start=planned_start,
@@ -49,6 +78,44 @@ def create_wbs_node(
         status="PLANNING",
     )
     db.add(node)
+    db.flush()
+    return node
+
+
+def update_wbs_node(
+    db: Session,
+    *,
+    node: WBSNode,
+    values: dict,
+) -> WBSNode:
+    new_parent_id = values.get("parent_id", node.parent_id)
+    parent = _validated_parent(
+        db,
+        project_id=node.project_id,
+        parent_id=new_parent_id,
+        node_id=node.id,
+    )
+    new_level = parent.level + 1 if parent is not None else 0
+    level_delta = new_level - node.level
+
+    for field in ("code", "name", "manager", "planned_start", "planned_finish", "status", "progress_percent"):
+        if field in values:
+            setattr(node, field, values[field])
+    if "parent_id" in values:
+        node.parent_id = new_parent_id
+    node.level = new_level
+
+    if level_delta:
+        descendants = list_wbs_for_project(db, node.project_id)
+        children_by_parent: dict[uuid.UUID, list[WBSNode]] = {}
+        for candidate in descendants:
+            if candidate.parent_id is not None:
+                children_by_parent.setdefault(candidate.parent_id, []).append(candidate)
+        stack = list(children_by_parent.get(node.id, []))
+        while stack:
+            descendant = stack.pop()
+            descendant.level += level_delta
+            stack.extend(children_by_parent.get(descendant.id, []))
     db.flush()
     return node
 

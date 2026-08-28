@@ -38,28 +38,36 @@ def _seed_target_with_nullable_contract(db_session):
     return project.id, contract.id
 
 
+def _drop_alembic_version(db_session):
+    db_session.execute(text("DROP TABLE IF EXISTS alembic_version"))
+    db_session.commit()
+
+
 def test_preflight_detaches_nullable_reference_and_records_audit(db_session):
     project_id, contract_id = _seed_target_with_nullable_contract(db_session)
 
-    run_authorized_project_reset_preflight()
+    try:
+        run_authorized_project_reset_preflight()
 
-    db_session.expire_all()
-    contract = db_session.get(SupplierContract, contract_id)
-    assert contract is not None
-    assert contract.project_id is None
-    assert db_session.get(Project, project_id) is not None  # Alembic owns the deletion itself.
+        db_session.expire_all()
+        contract = db_session.get(SupplierContract, contract_id)
+        assert contract is not None
+        assert contract.project_id is None
+        assert db_session.get(Project, project_id) is not None  # Alembic owns the deletion itself.
 
-    row = db_session.execute(
-        text(
-            "SELECT action, entity_id, project_id, after->>'deletedByAuthorizedReset' "
-            "FROM audit_logs WHERE entity_id=:project_id"
-        ),
-        {"project_id": project_id},
-    ).one()
-    assert row[0] == "project.reset.authorized"
-    assert row[1] == project_id
-    assert row[2] is None
-    assert row[3] == "true"
+        row = db_session.execute(
+            text(
+                "SELECT action, entity_id, project_id, after->>'deletedByAuthorizedReset' "
+                "FROM audit_logs WHERE entity_id=:project_id"
+            ),
+            {"project_id": project_id},
+        ).one()
+        assert row[0] == "project.reset.authorized"
+        assert row[1] == project_id
+        assert row[2] is None
+        assert row[3] == "true"
+    finally:
+        _drop_alembic_version(db_session)
 
 
 def test_preflight_aborts_if_a_mandatory_reference_exists(db_session):
@@ -77,10 +85,14 @@ def test_preflight_aborts_if_a_mandatory_reference_exists(db_session):
     )
     db_session.commit()
 
-    with pytest.raises(RuntimeError, match="mandatory references"):
-        run_authorized_project_reset_preflight()
+    try:
+        with pytest.raises(RuntimeError, match="mandatory references"):
+            run_authorized_project_reset_preflight()
 
-    db_session.expire_all()
-    contract = db_session.get(SupplierContract, contract_id)
-    assert contract is not None
-    assert contract.project_id == project_id
+        db_session.expire_all()
+        contract = db_session.get(SupplierContract, contract_id)
+        assert contract is not None
+        assert contract.project_id == project_id
+    finally:
+        db_session.execute(text("DROP TABLE IF EXISTS project_reset_blocker"))
+        _drop_alembic_version(db_session)

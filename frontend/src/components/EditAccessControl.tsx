@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { Badge, Button, Input, Modal } from '../design-system'
 import { editAccessService } from '../services/editAccessService'
 import { ApiError } from '../services/httpClient'

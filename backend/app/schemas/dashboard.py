@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import Field
 
 from app.schemas.base import CamelModel
@@ -26,3 +28,7 @@ class DashboardSummaryResponse(CamelModel):
     cash_flow: list[CashFlowPointResponse] = Field(default_factory=list)
     expenses_by_scope: list[ScopeAmountResponse] = Field(default_factory=list)
     currency: str = "HNL"
+    fiscal_period_label: str | None = None
+    fiscal_period_status: str | None = None
+    fiscal_period_start: date | None = None
+    fiscal_period_end: date | None = None

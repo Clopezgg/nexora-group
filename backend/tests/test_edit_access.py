@@ -19,12 +19,13 @@ def _configure_test_pin(settings, pin: str) -> None:
     settings.edit_access_token_digest = base64.urlsafe_b64encode(digest).decode("ascii")
 
 
-def test_edit_pin_is_hashed_and_capability_is_signed_and_tamper_proof():
+def test_edit_pin_is_hashed_and_capability_is_signed_tamper_proof_and_session_bound():
     settings = get_settings()
     old_salt = settings.edit_access_token_salt
     old_digest = settings.edit_access_token_digest
     old_ttl = settings.edit_access_ttl_seconds
     test_pin = "246810"
+    session_token = "test-session-a"
     try:
         _configure_test_pin(settings, test_pin)
         assert edit_access_service.verify_pin(test_pin, settings)
@@ -33,20 +34,31 @@ def test_edit_pin_is_hashed_and_capability_is_signed_and_tamper_proof():
         import uuid
 
         capability, expires_at = edit_access_service.issue_capability(
-            user_id=uuid.uuid4(), settings=settings
+            user_id=uuid.uuid4(), session_token=session_token, settings=settings
         )
         assert expires_at > 0
-        assert edit_access_service.verify_capability(capability, settings)
+        assert edit_access_service.verify_capability(
+            capability, session_token=session_token, settings=settings
+        )
+        assert not edit_access_service.verify_capability(
+            capability, session_token="different-session", settings=settings
+        )
 
         payload, signature = capability.split(".", 1)
         replacement = "A" if signature[-1] != "A" else "B"
         assert not edit_access_service.verify_capability(
-            f"{payload}.{signature[:-1]}{replacement}", settings
+            f"{payload}.{signature[:-1]}{replacement}",
+            session_token=session_token,
+            settings=settings,
         )
 
         settings.edit_access_ttl_seconds = -1
-        expired, _ = edit_access_service.issue_capability(user_id=uuid.uuid4(), settings=settings)
-        assert not edit_access_service.verify_capability(expired, settings)
+        expired, _ = edit_access_service.issue_capability(
+            user_id=uuid.uuid4(), session_token=session_token, settings=settings
+        )
+        assert not edit_access_service.verify_capability(
+            expired, session_token=session_token, settings=settings
+        )
     finally:
         settings.edit_access_token_salt = old_salt
         settings.edit_access_token_digest = old_digest

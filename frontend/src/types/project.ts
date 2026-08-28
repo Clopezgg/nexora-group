@@ -16,6 +16,8 @@ export type ProjectStatus =
   | 'CLOSED'
   | 'CANCELLED'
 
+export type WBSStatus = 'PLANNING' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED'
+
 export interface Project {
   id: string
   companyId: string
@@ -72,10 +74,18 @@ export interface WBSNode {
   name: string
   level: number
   manager: string | null
-  status: string
+  status: WBSStatus
   plannedStart: string | null
   plannedFinish: string | null
   progressPercent: string
+}
+
+export interface WBSFinancialSummary {
+  wbsNodeId: string
+  authorized: string
+  committed: string | null
+  actualCost: string | null
+  variance: string | null
 }
 
 export interface BudgetLine {
@@ -125,6 +135,7 @@ export interface ChangeOrder {
   reason: string
   scopeChange: string | null
   budgetChangeAmount: string
+  contractChangeAmount: string
   scheduleChangeDays: number | null
   requestedBy: string
   approvedBy: string | null

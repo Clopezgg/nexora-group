@@ -14,6 +14,23 @@ function stubAuthenticatedFetch(roles: string[], dashboard?: Record<string, unkn
           json: async () => ({ id: 'u1', email: 'user@nexora.group', fullName: 'Usuaria Demo', roles }),
         } as Response)
       }
+      if (url.includes('/master-data/companies')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              id: 'c1',
+              name: 'NEXORA GROUP',
+              code: null,
+              legalName: null,
+              functionalCurrencyCode: 'HNL',
+              country: null,
+              fiscalId: null,
+            },
+          ],
+        } as Response)
+      }
       if (url.includes('/dashboard/summary') && dashboard) {
         return Promise.resolve({ ok: true, status: 200, json: async () => dashboard } as Response)
       }

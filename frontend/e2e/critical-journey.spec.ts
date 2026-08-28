@@ -44,23 +44,23 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
   let companyId = ''
   let projectId = ''
   await test.step('company + project + ActiveUIContext', async () => {
+    const company = await api<any>(page.request, 'post', '/master-data/companies', {
+      name: 'Constructora E2E',
+      functionalCurrencyCode: 'HNL',
+    })
+    companyId = company.id
+
     await page.goto('/proyectos')
-    await page.getByLabel('Nombre de la compañía').fill('Constructora E2E')
-    await page.getByRole('button', { name: 'Crear compañía' }).click()
     await expect(page.getByText('Nuevo proyecto')).toBeVisible({ timeout: 10_000 })
 
     await page.getByLabel('Nombre', { exact: true }).fill('Torre Critical Journey')
     await page.getByLabel('Código (opcional)').fill('CJ-001')
     await page.getByRole('button', { name: 'Crear proyecto' }).click()
-    await expect(page.getByText('Torre Critical Journey')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('button', { name: 'Torre Critical Journey', exact: true })).toBeVisible({ timeout: 10_000 })
 
-    await page.getByRole('button', { name: 'Usar como activo' }).click()
-    await expect(page.getByLabel('Proyecto activo')).toBeVisible()
+    await page.getByRole('button', { name: 'Seleccionar', exact: true }).click()
+    await expect(page.getByLabel('Proyecto seleccionado')).toHaveValue(/.+/)
 
-    const companies = await api<any[]>(page.request, 'get', '/master-data/companies')
-    const company = companies.find((c) => c.name === 'Constructora E2E')
-    expect(company).toBeTruthy()
-    companyId = company.id
     const projects = await api<any[]>(page.request, 'get', `/projects?company_id=${companyId}`)
     const project = projects.find((p: any) => p.name === 'Torre Critical Journey')
     expect(project).toBeTruthy()
@@ -70,10 +70,10 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
   // 4. WBS
   await test.step('WBS', async () => {
     await page.goto('/proyectos/wbs')
-    await page.getByPlaceholder('02.01').fill('01')
-    await page.getByPlaceholder('EXCAVACIÓN').fill('Movimiento de tierra')
-    await page.getByRole('button', { name: 'Agregar nodo' }).click()
-    await expect(page.getByRole('listitem').filter({ hasText: 'Movimiento de tierra' })).toBeVisible({
+    await page.getByLabel('Código', { exact: true }).fill('01')
+    await page.getByLabel('Nombre', { exact: true }).fill('Movimiento de tierra')
+    await page.getByRole('button', { name: 'Crear nodo' }).click()
+    await expect(page.getByRole('row').filter({ hasText: 'Movimiento de tierra' })).toBeVisible({
       timeout: 10_000,
     })
   })
@@ -344,7 +344,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     })
 
     await page.goto('/comercial/contratos')
-    await expect(page.getByText(/E2E/)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('cell', { name: 'SC-E2E-001', exact: true })).toBeVisible({ timeout: 10_000 })
   })
 
   // 32. workflow/approvals UI -> 33. notifications

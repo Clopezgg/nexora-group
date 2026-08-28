@@ -20,24 +20,74 @@ import type { FiscalPeriod, FiscalPeriodStatus, FiscalYear } from '../../types/f
 import type { Company } from '../../types/masterData'
 import { statusLabel } from '../../utils/statusLabels'
 
+function CompanyProfileForm({ company }: { company: Company }) {
+  const queryClient = useQueryClient()
+  const [form, setForm] = useState({
+    name: company.name,
+    code: company.code ?? '',
+    legalName: company.legalName ?? '',
+    fiscalId: company.fiscalId ?? '',
+    country: company.country ?? 'HN',
+    functionalCurrencyCode: company.functionalCurrencyCode ?? 'HNL',
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: () => masterDataService.updateCompany(company.id, {
+      name: form.name,
+      code: company.code ? undefined : form.code || undefined,
+      legalName: form.legalName,
+      fiscalId: form.fiscalId,
+      country: form.country,
+      functionalCurrencyCode: company.functionalCurrencyCode ? undefined : form.functionalCurrencyCode,
+    }),
+    onSuccess: (updatedCompany: Company) => {
+      queryClient.invalidateQueries({ queryKey: ['master-data', 'companies'] })
+      setForm({
+        name: updatedCompany.name,
+        code: updatedCompany.code ?? '',
+        legalName: updatedCompany.legalName ?? '',
+        fiscalId: updatedCompany.fiscalId ?? '',
+        country: updatedCompany.country ?? 'HN',
+        functionalCurrencyCode: updatedCompany.functionalCurrencyCode ?? 'HNL',
+      })
+    },
+  })
+
+  return (
+    <form onSubmit={(event) => { event.preventDefault(); updateMutation.mutate() }}>
+      <Input label="Nombre" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+      <Input
+        label={company.code ? 'Código · inmutable' : 'Código · se asigna una sola vez'}
+        value={form.code}
+        onChange={(event) => setForm({ ...form, code: event.target.value })}
+        disabled={Boolean(company.code)}
+        required={!company.code}
+      />
+      <Input label="Razón social" value={form.legalName} onChange={(event) => setForm({ ...form, legalName: event.target.value })} />
+      <Input label="Identificación fiscal / RTN" value={form.fiscalId} onChange={(event) => setForm({ ...form, fiscalId: event.target.value })} />
+      <Select label="País" value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })}>
+        <option value="HN">HN — Honduras</option>
+      </Select>
+      <Select
+        label={company.functionalCurrencyCode ? 'Moneda funcional · inmutable' : 'Moneda funcional · se asigna una sola vez'}
+        value={form.functionalCurrencyCode}
+        onChange={(event) => setForm({ ...form, functionalCurrencyCode: event.target.value })}
+        disabled={Boolean(company.functionalCurrencyCode)}
+      >
+        <option value="HNL">HNL — Lempira hondureño</option>
+        <option value="USD">USD — Dólar estadounidense</option>
+      </Select>
+      <Button type="submit" loading={updateMutation.isPending} disabled={!form.name.trim() || (!company.code && !form.code.trim())}>Guardar cambios</Button>
+      {updateMutation.isSuccess ? <p className="nx-field__hint" role="status">Cambios guardados.</p> : null}
+      {updateMutation.isError ? <p className="nx-field__error" role="alert">{(updateMutation.error as Error).message}</p> : null}
+    </form>
+  )
+}
+
 export function CompanySettingsPage() {
   const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
   const queryClient = useQueryClient()
   const selectedCompany = companies.find((company) => company.id === activeCompanyId) ?? null
-
-  const [syncedCompanyId, setSyncedCompanyId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', code: '', legalName: '', fiscalId: '', country: 'HN', functionalCurrencyCode: 'HNL' })
-  if (selectedCompany && selectedCompany.id !== syncedCompanyId) {
-    setSyncedCompanyId(selectedCompany.id)
-    setForm({
-      name: selectedCompany.name,
-      code: selectedCompany.code ?? '',
-      legalName: selectedCompany.legalName ?? '',
-      fiscalId: selectedCompany.fiscalId ?? '',
-      country: selectedCompany.country ?? 'HN',
-      functionalCurrencyCode: selectedCompany.functionalCurrencyCode ?? 'HNL',
-    })
-  }
 
   const yearsQuery = useQuery({
     queryKey: ['fiscal', 'years', activeCompanyId],
@@ -48,22 +98,6 @@ export function CompanySettingsPage() {
     queryKey: ['fiscal', 'periods', activeCompanyId],
     queryFn: () => fiscalService.listPeriods(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: () => masterDataService.updateCompany(selectedCompany!.id, {
-      name: form.name,
-      code: selectedCompany?.code ? undefined : form.code || undefined,
-      legalName: form.legalName,
-      fiscalId: form.fiscalId,
-      country: form.country,
-      functionalCurrencyCode: selectedCompany?.functionalCurrencyCode ? undefined : form.functionalCurrencyCode,
-    }),
-    onSuccess: (updatedCompany: Company) => {
-      queryClient.invalidateQueries({ queryKey: ['master-data', 'companies'] })
-      setSyncedCompanyId(null)
-      setForm((current) => ({ ...current, name: updatedCompany.name }))
-    },
   })
 
   const [yearForm, setYearForm] = useState({ code: '', startDate: '', endDate: '' })
@@ -100,8 +134,8 @@ export function CompanySettingsPage() {
   if (isError) return <ErrorState description="No se pudieron cargar las compañías." onRetry={() => refetch()} />
   if (companies.length === 0) return <EmptyState icon="tool" title="No hay compañías registradas" description="Crea una compañía antes de editar su perfil." />
 
-  const years = yearsQuery.data ?? []
-  const periods = periodsQuery.data ?? []
+  const years = Array.isArray(yearsQuery.data) ? yearsQuery.data : []
+  const periods = Array.isArray(periodsQuery.data) ? periodsQuery.data : []
   const yearById = new Map(years.map((year) => [year.id, year]))
   const periodColumns: TableColumn<FiscalPeriod>[] = [
     { key: 'period', header: 'Período', render: (row) => `${yearById.get(row.fiscalYearId)?.code ?? ''} · P${String(row.periodNumber).padStart(2, '0')}` },
@@ -133,33 +167,7 @@ export function CompanySettingsPage() {
 
       {selectedCompany ? (
         <Card title="Perfil de la compañía">
-          <form onSubmit={(event) => { event.preventDefault(); updateMutation.mutate() }}>
-            <Input label="Nombre" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-            <Input
-              label={selectedCompany.code ? 'Código · inmutable' : 'Código · se asigna una sola vez'}
-              value={form.code}
-              onChange={(event) => setForm({ ...form, code: event.target.value })}
-              disabled={Boolean(selectedCompany.code)}
-              required={!selectedCompany.code}
-            />
-            <Input label="Razón social" value={form.legalName} onChange={(event) => setForm({ ...form, legalName: event.target.value })} />
-            <Input label="Identificación fiscal / RTN" value={form.fiscalId} onChange={(event) => setForm({ ...form, fiscalId: event.target.value })} />
-            <Select label="País" value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })}>
-              <option value="HN">HN — Honduras</option>
-            </Select>
-            <Select
-              label={selectedCompany.functionalCurrencyCode ? 'Moneda funcional · inmutable' : 'Moneda funcional · se asigna una sola vez'}
-              value={form.functionalCurrencyCode}
-              onChange={(event) => setForm({ ...form, functionalCurrencyCode: event.target.value })}
-              disabled={Boolean(selectedCompany.functionalCurrencyCode)}
-            >
-              <option value="HNL">HNL — Lempira hondureño</option>
-              <option value="USD">USD — Dólar estadounidense</option>
-            </Select>
-            <Button type="submit" loading={updateMutation.isPending} disabled={!form.name.trim() || (!selectedCompany.code && !form.code.trim())}>Guardar cambios</Button>
-            {updateMutation.isSuccess ? <p className="nx-field__hint" role="status">Cambios guardados.</p> : null}
-            {updateMutation.isError ? <p className="nx-field__error" role="alert">{(updateMutation.error as Error).message}</p> : null}
-          </form>
+          <CompanyProfileForm key={selectedCompany.id} company={selectedCompany} />
         </Card>
       ) : null}
 

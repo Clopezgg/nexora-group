@@ -1,4 +1,4 @@
-import { forwardRef, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { forwardRef, useId, type ReactNode, type SelectHTMLAttributes } from 'react'
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
@@ -8,7 +8,8 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, id, className, children, ...rest }, ref) => {
-    const selectId = id ?? rest.name
+    const generatedId = useId()
+    const selectId = id ?? rest.name ?? generatedId
     return (
       <div className="nx-field">
         {label ? (

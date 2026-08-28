@@ -22,16 +22,24 @@ export const documentService = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-
-  // Sube el archivo real (multipart/form-data) a Azure Blob vía el backend
-  // y devuelve la metadata de Evidence -- el `id` resultante es lo que
-  // documentService.create/addVersion esperan como `evidenceId`. Si el
-  // backend no tiene EVIDENCE_BACKEND configurado, esta llamada rechaza con
-  // un 503 real (NXR-EVIDENCE-001), nunca con una URL fabricada.
-  uploadEvidence: (companyId: string, file: File, category?: string) => {
+  listEvidence: (companyId: string, entityType?: string, entityId?: string) => {
+    const params = new URLSearchParams({ companyId })
+    if (entityType) params.set('entityType', entityType)
+    if (entityId) params.set('entityId', entityId)
+    return apiFetch<Evidence[]>(`/evidence?${params.toString()}`)
+  },
+  uploadEvidence: (
+    companyId: string,
+    file: File,
+    category?: string,
+    entityType?: string,
+    entityId?: string,
+  ) => {
     const formData = new FormData()
     formData.append('companyId', companyId)
     if (category) formData.append('category', category)
+    if (entityType) formData.append('entityType', entityType)
+    if (entityId) formData.append('entityId', entityId)
     formData.append('file', file)
     return apiFetch<Evidence>('/evidence', { method: 'POST', body: formData })
   },

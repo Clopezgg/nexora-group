@@ -1,5 +1,5 @@
 import { apiFetch } from './httpClient'
-import type { Account, Company, CompanyUser } from '../types/masterData'
+import type { Account, Company, CompanyUser, ControllingDimension } from '../types/masterData'
 
 export interface CompanyProfileInput {
   name?: string
@@ -34,6 +34,10 @@ export const masterDataService = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+  listCostCenters: (companyId: string) =>
+    apiFetch<ControllingDimension[]>(`/master-data/cost-centers?companyId=${companyId}`),
+  listEconomicCategories: (companyId: string) =>
+    apiFetch<ControllingDimension[]>(`/master-data/economic-categories?companyId=${companyId}`),
   listAccounts: async (
     companyId: string,
     options?: { includeNonPostable?: boolean },

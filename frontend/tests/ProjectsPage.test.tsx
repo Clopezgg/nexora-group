@@ -25,12 +25,13 @@ function stubFetch(routes: Record<string, unknown>) {
 }
 
 describe('ProjectsPage', () => {
-  it('offers to create the first company when there are none (no fabricated data)', async () => {
+  it('explains that a company is required when there are none (no fabricated data)', async () => {
     stubFetch({ '/master-data/companies': [] })
 
     render(renderApp('/proyectos'))
 
-    expect(await screen.findByText('Crea tu primera compañía')).toBeInTheDocument()
+    expect(await screen.findByText('Sin compañía')).toBeInTheDocument()
+    expect(screen.getByText('Configura una compañía antes de crear proyectos.')).toBeInTheDocument()
     expect(screen.queryByText('Sin proyectos')).not.toBeInTheDocument()
   })
 
@@ -45,6 +46,6 @@ describe('ProjectsPage', () => {
     render(renderApp('/proyectos'))
 
     expect(await screen.findByText('Torre Nexora II')).toBeInTheDocument()
-    expect(screen.getByText('PLANNING')).toBeInTheDocument()
+    expect(screen.getByText('Planificación')).toBeInTheDocument()
   })
 })

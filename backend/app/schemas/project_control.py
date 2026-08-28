@@ -9,6 +9,7 @@ from app.schemas.base import CamelModel
 
 
 PROJECT_STATUS_VALUES = Literal["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CLOSED", "CANCELLED"]
+WBS_STATUS_VALUES = Literal["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"]
 
 
 class ProjectCreateRequest(CamelModel):
@@ -42,6 +43,12 @@ class ProjectUpdateRequest(CamelModel):
     planned_start: date | None = None
     planned_end: date | None = None
     description: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_planned_dates(self):
+        if self.planned_start and self.planned_end and self.planned_end < self.planned_start:
+            raise ValueError("La fecha final prevista no puede ser anterior a la fecha de inicio")
+        return self
 
 
 class ProjectStatusTransitionRequest(CamelModel):
@@ -112,6 +119,23 @@ class WBSNodeCreateRequest(CamelModel):
         return self
 
 
+class WBSNodeUpdateRequest(CamelModel):
+    code: str | None = Field(default=None, min_length=1, max_length=32)
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    parent_id: uuid.UUID | None = None
+    manager: str | None = Field(default=None, max_length=255)
+    planned_start: date | None = None
+    planned_finish: date | None = None
+    status: WBS_STATUS_VALUES | None = None
+    progress_percent: Decimal | None = Field(default=None, ge=0, le=100)
+
+    @model_validator(mode="after")
+    def validate_planned_dates(self):
+        if self.planned_start and self.planned_finish and self.planned_finish < self.planned_start:
+            raise ValueError("La fecha final del WBS no puede ser anterior a la fecha de inicio")
+        return self
+
+
 class WBSNodeResponse(CamelModel):
     id: uuid.UUID
     project_id: uuid.UUID
@@ -124,6 +148,14 @@ class WBSNodeResponse(CamelModel):
     planned_start: date | None
     planned_finish: date | None
     progress_percent: Decimal
+
+
+class WBSFinancialResponse(CamelModel):
+    wbs_node_id: uuid.UUID
+    authorized: Decimal
+    committed: Decimal | None = None
+    actual_cost: Decimal | None = None
+    variance: Decimal | None = None
 
 
 class TaskCreateRequest(CamelModel):
@@ -222,6 +254,7 @@ class ChangeOrderCreateRequest(CamelModel):
     wbs_node_id: uuid.UUID | None = None
     scope_change: str | None = Field(default=None, max_length=2000)
     budget_change_amount: Decimal = Decimal("0")
+    contract_change_amount: Decimal = Decimal("0")
     schedule_change_days: int | None = None
 
 
@@ -232,6 +265,7 @@ class ChangeOrderResponse(CamelModel):
     reason: str
     scope_change: str | None
     budget_change_amount: Decimal
+    contract_change_amount: Decimal
     schedule_change_days: int | None
     requested_by: uuid.UUID
     approved_by: uuid.UUID | None

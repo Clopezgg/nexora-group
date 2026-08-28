@@ -36,7 +36,10 @@ export function useActiveCompany() {
     queryFn: masterDataService.listCompanies,
   })
   const selectedId = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-  const companies = useMemo(() => companiesQuery.data ?? [], [companiesQuery.data])
+  const companies = useMemo(
+    () => (Array.isArray(companiesQuery.data) ? companiesQuery.data : []),
+    [companiesQuery.data],
+  )
   const selectedExists = selectedId ? companies.some((company) => company.id === selectedId) : false
   const activeCompanyId = selectedExists ? selectedId : companies[0]?.id ?? null
   const activeCompany = companies.find((company) => company.id === activeCompanyId) ?? null

@@ -6,11 +6,29 @@ import { useState } from 'react'
 import {
   CommandPalette,
   Combobox,
+  Input,
   MoneyInput,
+  Select,
   StatCard,
   Tabs,
   EntitySelector,
 } from '../src/design-system'
+
+describe('Form controls', () => {
+  it('associates generated ids with Input and Select labels', () => {
+    render(
+      <>
+        <Input label="Nombre" />
+        <Select label="Moneda">
+          <option value="HNL">HNL</option>
+        </Select>
+      </>,
+    )
+
+    expect(screen.getByLabelText('Nombre')).toHaveProperty('type', 'text')
+    expect(screen.getByLabelText('Moneda')).toHaveValue('HNL')
+  })
+})
 
 describe('CommandPalette', () => {
   it('opens on Cmd/Ctrl+K and navigates to the selected route', async () => {

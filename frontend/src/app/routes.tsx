@@ -6,9 +6,6 @@ import { navItems } from './navigation'
 
 type LazyRoute = NonNullable<RouteObject['lazy']>
 
-// Keep the authenticated shell eager, but split every business module into its
-// own route chunk. This prevents Login/Inicio from downloading and evaluating
-// the entire ERP (reports, procurement, inventory, workforce, etc.) up front.
 const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
   '/finanzas/contabilidad': async () => ({
     Component: (await import('../features/accounting/AccountingPage')).AccountingPage,
@@ -163,6 +160,12 @@ export const routes: RouteObject[] = [
             path: 'inicio',
             lazy: async () => ({
               Component: (await import('../features/home/HomePage')).HomePage,
+            }),
+          },
+          {
+            path: 'proyectos/:projectId',
+            lazy: async () => ({
+              Component: (await import('../features/projects/ProjectDetailPage')).ProjectDetailPage,
             }),
           },
           ...applicationRoutes,

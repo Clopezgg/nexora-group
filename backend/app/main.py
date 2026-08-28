@@ -27,9 +27,11 @@ from app.api.routes import (
     health,
     inventory,
     master_data,
+    master_dimensions,
     notifications,
     procurement,
     project_budget_management,
+    project_extended_control,
     project_management,
     projects,
     quality,
@@ -117,6 +119,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(context.router, prefix="/api")
     app.include_router(master_data.router, prefix="/api")
+    app.include_router(master_dimensions.router, prefix="/api")
     app.include_router(company_management.router, prefix="/api")
     app.include_router(fiscal.router, prefix="/api")
     app.include_router(accounting.router, prefix="/api")
@@ -126,6 +129,7 @@ def create_app() -> FastAPI:
     app.include_router(projects.router, prefix="/api")
     app.include_router(project_management.router, prefix="/api")
     app.include_router(project_budget_management.router, prefix="/api")
+    app.include_router(project_extended_control.router, prefix="/api")
     app.include_router(treasury.router, prefix="/api")
     app.include_router(ap.router, prefix="/api")
     app.include_router(ar.router, prefix="/api")

@@ -83,13 +83,16 @@ def verify_capability(
         encoded_payload.encode("ascii"),
         hashlib.sha256,
     ).digest()
+    # Compare the canonical base64url representation itself. Decoding first can
+    # accept distinct textual encodings whose unused trailing base64 bits map
+    # to the same bytes, which would make a visibly modified token validate.
+    expected_encoded_signature = _b64encode(expected_signature)
+    if not hmac.compare_digest(encoded_signature, expected_encoded_signature):
+        return False
     try:
-        supplied_signature = base64.urlsafe_b64decode(_restore_padding(encoded_signature))
         raw_payload = base64.urlsafe_b64decode(_restore_padding(encoded_payload))
         payload = json.loads(raw_payload.decode("utf-8"))
     except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
-        return False
-    if not hmac.compare_digest(supplied_signature, expected_signature):
         return False
     if payload.get("purpose") != "edit-access":
         return False

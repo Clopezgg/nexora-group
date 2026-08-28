@@ -45,11 +45,13 @@ def list_evidence(
     company_id: uuid.UUID,
     entity_type: str | None = None,
     entity_id: uuid.UUID | None = None,
+    offset: int = 0,
+    limit: int = 50,
 ) -> list[Evidence]:
     stmt = select(Evidence).where(Evidence.company_id == company_id)
     if entity_type is not None:
         stmt = stmt.where(Evidence.entity_type == entity_type)
     if entity_id is not None:
         stmt = stmt.where(Evidence.entity_id == entity_id)
-    stmt = stmt.order_by(Evidence.created_at.desc())
+    stmt = stmt.order_by(Evidence.created_at.desc(), Evidence.id.asc()).offset(offset).limit(limit)
     return list(db.execute(stmt).scalars())

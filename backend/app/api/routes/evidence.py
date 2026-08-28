@@ -34,33 +34,40 @@ async def upload_evidence(
     assert_company_access(
         db, user_id=user.id, resource="document.evidence", action="create", company_id=company_id
     )
-    content = await file.read()
-    evidence = evidence_service.upload_evidence(
-        db,
-        company_id=company_id,
-        uploaded_by=user.id,
-        filename=file.filename or "archivo",
-        mime_type=file.content_type or "application/octet-stream",
-        content=content,
-        category=category,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        commit=False,
-    )
-    audit_service.record(
-        db,
-        actor_user_id=user.id,
-        action="document.evidence.upload",
-        entity_type="document.evidence",
-        entity_id=evidence.id,
-        company_id=company_id,
-        project_id=None,
-        before=None,
-        after={"originalFilename": evidence.original_filename, "sizeBytes": evidence.size_bytes},
-        correlation_id=correlation_id,
-    )
-    db.commit()
-    return EvidenceResponse.model_validate(evidence, from_attributes=True)
+    content = await evidence_service.read_bounded_upload(file)
+    evidence = None
+    try:
+        evidence = evidence_service.upload_evidence(
+            db,
+            company_id=company_id,
+            uploaded_by=user.id,
+            filename=file.filename or "archivo",
+            mime_type=file.content_type or "application/octet-stream",
+            content=content,
+            category=category,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            commit=False,
+        )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="document.evidence.upload",
+            entity_type="document.evidence",
+            entity_id=evidence.id,
+            company_id=company_id,
+            project_id=None,
+            before=None,
+            after={"originalFilename": evidence.original_filename, "sizeBytes": evidence.size_bytes},
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        return EvidenceResponse.model_validate(evidence, from_attributes=True)
+    except Exception:
+        db.rollback()
+        if evidence is not None:
+            evidence_service.compensate_evidence_blob(evidence.blob_key)
+        raise
 
 
 @router.get("", response_model=list[EvidenceResponse])
@@ -68,6 +75,8 @@ def list_evidence(
     company_id: uuid.UUID = Query(alias="companyId"),
     entity_type: str | None = Query(default=None, alias="entityType"),
     entity_id: uuid.UUID | None = Query(default=None, alias="entityId"),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
     user=Depends(require_permission("document.evidence", "read")),
 ) -> list[EvidenceResponse]:
@@ -77,7 +86,12 @@ def list_evidence(
     return [
         EvidenceResponse.model_validate(e, from_attributes=True)
         for e in evidence_service.list_evidence(
-            db, company_id=company_id, entity_type=entity_type, entity_id=entity_id
+            db,
+            company_id=company_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            offset=offset,
+            limit=limit,
         )
     ]
 

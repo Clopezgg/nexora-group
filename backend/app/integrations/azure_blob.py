@@ -31,3 +31,13 @@ def get_evidence_container_client(settings: Settings):
     account_url = f"https://{settings.azure_storage_account_name}.blob.core.windows.net"
     service_client = BlobServiceClient(account_url=account_url, credential=DefaultAzureCredential())
     return service_client.get_container_client(settings.evidence_container_name)
+
+
+def delete_blob_if_exists(container_client, blob_key: str) -> None:
+    """Delete a compensation target without failing if it is already gone."""
+    from azure.core.exceptions import ResourceNotFoundError
+
+    try:
+        container_client.delete_blob(blob_key)
+    except ResourceNotFoundError:
+        pass

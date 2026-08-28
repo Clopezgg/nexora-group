@@ -9,6 +9,27 @@ from tests.conftest import BOOTSTRAP_ADMIN_EMAIL
 from tests.helpers import create_company, create_user_with_role, login_admin, login_as
 
 
+def _record_page_entries(db_session, *, company_id: str, count: int) -> None:
+    from app.services import audit_service
+
+    admin = db_session.execute(
+        select(User).where(User.email == BOOTSTRAP_ADMIN_EMAIL)
+    ).scalar_one()
+    for index in range(count):
+        audit_service.record(
+            db_session,
+            actor_user_id=admin.id,
+            action="test.page.create",
+            entity_type="test.page",
+            entity_id=uuid.uuid4(),
+            company_id=uuid.UUID(company_id),
+            before=None,
+            after={"sequence": index},
+            correlation_id=f"page-{index}",
+        )
+    db_session.commit()
+
+
 def test_audit_log_is_append_only_and_records_actor_and_entity(client, db_session):
     login_admin(client)
     company = create_company(client)
@@ -62,3 +83,48 @@ def test_company_access_blocks_cross_company_audit_log(client, db_session):
     response = client.get(f"/api/audit?companyId={company_a['id']}")
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_audit_feed_has_bounded_default_and_supports_offset(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Audit Pagination Co")
+    _record_page_entries(db_session, company_id=company["id"], count=105)
+
+    default_page = client.get(
+        f"/api/audit?companyId={company['id']}&entityType=test.page"
+    )
+    assert default_page.status_code == 200, default_page.text
+    assert len(default_page.json()) == 50
+
+    first_twenty = client.get(
+        f"/api/audit?companyId={company['id']}&entityType=test.page&limit=20"
+    ).json()
+    second_ten = client.get(
+        f"/api/audit?companyId={company['id']}&entityType=test.page&offset=10&limit=10"
+    ).json()
+    assert [row["id"] for row in second_ten] == [row["id"] for row in first_twenty[10:20]]
+
+
+def test_audit_feed_rejects_unbounded_or_negative_pages(client):
+    login_admin(client)
+    company = create_company(client, name="Audit Bounds Co")
+
+    for query in ("limit=0", "limit=101", "offset=-1"):
+        response = client.get(f"/api/audit?companyId={company['id']}&{query}")
+        assert response.status_code == 422, response.text
+
+
+def test_audit_feed_order_is_stable_when_timestamps_match(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Audit Stable Order Co")
+    _record_page_entries(db_session, company_id=company["id"], count=8)
+
+    first = client.get(
+        f"/api/audit?companyId={company['id']}&entityType=test.page&limit=8"
+    ).json()
+    second = client.get(
+        f"/api/audit?companyId={company['id']}&entityType=test.page&limit=8"
+    ).json()
+
+    assert [row["id"] for row in first] == [row["id"] for row in second]
+    assert [row["id"] for row in first] == sorted(row["id"] for row in first)

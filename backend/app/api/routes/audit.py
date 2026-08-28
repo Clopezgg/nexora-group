@@ -16,6 +16,8 @@ def list_audit_logs(
     company_id: uuid.UUID = Query(alias="companyId"),
     entity_type: str | None = Query(default=None, alias="entityType"),
     entity_id: uuid.UUID | None = Query(default=None, alias="entityId"),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
     user=Depends(require_permission("audit.log", "read")),
 ) -> list[AuditLogResponse]:
@@ -23,6 +25,11 @@ def list_audit_logs(
         db, user_id=user.id, resource="audit.log", action="read", company_id=company_id
     )
     rows = audit_repository.list_for_company(
-        db, company_id=company_id, entity_type=entity_type, entity_id=entity_id
+        db,
+        company_id=company_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        offset=offset,
+        limit=limit,
     )
     return [AuditLogResponse.model_validate(r, from_attributes=True) for r in rows]

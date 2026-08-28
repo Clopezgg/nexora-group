@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,3 +34,11 @@ class AuditLog(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+Index(
+    "ix_audit_logs_company_created_id",
+    AuditLog.company_id,
+    AuditLog.created_at.desc(),
+    AuditLog.id,
+)

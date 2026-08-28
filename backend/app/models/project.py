@@ -1,5 +1,6 @@
 import uuid
 from datetime import date
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
@@ -7,6 +8,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
+
+if TYPE_CHECKING:
+    from app.models.company import Company
 
 # Un Project nunca posee efectivo: solo referencia presupuesto/estado (INV-
 # TRE-002, ver CLAUDE.md §7 y docs/PROJECTS_WBS.md). Deliberadamente esta

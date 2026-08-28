@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
+
+if TYPE_CHECKING:
+    from app.models.user_role import UserRole
 
 # Roles base de NEXORA GROUP (orden maestra §87 -- 14 roles). El motor de
 # permisos central vive en app/models/permission.py + app/services/

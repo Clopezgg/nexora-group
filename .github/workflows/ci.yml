@@ -35,6 +35,15 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: pip install -r requirements-dev.txt
+      - name: Compile Python source
+        working-directory: backend
+        run: python -m compileall -q app tests
+      - name: Check undefined names and syntax errors
+        working-directory: backend
+        run: ruff check --select E9,F63,F7,F82 app tests
+      - name: Audit backend dependencies
+        working-directory: backend
+        run: pip-audit -r requirements.txt
       - name: Create test database for worktree slug
         run: |
           SLUG=$(python3 -c "import re,os; print(re.sub(r'[^a-z0-9]+','_',os.path.basename(os.path.dirname(os.path.join('${{ github.workspace }}','backend'))).lower()).strip('_') or 'default')")
@@ -56,6 +65,9 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
       - name: Typecheck
         working-directory: frontend
         run: npm run typecheck
@@ -68,6 +80,14 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
+
+  iac:
+    name: Compile Azure Bicep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile subscription template without deploying
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
 
   e2e:
     runs-on: ubuntu-latest

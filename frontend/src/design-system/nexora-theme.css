@@ -1,0 +1,182 @@
+/* NEXORA executive ERP theme — visual direction based on the approved product reference. */
+:root {
+  --nx-navy-950: #071a33;
+  --nx-navy-900: #0b274a;
+  --nx-navy-800: #10345f;
+  --nx-navy-700: #174678;
+  --nx-navy-600: #1d5a95;
+  --nx-navy-100: #c7d7ea;
+  --nx-blue-700: #0f56a8;
+  --nx-blue-600: #1769d2;
+  --nx-blue-500: #2480f0;
+  --nx-blue-400: #55a3ff;
+  --nx-blue-200: #bddcff;
+  --nx-blue-100: #eaf4ff;
+  --nx-gray-50: #f4f7fb;
+  --nx-gray-100: #edf2f8;
+  --nx-gray-200: #dbe4ef;
+  --nx-gray-400: #7c8999;
+  --nx-gray-600: #536174;
+  --nx-gray-800: #243247;
+  --nx-success: #198754;
+  --nx-warning: #b7791f;
+  --nx-danger: #c73b4b;
+  --nx-radius-sm: 5px;
+  --nx-radius-md: 8px;
+  --nx-radius-lg: 12px;
+  --nx-shadow-sm: 0 1px 3px rgba(7, 26, 51, .06), 0 1px 2px rgba(7, 26, 51, .04);
+  --nx-shadow-md: 0 8px 24px rgba(7, 26, 51, .10);
+  --nx-shadow-lg: 0 24px 56px rgba(7, 26, 51, .18);
+}
+
+body {
+  background: #eef3f9;
+  color: #102844;
+}
+
+a { color: var(--nx-blue-600); }
+
+/* Cards and KPIs */
+.nx-card,
+.nx-stat-card,
+.nx-chart-card {
+  border: 1px solid #dce5ef;
+  border-radius: 9px;
+  box-shadow: 0 1px 2px rgba(7, 26, 51, .045);
+  background: #fff;
+}
+
+.nx-card { padding: 20px; }
+.nx-card__title,
+.nx-stat-card__label {
+  color: #4f6176;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .015em;
+}
+.nx-stat-card {
+  min-height: 112px;
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.nx-stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #2a7de1;
+  opacity: .9;
+}
+.nx-stat-card__value,
+.nx-card__value {
+  color: #0e345d;
+  font-size: clamp(22px, 2vw, 30px);
+  font-weight: 750;
+  letter-spacing: -.025em;
+  font-variant-numeric: tabular-nums;
+}
+.nx-chart-card { padding: 20px; min-height: 320px; }
+.nx-chart-card__title { color: #173a60; font-size: 14px; }
+
+/* Enterprise forms */
+.nx-field__label {
+  color: #354a63;
+  font-size: 12px;
+  font-weight: 700;
+}
+.nx-input,
+.nx-select,
+.nx-textarea {
+  border-color: #cfdae7;
+  border-radius: 6px;
+  background: #fff;
+  color: #17324f;
+  box-shadow: inset 0 1px 0 rgba(7, 26, 51, .015);
+}
+.nx-input,
+.nx-select { height: 39px; }
+.nx-input:hover,
+.nx-select:hover,
+.nx-textarea:hover { border-color: #aebed0; }
+.nx-input:focus,
+.nx-select:focus,
+.nx-textarea:focus {
+  border-color: #2b78d0;
+  box-shadow: 0 0 0 3px rgba(36, 128, 240, .12);
+}
+
+/* Tables / grids */
+.nx-table {
+  border: 1px solid #dce5ef;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.nx-table th {
+  background: #f6f9fc;
+  color: #506176;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .035em;
+  padding: 11px 13px;
+  border-bottom-color: #dce5ef;
+}
+.nx-table td {
+  color: #263b53;
+  padding: 11px 13px;
+  border-bottom-color: #edf2f7;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.nx-table tbody tr:hover td { background: #f8fbff; }
+
+/* Buttons */
+.nx-button {
+  border-radius: 6px;
+  font-weight: 700;
+  letter-spacing: .005em;
+  box-shadow: none;
+}
+.nx-button--primary {
+  background: linear-gradient(180deg, #207ce2 0%, #1262be 100%);
+  border-color: #145eb4;
+}
+.nx-button--primary:hover { filter: brightness(.96); }
+
+/* Badges */
+.nx-badge {
+  border-radius: 999px;
+  font-size: 11px;
+  height: 21px;
+  padding: 0 8px;
+}
+
+/* Modals / drawers */
+.nx-modal__overlay,
+.nx-drawer__overlay { backdrop-filter: blur(3px); }
+.nx-modal {
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 12px;
+}
+
+/* Filters */
+.nx-filter-bar {
+  background: #fff;
+  border: 1px solid #dce5ef;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+/* Generic headings used across feature pages */
+.nx-app-shell__content h1 {
+  color: #153a60;
+  letter-spacing: -.025em;
+}
+.nx-app-shell__content h2,
+.nx-app-shell__content h3 { color: #1d4268; }
+
+/* Scrollbars intentionally subtle in ERP shell */
+* { scrollbar-color: #b9c7d6 transparent; scrollbar-width: thin; }

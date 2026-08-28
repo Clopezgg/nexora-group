@@ -13,6 +13,7 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
               <li key={item.path}>
                 <NavLink
                   to={item.path}
+                  end
                   onClick={onNavigate}
                   className={({ isActive }) =>
                     ['nx-sidebar__link', isActive ? 'nx-sidebar__link--active' : '']

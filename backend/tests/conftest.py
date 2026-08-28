@@ -21,6 +21,10 @@ os.environ["BOOTSTRAP_ADMIN_EMAIL"] = "admin@nexora.group"
 os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "NexoraAdmin123!"
 os.environ["FRONTEND_URL"] = "http://localhost:5173"
 os.environ["APP_ENV"] = "test"
+# Existing domain tests exercise their own RBAC/SoD contracts and should not all
+# need to acquire the new secondary edit capability. Dedicated edit-access tests
+# enable this setting explicitly and cover the guard itself.
+os.environ["EDIT_ACCESS_REQUIRED"] = "false"
 
 import pytest
 from fastapi.testclient import TestClient

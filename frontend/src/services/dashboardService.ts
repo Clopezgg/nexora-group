@@ -2,5 +2,8 @@ import { apiFetch } from './httpClient'
 import type { DashboardSummary } from '../types/dashboard'
 
 export const dashboardService = {
-  getSummary: () => apiFetch<DashboardSummary>('/dashboard/summary'),
+  getSummary: (companyId?: string | null) =>
+    apiFetch<DashboardSummary>(
+      companyId ? `/dashboard/summary?companyId=${companyId}` : '/dashboard/summary',
+    ),
 }

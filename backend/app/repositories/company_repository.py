@@ -3,7 +3,6 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.errors import NotFoundError
 from app.models.chart_of_accounts import ChartOfAccount
 from app.models.company import Company
 
@@ -39,9 +38,6 @@ def create_company(
     )
     db.add(company)
     db.flush()
-    # Digital Core: toda company necesita su propio chart of accounts desde
-    # el día uno (una sola tabla por company, ver ChartOfAccount.company_id
-    # unique). Se crea vacío; las Account individuales se agregan aparte.
     db.add(ChartOfAccount(company_id=company.id, name=f"Catálogo contable — {name}"))
     db.flush()
     return company
@@ -51,14 +47,33 @@ def update_company(
     db: Session,
     *,
     company: Company,
+    name: str | None = None,
+    code: str | None = None,
     legal_name: str | None = None,
+    functional_currency_code: str | None = None,
+    country: str | None = None,
     fiscal_id: str | None = None,
 ) -> Company:
-    """Solo legal_name/fiscal_id son editables aquí -- code y
-    functional_currency_code son inmutables post-creación (CLAUDE.md)."""
+    if name is not None:
+        company.name = name.strip()
+    if code is not None:
+        normalized_code = code.strip()
+        if company.code is not None and normalized_code != company.code:
+            raise ValueError("El código de compañía ya fue asignado y es inmutable")
+        company.code = normalized_code
+    if functional_currency_code is not None:
+        normalized_currency = functional_currency_code.upper().strip()
+        if (
+            company.functional_currency_code is not None
+            and normalized_currency != company.functional_currency_code
+        ):
+            raise ValueError("La moneda funcional ya fue asignada y es inmutable")
+        company.functional_currency_code = normalized_currency
     if legal_name is not None:
-        company.legal_name = legal_name
+        company.legal_name = legal_name.strip() or None
+    if country is not None:
+        company.country = country.upper().strip() or None
     if fiscal_id is not None:
-        company.fiscal_id = fiscal_id
+        company.fiscal_id = fiscal_id.strip() or None
     db.flush()
     return company

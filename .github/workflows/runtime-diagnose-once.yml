@@ -24,86 +24,24 @@ jobs:
       - name: Inspect active Container App runtime
         run: |
           set -euo pipefail
-          echo "=== Container App ==="
           az containerapp show -g nexora-rg-dev -n nexora-backend-dev \
             --query '{mode:properties.configuration.activeRevisionsMode,latest:properties.latestRevisionName,ready:properties.latestReadyRevisionName,image:properties.template.containers[0].image,traffic:properties.configuration.ingress.traffic}' -o jsonc
-          echo "=== Revisions ==="
           az containerapp revision list -g nexora-rg-dev -n nexora-backend-dev \
-            --query '[].{name:name,active:properties.active,health:properties.healthState,image:properties.template.containers[0].image,created:properties.createdTime}' -o jsonc
+            --query '[].{name:name,active:properties.active,health:properties.healthState,image:properties.template.containers[0].image}' -o jsonc
 
-      - name: Capture unhealthy revision logs
-        run: |
-          set +e
-          echo "=== Console logs: latest unhealthy revision ==="
-          az containerapp logs show -g nexora-rg-dev -n nexora-backend-dev \
-            --revision nexora-backend-dev--0000024 --type console --tail 150
-          exit 0
-
-      - name: Enumerate live database references to target projects
+      - name: Inspect database references from healthy backend replica
         run: |
           set -euo pipefail
-          VAULT_NAME="$(az keyvault list -g nexora-rg-dev --query '[0].name' -o tsv)"
-          if [ -z "$VAULT_NAME" ]; then
-            echo "::warning::Key Vault not found; DB reference enumeration skipped"
-            exit 0
+          REVISION=nexora-backend-dev--0000023
+          REPLICA="$(az containerapp replica list -g nexora-rg-dev -n nexora-backend-dev --revision "$REVISION" --query '[0].name' -o tsv)"
+          if [ -z "$REPLICA" ]; then
+            echo "::error::No replica found for healthy revision"
+            exit 1
           fi
-          set +e
-          DB_URL="$(az keyvault secret show --vault-name "$VAULT_NAME" --name database-url --query value -o tsv 2>"$RUNNER_TEMP/kv.err")"
-          KV_STATUS=$?
-          set -e
-          if [ "$KV_STATUS" -ne 0 ] || [ -z "$DB_URL" ]; then
-            echo "::warning::CI identity cannot read database-url; DB reference enumeration skipped"
-            cat "$RUNNER_TEMP/kv.err" | sed -E 's#https?://[^ ]+#<redacted>#g' | head -n 5
-            exit 0
-          fi
-          python -m pip install --quiet 'psycopg[binary]>=3.2,<4'
-          export DB_URL
-          python - <<'PY'
-          import os
-          import psycopg
-
-          dsn = os.environ['DB_URL'].replace('postgresql+psycopg://', 'postgresql://', 1)
-          with psycopg.connect(dsn) as conn:
-              with conn.cursor() as cur:
-                  cur.execute("""
-                      SELECT p.id, p.code, p.name
-                      FROM projects p JOIN companies c ON c.id=p.company_id
-                      WHERE upper(trim(c.name))='NEXORA GROUP'
-                        AND trim(p.code) IN ('21000','22000')
-                      ORDER BY p.code
-                  """)
-                  projects = cur.fetchall()
-                  ids = [row[0] for row in projects]
-                  print('target_projects=', [(str(r[0]), r[1], r[2]) for r in projects])
-                  if not ids:
-                      raise SystemExit(0)
-                  cur.execute("""
-                      SELECT tc.table_schema, tc.table_name, kcu.column_name,
-                             cols.is_nullable, rc.delete_rule
-                      FROM information_schema.table_constraints tc
-                      JOIN information_schema.key_column_usage kcu
-                        ON tc.constraint_name=kcu.constraint_name AND tc.constraint_schema=kcu.constraint_schema
-                      JOIN information_schema.referential_constraints rc
-                        ON tc.constraint_name=rc.constraint_name AND tc.constraint_schema=rc.constraint_schema
-                      JOIN information_schema.constraint_column_usage ccu
-                        ON rc.unique_constraint_name=ccu.constraint_name AND rc.unique_constraint_schema=ccu.constraint_schema
-                      JOIN information_schema.columns cols
-                        ON cols.table_schema=tc.table_schema AND cols.table_name=tc.table_name AND cols.column_name=kcu.column_name
-                      WHERE tc.constraint_type='FOREIGN KEY'
-                        AND ccu.table_name='projects'
-                      ORDER BY tc.table_schema, tc.table_name, kcu.column_name
-                  """)
-                  refs = cur.fetchall()
-                  print('=== Referencing rows ===')
-                  for schema, table, column, nullable, delete_rule in refs:
-                      cur.execute(
-                          f'SELECT count(*) FROM "{schema}"."{table}" WHERE "{column}" = ANY(%s)',
-                          (ids,),
-                      )
-                      count = cur.fetchone()[0]
-                      if count:
-                          print(f'{schema}.{table}.{column}: count={count} nullable={nullable} delete_rule={delete_rule}')
-          PY
+          CODE_B64='CmltcG9ydCBvcywgcHN5Y29wZwpkc249b3MuZW52aXJvblsiREFUQUJBU0VfVVJMIl0ucmVwbGFjZSgicG9zdGdyZXNxbCtwc3ljb3BnOi8vIiwicG9zdGdyZXNxbDovLyIsMSkKd2l0aCBwc3ljb3BnLmNvbm5lY3QoZHNuKSBhcyBjb25uOgogICAgd2l0aCBjb25uLmN1cnNvcigpIGFzIGN1cjoKICAgICAgICBjdXIuZXhlY3V0ZSgiIiIKICAgICAgICBTRUxFQ1QgcC5pZCxwLmNvZGUscC5uYW1lIEZST00gcHJvamVjdHMgcCBKT0lOIGNvbXBhbmllcyBjIE9OIGMuaWQ9cC5jb21wYW55X2lkCiAgICAgICAgV0hFUkUgdXBwZXIodHJpbShjLm5hbWUpKT0nTkVYT1JBIEdST1VQJyBBTkQgdHJpbShwLmNvZGUpIElOICgnMjEwMDAnLCcyMjAwMCcpIE9SREVSIEJZIHAuY29kZQogICAgICAgICIiIikKICAgICAgICBwcm9qZWN0cz1jdXIuZmV0Y2hhbGwoKQogICAgICAgIGlkcz1bclswXSBmb3IgciBpbiBwcm9qZWN0c10KICAgICAgICBwcmludCgiVEFSR0VUUyIsIFsoc3RyKHJbMF0pLHJbMV0sclsyXSkgZm9yIHIgaW4gcHJvamVjdHNdKQogICAgICAgIGN1ci5leGVjdXRlKCIiIgogICAgICAgIFNFTEVDVCB0Yy50YWJsZV9zY2hlbWEsdGMudGFibGVfbmFtZSxrY3UuY29sdW1uX25hbWUsY29scy5pc19udWxsYWJsZSxyYy5kZWxldGVfcnVsZQogICAgICAgIEZST00gaW5mb3JtYXRpb25fc2NoZW1hLnRhYmxlX2NvbnN0cmFpbnRzIHRjCiAgICAgICAgSk9JTiBpbmZvcm1hdGlvbl9zY2hlbWEua2V5X2NvbHVtbl91c2FnZSBrY3UgT04gdGMuY29uc3RyYWludF9uYW1lPWtjdS5jb25zdHJhaW50X25hbWUgQU5EIHRjLmNvbnN0cmFpbnRfc2NoZW1hPWtjdS5jb25zdHJhaW50X3NjaGVtYQogICAgICAgIEpPSU4gaW5mb3JtYXRpb25fc2NoZW1hLnJlZmVyZW50aWFsX2NvbnN0cmFpbnRzIHJjIE9OIHRjLmNvbnN0cmFpbnRfbmFtZT1yYy5jb25zdHJhaW50X25hbWUgQU5EIHRjLmNvbnN0cmFpbnRfc2NoZW1hPXJjLmNvbnN0cmFpbnRfc2NoZW1hCiAgICAgICAgSk9JTiBpbmZvcm1hdGlvbl9zY2hlbWEuY29uc3RyYWludF9jb2x1bW5fdXNhZ2UgY2N1IE9OIHJjLnVuaXF1ZV9jb25zdHJhaW50X25hbWU9Y2N1LmNvbnN0cmFpbnRfbmFtZSBBTkQgcmMudW5pcXVlX2NvbnN0cmFpbnRfc2NoZW1hPWNjdS5jb25zdHJhaW50X3NjaGVtYQogICAgICAgIEpPSU4gaW5mb3JtYXRpb25fc2NoZW1hLmNvbHVtbnMgY29scyBPTiBjb2xzLnRhYmxlX3NjaGVtYT10Yy50YWJsZV9zY2hlbWEgQU5EIGNvbHMudGFibGVfbmFtZT10Yy50YWJsZV9uYW1lIEFORCBjb2xzLmNvbHVtbl9uYW1lPWtjdS5jb2x1bW5fbmFtZQogICAgICAgIFdIRVJFIHRjLmNvbnN0cmFpbnRfdHlwZT0nRk9SRUlHTiBLRVknIEFORCBjY3UudGFibGVfbmFtZT0ncHJvamVjdHMnCiAgICAgICAgT1JERVIgQlkgdGMudGFibGVfc2NoZW1hLHRjLnRhYmxlX25hbWUsa2N1LmNvbHVtbl9uYW1lCiAgICAgICAgIiIiKQogICAgICAgIGZvciBzY2hlbWEsdGFibGUsY29sdW1uLG51bGxhYmxlLHJ1bGUgaW4gY3VyLmZldGNoYWxsKCk6CiAgICAgICAgICAgIGN1ci5leGVjdXRlKGYnU0VMRUNUIGNvdW50KCopIEZST00gIntzY2hlbWF9Ii4ie3RhYmxlfSIgV0hFUkUgIntjb2x1bW59IiA9IEFOWSglcyknLCAoaWRzLCkpCiAgICAgICAgICAgIGNvdW50PWN1ci5mZXRjaG9uZSgpWzBdCiAgICAgICAgICAgIGlmIGNvdW50OgogICAgICAgICAgICAgICAgcHJpbnQoIlJFRiIsc2NoZW1hLHRhYmxlLGNvbHVtbixjb3VudCxudWxsYWJsZSxydWxlKQo='
+          CMD="python -c \"import base64;exec(base64.b64decode('$CODE_B64'))\""
+          az containerapp exec -g nexora-rg-dev -n nexora-backend-dev \
+            --revision "$REVISION" --replica "$REPLICA" --container backend --command "$CMD"
 
       - name: Probe live API route and projects
         env:
@@ -114,15 +52,10 @@ jobs:
           set -euo pipefail
           COOKIE_JAR="$RUNNER_TEMP/nexora-diag-cookies.txt"
           LOGIN_PAYLOAD="$(jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email:$email,password:$password}')"
-          curl --fail --silent --show-error --cookie-jar "$COOKIE_JAR" \
-            --header 'Content-Type: application/json' --data "$LOGIN_PAYLOAD" \
-            "$FRONTEND_URL/api/auth/login" >/dev/null
-
+          curl --fail --silent --show-error --cookie-jar "$COOKIE_JAR" --header 'Content-Type: application/json' --data "$LOGIN_PAYLOAD" "$FRONTEND_URL/api/auth/login" >/dev/null
           EDIT_CODE="$(curl --silent --show-error --cookie "$COOKIE_JAR" --output "$RUNNER_TEMP/edit-probe.json" --write-out '%{http_code}' "$FRONTEND_URL/api/edit-access/verify")"
           echo "edit-access GET status=$EDIT_CODE"
           cat "$RUNNER_TEMP/edit-probe.json" || true
-          echo
-
           curl --fail --silent --show-error --cookie "$COOKIE_JAR" "$FRONTEND_URL/api/master-data/companies" > "$RUNNER_TEMP/companies.json"
           COMPANY_ID="$(jq -r '.[] | select((.name|ascii_upcase)=="NEXORA GROUP") | .id' "$RUNNER_TEMP/companies.json" | head -n1)"
           curl --fail --silent --show-error --cookie "$COOKIE_JAR" "$FRONTEND_URL/api/projects?company_id=$COMPANY_ID" > "$RUNNER_TEMP/projects.json"

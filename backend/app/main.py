@@ -22,6 +22,7 @@ from app.api.routes import (
     documents,
     equipment,
     evidence,
+    fiscal,
     health,
     inventory,
     master_data,
@@ -114,6 +115,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(context.router, prefix="/api")
     app.include_router(master_data.router, prefix="/api")
+    app.include_router(fiscal.router, prefix="/api")
     app.include_router(accounting.router, prefix="/api")
     app.include_router(suppliers.router, prefix="/api")
     app.include_router(procurement.router, prefix="/api")

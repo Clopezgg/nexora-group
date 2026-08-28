@@ -81,6 +81,11 @@ def test_edit_guard_requires_unlock_then_allows_request_to_reach_route(client):
         )
         assert login.status_code == 200, login.text
 
+        # ActiveUIContext changes only navigation state. Selecting a project must
+        # remain possible without unlocking business-data editing.
+        context_update = client.put("/api/context", json={"activeProjectId": None})
+        assert context_update.status_code == 200, context_update.text
+
         import uuid
 
         missing_capability = client.patch(

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # Nunca se conserva el PIN en texto plano. El digest por defecto corresponde
     # a la clave empresarial configurada para esta instancia y puede rotarse por
     # variables de entorno sin tocar el frontend.
+    edit_access_required: bool = True
     edit_access_token_salt: str = "fYyyYqkKw3wA1_gSBsp6Yw=="
     edit_access_token_digest: str = "fpyQturFHSsqW1An4hKXeUJOe4wdMjuRTvepcSKOfag="
     edit_access_pbkdf2_iterations: int = 250_000

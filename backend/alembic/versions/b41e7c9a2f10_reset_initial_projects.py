@@ -30,10 +30,8 @@ _TARGET_PREDICATE = """
 
 
 def upgrade() -> None:
-    # Abort rather than destroy history if either project has gained a row in
-    # any table whose FK policy intentionally forbids project deletion.
-    op.execute(
-        f"""
+    predicate = _TARGET_PREDICATE.replace("\n", " ")
+    safety_sql = """
         DO $$
         DECLARE
           ref RECORD;
@@ -62,7 +60,7 @@ def upgrade() -> None:
             EXECUTE format(
               'SELECT count(*) FROM %I.%I r WHERE r.%I IN '
               || '(SELECT p.id FROM projects p JOIN companies c ON c.id = p.company_id '
-              || 'WHERE upper(c.name) = ''NEXORA GROUP'' AND {predicate})',
+              || 'WHERE upper(c.name) = ''NEXORA GROUP'' AND __TARGET_PREDICATE__)',
               ref.table_schema,
               ref.table_name,
               ref.column_name
@@ -75,8 +73,8 @@ def upgrade() -> None:
             END IF;
           END LOOP;
         END $$;
-        """.replace("{{predicate}}", _TARGET_PREDICATE.replace("\n", " "))
-    )
+    """.replace("__TARGET_PREDICATE__", predicate)
+    op.execute(safety_sql)
 
     # Cascading project-control records (for example WBS/budgets) are removed
     # by their published FK policies; SET NULL relationships preserve audit

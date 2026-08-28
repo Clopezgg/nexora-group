@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Badge,
@@ -20,15 +20,26 @@ import type { FiscalPeriod, FiscalPeriodStatus, FiscalYear } from '../../types/f
 import type { Company } from '../../types/masterData'
 import { statusLabel } from '../../utils/statusLabels'
 
+const EMPTY_COMPANY_FORM = {
+  name: '',
+  code: '',
+  legalName: '',
+  fiscalId: '',
+  country: 'HN',
+  functionalCurrencyCode: 'HNL',
+}
+
 export function CompanySettingsPage() {
   const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
   const queryClient = useQueryClient()
   const selectedCompany = companies.find((company) => company.id === activeCompanyId) ?? null
+  const [form, setForm] = useState(EMPTY_COMPANY_FORM)
 
-  const [syncedCompanyId, setSyncedCompanyId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', code: '', legalName: '', fiscalId: '', country: 'HN', functionalCurrencyCode: 'HNL' })
-  if (selectedCompany && selectedCompany.id !== syncedCompanyId) {
-    setSyncedCompanyId(selectedCompany.id)
+  useEffect(() => {
+    if (!selectedCompany) {
+      setForm(EMPTY_COMPANY_FORM)
+      return
+    }
     setForm({
       name: selectedCompany.name,
       code: selectedCompany.code ?? '',
@@ -37,7 +48,7 @@ export function CompanySettingsPage() {
       country: selectedCompany.country ?? 'HN',
       functionalCurrencyCode: selectedCompany.functionalCurrencyCode ?? 'HNL',
     })
-  }
+  }, [selectedCompany])
 
   const yearsQuery = useQuery({
     queryKey: ['fiscal', 'years', activeCompanyId],
@@ -61,8 +72,14 @@ export function CompanySettingsPage() {
     }),
     onSuccess: (updatedCompany: Company) => {
       queryClient.invalidateQueries({ queryKey: ['master-data', 'companies'] })
-      setSyncedCompanyId(null)
-      setForm((current) => ({ ...current, name: updatedCompany.name }))
+      setForm({
+        name: updatedCompany.name,
+        code: updatedCompany.code ?? '',
+        legalName: updatedCompany.legalName ?? '',
+        fiscalId: updatedCompany.fiscalId ?? '',
+        country: updatedCompany.country ?? 'HN',
+        functionalCurrencyCode: updatedCompany.functionalCurrencyCode ?? 'HNL',
+      })
     },
   })
 

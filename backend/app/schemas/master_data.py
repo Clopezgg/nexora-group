@@ -11,7 +11,7 @@ class CompanyCreateRequest(CamelModel):
     code: str | None = Field(default=None, min_length=1, max_length=32)
     legal_name: str | None = Field(default=None, max_length=255)
     functional_currency_code: str | None = Field(default=None, min_length=3, max_length=3)
-    country: str | None = Field(default=None, max_length=64)
+    country: str | None = Field(default=None, min_length=2, max_length=2)
     fiscal_id: str | None = Field(default=None, max_length=64)
 
 
@@ -26,7 +26,7 @@ class CompanyUpdateRequest(CamelModel):
     code: str | None = Field(default=None, min_length=1, max_length=32)
     legal_name: str | None = Field(default=None, max_length=255)
     functional_currency_code: str | None = Field(default=None, min_length=3, max_length=3)
-    country: str | None = Field(default=None, max_length=64)
+    country: str | None = Field(default=None, min_length=2, max_length=2)
     fiscal_id: str | None = Field(default=None, max_length=64)
 
 

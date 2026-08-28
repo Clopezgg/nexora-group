@@ -27,6 +27,7 @@ from app.api.routes import (
     health,
     inventory,
     master_data,
+    master_dimensions,
     notifications,
     procurement,
     project_budget_management,
@@ -117,6 +118,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(context.router, prefix="/api")
     app.include_router(master_data.router, prefix="/api")
+    app.include_router(master_dimensions.router, prefix="/api")
     app.include_router(company_management.router, prefix="/api")
     app.include_router(fiscal.router, prefix="/api")
     app.include_router(accounting.router, prefix="/api")

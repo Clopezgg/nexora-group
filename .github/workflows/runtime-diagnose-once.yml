@@ -31,6 +31,17 @@ jobs:
           az containerapp revision list -g nexora-rg-dev -n nexora-backend-dev \
             --query '[].{name:name,active:properties.active,health:properties.healthState,image:properties.template.containers[0].image,created:properties.createdTime}' -o jsonc
 
+      - name: Capture unhealthy revision logs
+        run: |
+          set +e
+          echo "=== Console logs: latest unhealthy revision ==="
+          az containerapp logs show -g nexora-rg-dev -n nexora-backend-dev \
+            --revision nexora-backend-dev--0000024 --type console --tail 150
+          echo "=== System logs: latest unhealthy revision ==="
+          az containerapp logs show -g nexora-rg-dev -n nexora-backend-dev \
+            --revision nexora-backend-dev--0000024 --type system --tail 100
+          exit 0
+
       - name: Probe live API route and projects
         env:
           FRONTEND_URL: https://jolly-plant-0d6bf700f.7.azurestaticapps.net

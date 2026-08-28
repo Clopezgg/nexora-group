@@ -34,6 +34,14 @@ export interface ProjectInput {
   description?: string
 }
 
+export interface BudgetLineInput {
+  authorizedAmount: number
+  wbsNodeId?: string | null
+  economicCategoryId?: string | null
+  costCenterId?: string | null
+  fiscalPeriodId?: string | null
+}
+
 export const projectService = {
   list: (companyId: string) => apiFetch<Project[]>(`/projects?company_id=${companyId}`),
   create: (input: ProjectInput) =>
@@ -62,24 +70,15 @@ export const projectService = {
     },
   ) => apiFetch<WBSNode>(`/projects/${projectId}/wbs`, { method: 'POST', body: JSON.stringify(input) }),
 
-  getBudgetSummary: (projectId: string) =>
-    apiFetch<BudgetSummary>(`/projects/${projectId}/budgets/summary`),
+  getBudgetSummary: (projectId: string) => apiFetch<BudgetSummary>(`/projects/${projectId}/budgets/summary`),
   getActiveBudget: (projectId: string) => apiFetch<Budget>(`/projects/${projectId}/budgets/active`),
-  createBaseline: (
-    projectId: string,
-    input: {
-      currencyCode: string
-      lines: Array<{
-        authorizedAmount: number
-        wbsNodeId?: string | null
-        economicCategoryId?: string | null
-        costCenterId?: string | null
-        fiscalPeriodId?: string | null
-      }>
-      notes?: string
-    },
-  ) =>
+  createBaseline: (projectId: string, input: { currencyCode: string; lines: BudgetLineInput[]; notes?: string }) =>
     apiFetch<Budget>(`/projects/${projectId}/budgets/baseline`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  redistributeUnassignedBudget: (projectId: string, input: { lines: BudgetLineInput[]; notes?: string }) =>
+    apiFetch<Budget>(`/projects/${projectId}/budgets/redistribute-unassigned`, {
       method: 'POST',
       body: JSON.stringify(input),
     }),

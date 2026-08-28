@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/auth-context'
 import { useActiveContext } from '../features/context/useActiveContext'
 import { Badge, Icon, IconButton, Select, Tooltip } from '../design-system'
+import { EditAccessControl } from '../components/EditAccessControl'
 import { NotificationBell } from '../components/NotificationBell'
 import { useActiveCompany } from '../hooks/useActiveCompany'
 import { projectService } from '../services/projectService'
@@ -51,8 +52,8 @@ export function Topbar({ onOpenNav }: TopbarProps) {
   const currentPeriod = fiscalQuery.data?.period ?? null
   const fiscalYear = fiscalQuery.data?.fiscalYear ?? null
   const periodText = currentPeriod
-    ? `Período: ${fiscalYear?.code ?? currentPeriod.startDate.slice(0, 4)} · P${String(currentPeriod.periodNumber).padStart(2, '0')} · ${PERIOD_STATUS_LABEL[currentPeriod.status] ?? currentPeriod.status}`
-    : 'Período: no configurado'
+    ? `${fiscalYear?.code ?? currentPeriod.startDate.slice(0, 4)} · P${String(currentPeriod.periodNumber).padStart(2, '0')} · ${PERIOD_STATUS_LABEL[currentPeriod.status] ?? currentPeriod.status}`
+    : 'Período no configurado'
 
   return (
     <header className="nx-topbar">
@@ -78,21 +79,21 @@ export function Topbar({ onOpenNav }: TopbarProps) {
               ))}
             </Select>
           ) : (
-            <span className="nx-topbar__company-name">{activeCompany?.name ?? 'NEXORA'}</span>
+            <span className="nx-topbar__company-name">{activeCompany?.name ?? 'NEXORA GROUP'}</span>
           )}
         </div>
         <div className="nx-topbar__context">
-          <span className="nx-topbar__context-label">Proyecto seleccionado</span>
+          <span className="nx-topbar__context-label">Proyecto activo</span>
           <Select
             aria-label="Proyecto seleccionado"
             value={context.activeProjectId ?? ''}
             disabled={contextLoading || projectsQuery.isLoading || !activeCompanyId}
             onChange={(event) => setActiveProject(event.target.value || null)}
           >
-            <option value="">Vista empresa (sin proyecto)</option>
+            <option value="">Vista empresa · sin proyecto</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
-                {project.name}
+                {project.code ? `${project.code} · ` : ''}{project.name}
               </option>
             ))}
           </Select>
@@ -109,6 +110,7 @@ export function Topbar({ onOpenNav }: TopbarProps) {
       </div>
 
       <div className="nx-topbar__right">
+        <EditAccessControl />
         <Tooltip label="Búsqueda global (Cmd/Ctrl + K)">
           <IconButton
             label="Búsqueda global"
@@ -132,7 +134,7 @@ export function Topbar({ onOpenNav }: TopbarProps) {
             {primaryRole ? <span className="nx-topbar__user-role">{primaryRole}</span> : null}
           </div>
           <button className="nx-topbar__logout" onClick={logout}>
-            Cerrar sesión
+            Salir
           </button>
         </div>
       </div>

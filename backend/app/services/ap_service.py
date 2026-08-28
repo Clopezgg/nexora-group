@@ -135,7 +135,9 @@ def submit_supplier_invoice_for_approval(
     return invoice
 
 
-def approve_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierInvoice:
+def approve_supplier_invoice(
+    db: Session, *, invoice_id: uuid.UUID, commit: bool = True
+) -> SupplierInvoice:
     """DRAFT o REVIEW -> APPROVED. Contabiliza el accrual: Debit gasto,
     Credit cuentas por pagar (orden maestra §34). DRAFT sigue siendo un
     estado válido de entrada para permitir la aprobación directa cuando no
@@ -184,12 +186,17 @@ def approve_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierI
 
     invoice.status = "APPROVED"
     invoice.accrual_document_id = document.id
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(invoice)
     return invoice
 
 
-def cancel_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierInvoice:
+def cancel_supplier_invoice(
+    db: Session, *, invoice_id: uuid.UUID, commit: bool = True
+) -> SupplierInvoice:
     invoice = db.get(SupplierInvoice, invoice_id)
     if invoice is None:
         raise ValueError(f"SupplierInvoice {invoice_id} no existe")
@@ -199,7 +206,10 @@ def cancel_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierIn
             "reversal contable, no cancelación directa"
         )
     invoice.status = "CANCELLED"
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(invoice)
     return invoice
 
@@ -298,9 +308,9 @@ def apply_approval_decision(db: Session, *, invoice_id: uuid.UUID, decision: str
     de `approve_supplier_invoice`/`cancel_supplier_invoice`. Delega en
     ellas: la transición real sigue viviendo únicamente ahí."""
     if decision == "APPROVED":
-        approve_supplier_invoice(db, invoice_id=invoice_id)
+        approve_supplier_invoice(db, invoice_id=invoice_id, commit=False)
     elif decision == "REJECTED":
-        cancel_supplier_invoice(db, invoice_id=invoice_id)
+        cancel_supplier_invoice(db, invoice_id=invoice_id, commit=False)
 
 
 def get_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierInvoice | None:

@@ -146,4 +146,10 @@ def apply_approval_decision(
     revisor registrada, `decide_submittal` rechaza con
     `InvalidSubmittalStateError` -- ese precondition es del dominio, no se
     relaja aquí solo porque la decisión llega vía Approval Inbox."""
-    decide_submittal(db, submittal_id=submittal_id, decision=decision, decided_by=decided_by)
+    decide_submittal(
+        db,
+        submittal_id=submittal_id,
+        decision=decision,
+        decided_by=decided_by,
+        commit=False,
+    )

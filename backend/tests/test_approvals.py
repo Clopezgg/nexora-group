@@ -209,6 +209,66 @@ def test_deciding_ap_approval_request_transitions_the_real_invoice(client, db_se
     assert refreshed.status == "APPROVED"
 
 
+def test_ap_approval_decision_rolls_back_domain_and_request_when_audit_fails(
+    client, db_session, monkeypatch
+):
+    from app.models.ap import SupplierInvoice
+    from app.repositories import approval_repository
+    from tests.test_ap_ar import _setup_ap
+
+    login_admin(client)
+    company, _bank, expense, payable, supplier = _setup_ap(client)
+    admin_user = _get_admin_user(db_session)
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "A-APR-ROLLBACK",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "100.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    ).json()
+
+    approver = create_user_with_role(
+        db_session, email="approver-audit-rollback@nexora.group", role_name="Finance Manager"
+    )
+    db_session.add(UserCompanyAccess(user_id=approver.id, company_id=uuid.UUID(company["id"])))
+    request = approval_service.create_request(
+        db_session,
+        policy_id=None,
+        entity_type="ap.supplier_invoice",
+        entity_id=uuid.UUID(invoice["id"]),
+        company_id=uuid.UUID(company["id"]),
+        requested_by=admin_user.id,
+        assigned_to=approver.id,
+        module="ap",
+    )
+    db_session.commit()
+
+    def fail_record(*args, **kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr("app.api.routes.approvals.audit_service.record", fail_record)
+    login_as(client, email="approver-audit-rollback@nexora.group")
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        client.post(f"/api/approvals/{request.id}/decide", json={"decision": "APPROVED"})
+
+    db_session.rollback()
+    db_session.expire_all()
+    reloaded_request = approval_repository.get_for_update(db_session, request_id=request.id)
+    reloaded_invoice = db_session.get(SupplierInvoice, uuid.UUID(invoice["id"]))
+    assert reloaded_request.status == "PENDING"
+    assert reloaded_invoice.status == "DRAFT"
+    assert reloaded_invoice.accrual_document_id is None
+
+
 def test_company_access_blocks_cross_company_approval_list(client, db_session):
     login_admin(client)
     company_a = create_company(client, name="Aprobaciones A")
@@ -237,7 +297,7 @@ def test_read_only_role_cannot_decide_approval(client, db_session):
     # Auditor is granted workflow.approval/read but deliberately not
     # workflow.approval/decide (see permission_repository.py) -- Auditors
     # observe, they never decide.
-    user = create_user_with_role(
+    create_user_with_role(
         db_session, email="auditor-approvals@nexora.group", role_name="Auditor"
     )
     db_session.commit()

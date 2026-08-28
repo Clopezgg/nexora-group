@@ -55,29 +55,37 @@ def decide_approval(
     user=Depends(require_permission("workflow.approval", "decide")),
     correlation_id: str = Depends(get_correlation_id),
 ) -> ApprovalRequestResponse:
-    existing = approval_repository.get_for_update(db, request_id=request_id)
-    assert_company_access(
-        db,
-        user_id=user.id,
-        resource="workflow.approval",
-        action="decide",
-        company_id=existing.company_id,
-    )
-    before_status = existing.status
-    updated = approval_service.decide(
-        db, request_id=request_id, decided_by=user.id, decision=body.decision, comment=body.comment
-    )
-    audit_service.record(
-        db,
-        actor_user_id=user.id,
-        action="workflow.approval.decide",
-        entity_type="workflow.approval_request",
-        entity_id=updated.id,
-        company_id=updated.company_id,
-        project_id=updated.project_id,
-        before={"status": before_status},
-        after={"status": updated.status},
-        correlation_id=correlation_id,
-    )
-    db.commit()
-    return ApprovalRequestResponse.model_validate(updated, from_attributes=True)
+    try:
+        existing = approval_repository.get_for_update(db, request_id=request_id)
+        assert_company_access(
+            db,
+            user_id=user.id,
+            resource="workflow.approval",
+            action="decide",
+            company_id=existing.company_id,
+        )
+        before_status = existing.status
+        updated = approval_service.decide(
+            db,
+            request_id=request_id,
+            decided_by=user.id,
+            decision=body.decision,
+            comment=body.comment,
+        )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="workflow.approval.decide",
+            entity_type="workflow.approval_request",
+            entity_id=updated.id,
+            company_id=updated.company_id,
+            project_id=updated.project_id,
+            before={"status": before_status},
+            after={"status": updated.status},
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        return ApprovalRequestResponse.model_validate(updated, from_attributes=True)
+    except Exception:
+        db.rollback()
+        raise

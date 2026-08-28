@@ -39,21 +39,24 @@ const NEXT_STATUS: Partial<Record<ProjectStatus, Array<{ status: ProjectStatus; 
   COMPLETED: [{ status: 'CLOSED', label: 'Cerrar proyecto' }],
 }
 
+const EMPTY_FORM = {
+  name: '',
+  code: '',
+  customerId: '',
+  manager: '',
+  currencyCode: 'HNL',
+  costCenterId: '',
+  plannedStart: '',
+  plannedEnd: '',
+  description: '',
+}
+
 export function ProjectsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { context, setActiveProject } = useActiveContext()
   const { activeCompany, activeCompanyId, isLoading: companiesLoading, isError: companiesError, refetch } = useActiveCompany()
-  const [form, setForm] = useState({
-    name: '',
-    code: '',
-    customerId: '',
-    manager: '',
-    currencyCode: 'HNL',
-    plannedStart: '',
-    plannedEnd: '',
-    description: '',
-  })
+  const [form, setForm] = useState(EMPTY_FORM)
 
   const projectsQuery = useQuery({
     queryKey: ['projects', activeCompanyId],
@@ -68,6 +71,11 @@ export function ProjectsPage() {
   const usersQuery = useQuery({
     queryKey: ['master-data', 'users', activeCompanyId],
     queryFn: () => masterDataService.listUsers(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const costCentersQuery = useQuery({
+    queryKey: ['master-data', 'cost-centers', activeCompanyId],
+    queryFn: () => masterDataService.listCostCenters(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
 
@@ -85,22 +93,14 @@ export function ProjectsPage() {
         customerId: form.customerId || undefined,
         manager: form.manager || undefined,
         currencyCode: form.currencyCode || undefined,
+        costCenterId: form.costCenterId || undefined,
         plannedStart: form.plannedStart || undefined,
         plannedEnd: form.plannedEnd || undefined,
         description: form.description.trim() || undefined,
       }),
     onSuccess: () => {
       invalidate()
-      setForm({
-        name: '',
-        code: '',
-        customerId: '',
-        manager: '',
-        currencyCode: 'HNL',
-        plannedStart: '',
-        plannedEnd: '',
-        description: '',
-      })
+      setForm(EMPTY_FORM)
     },
   })
 
@@ -187,6 +187,12 @@ export function ProjectsPage() {
           <option value="">Sin responsable asignado</option>
           {(usersQuery.data ?? []).map((user) => (
             <option key={user.id} value={user.fullName}>{user.fullName}</option>
+          ))}
+        </Select>
+        <Select label="Centro de costo" value={form.costCenterId} onChange={(event) => setForm({ ...form, costCenterId: event.target.value })}>
+          <option value="">Sin centro de costo</option>
+          {(costCentersQuery.data ?? []).map((item) => (
+            <option key={item.id} value={item.id}>{item.code} · {item.name}</option>
           ))}
         </Select>
         <Select label="Moneda" value={form.currencyCode} onChange={(event) => setForm({ ...form, currencyCode: event.target.value })}>

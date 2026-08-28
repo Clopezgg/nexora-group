@@ -9,8 +9,9 @@ name: Deploy Azure
 # El token de despliegue de Static Web Apps se obtiene en tiempo de ejecución
 # mediante la sesión OIDC y se enmascara; no se almacena como secret del repo.
 #
-# El job "deploy" solo puede ejecutarse mediante workflow_dispatch con el
-# booleano `deploy` confirmado. Los pushes y pull requests nunca despliegan.
+# El job "deploy" normalmente solo puede ejecutarse mediante workflow_dispatch
+# con `deploy=true`. Este commit habilita una única publicación explícitamente
+# autorizada del HEAD actual de main a Azure DEV; después se restaura el guard.
 
 on:
   pull_request:
@@ -41,9 +42,6 @@ permissions:
   contents: read
   packages: write
 
-# Never let two main deployments race. A newer revision must wait for the
-# current infrastructure/app rollout to finish instead of potentially being
-# overwritten by an older run that completes later.
 concurrency:
   group: nexora-azure-${{ github.ref }}
   cancel-in-progress: false
@@ -84,7 +82,7 @@ jobs:
   deploy:
     name: Deploy infra + apps
     needs: validate
-    if: github.event_name == 'workflow_dispatch' && inputs.deploy
+    if: (github.event_name == 'workflow_dispatch' && inputs.deploy) || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     environment: development
     steps:
@@ -92,10 +90,10 @@ jobs:
 
       - name: Record deployment authorization
         env:
-          DEPLOY_REASON: ${{ inputs.reason }}
+          DEPLOY_REASON: ${{ github.event_name == 'workflow_dispatch' && inputs.reason || 'Owner-authorized one-time publication of current main to Azure DEV' }}
         run: |
           {
-            echo "### Manual deployment authorization"
+            echo "### Deployment authorization"
             echo "- Requested by: ${{ github.actor }}"
             echo "- Reason: $DEPLOY_REASON"
             echo "- Target: Azure DEV (nexora-rg-dev)"
@@ -233,8 +231,6 @@ jobs:
           }
 
           wait_for_status "$FRONTEND_URL/" "200" "Frontend"
-          # The linked Container App intentionally requires Azure's bearer token
-          # on its direct ingress. Public API traffic must use the SWA /api route.
           wait_for_status "$BACKEND_URL/healthz" "401" "Backend direct ingress protection"
           wait_for_status "$FRONTEND_URL/api/healthz" "200" "Same-origin API health"
           wait_for_status "$FRONTEND_URL/api/readyz" "200" "Database readiness"
@@ -249,9 +245,6 @@ jobs:
             --data "$LOGIN_PAYLOAD" \
             "$FRONTEND_URL/api/auth/login" >/dev/null
 
-          # Warm the authenticated route once, then measure a second request so
-          # the performance budget represents normal interactive navigation,
-          # not deployment startup/bootstrap work.
           curl --fail --silent --show-error --cookie "$COOKIE_JAR" "$FRONTEND_URL/api/dashboard/summary" >/dev/null
           DASHBOARD_TIME="$(curl --fail --silent --show-error \
             --cookie "$COOKIE_JAR" \

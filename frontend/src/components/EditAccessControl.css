@@ -1,0 +1,42 @@
+.nx-edit-access {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px;
+  background: rgba(255,255,255,.055);
+  color: #b7c9dc;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nx-edit-access:hover { color: #fff; background: rgba(255,255,255,.09); }
+.nx-edit-access__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e0a63c;
+  box-shadow: 0 0 0 3px rgba(224,166,60,.12);
+}
+.nx-edit-access--unlocked {
+  border-color: rgba(66, 201, 142, .30);
+  color: #9ce0bf;
+  background: rgba(25,135,84,.13);
+}
+.nx-edit-access--unlocked .nx-edit-access__dot {
+  background: #42c98e;
+  box-shadow: 0 0 0 3px rgba(66,201,142,.12);
+}
+.nx-edit-access__form { display: flex; flex-direction: column; gap: 16px; }
+.nx-edit-access__form > p { margin: 0; color: #617187; font-size: 13px; line-height: 1.55; }
+.nx-edit-access__error { margin: 0; color: var(--nx-danger); font-size: 12px; }
+.nx-edit-access__actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+@media (max-width: 1180px) {
+  .nx-edit-access { width: 32px; padding: 0; justify-content: center; font-size: 0; }
+}

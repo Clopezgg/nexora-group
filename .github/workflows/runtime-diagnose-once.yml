@@ -1,0 +1,71 @@
+name: Runtime Diagnose Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/runtime-diagnose-once.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Inspect active Container App runtime
+        run: |
+          set -euo pipefail
+          echo "=== Container App ==="
+          az containerapp show -g nexora-rg-dev -n nexora-backend-dev \
+            --query '{mode:properties.configuration.activeRevisionsMode,latest:properties.latestRevisionName,ready:properties.latestReadyRevisionName,image:properties.template.containers[0].image,traffic:properties.configuration.ingress.traffic}' -o jsonc
+          echo "=== Revisions ==="
+          az containerapp revision list -g nexora-rg-dev -n nexora-backend-dev \
+            --query '[].{name:name,active:properties.active,health:properties.healthState,image:properties.template.containers[0].image,created:properties.createdTime}' -o jsonc
+
+      - name: Probe live API route and projects
+        env:
+          FRONTEND_URL: https://jolly-plant-0d6bf700f.7.azurestaticapps.net
+          ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          COOKIE_JAR="$RUNNER_TEMP/nexora-diag-cookies.txt"
+
+          LOGIN_PAYLOAD="$(jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email:$email,password:$password}')"
+          curl --fail --silent --show-error --cookie-jar "$COOKIE_JAR" \
+            --header 'Content-Type: application/json' --data "$LOGIN_PAYLOAD" \
+            "$FRONTEND_URL/api/auth/login" >/dev/null
+
+          EDIT_CODE="$(curl --silent --show-error --cookie "$COOKIE_JAR" --output "$RUNNER_TEMP/edit-probe.json" --write-out '%{http_code}' "$FRONTEND_URL/api/edit-access/verify")"
+          echo "edit-access GET status=$EDIT_CODE"
+          cat "$RUNNER_TEMP/edit-probe.json" || true
+          echo
+
+          curl --fail --silent --show-error --cookie "$COOKIE_JAR" \
+            "$FRONTEND_URL/api/master-data/companies" > "$RUNNER_TEMP/companies.json"
+          COMPANY_ID="$(jq -r '.[] | select((.name|ascii_upcase)=="NEXORA GROUP") | .id' "$RUNNER_TEMP/companies.json" | head -n1)"
+          if [ -z "$COMPANY_ID" ] || [ "$COMPANY_ID" = "null" ]; then
+            echo "::error::NEXORA GROUP company not found"
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --cookie "$COOKIE_JAR" \
+            "$FRONTEND_URL/api/projects?company_id=$COMPANY_ID" > "$RUNNER_TEMP/projects.json"
+          echo "=== Projects returned by live API ==="
+          jq '[.[] | {id,code,name,status}]' "$RUNNER_TEMP/projects.json"
+
+          {
+            echo "### Live runtime diagnosis"
+            echo "- edit-access GET HTTP: $EDIT_CODE (405 means route exists; 404 means live backend lacks it)"
+            echo "- project count: $(jq length "$RUNNER_TEMP/projects.json")"
+            echo "- target projects present: $(jq '[.[] | select(.code=="21000" or .code=="22000")] | length' "$RUNNER_TEMP/projects.json")"
+          } >> "$GITHUB_STEP_SUMMARY"

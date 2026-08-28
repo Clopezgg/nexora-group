@@ -278,7 +278,7 @@
   .nx-topbar__context { flex: 1; }
   .nx-topbar .nx-select { width: 100%; min-width: 0; }
   .nx-topbar__user-info { display: none; }
-  .nx-topbar__logout { display: none; }
+  .nx-topbar__logout { display: inline-flex; align-items: center; justify-content: center; }
 }
 
 @media (max-width: 430px) {

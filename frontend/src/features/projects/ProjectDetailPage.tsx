@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import {
@@ -37,11 +37,24 @@ function percent(value: string | null) {
   return value === null ? '—' : `${Number(value).toFixed(1)}%`
 }
 
+const EMPTY_FORM = {
+  name: '',
+  code: '',
+  customerId: '',
+  manager: '',
+  currencyCode: 'HNL',
+  costCenterId: '',
+  plannedStart: '',
+  plannedEnd: '',
+  description: '',
+}
+
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const queryClient = useQueryClient()
   const { activeCompanyId } = useActiveCompany()
   const { context, setActiveProject } = useActiveContext()
+  const [form, setForm] = useState(EMPTY_FORM)
 
   const projectQuery = useQuery({
     queryKey: ['project', projectId],
@@ -63,30 +76,30 @@ export function ProjectDetailPage() {
     queryFn: () => masterDataService.listUsers(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
+  const costCentersQuery = useQuery({
+    queryKey: ['master-data', 'cost-centers', activeCompanyId],
+    queryFn: () => masterDataService.listCostCenters(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
 
   const project = projectQuery.data ?? null
-  const [formProjectId, setFormProjectId] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    name: '',
-    code: '',
-    customerId: '',
-    manager: '',
-    plannedStart: '',
-    plannedEnd: '',
-    description: '',
-  })
-  if (project && formProjectId !== project.id) {
-    setFormProjectId(project.id)
+  useEffect(() => {
+    if (!project) {
+      setForm(EMPTY_FORM)
+      return
+    }
     setForm({
       name: project.name,
       code: project.code ?? '',
       customerId: project.customerId ?? '',
       manager: project.manager ?? '',
+      currencyCode: project.currencyCode ?? 'HNL',
+      costCenterId: project.costCenterId ?? '',
       plannedStart: project.plannedStart ?? '',
       plannedEnd: project.plannedEnd ?? '',
       description: project.description ?? '',
     })
-  }
+  }, [project])
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['project', projectId] })
@@ -100,15 +113,16 @@ export function ProjectDetailPage() {
       projectService.update(projectId as string, {
         name: form.name.trim(),
         code: form.code.trim() || undefined,
-        customerId: form.customerId || undefined,
-        manager: form.manager || undefined,
-        plannedStart: form.plannedStart || undefined,
-        plannedEnd: form.plannedEnd || undefined,
-        description: form.description.trim() || undefined,
+        customerId: form.customerId || null,
+        manager: form.manager || null,
+        currencyCode: form.currencyCode,
+        costCenterId: form.costCenterId || null,
+        plannedStart: form.plannedStart || null,
+        plannedEnd: form.plannedEnd || null,
+        description: form.description.trim() || null,
       }),
     onSuccess: (updated: Project) => {
       invalidate()
-      setFormProjectId(null)
       if (context.activeProjectId === updated.id) setActiveProject(updated.id)
     },
   })
@@ -233,6 +247,14 @@ export function ProjectDetailPage() {
           <Select label="Responsable" value={form.manager} onChange={(event) => setForm({ ...form, manager: event.target.value })}>
             <option value="">Sin responsable asignado</option>
             {(usersQuery.data ?? []).map((user) => <option key={user.id} value={user.fullName}>{user.fullName}</option>)}
+          </Select>
+          <Select label="Centro de costo" value={form.costCenterId} onChange={(event) => setForm({ ...form, costCenterId: event.target.value })}>
+            <option value="">Sin centro de costo</option>
+            {(costCentersQuery.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}
+          </Select>
+          <Select label="Moneda" value={form.currencyCode} onChange={(event) => setForm({ ...form, currencyCode: event.target.value })}>
+            <option value="HNL">HNL — Lempira hondureño</option>
+            <option value="USD">USD — Dólar estadounidense</option>
           </Select>
           <Input label="Inicio previsto" type="date" value={form.plannedStart} onChange={(event) => setForm({ ...form, plannedStart: event.target.value })} />
           <Input label="Final previsto" type="date" value={form.plannedEnd} onChange={(event) => setForm({ ...form, plannedEnd: event.target.value })} />

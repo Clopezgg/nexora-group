@@ -9,7 +9,9 @@ import type {
   ProjectFinancialSummary,
   ProjectStatus,
   ProgressRecord,
+  WBSFinancialSummary,
   WBSNode,
+  WBSStatus,
 } from '../types/project'
 
 export const companyService = {
@@ -25,13 +27,13 @@ export interface ProjectInput {
   companyId: string
   name: string
   code?: string
-  customerId?: string
-  manager?: string
+  customerId?: string | null
+  manager?: string | null
   currencyCode?: string
-  costCenterId?: string
-  plannedStart?: string
-  plannedEnd?: string
-  description?: string
+  costCenterId?: string | null
+  plannedStart?: string | null
+  plannedEnd?: string | null
+  description?: string | null
 }
 
 export interface BudgetLineInput {
@@ -40,6 +42,17 @@ export interface BudgetLineInput {
   economicCategoryId?: string | null
   costCenterId?: string | null
   fiscalPeriodId?: string | null
+}
+
+export interface WBSInput {
+  code?: string
+  name?: string
+  parentId?: string | null
+  manager?: string | null
+  plannedStart?: string | null
+  plannedFinish?: string | null
+  status?: WBSStatus
+  progressPercent?: number
 }
 
 export const projectService = {
@@ -58,17 +71,15 @@ export const projectService = {
     apiFetch<ProjectFinancialSummary>(`/projects/${projectId}/financial-summary`),
 
   listWbs: (projectId: string) => apiFetch<WBSNode[]>(`/projects/${projectId}/wbs`),
-  createWbs: (
-    projectId: string,
-    input: {
-      code: string
-      name: string
-      parentId?: string | null
-      manager?: string
-      plannedStart?: string
-      plannedFinish?: string
-    },
-  ) => apiFetch<WBSNode>(`/projects/${projectId}/wbs`, { method: 'POST', body: JSON.stringify(input) }),
+  listWbsFinancials: (projectId: string) =>
+    apiFetch<WBSFinancialSummary[]>(`/projects/${projectId}/wbs/financial-summary`),
+  createWbs: (projectId: string, input: Required<Pick<WBSInput, 'code' | 'name'>> & WBSInput) =>
+    apiFetch<WBSNode>(`/projects/${projectId}/wbs`, { method: 'POST', body: JSON.stringify(input) }),
+  updateWbs: (projectId: string, nodeId: string, input: WBSInput) =>
+    apiFetch<WBSNode>(`/projects/${projectId}/wbs/${nodeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
 
   getBudgetSummary: (projectId: string) => apiFetch<BudgetSummary>(`/projects/${projectId}/budgets/summary`),
   getActiveBudget: (projectId: string) => apiFetch<Budget>(`/projects/${projectId}/budgets/active`),
@@ -92,6 +103,7 @@ export const projectService = {
       wbsNodeId?: string | null
       scopeChange?: string
       budgetChangeAmount: number
+      contractChangeAmount: number
       scheduleChangeDays?: number | null
     },
   ) =>

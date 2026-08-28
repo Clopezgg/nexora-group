@@ -4,6 +4,9 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.domain.errors import InvalidFinancialReferenceError
+from app.models.cost_center import CostCenter
+from app.models.crm import Customer
 from app.models.project import Project
 
 
@@ -47,10 +50,26 @@ def create_project(
     planned_end: date | None = None,
     description: str | None = None,
 ) -> Project:
+    if customer_id is not None:
+        customer = db.get(Customer, customer_id)
+        if customer is None or customer.company_id != company_id:
+            raise InvalidFinancialReferenceError(
+                "customer_id debe pertenecer a la compañía propietaria"
+            )
+    if cost_center_id is not None:
+        cost_center = db.get(CostCenter, cost_center_id)
+        if cost_center is None or cost_center.company_id != company_id:
+            raise InvalidFinancialReferenceError(
+                "cost_center_id debe pertenecer a la compañía propietaria"
+            )
+    if planned_start and planned_end and planned_end < planned_start:
+        raise InvalidFinancialReferenceError(
+            "La fecha final prevista no puede ser anterior a la fecha de inicio"
+        )
     project = Project(
         company_id=company_id,
-        name=name,
-        code=code,
+        name=name.strip(),
+        code=code.strip() if code else None,
         customer_id=customer_id,
         customer_ref=customer_ref,
         manager=manager,

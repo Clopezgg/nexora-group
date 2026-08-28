@@ -37,10 +37,73 @@ jobs:
           echo "=== Console logs: latest unhealthy revision ==="
           az containerapp logs show -g nexora-rg-dev -n nexora-backend-dev \
             --revision nexora-backend-dev--0000024 --type console --tail 150
-          echo "=== System logs: latest unhealthy revision ==="
-          az containerapp logs show -g nexora-rg-dev -n nexora-backend-dev \
-            --revision nexora-backend-dev--0000024 --type system --tail 100
           exit 0
+
+      - name: Enumerate live database references to target projects
+        run: |
+          set -euo pipefail
+          VAULT_NAME="$(az keyvault list -g nexora-rg-dev --query '[0].name' -o tsv)"
+          if [ -z "$VAULT_NAME" ]; then
+            echo "::warning::Key Vault not found; DB reference enumeration skipped"
+            exit 0
+          fi
+          set +e
+          DB_URL="$(az keyvault secret show --vault-name "$VAULT_NAME" --name database-url --query value -o tsv 2>"$RUNNER_TEMP/kv.err")"
+          KV_STATUS=$?
+          set -e
+          if [ "$KV_STATUS" -ne 0 ] || [ -z "$DB_URL" ]; then
+            echo "::warning::CI identity cannot read database-url; DB reference enumeration skipped"
+            cat "$RUNNER_TEMP/kv.err" | sed -E 's#https?://[^ ]+#<redacted>#g' | head -n 5
+            exit 0
+          fi
+          python -m pip install --quiet 'psycopg[binary]>=3.2,<4'
+          export DB_URL
+          python - <<'PY'
+          import os
+          import psycopg
+
+          dsn = os.environ['DB_URL'].replace('postgresql+psycopg://', 'postgresql://', 1)
+          with psycopg.connect(dsn) as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                      SELECT p.id, p.code, p.name
+                      FROM projects p JOIN companies c ON c.id=p.company_id
+                      WHERE upper(trim(c.name))='NEXORA GROUP'
+                        AND trim(p.code) IN ('21000','22000')
+                      ORDER BY p.code
+                  """)
+                  projects = cur.fetchall()
+                  ids = [row[0] for row in projects]
+                  print('target_projects=', [(str(r[0]), r[1], r[2]) for r in projects])
+                  if not ids:
+                      raise SystemExit(0)
+                  cur.execute("""
+                      SELECT tc.table_schema, tc.table_name, kcu.column_name,
+                             cols.is_nullable, rc.delete_rule
+                      FROM information_schema.table_constraints tc
+                      JOIN information_schema.key_column_usage kcu
+                        ON tc.constraint_name=kcu.constraint_name AND tc.constraint_schema=kcu.constraint_schema
+                      JOIN information_schema.referential_constraints rc
+                        ON tc.constraint_name=rc.constraint_name AND tc.constraint_schema=rc.constraint_schema
+                      JOIN information_schema.constraint_column_usage ccu
+                        ON rc.unique_constraint_name=ccu.constraint_name AND rc.unique_constraint_schema=ccu.constraint_schema
+                      JOIN information_schema.columns cols
+                        ON cols.table_schema=tc.table_schema AND cols.table_name=tc.table_name AND cols.column_name=kcu.column_name
+                      WHERE tc.constraint_type='FOREIGN KEY'
+                        AND ccu.table_name='projects'
+                      ORDER BY tc.table_schema, tc.table_name, kcu.column_name
+                  """)
+                  refs = cur.fetchall()
+                  print('=== Referencing rows ===')
+                  for schema, table, column, nullable, delete_rule in refs:
+                      cur.execute(
+                          f'SELECT count(*) FROM "{schema}"."{table}" WHERE "{column}" = ANY(%s)',
+                          (ids,),
+                      )
+                      count = cur.fetchone()[0]
+                      if count:
+                          print(f'{schema}.{table}.{column}: count={count} nullable={nullable} delete_rule={delete_rule}')
+          PY
 
       - name: Probe live API route and projects
         env:
@@ -50,7 +113,6 @@ jobs:
         run: |
           set -euo pipefail
           COOKIE_JAR="$RUNNER_TEMP/nexora-diag-cookies.txt"
-
           LOGIN_PAYLOAD="$(jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email:$email,password:$password}')"
           curl --fail --silent --show-error --cookie-jar "$COOKIE_JAR" \
             --header 'Content-Type: application/json' --data "$LOGIN_PAYLOAD" \
@@ -61,22 +123,8 @@ jobs:
           cat "$RUNNER_TEMP/edit-probe.json" || true
           echo
 
-          curl --fail --silent --show-error --cookie "$COOKIE_JAR" \
-            "$FRONTEND_URL/api/master-data/companies" > "$RUNNER_TEMP/companies.json"
+          curl --fail --silent --show-error --cookie "$COOKIE_JAR" "$FRONTEND_URL/api/master-data/companies" > "$RUNNER_TEMP/companies.json"
           COMPANY_ID="$(jq -r '.[] | select((.name|ascii_upcase)=="NEXORA GROUP") | .id' "$RUNNER_TEMP/companies.json" | head -n1)"
-          if [ -z "$COMPANY_ID" ] || [ "$COMPANY_ID" = "null" ]; then
-            echo "::error::NEXORA GROUP company not found"
-            exit 1
-          fi
-
-          curl --fail --silent --show-error --cookie "$COOKIE_JAR" \
-            "$FRONTEND_URL/api/projects?company_id=$COMPANY_ID" > "$RUNNER_TEMP/projects.json"
+          curl --fail --silent --show-error --cookie "$COOKIE_JAR" "$FRONTEND_URL/api/projects?company_id=$COMPANY_ID" > "$RUNNER_TEMP/projects.json"
           echo "=== Projects returned by live API ==="
           jq '[.[] | {id,code,name,status}]' "$RUNNER_TEMP/projects.json"
-
-          {
-            echo "### Live runtime diagnosis"
-            echo "- edit-access GET HTTP: $EDIT_CODE (405 means route exists; 404 means live backend lacks it)"
-            echo "- project count: $(jq length "$RUNNER_TEMP/projects.json")"
-            echo "- target projects present: $(jq '[.[] | select(.code=="21000" or .code=="22000")] | length' "$RUNNER_TEMP/projects.json")"
-          } >> "$GITHUB_STEP_SUMMARY"

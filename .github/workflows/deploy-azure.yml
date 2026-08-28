@@ -9,9 +9,9 @@ name: Deploy Azure
 # El token de despliegue de Static Web Apps se obtiene en tiempo de ejecución
 # mediante la sesión OIDC y se enmascara; no se almacena como secret del repo.
 #
-# El job "deploy" normalmente solo puede ejecutarse mediante workflow_dispatch
-# con `deploy=true`. Este commit habilita una única publicación explícitamente
-# autorizada del HEAD actual de main a Azure DEV; después se restaura el guard.
+# El job "deploy" solo puede ejecutarse mediante workflow_dispatch con el
+# booleano `deploy` confirmado. Los pushes y pull requests nunca despliegan.
+# Azure actual se trata como DEV; el job usa la identidad federada de main.
 
 on:
   pull_request:
@@ -82,17 +82,17 @@ jobs:
   deploy:
     name: Deploy infra + apps
     needs: validate
-    if: (github.event_name == 'workflow_dispatch' && inputs.deploy) || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Record deployment authorization
         env:
-          DEPLOY_REASON: ${{ github.event_name == 'workflow_dispatch' && inputs.reason || 'Owner-authorized one-time publication of current main to Azure DEV' }}
+          DEPLOY_REASON: ${{ inputs.reason }}
         run: |
           {
-            echo "### Deployment authorization"
+            echo "### Manual deployment authorization"
             echo "- Requested by: ${{ github.actor }}"
             echo "- Reason: $DEPLOY_REASON"
             echo "- Target: Azure DEV (nexora-rg-dev)"

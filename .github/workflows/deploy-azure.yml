@@ -149,7 +149,7 @@ jobs:
             exit 1
           fi
           if [[ "$DEPLOYED_IMAGE" != *"${{ github.sha }}"* ]]; then
-            echo "::error::Container App is not running the expected Git SHA"
+            echo "::error::Container App desired template does not reference the expected Git SHA"
             exit 1
           fi
           if [ "$MIN_REPLICAS" != "1" ]; then
@@ -170,6 +170,43 @@ jobs:
             echo "- Backend: https://$BACKEND_FQDN"
             echo "- Container: $CPU CPU / $MEMORY / minReplicas=$MIN_REPLICAS"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify latest backend revision is healthy and serving
+        run: |
+          set -euo pipefail
+          APP=nexora-backend-dev
+          RG=nexora-rg-dev
+          EXPECTED_SHA='${{ github.sha }}'
+          READY_REVISION=''
+
+          for attempt in $(seq 1 36); do
+            LATEST_REVISION="$(az containerapp show -g "$RG" -n "$APP" --query properties.latestRevisionName -o tsv)"
+            READY_REVISION="$(az containerapp show -g "$RG" -n "$APP" --query properties.latestReadyRevisionName -o tsv)"
+            LATEST_HEALTH="$(az containerapp revision list -g "$RG" -n "$APP" --query "[?name=='$LATEST_REVISION'] | [0].properties.healthState" -o tsv)"
+            LATEST_IMAGE="$(az containerapp revision list -g "$RG" -n "$APP" --query "[?name=='$LATEST_REVISION'] | [0].properties.template.containers[0].image" -o tsv)"
+
+            echo "attempt=$attempt latest=$LATEST_REVISION ready=$READY_REVISION health=$LATEST_HEALTH image=$LATEST_IMAGE"
+            if [ -n "$LATEST_REVISION" ] \
+              && [ "$LATEST_REVISION" = "$READY_REVISION" ] \
+              && [ "$LATEST_HEALTH" = "Healthy" ] \
+              && [[ "$LATEST_IMAGE" == *"$EXPECTED_SHA"* ]]; then
+              echo "Backend revision $LATEST_REVISION is healthy and is the serving revision."
+              {
+                echo "- Ready backend revision: $LATEST_REVISION"
+                echo "- Ready backend image: $LATEST_IMAGE"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "::error::Newest backend revision never became healthy/ready; refusing to validate an older serving revision"
+          az containerapp revision list -g "$RG" -n "$APP" \
+            --query '[].{name:name,active:properties.active,health:properties.healthState,image:properties.template.containers[0].image}' -o table || true
+          if [ -n "${LATEST_REVISION:-}" ]; then
+            az containerapp logs show -g "$RG" -n "$APP" --revision "$LATEST_REVISION" --type console --tail 120 || true
+          fi
+          exit 1
 
       - name: Configure same-origin API route
         run: echo "VITE_API_BASE_URL=/api" >> "$GITHUB_ENV"
@@ -233,6 +270,7 @@ jobs:
           wait_for_status "$BACKEND_URL/healthz" "401" "Backend direct ingress protection"
           wait_for_status "$FRONTEND_URL/api/healthz" "200" "Same-origin API health"
           wait_for_status "$FRONTEND_URL/api/readyz" "200" "Database readiness"
+          wait_for_status "$FRONTEND_URL/api/edit-access/verify" "405" "Edit-access API route"
 
           HEALTH_TIME="$(curl --fail --silent --show-error --output /dev/null --write-out '%{time_total}' "$FRONTEND_URL/api/healthz")"
           READY_TIME="$(curl --fail --silent --show-error --output /dev/null --write-out '%{time_total}' "$FRONTEND_URL/api/readyz")"
@@ -267,5 +305,6 @@ jobs:
             echo "- healthz: ${HEALTH_TIME}s"
             echo "- readyz: ${READY_TIME}s"
             echo "- authenticated dashboard warm: ${DASHBOARD_TIME}s"
+            echo "- edit-access route: verified"
             echo "- HNL contract: verified"
           } >> "$GITHUB_STEP_SUMMARY"

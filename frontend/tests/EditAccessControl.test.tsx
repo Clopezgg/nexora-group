@@ -3,9 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditAccessControl } from '../src/components/EditAccessControl'
 
-const unlock = vi.fn()
-const lock = vi.fn()
-const isUnlocked = vi.fn()
+const { unlock, lock, isUnlocked } = vi.hoisted(() => ({
+  unlock: vi.fn(),
+  lock: vi.fn(),
+  isUnlocked: vi.fn(),
+}))
 
 vi.mock('../src/services/editAccessService', () => ({
   editAccessService: {

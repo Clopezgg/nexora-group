@@ -16,17 +16,21 @@ from app.api.routes import (
     assets,
     audit,
     auth,
+    company_management,
     context,
     crm,
     dashboard,
     documents,
     equipment,
     evidence,
+    fiscal,
     health,
     inventory,
     master_data,
     notifications,
     procurement,
+    project_budget_management,
+    project_management,
     projects,
     quality,
     reports,
@@ -73,18 +77,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    # Tables, reports and dashboard payloads can become sizeable as the ERP
-    # accumulates data. Compress them on the API boundary to reduce transfer
-    # latency while leaving small responses untouched.
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
     register_csrf_guard(app)
-    # Outermost middleware (added last -- see Starlette's add_middleware,
-    # que inserta al frente de la pila): el correlation_id debe existir
-    # ANTES que cualquier otro middleware pueda necesitarlo (p.ej. el
-    # error 403 de CsrfOriginGuardMiddleware ya lo usa).
     app.add_middleware(CorrelationIdMiddleware)
-    # Más externo todavía: los security headers deben aplicar a
-    # absolutamente toda respuesta, incluyendo los 403 de CORS/CSRF.
     register_security_headers(app)
 
     register_error_handlers(app)
@@ -122,41 +117,33 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(context.router, prefix="/api")
     app.include_router(master_data.router, prefix="/api")
+    app.include_router(company_management.router, prefix="/api")
+    app.include_router(fiscal.router, prefix="/api")
     app.include_router(accounting.router, prefix="/api")
     app.include_router(suppliers.router, prefix="/api")
     app.include_router(procurement.router, prefix="/api")
     app.include_router(inventory.router, prefix="/api")
     app.include_router(projects.router, prefix="/api")
-    # Track A - Financial Core.
+    app.include_router(project_management.router, prefix="/api")
+    app.include_router(project_budget_management.router, prefix="/api")
     app.include_router(treasury.router, prefix="/api")
     app.include_router(ap.router, prefix="/api")
     app.include_router(ar.router, prefix="/api")
-    # Track D - Enterprise Resources.
     app.include_router(assets.router, prefix="/api")
     app.include_router(equipment.router, prefix="/api")
     app.include_router(workforce.router, prefix="/api")
-    # Track E - Commercial (CRM).
     app.include_router(crm.router, prefix="/api")
-    # Track D - Construction Control (Documents/Evidence, RFI/Submittals).
     app.include_router(documents.router, prefix="/api")
     app.include_router(evidence.router, prefix="/api")
     app.include_router(rfi.router, prefix="/api")
     app.include_router(submittals.router, prefix="/api")
-    # Track D - Construction Control (Daily Site Reports/Quality/Safety).
     app.include_router(site_reports.router, prefix="/api")
     app.include_router(quality.router, prefix="/api")
     app.include_router(safety.router, prefix="/api")
-    # Track G - Platform (Audit trail, NXR-REQ-0090; Approval Inbox / SoD,
-    # NXR-REQ-0087/0088/0089).
     app.include_router(audit.router, prefix="/api")
     app.include_router(approvals.router, prefix="/api")
     app.include_router(notifications.router, prefix="/api")
-    # Track H - Reports/Search/Analytics (NXR-REQ-0093/0094): Trial
-    # Balance + Budget vs Actual + CSV export only -- see
-    # docs/superpowers/specs/2026-08-25-reports-search-analytics-design.md
-    # for what is deliberately out of scope in this phase.
     app.include_router(reports.router, prefix="/api")
-    # Track H - Reports/Search/Analytics (NXR-REQ-0092).
     app.include_router(search.router, prefix="/api")
 
     return app

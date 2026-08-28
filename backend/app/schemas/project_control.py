@@ -1,22 +1,52 @@
 import uuid
 from datetime import date
 from decimal import Decimal
+from typing import Literal
+
+from pydantic import Field, model_validator
 
 from app.schemas.base import CamelModel
 
 
+PROJECT_STATUS_VALUES = Literal["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CLOSED", "CANCELLED"]
+
+
 class ProjectCreateRequest(CamelModel):
     company_id: uuid.UUID
-    name: str
-    code: str | None = None
+    name: str = Field(min_length=1, max_length=255)
+    code: str | None = Field(default=None, max_length=32)
     customer_id: uuid.UUID | None = None
-    customer_ref: str | None = None
-    manager: str | None = None
-    currency_code: str | None = None
+    customer_ref: str | None = Field(default=None, max_length=255)
+    manager: str | None = Field(default=None, max_length=255)
+    currency_code: str | None = Field(default=None, min_length=3, max_length=3)
     cost_center_id: uuid.UUID | None = None
     planned_start: date | None = None
     planned_end: date | None = None
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_planned_dates(self):
+        if self.planned_start and self.planned_end and self.planned_end < self.planned_start:
+            raise ValueError("La fecha final prevista no puede ser anterior a la fecha de inicio")
+        return self
+
+
+class ProjectUpdateRequest(CamelModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    code: str | None = Field(default=None, max_length=32)
+    customer_id: uuid.UUID | None = None
+    customer_ref: str | None = Field(default=None, max_length=255)
+    manager: str | None = Field(default=None, max_length=255)
+    currency_code: str | None = Field(default=None, min_length=3, max_length=3)
+    cost_center_id: uuid.UUID | None = None
+    planned_start: date | None = None
+    planned_end: date | None = None
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class ProjectStatusTransitionRequest(CamelModel):
+    status: PROJECT_STATUS_VALUES
+    reason: str | None = Field(default=None, max_length=1000)
 
 
 class ProjectResponse(CamelModel):
@@ -36,13 +66,50 @@ class ProjectResponse(CamelModel):
     description: str | None
 
 
+class ProjectFinancialSummaryResponse(CamelModel):
+    project_id: uuid.UUID
+    currency_code: str
+    contract_value: Decimal | None
+    baseline_budget: Decimal | None
+    current_budget: Decimal | None
+    committed: Decimal
+    accrued: Decimal
+    paid: Decimal
+    available: Decimal | None
+    invoiced: Decimal
+    collected: Decimal
+    receivables_outstanding: Decimal
+    recognized_revenue: Decimal
+    actual_cost: Decimal
+    expected_profit: Decimal | None
+    expected_margin_percent: Decimal | None
+    actual_profit: Decimal | None
+    actual_margin_percent: Decimal | None
+    progress_percent: Decimal | None
+    bac: Decimal | None
+    pv: Decimal | None
+    ev: Decimal | None
+    ac: Decimal | None
+    cpi: Decimal | None
+    spi: Decimal | None
+    etc: Decimal | None
+    eac: Decimal | None
+    vac: Decimal | None
+
+
 class WBSNodeCreateRequest(CamelModel):
-    code: str
-    name: str
+    code: str = Field(min_length=1, max_length=32)
+    name: str = Field(min_length=1, max_length=255)
     parent_id: uuid.UUID | None = None
-    manager: str | None = None
+    manager: str | None = Field(default=None, max_length=255)
     planned_start: date | None = None
     planned_finish: date | None = None
+
+    @model_validator(mode="after")
+    def validate_planned_dates(self):
+        if self.planned_start and self.planned_finish and self.planned_finish < self.planned_start:
+            raise ValueError("La fecha final del WBS no puede ser anterior a la fecha de inicio")
+        return self
 
 
 class WBSNodeResponse(CamelModel):
@@ -97,7 +164,7 @@ class MilestoneResponse(CamelModel):
 
 
 class BudgetLineRequest(CamelModel):
-    authorized_amount: Decimal
+    authorized_amount: Decimal = Field(gt=0)
     wbs_node_id: uuid.UUID | None = None
     economic_category_id: uuid.UUID | None = None
     cost_center_id: uuid.UUID | None = None
@@ -106,7 +173,7 @@ class BudgetLineRequest(CamelModel):
 
 class BudgetBaselineCreateRequest(CamelModel):
     currency_code: str
-    lines: list[BudgetLineRequest]
+    lines: list[BudgetLineRequest] = Field(min_length=1)
     notes: str | None = None
 
 
@@ -151,9 +218,9 @@ class ForecastResponse(CamelModel):
 
 
 class ChangeOrderCreateRequest(CamelModel):
-    reason: str
+    reason: str = Field(min_length=1, max_length=1000)
     wbs_node_id: uuid.UUID | None = None
-    scope_change: str | None = None
+    scope_change: str | None = Field(default=None, max_length=2000)
     budget_change_amount: Decimal = Decimal("0")
     schedule_change_days: int | None = None
 
@@ -177,11 +244,11 @@ class ChangeOrderSubmitRequest(CamelModel):
 
 class ProgressRecordCreateRequest(CamelModel):
     record_date: date
-    planned_percent: Decimal
-    actual_percent: Decimal
+    planned_percent: Decimal = Field(ge=0, le=100)
+    actual_percent: Decimal = Field(ge=0, le=100)
     wbs_node_id: uuid.UUID | None = None
-    description: str | None = None
-    responsible: str | None = None
+    description: str | None = Field(default=None, max_length=2000)
+    responsible: str | None = Field(default=None, max_length=255)
     evidence_id: uuid.UUID | None = None
 
 

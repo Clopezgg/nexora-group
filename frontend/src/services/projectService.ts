@@ -6,6 +6,8 @@ import type {
   Company,
   Forecast,
   Project,
+  ProjectFinancialSummary,
+  ProjectStatus,
   ProgressRecord,
   WBSNode,
 } from '../types/project'
@@ -19,26 +21,64 @@ export const companyService = {
     }),
 }
 
+export interface ProjectInput {
+  companyId: string
+  name: string
+  code?: string
+  customerId?: string
+  manager?: string
+  currencyCode?: string
+  costCenterId?: string
+  plannedStart?: string
+  plannedEnd?: string
+  description?: string
+}
+
+export interface BudgetLineInput {
+  authorizedAmount: number
+  wbsNodeId?: string | null
+  economicCategoryId?: string | null
+  costCenterId?: string | null
+  fiscalPeriodId?: string | null
+}
+
 export const projectService = {
   list: (companyId: string) => apiFetch<Project[]>(`/projects?company_id=${companyId}`),
-  create: (input: { companyId: string; name: string; code?: string; currencyCode?: string }) =>
+  create: (input: ProjectInput) =>
     apiFetch<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }),
   get: (projectId: string) => apiFetch<Project>(`/projects/${projectId}`),
+  update: (projectId: string, input: Partial<Omit<ProjectInput, 'companyId'>>) =>
+    apiFetch<Project>(`/projects/${projectId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  transitionStatus: (projectId: string, status: ProjectStatus, reason?: string) =>
+    apiFetch<Project>(`/projects/${projectId}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status, reason }),
+    }),
+  getFinancialSummary: (projectId: string) =>
+    apiFetch<ProjectFinancialSummary>(`/projects/${projectId}/financial-summary`),
 
   listWbs: (projectId: string) => apiFetch<WBSNode[]>(`/projects/${projectId}/wbs`),
   createWbs: (
     projectId: string,
-    input: { code: string; name: string; parentId?: string | null },
+    input: {
+      code: string
+      name: string
+      parentId?: string | null
+      manager?: string
+      plannedStart?: string
+      plannedFinish?: string
+    },
   ) => apiFetch<WBSNode>(`/projects/${projectId}/wbs`, { method: 'POST', body: JSON.stringify(input) }),
 
-  getBudgetSummary: (projectId: string) =>
-    apiFetch<BudgetSummary>(`/projects/${projectId}/budgets/summary`),
+  getBudgetSummary: (projectId: string) => apiFetch<BudgetSummary>(`/projects/${projectId}/budgets/summary`),
   getActiveBudget: (projectId: string) => apiFetch<Budget>(`/projects/${projectId}/budgets/active`),
-  createBaseline: (
-    projectId: string,
-    input: { currencyCode: string; lines: { authorizedAmount: number; wbsNodeId?: string | null }[] },
-  ) =>
+  createBaseline: (projectId: string, input: { currencyCode: string; lines: BudgetLineInput[]; notes?: string }) =>
     apiFetch<Budget>(`/projects/${projectId}/budgets/baseline`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  redistributeUnassignedBudget: (projectId: string, input: { lines: BudgetLineInput[]; notes?: string }) =>
+    apiFetch<Budget>(`/projects/${projectId}/budgets/redistribute-unassigned`, {
       method: 'POST',
       body: JSON.stringify(input),
     }),
@@ -47,7 +87,13 @@ export const projectService = {
   listChangeOrders: (projectId: string) => apiFetch<ChangeOrder[]>(`/projects/${projectId}/change-orders`),
   createChangeOrder: (
     projectId: string,
-    input: { reason: string; budgetChangeAmount: number },
+    input: {
+      reason: string
+      wbsNodeId?: string | null
+      scopeChange?: string
+      budgetChangeAmount: number
+      scheduleChangeDays?: number | null
+    },
   ) =>
     apiFetch<ChangeOrder>(`/projects/${projectId}/change-orders`, {
       method: 'POST',
@@ -61,7 +107,15 @@ export const projectService = {
   listProgress: (projectId: string) => apiFetch<ProgressRecord[]>(`/projects/${projectId}/progress`),
   createProgress: (
     projectId: string,
-    input: { recordDate: string; plannedPercent: number; actualPercent: number; description?: string },
+    input: {
+      recordDate: string
+      plannedPercent: number
+      actualPercent: number
+      wbsNodeId?: string | null
+      description?: string
+      responsible?: string
+      evidenceId?: string | null
+    },
   ) =>
     apiFetch<ProgressRecord>(`/projects/${projectId}/progress`, {
       method: 'POST',

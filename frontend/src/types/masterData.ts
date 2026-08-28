@@ -23,3 +23,10 @@ export interface CompanyUser {
   fullName: string
   roles: string[]
 }
+
+export interface ControllingDimension {
+  id: string
+  companyId: string
+  code: string
+  name: string
+}

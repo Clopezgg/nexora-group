@@ -8,11 +8,20 @@ export interface Company {
   fiscalId: string | null
 }
 
+export type ProjectStatus =
+  | 'PLANNING'
+  | 'ACTIVE'
+  | 'ON_HOLD'
+  | 'COMPLETED'
+  | 'CLOSED'
+  | 'CANCELLED'
+
 export interface Project {
   id: string
   companyId: string
   name: string
   code: string | null
+  customerId: string | null
   customerRef: string | null
   manager: string | null
   currencyCode: string | null
@@ -20,8 +29,39 @@ export interface Project {
   plannedStart: string | null
   plannedEnd: string | null
   actualEnd: string | null
-  status: string
+  status: ProjectStatus
   description: string | null
+}
+
+export interface ProjectFinancialSummary {
+  projectId: string
+  currencyCode: string
+  contractValue: string | null
+  baselineBudget: string | null
+  currentBudget: string | null
+  committed: string
+  accrued: string
+  paid: string
+  available: string | null
+  invoiced: string
+  collected: string
+  receivablesOutstanding: string
+  recognizedRevenue: string
+  actualCost: string
+  expectedProfit: string | null
+  expectedMarginPercent: string | null
+  actualProfit: string | null
+  actualMarginPercent: string | null
+  progressPercent: string | null
+  bac: string | null
+  pv: string | null
+  ev: string | null
+  ac: string | null
+  cpi: string | null
+  spi: string | null
+  etc: string | null
+  eac: string | null
+  vac: string | null
 }
 
 export interface WBSNode {
@@ -100,5 +140,5 @@ export interface ProgressRecord {
   actualPercent: string
   description: string | null
   responsible: string | null
-  evidenceRef: string | null
+  evidenceId: string | null
 }

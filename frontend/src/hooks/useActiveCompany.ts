@@ -3,8 +3,37 @@ import { useQuery } from '@tanstack/react-query'
 import { masterDataService } from '../services/masterDataService'
 
 const STORAGE_KEY = 'nexora.activeCompanyId'
-let selectedCompanyId: string | null =
-  typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null
+type CompanyStorage = Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>
+
+function getBrowserStorage(): CompanyStorage | undefined {
+  try {
+    return typeof window === 'undefined' ? undefined : window.localStorage
+  } catch {
+    return undefined
+  }
+}
+
+export function readSelectedCompanyId(storage: CompanyStorage | undefined): string | null {
+  try {
+    return storage?.getItem(STORAGE_KEY) ?? null
+  } catch {
+    return null
+  }
+}
+
+export function writeSelectedCompanyId(
+  storage: CompanyStorage | undefined,
+  value: string | null,
+) {
+  try {
+    if (value) storage?.setItem(STORAGE_KEY, value)
+    else storage?.removeItem(STORAGE_KEY)
+  } catch {
+    // Storage is an optional durability enhancement; in-memory state remains usable.
+  }
+}
+
+let selectedCompanyId: string | null = readSelectedCompanyId(getBrowserStorage())
 const listeners = new Set<() => void>()
 
 function subscribe(listener: () => void) {
@@ -18,10 +47,7 @@ function getSnapshot() {
 
 function setSelectedCompanyId(value: string | null) {
   selectedCompanyId = value
-  if (typeof window !== 'undefined') {
-    if (value) window.localStorage.setItem(STORAGE_KEY, value)
-    else window.localStorage.removeItem(STORAGE_KEY)
-  }
+  writeSelectedCompanyId(getBrowserStorage(), value)
   listeners.forEach((listener) => listener())
 }
 

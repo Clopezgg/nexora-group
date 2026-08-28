@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { readSelectedCompanyId, writeSelectedCompanyId } from '../src/hooks/useActiveCompany'
 import { renderApp } from './testUtils'
 
 function stubAuthenticatedFetch(roles: string[], dashboard?: Record<string, unknown>) {
@@ -40,6 +41,26 @@ function stubAuthenticatedFetch(roles: string[], dashboard?: Record<string, unkn
 }
 
 describe('HomePage', () => {
+  it('keeps working when browser storage is unavailable or blocked', () => {
+    const blockedStorage = {
+      getItem: vi.fn(() => {
+        throw new Error('storage blocked')
+      }),
+      removeItem: vi.fn(() => {
+        throw new Error('storage blocked')
+      }),
+      setItem: vi.fn(() => {
+        throw new Error('storage blocked')
+      }),
+    }
+
+    expect(readSelectedCompanyId(undefined)).toBeNull()
+    expect(readSelectedCompanyId(blockedStorage)).toBeNull()
+    expect(() => writeSelectedCompanyId(undefined, 'c1')).not.toThrow()
+    expect(() => writeSelectedCompanyId(blockedStorage, 'c1')).not.toThrow()
+    expect(() => writeSelectedCompanyId(blockedStorage, null)).not.toThrow()
+  })
+
   it('shows the finance home with real treasury cards for Administrator', async () => {
     stubAuthenticatedFetch(['Administrator'], {
       treasuryBalance: 12000,

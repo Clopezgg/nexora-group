@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from decimal import Decimal
 from pathlib import Path
 
@@ -39,7 +40,7 @@ def _pg_env() -> dict:
 
 
 _ALEMBIC_BIN = shutil.which("alembic") or str(_BACKEND_DIR / ".venv" / "bin" / "alembic")
-_PYTHON_BIN = shutil.which("python3") or str(_BACKEND_DIR / ".venv" / "bin" / "python")
+_PYTHON_BIN = sys.executable
 
 
 def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:

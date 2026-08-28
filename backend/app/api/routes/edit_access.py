@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ class EditAccessResponse(BaseModel):
 @router.post("/verify", response_model=EditAccessResponse)
 def verify_edit_access(
     payload: EditAccessRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current: tuple[User, list[str]] = Depends(get_current_user),
 ) -> EditAccessResponse:
@@ -46,7 +47,13 @@ def verify_edit_access(
             detail="Token de edición incorrecto.",
         )
 
+    session_token = request.cookies.get(settings.session_cookie_name)
+    if not session_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sesión requerida.")
+
     capability, expires_at = edit_access_service.issue_capability(
-        user_id=uuid.UUID(str(user.id)), settings=settings
+        user_id=uuid.UUID(str(user.id)),
+        session_token=session_token,
+        settings=settings,
     )
     return EditAccessResponse(capability=capability, expiresAt=expires_at)

@@ -175,7 +175,7 @@
 }
 .nx-login__form-head p {
   margin: 6px 0 0;
-  color: #718096;
+  color: #5b6779;
   font-size: 12px;
 }
 .nx-login__row {
@@ -203,12 +203,12 @@
   padding: 0;
 }
 .nx-login__submit { width: 100%; margin-top: 4px; }
-.nx-login__notice { margin: 0; font-size: 12px; color: #64748b; }
+.nx-login__notice { margin: 0; font-size: 12px; color: #5b6779; }
 .nx-login__notice--error { color: var(--nx-danger); }
 .nx-login__secure-note {
   padding-top: 10px;
   border-top: 1px solid #edf2f7;
-  color: #8a98a8;
+  color: #5b6779;
   text-align: center;
   font-size: 9px;
   letter-spacing: .02em;
@@ -230,7 +230,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: #8a98a8;
+  color: #5b6779;
   font-size: 8px;
 }
 .nx-login__trust-strip b { color: #385675; font-size: 10px; margin-bottom: 3px; }

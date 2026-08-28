@@ -21,4 +21,8 @@ export interface DashboardSummary {
   cashFlow: CashFlowPoint[]
   expensesByScope: ScopeAmount[]
   currency: string
+  fiscalPeriodLabel: string | null
+  fiscalPeriodStatus: string | null
+  fiscalPeriodStart: string | null
+  fiscalPeriodEnd: string | null
 }

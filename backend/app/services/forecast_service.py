@@ -2,26 +2,21 @@ import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.repositories import (
-    budget_repository,
-    inventory_repository,
-    project_control_repository,
-    project_repository,
-)
+from app.models.accounting import AccountingDocument, JournalLine
+from app.models.chart_of_accounts import Account
+from app.repositories import budget_repository, project_control_repository, project_repository
 
-"""Forecast / Earned Value (orden maestra §42, docs/BUDGET_CONTROLLING.md).
+"""Forecast / Earned Value.
 
-Simplificación honesta y documentada: no existe todavía un motor de
-scheduling con asignación de $ por fecha, así que PV/EV se derivan del
-`planned_percent`/`actual_percent` del ProgressRecord más reciente contra
-BAC (Budget At Completion = AUTHORIZED del budget activo). AC consume el
-costo real de emisiones de inventario posteadas al proyecto; no representa
-efectivo ni se deriva de PAID. Ningún valor se inventa: si no hay
-ProgressRecord todavía, PV/EV/CPI/SPI/ETC/EAC/VAC son `None` (no 0 falso,
-no fake) -- la orden maestra §42 exige "solo mostrar valores calculables
-con datos disponibles"."""
+BAC is the active project COST budget. PV/EV use the latest progress record
+against BAC. AC is authoritative posted General Ledger expense attributed to
+the project, never cash paid and never a parallel inventory-only cost ledger.
+When progress or a cost budget is missing, dependent metrics remain None so the
+UI can show an honest em dash instead of a fabricated zero.
+"""
 
 
 @dataclass
@@ -37,6 +32,25 @@ class ForecastSnapshot:
     vac: Decimal | None
 
 
+def _project_gl_actual_cost(db: Session, *, project_id: uuid.UUID) -> Decimal:
+    stmt = (
+        select(func.coalesce(func.sum(JournalLine.debit_amount - JournalLine.credit_amount), 0))
+        .join(
+            AccountingDocument,
+            JournalLine.accounting_document_id == AccountingDocument.id,
+        )
+        .join(Account, Account.id == JournalLine.account_id)
+        .where(
+            AccountingDocument.status == "POSTED",
+            AccountingDocument.scope == "PROJECT",
+            AccountingDocument.project_id == project_id,
+            JournalLine.project_id == project_id,
+            Account.account_type == "EXPENSE",
+        )
+    )
+    return Decimal(db.execute(stmt).scalar_one())
+
+
 def compute_forecast(db: Session, *, project_id: uuid.UUID) -> ForecastSnapshot:
     active_budget = budget_repository.get_active_budget(db, project_id)
     bac = budget_repository.sum_authorized(db, active_budget.id) if active_budget is not None else Decimal("0")
@@ -44,11 +58,10 @@ def compute_forecast(db: Session, *, project_id: uuid.UUID) -> ForecastSnapshot:
     project = project_repository.get_by_id(db, project_id)
     if project is None:
         raise ValueError(f"Project {project_id} no existe")
-    actuals = inventory_repository.project_actuals_by_project(db, company_id=project.company_id)
-    ac = actuals.get(project_id, Decimal("0"))
+    ac = _project_gl_actual_cost(db, project_id=project_id)
 
     latest_progress = project_control_repository.latest_progress(db, project_id)
-    if latest_progress is None:
+    if latest_progress is None or active_budget is None:
         return ForecastSnapshot(
             bac=bac, pv=None, ev=None, ac=ac, cpi=None, spi=None, etc=None, eac=None, vac=None
         )
@@ -58,7 +71,7 @@ def compute_forecast(db: Session, *, project_id: uuid.UUID) -> ForecastSnapshot:
 
     cpi = (ev / ac) if ac > 0 else None
     spi = (ev / pv) if pv > 0 else None
-    etc = ((bac - ev) / cpi) if cpi and cpi > 0 else None
+    etc = ((bac - ev) / cpi) if cpi is not None and cpi > 0 else None
     eac = (ac + etc) if etc is not None else None
     vac = (bac - eac) if eac is not None else None
 

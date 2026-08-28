@@ -20,18 +20,14 @@ down_revision: Union[str, None] = "9c6d4b2a1e70"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-_TARGET_PREDICATE = """
-(
-  (p.code = '21000' AND p.name = 'Cerco Perimetral')
-  OR
-  (p.code = '22000' AND p.name = 'Portones y Verjas')
-)
-"""
-
 
 def upgrade() -> None:
-    predicate = _TARGET_PREDICATE.replace("\n", " ")
-    safety_sql = """
+    # Abort rather than destroy history if either project has gained a row in
+    # any table whose FK policy intentionally forbids project deletion.
+    # Dollar-quoting keeps the target names safely inside the dynamic statement
+    # while format() is used only for schema/table/column identifiers.
+    op.execute(
+        """
         DO $$
         DECLARE
           ref RECORD;
@@ -58,9 +54,21 @@ def upgrade() -> None:
               AND rc.delete_rule IN ('NO ACTION', 'RESTRICT')
           LOOP
             EXECUTE format(
-              'SELECT count(*) FROM %I.%I r WHERE r.%I IN '
-              || '(SELECT p.id FROM projects p JOIN companies c ON c.id = p.company_id '
-              || 'WHERE upper(c.name) = ''NEXORA GROUP'' AND __TARGET_PREDICATE__)',
+              $query$
+              SELECT count(*)
+              FROM %I.%I r
+              WHERE r.%I IN (
+                SELECT p.id
+                FROM projects p
+                JOIN companies c ON c.id = p.company_id
+                WHERE upper(c.name) = 'NEXORA GROUP'
+                  AND (
+                    (p.code = '21000' AND p.name = 'Cerco Perimetral')
+                    OR
+                    (p.code = '22000' AND p.name = 'Portones y Verjas')
+                  )
+              )
+              $query$,
               ref.table_schema,
               ref.table_name,
               ref.column_name
@@ -73,19 +81,23 @@ def upgrade() -> None:
             END IF;
           END LOOP;
         END $$;
-    """.replace("__TARGET_PREDICATE__", predicate)
-    op.execute(safety_sql)
+        """
+    )
 
     # Cascading project-control records (for example WBS/budgets) are removed
     # by their published FK policies; SET NULL relationships preserve audit
     # and contextual history. No company/account/treasury master data is touched.
     op.execute(
-        f"""
+        """
         DELETE FROM projects p
         USING companies c
         WHERE p.company_id = c.id
           AND upper(c.name) = 'NEXORA GROUP'
-          AND {_TARGET_PREDICATE};
+          AND (
+            (p.code = '21000' AND p.name = 'Cerco Perimetral')
+            OR
+            (p.code = '22000' AND p.name = 'Portones y Verjas')
+          );
         """
     )
 

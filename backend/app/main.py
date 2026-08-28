@@ -6,6 +6,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.correlation import CorrelationIdMiddleware
 from app.api.csrf import register_csrf_guard
+from app.api.edit_access_guard import register_edit_access_guard
 from app.api.error_handlers import register_error_handlers
 from app.api.security_headers import register_security_headers
 from app.api.routes import (
@@ -21,6 +22,7 @@ from app.api.routes import (
     crm,
     dashboard,
     documents,
+    edit_access,
     equipment,
     evidence,
     fiscal,
@@ -83,6 +85,7 @@ def create_app() -> FastAPI:
     register_csrf_guard(app)
     app.add_middleware(CorrelationIdMiddleware)
     register_security_headers(app)
+    register_edit_access_guard(app)
 
     register_error_handlers(app)
 
@@ -116,6 +119,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(auth.router, prefix="/api")
+    app.include_router(edit_access.router, prefix="/api")
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(context.router, prefix="/api")
     app.include_router(master_data.router, prefix="/api")

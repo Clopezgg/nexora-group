@@ -60,60 +60,92 @@ export function LoginPage() {
 
   return (
     <div className="nx-login">
-      <aside className="nx-login__brand">
-        <div className="nx-login__brand-inner">
-          <span className="nx-login__logo">NEXORA GROUP</span>
-          <h1>Gestión Empresarial y Control de Construcción</h1>
-          <p>Tesorería, proyectos, abastecimiento y control de obra en un solo lugar.</p>
-          <ConstructionIllustration className="nx-login__illustration" />
-        </div>
-      </aside>
-      <main className="nx-login__panel">
-        <form className="nx-login__form" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <h2 className="nx-login__title">Iniciar sesión</h2>
-          <Input
-            label="Correo electrónico"
-            type="email"
-            autoComplete="username"
-            error={errors.email?.message}
-            {...register('email')}
-          />
-          <Input
-            label="Contraseña"
-            type="password"
-            autoComplete="current-password"
-            error={errors.password?.message}
-            {...register('password')}
-          />
-          <div className="nx-login__row">
-            <label className="nx-login__remember">
-              <input type="checkbox" {...register('rememberMe')} />
-              Recordarme
-            </label>
-            <button
-              type="button"
-              className="nx-login__forgot"
-              onClick={() => setForgotPasswordOpen(true)}
-            >
-              ¿Olvidaste tu contraseña?
-            </button>
+      <section className="nx-login__hero">
+        <div className="nx-login__hero-inner">
+          <div className="nx-login__brand-lockup">
+            <span className="nx-login__brand-mark" aria-hidden="true" />
+            <div>
+              <strong>NEXORA</strong>
+              <span>Gestión Financiera para Construcción</span>
+            </div>
           </div>
-
-          {apiWaking ? (
-            <p className="nx-login__notice" role="status">
-              El servidor está despertando, esto puede tardar unos segundos…
+          <div className="nx-login__hero-copy">
+            <p className="nx-login__kicker">CONTROL EMPRESARIAL · TESORERÍA · PROYECTOS</p>
+            <h1>Control total. Claridad financiera. Construcción con confianza.</h1>
+            <p>
+              Una sola plataforma para tesorería central, operaciones, proyectos,
+              abastecimiento, comercial y auditoría.
             </p>
-          ) : null}
-          {formError ? (
-            <p className="nx-login__notice nx-login__notice--error" role="alert">
-              {formError}
-            </p>
-          ) : null}
+          </div>
+          <ConstructionIllustration className="nx-login__illustration" />
+          <div className="nx-login__scope-strip" aria-label="Alcances de operación">
+            <span><b>CENTRAL</b>Tesorería y movimientos internos</span>
+            <span><b>GENERAL</b>Operación sin proyecto</span>
+            <span><b>PROYECTO</b>Control financiero de obra</span>
+          </div>
+        </div>
+      </section>
 
-          <Button type="submit" loading={isLoggingIn} className="nx-login__submit">
-            Iniciar sesión
-          </Button>
-        </form>
+      <main className="nx-login__panel">
+        <div className="nx-login__panel-inner">
+          <form className="nx-login__form" onSubmit={handleSubmit(onSubmit)} noValidate>
+            <div className="nx-login__form-head">
+              <span className="nx-login__form-badge">NEXORA GROUP</span>
+              <h2 className="nx-login__title">Iniciar sesión</h2>
+              <p>Accede a tu cuenta para continuar.</p>
+            </div>
+            <Input
+              label="Correo electrónico"
+              type="email"
+              autoComplete="username"
+              error={errors.email?.message}
+              {...register('email')}
+            />
+            <Input
+              label="Contraseña"
+              type="password"
+              autoComplete="current-password"
+              error={errors.password?.message}
+              {...register('password')}
+            />
+            <div className="nx-login__row">
+              <label className="nx-login__remember">
+                <input type="checkbox" {...register('rememberMe')} />
+                Recordarme
+              </label>
+              <button
+                type="button"
+                className="nx-login__forgot"
+                onClick={() => setForgotPasswordOpen(true)}
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+
+            {apiWaking ? (
+              <p className="nx-login__notice" role="status">
+                El servidor está despertando, esto puede tardar unos segundos…
+              </p>
+            ) : null}
+            {formError ? (
+              <p className="nx-login__notice nx-login__notice--error" role="alert">
+                {formError}
+              </p>
+            ) : null}
+
+            <Button type="submit" loading={isLoggingIn} className="nx-login__submit">
+              Iniciar sesión
+            </Button>
+            <div className="nx-login__secure-note">Acceso seguro · Sesiones auditadas · Trazabilidad completa</div>
+          </form>
+
+          <div className="nx-login__trust-strip" aria-label="Características de seguridad">
+            <span><b>Seguro</b>Sesiones protegidas</span>
+            <span><b>Confiable</b>Operación centralizada</span>
+            <span><b>Auditado</b>Trazabilidad completa</span>
+            <span><b>En la nube</b>Acceso desde cualquier lugar</span>
+          </div>
+        </div>
       </main>
 
       <Modal

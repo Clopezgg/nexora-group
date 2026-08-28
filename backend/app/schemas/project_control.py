@@ -79,6 +79,7 @@ class ProjectFinancialSummaryResponse(CamelModel):
     invoiced: Decimal
     collected: Decimal
     receivables_outstanding: Decimal
+    recognized_revenue: Decimal
     actual_cost: Decimal
     expected_profit: Decimal | None
     expected_margin_percent: Decimal | None

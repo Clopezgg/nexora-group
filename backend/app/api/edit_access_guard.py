@@ -18,11 +18,12 @@ def register_edit_access_guard(app: FastAPI) -> None:
 
     @app.middleware("http")
     async def edit_access_guard(request: Request, call_next):
+        settings = get_settings()
         if (
-            request.method in _PROTECTED_METHODS
+            settings.edit_access_required
+            and request.method in _PROTECTED_METHODS
             and request.url.path.startswith("/api/")
         ):
-            settings = get_settings()
             capability = request.headers.get("x-nexora-edit-access")
             if not edit_access_service.verify_capability(capability, settings):
                 return JSONResponse(

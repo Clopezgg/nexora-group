@@ -5,15 +5,19 @@ from app.core.config import get_settings
 from app.services import edit_access_service
 
 _PROTECTED_METHODS = {"PUT", "PATCH", "DELETE"}
+_EXEMPT_PATHS = {"/api/context"}
 
 
 def register_edit_access_guard(app: FastAPI) -> None:
-    """Add a secondary confirmation to mutations of existing information.
+    """Add a secondary confirmation to mutations of existing business information.
 
     POST stays untouched because creating/approving/posting documents is already
     governed by the normal RBAC/SoD workflow. PUT/PATCH/DELETE represent edits or
-    deletions of data that already exists and therefore require the short-lived
-    edit capability in addition to the route's existing authentication/RBAC.
+    deletions of existing business data and therefore require the short-lived edit
+    capability in addition to the route's existing authentication/RBAC.
+
+    ActiveUIContext is navigation state, not business data, so changing the selected
+    project must remain usable without unlocking edit access.
     """
 
     @app.middleware("http")
@@ -23,6 +27,7 @@ def register_edit_access_guard(app: FastAPI) -> None:
             settings.edit_access_required
             and request.method in _PROTECTED_METHODS
             and request.url.path.startswith("/api/")
+            and request.url.path not in _EXEMPT_PATHS
         ):
             capability = request.headers.get("x-nexora-edit-access")
             session_token = request.cookies.get(settings.session_cookie_name)

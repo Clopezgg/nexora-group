@@ -1,3 +1,4 @@
+import uuid
 from datetime import date
 from decimal import Decimal
 
@@ -71,8 +72,8 @@ def test_preflight_aborts_if_a_mandatory_reference_exists(db_session):
         )
     )
     db_session.execute(
-        text("INSERT INTO project_reset_blocker(id, project_id) VALUES (gen_random_uuid(), :project_id)"),
-        {"project_id": project_id},
+        text("INSERT INTO project_reset_blocker(id, project_id) VALUES (:id, :project_id)"),
+        {"id": uuid.uuid4(), "project_id": project_id},
     )
     db_session.commit()
 

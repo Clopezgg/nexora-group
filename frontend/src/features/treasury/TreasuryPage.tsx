@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Badge,
@@ -534,13 +534,27 @@ function RemittanceModal({
   const [amount, setAmount] = useState<number | null>(null)
   const [fxRate, setFxRate] = useState(1)
 
-  const selectedTreasuryAccount = treasuryAccounts.find((account) => account.id === treasuryAccountId)
-  const selectedCurrency = selectedTreasuryAccount?.currencyCode ?? 'HNL'
-  const sender =
-    senderOption === OTHER_REMITTANCE_SENDER ? customSender.trim() : senderOption
-  const eligibleCounterAccounts = counterAccounts.filter(
-    (account) => account.accountType === REMITTANCE_ORIGIN_ACCOUNT_TYPES[originType],
+  const effectiveTreasuryAccountId = treasuryAccounts.some(
+    (account) => account.id === treasuryAccountId,
   )
+    ? treasuryAccountId
+    : (treasuryAccounts[0]?.id ?? '')
+  const selectedTreasuryAccount = treasuryAccounts.find(
+    (account) => account.id === effectiveTreasuryAccountId,
+  )
+  const selectedCurrency = selectedTreasuryAccount?.currencyCode ?? 'HNL'
+  const sender = senderOption === OTHER_REMITTANCE_SENDER ? customSender.trim() : senderOption
+  const eligibleCounterAccounts = useMemo(
+    () => counterAccounts.filter(
+      (account) => account.accountType === REMITTANCE_ORIGIN_ACCOUNT_TYPES[originType],
+    ),
+    [counterAccounts, originType],
+  )
+  const effectiveCounterAccountId = eligibleCounterAccounts.some(
+    (account) => account.id === counterAccountId,
+  )
+    ? counterAccountId
+    : (eligibleCounterAccounts[0]?.id ?? '')
 
   const mutation = useMutation({
     mutationFn: ({
@@ -577,8 +591,8 @@ function RemittanceModal({
           mutation.mutate({
             payload: {
               companyId,
-              treasuryAccountId,
-              counterAccountId,
+              treasuryAccountId: effectiveTreasuryAccountId,
+              counterAccountId: effectiveCounterAccountId,
               originType,
               sender,
               provider: provider || null,
@@ -600,7 +614,7 @@ function RemittanceModal({
         <Select
           name="treasuryAccountId"
           label="Cuenta receptora"
-          value={treasuryAccountId}
+          value={effectiveTreasuryAccountId}
           onChange={(event) => {
             setTreasuryAccountId(event.target.value)
             setFxRate(1)
@@ -636,7 +650,7 @@ function RemittanceModal({
         <Select
           name="counterAccountId"
           label="Cuenta contable de origen"
-          value={counterAccountId}
+          value={effectiveCounterAccountId}
           onChange={(event) => setCounterAccountId(event.target.value)}
           required
         >
@@ -753,8 +767,8 @@ function RemittanceModal({
           type="submit"
           loading={mutation.isPending}
           disabled={
-            !treasuryAccountId ||
-            !counterAccountId ||
+            !effectiveTreasuryAccountId ||
+            !effectiveCounterAccountId ||
             !sender.trim() ||
             !remittanceDate ||
             !amount ||

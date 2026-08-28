@@ -1,4 +1,4 @@
-import { forwardRef, type InputHTMLAttributes } from 'react'
+import { forwardRef, useId, type InputHTMLAttributes } from 'react'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
@@ -7,7 +7,8 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, id, className, ...rest }, ref) => {
-    const inputId = id ?? rest.name
+    const generatedId = useId()
+    const inputId = id ?? rest.name ?? generatedId
     return (
       <div className="nx-field">
         {label ? (

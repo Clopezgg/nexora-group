@@ -78,6 +78,10 @@ export function ProjectsPage() {
     queryFn: () => masterDataService.listCostCenters(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
+  const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : []
+  const customers = Array.isArray(customersQuery.data) ? customersQuery.data : []
+  const users = Array.isArray(usersQuery.data) ? usersQuery.data : []
+  const costCenters = Array.isArray(costCentersQuery.data) ? costCentersQuery.data : []
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['projects', activeCompanyId] })
@@ -179,19 +183,19 @@ export function ProjectsPage() {
         <Input label="Código (opcional)" value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} />
         <Select label="Cliente" value={form.customerId} onChange={(event) => setForm({ ...form, customerId: event.target.value })}>
           <option value="">Sin cliente asignado todavía</option>
-          {(customersQuery.data ?? []).map((customer) => (
+          {customers.map((customer) => (
             <option key={customer.id} value={customer.id}>{customer.legalName}</option>
           ))}
         </Select>
         <Select label="Responsable" value={form.manager} onChange={(event) => setForm({ ...form, manager: event.target.value })}>
           <option value="">Sin responsable asignado</option>
-          {(usersQuery.data ?? []).map((user) => (
+          {users.map((user) => (
             <option key={user.id} value={user.fullName}>{user.fullName}</option>
           ))}
         </Select>
         <Select label="Centro de costo" value={form.costCenterId} onChange={(event) => setForm({ ...form, costCenterId: event.target.value })}>
           <option value="">Sin centro de costo</option>
-          {(costCentersQuery.data ?? []).map((item) => (
+          {costCenters.map((item) => (
             <option key={item.id} value={item.id}>{item.code} · {item.name}</option>
           ))}
         </Select>
@@ -216,8 +220,8 @@ export function ProjectsPage() {
         <LoadingState label="Cargando proyectos…" />
       ) : projectsQuery.isError ? (
         <ErrorState description="No se pudieron cargar los proyectos." onRetry={() => projectsQuery.refetch()} />
-      ) : (projectsQuery.data ?? []).length > 0 ? (
-        <Table columns={columns} rows={projectsQuery.data ?? []} getRowKey={(row) => row.id} />
+      ) : projects.length > 0 ? (
+        <Table columns={columns} rows={projects} getRowKey={(row) => row.id} />
       ) : (
         <EmptyState icon="project" title="Sin proyectos" description="Crea el primer proyecto de esta compañía para empezar." />
       )}

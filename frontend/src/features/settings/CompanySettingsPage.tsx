@@ -134,8 +134,8 @@ export function CompanySettingsPage() {
   if (isError) return <ErrorState description="No se pudieron cargar las compañías." onRetry={() => refetch()} />
   if (companies.length === 0) return <EmptyState icon="tool" title="No hay compañías registradas" description="Crea una compañía antes de editar su perfil." />
 
-  const years = yearsQuery.data ?? []
-  const periods = periodsQuery.data ?? []
+  const years = Array.isArray(yearsQuery.data) ? yearsQuery.data : []
+  const periods = Array.isArray(periodsQuery.data) ? periodsQuery.data : []
   const yearById = new Map(years.map((year) => [year.id, year]))
   const periodColumns: TableColumn<FiscalPeriod>[] = [
     { key: 'period', header: 'Período', render: (row) => `${yearById.get(row.fiscalYearId)?.code ?? ''} · P${String(row.periodNumber).padStart(2, '0')}` },

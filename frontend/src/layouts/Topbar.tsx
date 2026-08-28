@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/auth-context'
@@ -37,7 +37,10 @@ export function Topbar({ onOpenNav }: TopbarProps) {
     enabled: Boolean(activeCompanyId),
   })
 
-  const projects = projectsQuery.data ?? []
+  const projects = useMemo(
+    () => (Array.isArray(projectsQuery.data) ? projectsQuery.data : []),
+    [projectsQuery.data],
+  )
   useEffect(() => {
     if (!projectsQuery.isSuccess || !context.activeProjectId) return
     if (!projects.some((project) => project.id === context.activeProjectId)) {

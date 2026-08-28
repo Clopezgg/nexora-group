@@ -78,7 +78,7 @@ describe('CompanySettingsPage', () => {
     render(renderApp('/control/configuracion'))
 
     expect(await screen.findByDisplayValue('NX-001')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('HNL')).toBeInTheDocument()
+    expect(screen.getByLabelText(/moneda funcional/i)).toHaveValue('HNL')
 
     const legalNameInput = screen.getByLabelText(/razón social/i)
     await user.clear(legalNameInput)
@@ -98,6 +98,6 @@ describe('CompanySettingsPage', () => {
 
     // El código y la moneda funcional nunca se enviaron ni cambiaron.
     expect(screen.getByDisplayValue('NX-001')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('HNL')).toBeInTheDocument()
+    expect(screen.getByLabelText(/moneda funcional/i)).toHaveValue('HNL')
   })
 })

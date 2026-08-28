@@ -15,6 +15,7 @@ export interface Account {
   accountType: string
   parentId: string | null
   isPostable: boolean
+  cashFlowActivity?: string | null
 }
 
 export interface CompanyUser {

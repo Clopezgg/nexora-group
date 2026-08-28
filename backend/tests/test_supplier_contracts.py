@@ -1,6 +1,10 @@
 from decimal import Decimal
 
+import pytest
+from sqlalchemy import select
+
 from app.models.permission import UserCompanyAccess
+from app.models.supplier import Supplier, SupplierContract
 from tests.helpers import create_company, create_supplier, create_user_with_role, login_admin, login_as
 
 
@@ -60,6 +64,121 @@ def test_creating_and_listing_supplier_contracts(client):
     listed = client.get(f"/api/procurement/suppliers/contracts?company_id={company['id']}")
     assert listed.status_code == 200, listed.text
     assert [c["id"] for c in listed.json()] == [body["id"]]
+
+
+def test_supplier_create_emits_safe_audit_snapshot(client):
+    login_admin(client)
+    company = create_company(client, name="Supplier Audit Co")
+
+    response = client.post(
+        "/api/procurement/suppliers",
+        json={
+            "companyId": company["id"],
+            "legalName": "Proveedor Auditado",
+            "classification": "CRITICAL",
+            "bankingDetails": {"account": "SECRET-123", "bank": "Private Bank"},
+        },
+        headers={"X-Correlation-Id": "supplier-audit-001"},
+    )
+    assert response.status_code == 201, response.text
+    supplier = response.json()
+
+    entries = client.get(
+        f"/api/audit?companyId={company['id']}&entityType=procurement.supplier"
+    ).json()
+    entry = next(item for item in entries if item["entityId"] == supplier["id"])
+    assert entry["action"] == "procurement.supplier.create"
+    assert entry["after"] == {
+        "classification": "CRITICAL",
+        "legalName": "Proveedor Auditado",
+        "status": "ACTIVE",
+        "tradeName": None,
+    }
+    assert "bankingDetails" not in entry["after"]
+    assert "SECRET-123" not in str(entry)
+    assert entry["correlationId"] == "supplier-audit-001"
+
+
+def test_supplier_create_rolls_back_when_audit_fails(client, db_session, monkeypatch):
+    login_admin(client)
+    company = create_company(client, name="Supplier Rollback Co")
+
+    def fail_record(*args, **kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr("app.api.routes.suppliers.audit_service.record", fail_record)
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        client.post(
+            "/api/procurement/suppliers",
+            json={"companyId": company["id"], "legalName": "Must Roll Back"},
+        )
+
+    db_session.expire_all()
+    rows = db_session.execute(
+        select(Supplier).where(Supplier.legal_name == "Must Roll Back")
+    ).scalars().all()
+    assert rows == []
+
+
+def test_supplier_contract_create_emits_audit_entry(client):
+    login_admin(client)
+    company = create_company(client, name="Contract Audit Co")
+    supplier = create_supplier(client, company_id=company["id"])
+    project = _create_project(client, company_id=company["id"], name="Audit Contract Project")
+
+    response = _create_contract(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        project_id=project["id"],
+        contract_number="AUD-CON-001",
+    )
+    assert response.status_code == 201, response.text
+    contract = response.json()
+
+    entries = client.get(
+        f"/api/audit?companyId={company['id']}&entityType=procurement.contract"
+    ).json()
+    entry = next(item for item in entries if item["entityId"] == contract["id"])
+    assert entry["action"] == "procurement.contract.create"
+    assert entry["projectId"] == project["id"]
+    assert entry["after"] == {
+        "contractNumber": "AUD-CON-001",
+        "currencyCode": "HNL",
+        "status": "DRAFT",
+        "supplierId": supplier["id"],
+        "value": "150000.00",
+    }
+
+
+def test_supplier_contract_create_rolls_back_when_audit_fails(
+    client, db_session, monkeypatch
+):
+    login_admin(client)
+    company = create_company(client, name="Contract Rollback Co")
+    supplier = create_supplier(client, company_id=company["id"])
+
+    def fail_record(*args, **kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr("app.api.routes.suppliers.audit_service.record", fail_record)
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        _create_contract(
+            client,
+            company_id=company["id"],
+            supplier_id=supplier["id"],
+            contract_number="ROLLBACK-CON-001",
+        )
+
+    db_session.expire_all()
+    rows = db_session.execute(
+        select(SupplierContract).where(
+            SupplierContract.contract_number == "ROLLBACK-CON-001"
+        )
+    ).scalars().all()
+    assert rows == []
 
 
 def test_supplier_contract_rejects_supplier_from_another_company(client):

@@ -28,6 +28,7 @@ def _to_response(document: AccountingDocument, lines: list[JournalLine]) -> Jour
     return JournalEntryResponse(
         id=document.id,
         document_number=document.document_number,
+        document_type_code=document.document_type_code,
         company_id=document.company_id,
         scope=document.scope,
         project_id=document.project_id,

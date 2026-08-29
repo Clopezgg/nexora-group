@@ -94,7 +94,7 @@ export function CollectionsPage() {
           {['APPROVED', 'PARTIALLY_COLLECTED'].includes(row.status) ? (
             <Button onClick={() => setCollectInvoice(row)}>Registrar cobro</Button>
           ) : null}
-          {row.amountCollected > 0 ? (
+          {row.amountCollected > 0 || row.status === 'APPROVED' ? (
             <Button variant="secondary" onClick={() => setHistoryInvoice(row)}>Historial</Button>
           ) : null}
         </div>
@@ -108,7 +108,7 @@ export function CollectionsPage() {
         <div>
           <p className="nx-page__eyebrow">Comercial</p>
           <h1 className="nx-dashboard__title">Cobros</h1>
-          <p className="nx-field__hint">Aplica entradas reales de Tesorería a facturas emitidas. Los reversals preservan el recibo original.</p>
+          <p className="nx-field__hint">Aplica entradas reales de Tesorería a facturas emitidas. Los reversals preservan el recibo original y su trazabilidad.</p>
         </div>
         <Select value={activeCompanyId ?? ''} onChange={(event) => setActiveCompanyId(event.target.value)} aria-label="Compañía">
           {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
@@ -228,7 +228,24 @@ function ReceiptHistoryModal({ invoice, treasuryAccounts, onClose, onReversed }:
     { key: 'account', header: 'Cuenta receptora', render: (row) => accountNames.get(row.treasuryAccountId) ?? 'Cuenta de Tesorería' },
     { key: 'amount', header: 'Monto', render: (row) => formatMoney(Number(row.amount), invoice.currencyCode) },
     { key: 'document', header: 'Documento GL', render: (row) => <code>{row.accountingDocumentId.slice(0, 8)}…</code> },
-    { key: 'actions', header: 'Acciones', render: (row) => <Button variant="secondary" onClick={() => setReverseReceipt(row)}>Revertir</Button> },
+    {
+      key: 'reversal',
+      header: 'Reversal',
+      render: (row) => row.reversalAccountingDocumentId ? (
+        <div>
+          <Badge>Revertido</Badge>
+          <div className="nx-field__hint">{row.reversedAt ? new Date(row.reversedAt).toLocaleString() : ''}</div>
+          <div className="nx-field__hint">{row.reversalReason ?? ''}</div>
+        </div>
+      ) : <Badge>Vigente</Badge>,
+    },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      render: (row) => row.reversalAccountingDocumentId ? null : (
+        <Button variant="secondary" onClick={() => setReverseReceipt(row)}>Revertir</Button>
+      ),
+    },
   ]
 
   return (

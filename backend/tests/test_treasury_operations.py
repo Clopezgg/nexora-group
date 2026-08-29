@@ -206,6 +206,10 @@ def test_voucher_pdf_is_generated_for_a_remittance(client):
     )
     assert response.status_code == 200, response.text
     assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["content-disposition"].startswith(
+        'attachment; filename="NEXORA-Comprobante-'
+    )
+    assert response.headers["content-disposition"].endswith('.pdf"')
     assert response.content.startswith(b"%PDF")
 
 

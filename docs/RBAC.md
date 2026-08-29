@@ -19,12 +19,15 @@ Backend autoritativo (`app/services/permission_service.py`). Modelo:
     Administrator, Auditor).
   - `company_scope=OWN`: el rol solo puede operar en las companies donde
     el usuario tiene un `UserCompanyAccess` explícito (INV-COMP-001).
-  - `project_scope` existe en el modelo con la misma semántica (`ANY` /
-    `OWN` / `NONE`) pero **todavía no se aplica** en ningún endpoint de
-    este track — ningún dominio construido hasta ahora necesita
-    restricción a nivel de proyecto. El siguiente track que sí la
-    necesite (p.ej. Project Control) debe seguir el mismo patrón que
-    `assert_company_access` para `assert_project_access`.
+  - `project_scope=ANY`: permite todos los proyectos de una compañía
+    accesible.
+  - `project_scope=OWN`: exige una fila `UserProjectAccess` para cada
+    proyecto concreto.
+  - `project_scope=NONE`: no concede contexto de proyecto. El middleware
+    autoritativo inspecciona path, query, JSON anidado/arrays e IDs
+    indirectos; Evidence resuelve explícitamente multipart PROJECT/WBS.
+    Los listados conservan registros GENERAL/CENTRAL y filtran registros
+    PROJECT fuera del conjunto accesible.
 
 Uso en un endpoint:
 
@@ -57,10 +60,11 @@ nuevo AGREGA sus propias filas a esa matriz cuando construye su módulo; no
 se inventan permisos para recursos que todavía no existen (eso violaría
 "no placeholders" del CLAUDE.md).
 
-## UserCompanyAccess
+## UserCompanyAccess / UserProjectAccess
 
-`app/models/permission.py::UserCompanyAccess` — tabla simple
-`(user_id, company_id)`. Todavía no tiene API de administración (crear/
-revocar acceso vía HTTP); por ahora se otorga directo en base de datos.
-Registrado como pendiente para el track que construya la pantalla de
-administración de usuarios/RBAC (Track G).
+`UserCompanyAccess(user_id, company_id)` y
+`UserProjectAccess(user_id, project_id)` son administrables mediante
+`/api/access-management` con asignación/revocación auditada. La pantalla
+Configuración → Accesos usa selectores de usuarios, roles, compañías y
+proyectos reales; el frontend solo refleja permisos efectivos y nunca es
+la autoridad final.

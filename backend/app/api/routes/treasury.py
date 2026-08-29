@@ -1,3 +1,4 @@
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
@@ -33,7 +34,11 @@ from app.schemas.treasury import (
     TreasuryTransferResponse,
 )
 from app.services import audit_service, idempotency_service, treasury_service, voucher_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/treasury", tags=["treasury"])
 
@@ -725,6 +730,16 @@ def list_fund_restrictions(
         .filter(FundRestriction.treasury_account_id == treasury_account_id)
         .all()
     )
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="treasury.fund_restriction", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        restrictions = [
+            row for row in restrictions
+            if row.restricted_for_project_id is None
+            or row.restricted_for_project_id in allowed_set
+        ]
     return [FundRestrictionResponse.model_validate(r, from_attributes=True) for r in restrictions]
 
 
@@ -763,4 +778,10 @@ def download_voucher(
         )
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
-    return Response(content=pdf_bytes, media_type="application/pdf")
+    safe_number = re.sub(r"[^A-Za-z0-9_-]+", "-", document.document_number).strip("-")
+    filename = f"NEXORA-Comprobante-{safe_number or document.id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

@@ -24,7 +24,11 @@ from app.schemas.inventory import (
 )
 from app.services import audit_service, inventory_service
 from app.services.financial_validation_service import assert_supplier_belongs_to_company
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -113,6 +117,15 @@ def list_warehouses(
         db, user_id=user.id, resource="inventory.warehouse", action="read", company_id=company_id
     )
     warehouses = inventory_repository.list_warehouses(db, company_id=company_id)
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="inventory.warehouse", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        warehouses = [
+            row for row in warehouses
+            if row.project_id is None or row.project_id in allowed_set
+        ]
     return [WarehouseResponse.model_validate(w, from_attributes=True) for w in warehouses]
 
 

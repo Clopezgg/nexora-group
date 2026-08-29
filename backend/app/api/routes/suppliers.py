@@ -17,7 +17,11 @@ from app.services.financial_validation_service import (
     assert_supplier_belongs_to_company,
 )
 from app.services import audit_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/procurement/suppliers", tags=["suppliers"])
 
@@ -99,6 +103,15 @@ def list_contracts(
         db, user_id=user.id, resource="procurement.contract", action="read", company_id=company_id
     )
     contracts = supplier_repository.list_contracts(db, company_id=company_id)
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="procurement.contract", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        contracts = [
+            row for row in contracts
+            if row.project_id is None or row.project_id in allowed_set
+        ]
     return [SupplierContractResponse.model_validate(c, from_attributes=True) for c in contracts]
 
 

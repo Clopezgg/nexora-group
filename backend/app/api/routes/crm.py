@@ -21,7 +21,11 @@ from app.schemas.crm import (
     SalesContractResponse,
 )
 from app.services import audit_service, crm_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/crm", tags=["crm"])
 
@@ -255,9 +259,19 @@ def list_quotations(
     assert_company_access(
         db, user_id=user.id, resource="crm.quotation", action="read", company_id=company_id
     )
+    rows = crm_repository.list_quotations(db, company_id=company_id)
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="crm.quotation", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        rows = [
+            row for row in rows
+            if row.project_id is None or row.project_id in allowed_set
+        ]
     return [
         QuotationResponse.model_validate(q, from_attributes=True)
-        for q in crm_repository.list_quotations(db, company_id=company_id)
+        for q in rows
     ]
 
 
@@ -337,9 +351,19 @@ def list_sales_contracts(
     assert_company_access(
         db, user_id=user.id, resource="crm.sales_contract", action="read", company_id=company_id
     )
+    rows = crm_repository.list_sales_contracts(db, company_id=company_id)
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="crm.sales_contract", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        rows = [
+            row for row in rows
+            if row.project_id is None or row.project_id in allowed_set
+        ]
     return [
         SalesContractResponse.model_validate(c, from_attributes=True)
-        for c in crm_repository.list_sales_contracts(db, company_id=company_id)
+        for c in rows
     ]
 
 

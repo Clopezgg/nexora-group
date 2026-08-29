@@ -427,34 +427,15 @@ un dominio nuevo.
   cambios para el nuevo dominio — la página ya es genérica sobre
   `entityType`.
 
-## Limitación conocida: call sites históricos todavía no atómicos
+## Atomicidad de negocio y auditoría
 
-`approval_service.decide()` (Track G Task 2) invoca el adaptador de
-decisión del dominio propietario (p.ej. `ap_service.apply_approval_decision`),
-que a su vez llama a una función de servicio existente
-(`approve_supplier_invoice`) que ya hace su propio `db.commit()`
-internamente. La ruta (`POST /api/approvals/{id}/decide`) recién después
-llama `audit_service.record(...)` y hace su propio `db.commit()`. Si el
-proceso falla en la ventana entre esos dos commits, la decisión y la
-mutación real de dominio ya quedaron persistidas, pero el registro de
-auditoría de ese evento se pierde — sin riesgo de integridad financiera
-ni de datos (la transacción de negocio ya es correcta y completa), solo
-un hueco de completitud del audit trail para ese evento puntual.
-
-Este mismo patrón existe en call sites históricos
-(`approve_supplier_invoice`/`pay_supplier_invoice`/`create_remittance`/
-`approve_cash_closing`/`approve_purchase_order`, entre otros): el servicio
-puede confirmar antes de que la ruta escriba el audit. No es un defecto
-introducido por este slice, pero sí un gap real de completitud.
-
-Las rutas agregadas el 2026-08-26 (cinco gaps de Treasury) **y las
-agregadas en este slice** (AP create/cancel, AR create/approve/collect,
-Treasury account/cash-closing/bank-statement/bank-statement-line create,
-Supply Chain: Procurement + Inventory completo)
-**ya no tienen esta limitación**: usan el parámetro `commit=False` y
-confirman negocio + audit juntos. El backlog debe aplicar el mismo contrato
-transaccional a los call sites históricos restantes, con tests de rollback
-ante fallo de audit, antes de certificar `Audit completeness` en producción.
+**RESUELTO.** Las rutas mutantes usan servicios con `commit=False` y una
+única confirmación después de `audit_service.record`. Los adaptadores de
+Approval Inbox (incluido AP) solo hacen `flush`; decisión, mutación de
+dominio, notificación y auditoría quedan en la misma transacción. Protected
+Edit registra autorización permitida/denegada y consumo de capability, y
+las mutations administrativas, reversals y tesorería avanzada tienen
+eventos explícitos sin incluir secretos.
 
 ## Frontend
 

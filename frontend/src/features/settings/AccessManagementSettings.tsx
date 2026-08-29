@@ -97,7 +97,7 @@ export function AccessManagementSettings() {
     )
   }
 
-  const users = usersQuery.data ?? []
+  const users = Array.isArray(usersQuery.data) ? usersQuery.data : []
   const access = accessQuery.data
 
   return (

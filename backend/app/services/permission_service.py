@@ -10,10 +10,30 @@ from app.api.deps import get_current_user, get_db
 from app.domain.errors import NotAuthorizedError
 from app.models.accounting import AccountingDocument, JournalLine
 from app.models.ap import SupplierInvoice, SupplierPayment
+from app.models.approval_request import ApprovalRequest
 from app.models.ar import CustomerInvoice, CustomerReceipt
 from app.models.asset import DepreciationEntry, FixedAsset
+from app.models.change_order import ChangeOrder
+from app.models.crm import Quotation as CustomerQuotation
+from app.models.crm import SalesContract
 from app.models.document import Document
 from app.models.equipment import Equipment, MaintenanceOrder
+from app.models.inventory import PhysicalCount
+from app.models.procurement import (
+    GoodsReceipt,
+    PurchaseOrder,
+    PurchaseRequisition,
+    RequestForQuotation,
+    ServiceEntry,
+    SupplierQuotation,
+)
+from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
+from app.models.rfi import RequestForInformation
+from app.models.safety import SafetyIncident, SafetyObservation
+from app.models.site_report import DailySiteReport
+from app.models.submittal import Submittal
+from app.models.treasury import FundRestriction
+from app.models.warehouse import Warehouse
 from app.models.permission import (
     SCOPE_ANY,
     SCOPE_NONE,
@@ -92,6 +112,59 @@ def _collect_project_values(value: Any) -> list[Any]:
     return result
 
 
+def _collect_entity_values(value: Any) -> dict[str, list[Any]]:
+    """Collect named entity identifiers from nested request JSON.
+
+    Project isolation cannot trust only explicit projectId fields. A caller may
+    instead submit purchaseOrderId, quotationId or another source entity whose
+    project is stored server-side. The normalized key disambiguates shared
+    names such as invoiceId by resource.
+    """
+    result: dict[str, list[Any]] = {}
+
+    def visit(child: Any) -> None:
+        if isinstance(child, dict):
+            for key, nested in child.items():
+                normalized = _normalized_key(str(key))
+                if normalized.endswith("id") and nested not in (None, ""):
+                    result.setdefault(normalized, []).append(nested)
+                elif normalized.endswith("ids") and isinstance(nested, list):
+                    result.setdefault(normalized, []).extend(
+                        item for item in nested if item not in (None, "")
+                    )
+                visit(nested)
+        elif isinstance(child, list):
+            for nested in child:
+                visit(nested)
+
+    visit(value)
+    return result
+
+
+async def _request_entity_values(request: Request) -> dict[str, list[Any]]:
+    result: dict[str, list[Any]] = {}
+
+    def add(key: str, value: Any) -> None:
+        if value in (None, ""):
+            return
+        result.setdefault(_normalized_key(key), []).append(value)
+
+    for key, value in request.path_params.items():
+        add(str(key), value)
+    for key, value in request.query_params.multi_items():
+        add(str(key), value)
+
+    content_type = request.headers.get("content-type", "").lower()
+    if request.method.upper() in {"POST", "PUT", "PATCH", "DELETE"} and "application/json" in content_type:
+        try:
+            nested = _collect_entity_values(await request.json())
+            for key, values in nested.items():
+                result.setdefault(key, []).extend(values)
+        except (ValueError, TypeError):
+            pass
+    return result
+
+
 def _uuid_path_value(request: Request, name: str) -> uuid.UUID | None:
     value = request.path_params.get(name)
     if value in (None, ""):
@@ -103,7 +176,7 @@ def _uuid_path_value(request: Request, name: str) -> uuid.UUID | None:
 
 
 def _indirect_entity_project_ids(
-    db: Session, *, resource: str, request: Request
+    db: Session, *, resource: str, entity_values: dict[str, list[Any]]
 ) -> set[uuid.UUID]:
     """Resolve project context hidden behind entity ids in the route.
 
@@ -117,11 +190,27 @@ def _indirect_entity_project_ids(
         if project_id is not None:
             project_ids.add(project_id)
 
-    accounting_document_id = _uuid_path_value(request, "accounting_document_id")
-    document_id = _uuid_path_value(request, "document_id")
-    if accounting_document_id is None and resource.startswith("accounting."):
-        accounting_document_id = document_id
-    if accounting_document_id is not None:
+    def ids(*names: str) -> list[uuid.UUID]:
+        parsed: list[uuid.UUID] = []
+        for name in names:
+            for value in entity_values.get(_normalized_key(name), []):
+                try:
+                    parsed.append(uuid.UUID(str(value)))
+                except (TypeError, ValueError) as exc:
+                    raise NotAuthorizedError("Identificador de entidad inválido") from exc
+        return parsed
+
+    def add_direct(model: type, names: tuple[str, ...], attribute: str = "project_id") -> None:
+        for entity_id in ids(*names):
+            entity = db.get(model, entity_id)
+            if entity is not None:
+                add(getattr(entity, attribute, None))
+
+    document_ids = ids("document_id", "documentId")
+    accounting_document_ids = ids("accounting_document_id", "accountingDocumentId")
+    if resource.startswith("accounting."):
+        accounting_document_ids.extend(document_ids)
+    for accounting_document_id in accounting_document_ids:
         accounting_document = db.get(AccountingDocument, accounting_document_id)
         if accounting_document is not None:
             add(accounting_document.project_id)
@@ -134,13 +223,12 @@ def _indirect_entity_project_ids(
             for project_id in line_projects:
                 add(project_id)
 
-    if resource.startswith("document.") and document_id is not None:
+    for document_id in document_ids if resource.startswith("document.") else []:
         document = db.get(Document, document_id)
         if document is not None:
             add(document.project_id)
 
-    invoice_id = _uuid_path_value(request, "invoice_id")
-    if invoice_id is not None:
+    for invoice_id in ids("invoice_id", "invoiceId"):
         if resource.startswith("ap."):
             supplier_invoice = db.get(SupplierInvoice, invoice_id)
             if supplier_invoice is not None:
@@ -150,55 +238,127 @@ def _indirect_entity_project_ids(
             if customer_invoice is not None:
                 add(customer_invoice.project_id)
 
-    payment_id = _uuid_path_value(request, "payment_id")
-    if payment_id is not None:
+    for payment_id in ids("payment_id", "paymentId"):
         payment = db.get(SupplierPayment, payment_id)
         if payment is not None:
             supplier_invoice = db.get(SupplierInvoice, payment.supplier_invoice_id)
             if supplier_invoice is not None:
                 add(supplier_invoice.project_id)
 
-    receipt_id = _uuid_path_value(request, "receipt_id")
-    if receipt_id is not None:
+    for receipt_id in ids("receipt_id", "receiptId"):
         receipt = db.get(CustomerReceipt, receipt_id)
         if receipt is not None:
             customer_invoice = db.get(CustomerInvoice, receipt.customer_invoice_id)
             if customer_invoice is not None:
                 add(customer_invoice.project_id)
 
-    equipment_id = _uuid_path_value(request, "equipment_id")
-    order_id = _uuid_path_value(request, "order_id")
-    if equipment_id is None and order_id is not None:
+    equipment_ids = ids("equipment_id", "equipmentId")
+    order_ids = ids("order_id", "orderId", "maintenance_order_id", "maintenanceOrderId")
+    for order_id in order_ids:
         order = db.get(MaintenanceOrder, order_id)
         if order is not None:
-            equipment_id = order.equipment_id
-    if equipment_id is not None:
+            equipment_ids.append(order.equipment_id)
+    for equipment_id in equipment_ids:
         equipment = db.get(Equipment, equipment_id)
         if equipment is not None:
             add(equipment.project_id)
 
-    time_entry_id = _uuid_path_value(request, "time_entry_id")
-    if time_entry_id is not None:
+    for time_entry_id in ids("time_entry_id", "timeEntryId"):
         entry = db.get(TimeEntry, time_entry_id)
         if entry is not None:
             add(entry.project_id)
 
-    crew_id = _uuid_path_value(request, "crew_id")
-    if crew_id is not None:
+    for crew_id in ids("crew_id", "crewId"):
         crew = db.get(Crew, crew_id)
         if crew is not None:
             add(crew.project_id)
 
-    asset_id = _uuid_path_value(request, "asset_id")
-    depreciation_entry_id = _uuid_path_value(request, "depreciation_entry_id")
-    if asset_id is None and depreciation_entry_id is not None:
+    asset_ids = ids("asset_id", "assetId")
+    depreciation_entry_ids = ids("depreciation_entry_id", "depreciationEntryId")
+    for depreciation_entry_id in depreciation_entry_ids:
         entry = db.get(DepreciationEntry, depreciation_entry_id)
         if entry is not None:
-            asset_id = entry.asset_id
-    if asset_id is not None:
+            asset_ids.append(entry.asset_id)
+    for asset_id in asset_ids:
         asset = db.get(FixedAsset, asset_id)
         if asset is not None:
             add(asset.project_id)
+
+    add_direct(ChangeOrder, ("change_order_id", "changeOrderId"))
+    add_direct(DailySiteReport, ("report_id", "reportId", "daily_site_report_id", "dailySiteReportId"))
+    add_direct(QualityInspection, ("inspection_id", "inspectionId"))
+    add_direct(NonConformance, ("non_conformance_id", "nonConformanceId"))
+    for corrective_action_id in ids("corrective_action_id", "correctiveActionId"):
+        action = db.get(CorrectiveAction, corrective_action_id)
+        if action is not None:
+            non_conformance = db.get(NonConformance, action.non_conformance_id)
+            if non_conformance is not None:
+                add(non_conformance.project_id)
+    add_direct(SafetyObservation, ("observation_id", "observationId"))
+    add_direct(SafetyIncident, ("incident_id", "incidentId"))
+    add_direct(Submittal, ("submittal_id", "submittalId"))
+    add_direct(RequestForInformation, ("rfi_id", "rfiId"))
+    add_direct(ApprovalRequest, ("request_id", "requestId"))
+    add_direct(FundRestriction, ("restriction_id", "restrictionId"), "restricted_for_project_id")
+    add_direct(Warehouse, ("warehouse_id", "warehouseId"))
+
+    for physical_count_id in ids("physical_count_id", "physicalCountId"):
+        count = db.get(PhysicalCount, physical_count_id)
+        if count is not None:
+            warehouse = db.get(Warehouse, count.warehouse_id)
+            if warehouse is not None:
+                add(warehouse.project_id)
+
+    for requisition_id in ids(
+        "requisition_id", "requisitionId", "purchase_requisition_id", "purchaseRequisitionId"
+    ):
+        requisition = db.get(PurchaseRequisition, requisition_id)
+        if requisition is not None:
+            add(requisition.project_id)
+
+    def add_rfq(rfq_id: uuid.UUID) -> None:
+        rfq = db.get(RequestForQuotation, rfq_id)
+        if rfq is not None and rfq.purchase_requisition_id is not None:
+            requisition = db.get(PurchaseRequisition, rfq.purchase_requisition_id)
+            if requisition is not None:
+                add(requisition.project_id)
+
+    for rfq_id in ids("rfq_id", "rfqId", "request_for_quotation_id", "requestForQuotationId"):
+        add_rfq(rfq_id)
+
+    quotation_ids = ids("quotation_id", "quotationId", "supplier_quotation_id", "supplierQuotationId")
+    if resource.startswith("crm."):
+        for quotation_id in quotation_ids:
+            quotation = db.get(CustomerQuotation, quotation_id)
+            if quotation is not None:
+                add(quotation.project_id)
+    elif resource.startswith("procurement."):
+        for quotation_id in quotation_ids:
+            quotation = db.get(SupplierQuotation, quotation_id)
+            if quotation is not None:
+                add_rfq(quotation.request_for_quotation_id)
+
+    add_direct(SalesContract, ("sales_contract_id", "salesContractId"))
+
+    purchase_order_ids = ids("po_id", "poId", "purchase_order_id", "purchaseOrderId")
+    for purchase_order_id in purchase_order_ids:
+        purchase_order = db.get(PurchaseOrder, purchase_order_id)
+        if purchase_order is not None:
+            add(purchase_order.project_id)
+
+    for goods_receipt_id in ids("goods_receipt_id", "goodsReceiptId"):
+        receipt = db.get(GoodsReceipt, goods_receipt_id)
+        if receipt is not None:
+            purchase_order = db.get(PurchaseOrder, receipt.purchase_order_id)
+            if purchase_order is not None:
+                add(purchase_order.project_id)
+
+    for service_entry_id in ids("service_entry_id", "serviceEntryId"):
+        entry = db.get(ServiceEntry, service_entry_id)
+        if entry is not None:
+            purchase_order = db.get(PurchaseOrder, entry.purchase_order_id)
+            if purchase_order is not None:
+                add(purchase_order.project_id)
 
     return project_ids
 
@@ -451,8 +611,11 @@ def require_permission(resource: str, action: str) -> Callable:
 
         if _is_project_aware_resource(resource):
             project_ids = await _request_project_ids(request)
+            entity_values = await _request_entity_values(request)
             project_ids.update(
-                _indirect_entity_project_ids(db, resource=resource, request=request)
+                _indirect_entity_project_ids(
+                    db, resource=resource, entity_values=entity_values
+                )
             )
             for project_id in project_ids:
                 assert_project_access(

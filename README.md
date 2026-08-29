@@ -88,6 +88,9 @@ de despliegue (ver `CLAUDE.md`).
   los secrets del repo y apruebe el environment `production` antes de que
   el deploy real se ejecute.
 
-Ningún recurso de Azure ha sido provisionado todavía: `infra/` solo contiene
-la infraestructura como código, validada con `az bicep build` y
-`az deployment sub what-if` (ambos sin costo, no crean recursos).
+Azure DEV está provisionado y disponible en
+`https://jolly-plant-0d6bf700f.7.azurestaticapps.net/`, con API same-origin,
+Container Apps, PostgreSQL, Blob Storage y Key Vault administrados por el
+workflow `Deploy Azure`. Los secretos de Protected Edit se pasan como
+parámetros seguros de Bicep y referencias de Key Vault; si no están
+provisionados, el backend falla cerrado.

@@ -1,9 +1,13 @@
+import uuid
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal
-from app.services import edit_access_service
+from app.domain.errors import NotAuthenticatedError
+from app.models.edit_access import EditAccessEvent
+from app.services import auth_service, edit_access_service
 
 _PROTECTED_METHODS = {"PUT", "PATCH", "DELETE"}
 _EXEMPT_PATHS = {"/api/context"}
@@ -30,18 +34,30 @@ def register_edit_access_guard(app: FastAPI) -> None:
                 )
             capability = request.headers.get("x-nexora-edit-access")
             session_token = request.cookies.get(settings.session_cookie_name)
+            correlation_id = request.headers.get("x-correlation-id") or str(uuid.uuid4())
             with SessionLocal() as db:
                 try:
+                    try:
+                        current_user, _roles = auth_service.get_current_user(
+                            db, raw_token=session_token
+                        )
+                    except NotAuthenticatedError:
+                        current_user = None
                     allowed = edit_access_service.consume_capability(
                         db,
                         capability,
                         session_token=session_token,
                         settings=settings,
                     )
-                    if allowed:
-                        db.commit()
-                    else:
-                        db.rollback()
+                    db.add(
+                        EditAccessEvent(
+                            user_id=current_user.id if current_user is not None else None,
+                            success=allowed,
+                            outcome="MUTATION_ALLOWED" if allowed else "MUTATION_DENIED",
+                            correlation_id=correlation_id,
+                        )
+                    )
+                    db.commit()
                 except Exception:
                     db.rollback()
                     raise

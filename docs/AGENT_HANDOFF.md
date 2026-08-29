@@ -146,8 +146,9 @@ session, real PostgreSQL, real commands — not inferred):
   reachable financial-invariant gap, not speculative.
   `posting_service.register_reversal_hook` (same pattern as
   `approval_service.register_decision_adapter`) fixes it for AP/AR;
-  payment/receipt reversal explicitly deferred as `DEFERRED-FINAL-018`
-  (not silently dropped). 267/267 backend tests.
+  payment/receipt reversal was historically deferred as
+  `DEFERRED-FINAL-018`; PR #21 now implements the formal AP/AR reversal
+  services, metadata, audit, history UI and E2E coverage.
 - Traceability tally after all of the above: 0 `VERIFIED`, 101
   `IMPLEMENTED`, 16 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
   across 124 rows. **This is still far from 100\% by the CANDADO FINAL
@@ -201,8 +202,8 @@ in the future, apply the same check yourself rather than waiting for
 another audit pass. Also `NXR-REQ-0025` Corrections (commit `6cfca55`):
 `posting_service.register_reversal_hook` now syncs
 `SupplierInvoice`/`CustomerInvoice` status when their accrual is
-reversed — see `DEFERRED-FINAL-018` for the explicitly-scoped-out
-payment/receipt-reversal follow-up. Also `NXR-REQ-0006` Tax architecture
+reversed. The formerly scoped-out payment/receipt follow-up
+(`DEFERRED-FINAL-018`) is implemented in PR #21. Also `NXR-REQ-0006` Tax architecture
 (commit `66cebf1`): `TaxCode`/`TaxLine` were pure unused scaffolding
 (model only, no service, no API, nothing ever created one or called
 `post_manual` with `tax_lines`) — now `tax_service.create_tax_code`/

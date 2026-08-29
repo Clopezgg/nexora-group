@@ -3,8 +3,9 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { NavList } from './NavList'
-import { navGroups } from '../app/navigation'
+import { filterNavGroups } from '../app/navigation'
 import { CommandPalette, Drawer, type CommandItem } from '../design-system'
+import { useAuth } from '../features/auth/auth-context'
 import { useActiveCompany } from '../hooks/useActiveCompany'
 import { globalSearch } from '../services/searchService'
 import './AppLayout.css'
@@ -12,10 +13,12 @@ import './AppLayout.css'
 export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const { activeCompanyId } = useActiveCompany()
+  const { user } = useAuth()
+  const visibleGroups = useMemo(() => filterNavGroups(user?.permissions), [user?.permissions])
 
   const commandItems = useMemo<CommandItem[]>(
     () =>
-      navGroups.flatMap((group) =>
+      visibleGroups.flatMap((group) =>
         group.items.map((item) => ({
           id: item.path,
           label: item.label,
@@ -23,12 +26,9 @@ export function AppLayout() {
           path: item.path,
         })),
       ),
-    [],
+    [visibleGroups],
   )
 
-  // Cross-entity global search (NXR-REQ-0092). Undefined (no remote branch)
-  // until a company is active -- CommandPalette keeps working as a pure
-  // local nav filter in that case, never blank.
   const searchRemote = useMemo(() => {
     if (!activeCompanyId) return undefined
     const companyId = activeCompanyId

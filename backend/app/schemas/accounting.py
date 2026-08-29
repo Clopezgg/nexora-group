@@ -36,6 +36,7 @@ class JournalLineResponse(CamelModel):
 class JournalEntryResponse(CamelModel):
     id: uuid.UUID
     document_number: str
+    document_type_code: str
     company_id: uuid.UUID
     scope: str
     project_id: uuid.UUID | None

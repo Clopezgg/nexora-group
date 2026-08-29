@@ -17,6 +17,7 @@ const E2E_BACKEND_PORT = 8010
 const E2E_FRONTEND_PORT = 5175
 const E2E_FRONTEND_URL = `http://localhost:${E2E_FRONTEND_PORT}`
 const E2E_BACKEND_URL = `http://localhost:${E2E_BACKEND_PORT}`
+const E2E_AZURE_STORAGE_CONNECTION_STRING = process.env.E2E_AZURE_STORAGE_CONNECTION_STRING ?? ''
 
 // Protected Edit never uses a repository/test fixture secret. A fresh token,
 // salt and PBKDF2 digest are generated for each Playwright process. The token
@@ -62,6 +63,8 @@ export default defineConfig({
         ...process.env,
         EDIT_ACCESS_TOKEN_SALT: E2E_EDIT_ACCESS_SALT,
         EDIT_ACCESS_TOKEN_DIGEST: E2E_EDIT_ACCESS_DIGEST,
+        EVIDENCE_BACKEND: E2E_AZURE_STORAGE_CONNECTION_STRING ? 'azure_blob' : 'none',
+        AZURE_STORAGE_CONNECTION_STRING: E2E_AZURE_STORAGE_CONNECTION_STRING,
       },
       url: `${E2E_BACKEND_URL}/readyz`,
       reuseExistingServer: false,

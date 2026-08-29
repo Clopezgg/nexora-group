@@ -1,10 +1,11 @@
 # E2E / Critical Journey / Accessibility (NXR-REQ-0112 / NXR-REQ-0113 / NXR-REQ-0105)
 
 Real Playwright suite, driven against a real backend + real frontend +
-real PostgreSQL — never mocked. Runs in its own database (`nexora_e2e`),
-never the dev DB (`nexora_dev`) or the pytest DB (`nexora_test_*`), and
-its own ports (backend `8010`, frontend `5175`) so it never collides with
-a manually-running dev server.
+real PostgreSQL — never mocked. Evidence uploads in CI use a real Azurite
+Blob-compatible service rather than bypassing storage. Runs in its own
+database (`nexora_e2e`), never the dev DB (`nexora_dev`) or the pytest DB
+(`nexora_test_*`), and its own ports (backend `8010`, frontend `5175`) so
+it never collides with a manually-running dev server.
 
 ## Prerequisites
 
@@ -13,6 +14,11 @@ a manually-running dev server.
 - Backend virtualenv already set up (`backend/.venv`).
 - `npx playwright install chromium` run once (downloads the browser
   binary — this repo does not commit it).
+- For the Documents/Evidence success path, a Blob-compatible Azurite
+  endpoint and `E2E_AZURE_STORAGE_CONNECTION_STRING` must be available.
+  GitHub Actions provisions this service automatically. Local runs may
+  point that variable to a local Azurite instance. This connection string
+  is development/E2E-only; production continues to use Managed Identity.
 
 ## Running
 
@@ -28,9 +34,10 @@ npm run test:e2e
    runs `alembic upgrade head` against the empty database (same as
    `backend/Dockerfile`'s `CMD`), then starts `uvicorn` on port 8010
    against it, with `FRONTEND_URL` set to the E2E frontend origin (so
-   CORS and the CSRF Origin guard both accept it) and a real bootstrap
-   admin (`admin@nexora.group` / `NexoraAdmin123!`) created on first
-   boot.
+   CORS and the CSRF Origin guard both accept it), a real bootstrap admin
+   (`admin@nexora.group` / `NexoraAdmin123!`) created on first boot, a
+   fresh process-local Protected Edit credential, and the optional Azurite
+   connection supplied by `E2E_AZURE_STORAGE_CONNECTION_STRING`.
 2. `webServer[1]` runs `vite` on port 5175, proxying `/api` to the E2E
    backend.
 3. Playwright waits for both to be ready (`/readyz` and the frontend
@@ -40,6 +47,10 @@ The Approval Inbox step needs a real second user (INV-SOD-001 forbids a
 submitter deciding their own approval) — created via the real
 `POST /api/master-data/users` endpoint (DEFERRED-FINAL-015), same as any
 other admin action in this journey.
+
+The resource-posting portion also closes a real maintenance order and
+asserts that FUE/MNT/LAB documents are present. This prevents the E2E from
+claiming coverage merely because posting configuration was saved.
 
 ## Why some steps are API calls, not clicks
 

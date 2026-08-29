@@ -105,7 +105,7 @@ def test_supplier_payment_reversal_preserves_original_and_restores_invoice(clien
         f"/api/ap/supplier-payments/{payment['id']}/reverse",
         json={"reason": "Segundo intento no permitido"},
     )
-    assert duplicate.status_code == 422, duplicate.text
+    assert duplicate.status_code == 409, duplicate.text
     unchanged = client.get(f"/api/ap/supplier-invoices/{invoice['id']}").json()
     assert float(unchanged["amountPaid"]) == 0
 
@@ -173,6 +173,6 @@ def test_customer_receipt_reversal_preserves_original_and_restores_invoice(clien
         f"/api/ar/customer-receipts/{receipt['id']}/reverse",
         json={"reason": "Segundo intento no permitido"},
     )
-    assert duplicate.status_code == 422, duplicate.text
+    assert duplicate.status_code == 409, duplicate.text
     unchanged = client.get(f"/api/ar/customer-invoices/{invoice['id']}").json()
     assert float(unchanged["amountCollected"]) == 0

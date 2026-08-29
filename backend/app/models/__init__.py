@@ -30,7 +30,7 @@ from app.models.inventory import PhysicalCount, PhysicalCountLine, StockLedgerEn
 from app.models.item import Item
 from app.models.notification import Notification
 from app.models.number_sequence import NumberSequence
-from app.models.permission import Permission, RolePermission, UserCompanyAccess
+from app.models.permission import Permission, RolePermission, UserCompanyAccess, UserProjectAccess
 from app.models.procurement import (
     GoodsReceipt,
     GoodsReceiptLine,
@@ -174,6 +174,7 @@ __all__ = [
     "TreasuryTransfer",
     "User",
     "UserCompanyAccess",
+    "UserProjectAccess",
     "UserContext",
     "UserRole",
     "Warehouse",

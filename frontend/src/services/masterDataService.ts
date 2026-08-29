@@ -1,5 +1,12 @@
 import { apiFetch } from './httpClient'
-import type { Account, Company, CompanyUser, ControllingDimension } from '../types/masterData'
+import type {
+  Account,
+  Company,
+  CompanyUser,
+  ControllingDimension,
+  ResourcePostingConfig,
+  ResourcePostingSource,
+} from '../types/masterData'
 
 export interface CompanyProfileInput {
   name?: string
@@ -56,4 +63,17 @@ export const masterDataService = {
     isPostable?: boolean
   }) =>
     apiFetch<Account>('/master-data/accounts', { method: 'POST', body: JSON.stringify(payload) }),
+  listResourcePostingConfigs: (companyId: string) =>
+    apiFetch<ResourcePostingConfig[]>(`/master-data/companies/${companyId}/resource-posting-configs`),
+  saveResourcePostingConfig: (
+    companyId: string,
+    sourceType: ResourcePostingSource,
+    payload: { expenseAccountId: string; offsetAccountId: string; active: boolean },
+  ) => apiFetch<ResourcePostingConfig>(
+    `/master-data/companies/${companyId}/resource-posting-configs/${sourceType}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ sourceType, ...payload }),
+    },
+  ),
 }

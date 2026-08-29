@@ -29,6 +29,14 @@ param bootstrapAdminPassword string = ''
 @description('Email del admin de bootstrap (no es secreto, pero se pasa junto al password por conveniencia).')
 param bootstrapAdminEmail string = ''
 
+@secure()
+@description('Salt PBKDF2 de Protected Edit codificado base64url. Vacío mantiene Protected Edit fail-closed.')
+param editAccessTokenSalt string = ''
+
+@secure()
+@description('Digest PBKDF2 de Protected Edit codificado base64url. Vacío mantiene Protected Edit fail-closed.')
+param editAccessTokenDigest string = ''
+
 @description('Imagen de contenedor del backend publicada por CI en GHCR. Placeholder hasta el primer build real.')
 param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
@@ -36,8 +44,8 @@ param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 param postgresAdminLogin string = 'nexoraadmin'
 
 var resourceGroupName = '${namePrefix}-rg-${environmentName}'
-// Sufijo corto y determinístico para nombres con restricciones de unicidad global (Key Vault, Storage).
 var uniqueSuffix = uniqueString(subscription().subscriptionId, resourceGroupName)
+var editAccessConfigured = !empty(editAccessTokenSalt) && !empty(editAccessTokenDigest)
 
 resource rg 'Microsoft.Resources/resourceGroups@2023-07-01' = {
   name: resourceGroupName
@@ -82,8 +90,6 @@ module postgres 'modules/postgres.bicep' = {
   }
 }
 
-// Se construye aquí (no dentro del módulo de postgres) porque combina el FQDN
-// del servidor con el password, que solo main.bicep tiene como parámetro secure.
 var databaseUrl = 'postgresql+psycopg://${postgresAdminLogin}:${postgresAdminPassword}@${postgres.outputs.fqdn}:5432/${postgres.outputs.databaseName}?sslmode=require'
 
 module keyVault 'modules/keyvault.bicep' = {
@@ -97,6 +103,8 @@ module keyVault 'modules/keyvault.bicep' = {
     databaseUrl: databaseUrl
     secretKey: backendSecretKey
     bootstrapAdminPassword: bootstrapAdminPassword
+    editAccessTokenSalt: editAccessTokenSalt
+    editAccessTokenDigest: editAccessTokenDigest
   }
 }
 
@@ -126,6 +134,7 @@ module containerApps 'modules/containerapps.bicep' = {
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     frontendUrl: 'https://${staticWebApp.outputs.defaultHostname}'
     bootstrapAdminEmail: bootstrapAdminEmail
+    editAccessConfigured: editAccessConfigured
   }
 }
 
@@ -146,3 +155,4 @@ output keyVaultUri string = keyVault.outputs.keyVaultUri
 output storageAccountName string = storage.outputs.storageAccountName
 output postgresServerFqdn string = postgres.outputs.fqdn
 output logAnalyticsWorkspaceId string = monitoring.outputs.logAnalyticsWorkspaceId
+output editAccessConfigured bool = editAccessConfigured

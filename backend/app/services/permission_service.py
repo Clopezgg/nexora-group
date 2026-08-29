@@ -8,6 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.domain.errors import NotAuthorizedError
+from app.models.accounting import AccountingDocument, JournalLine
+from app.models.ap import SupplierInvoice, SupplierPayment
+from app.models.ar import CustomerInvoice, CustomerReceipt
+from app.models.asset import DepreciationEntry, FixedAsset
+from app.models.document import Document
+from app.models.equipment import Equipment, MaintenanceOrder
 from app.models.permission import (
     SCOPE_ANY,
     SCOPE_NONE,
@@ -21,6 +27,7 @@ from app.models.project import Project
 from app.models.role import Role
 from app.models.user import User
 from app.models.user_role import UserRole
+from app.models.workforce import Crew, TimeEntry
 
 """Motor central de RBAC con aislamiento de compañía y proyecto.
 
@@ -83,6 +90,117 @@ def _collect_project_values(value: Any) -> list[Any]:
         for child in value:
             result.extend(_collect_project_values(child))
     return result
+
+
+def _uuid_path_value(request: Request, name: str) -> uuid.UUID | None:
+    value = request.path_params.get(name)
+    if value in (None, ""):
+        return None
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError) as exc:
+        raise NotAuthorizedError("Identificador de entidad inválido") from exc
+
+
+def _indirect_entity_project_ids(
+    db: Session, *, resource: str, request: Request
+) -> set[uuid.UUID]:
+    """Resolve project context hidden behind entity ids in the route.
+
+    This prevents bypassing OWN project isolation by calling an entity endpoint
+    that only exposes `invoice_id`, `equipment_id`, `document_id`, etc. Missing
+    entities are intentionally ignored here and remain the domain route's 404.
+    """
+    project_ids: set[uuid.UUID] = set()
+
+    def add(project_id: uuid.UUID | None) -> None:
+        if project_id is not None:
+            project_ids.add(project_id)
+
+    accounting_document_id = _uuid_path_value(request, "accounting_document_id")
+    document_id = _uuid_path_value(request, "document_id")
+    if accounting_document_id is None and resource.startswith("accounting."):
+        accounting_document_id = document_id
+    if accounting_document_id is not None:
+        accounting_document = db.get(AccountingDocument, accounting_document_id)
+        if accounting_document is not None:
+            add(accounting_document.project_id)
+            line_projects = db.execute(
+                select(JournalLine.project_id).where(
+                    JournalLine.accounting_document_id == accounting_document.id,
+                    JournalLine.project_id.is_not(None),
+                )
+            ).scalars()
+            for project_id in line_projects:
+                add(project_id)
+
+    if resource.startswith("document.") and document_id is not None:
+        document = db.get(Document, document_id)
+        if document is not None:
+            add(document.project_id)
+
+    invoice_id = _uuid_path_value(request, "invoice_id")
+    if invoice_id is not None:
+        if resource.startswith("ap."):
+            supplier_invoice = db.get(SupplierInvoice, invoice_id)
+            if supplier_invoice is not None:
+                add(supplier_invoice.project_id)
+        elif resource.startswith("ar."):
+            customer_invoice = db.get(CustomerInvoice, invoice_id)
+            if customer_invoice is not None:
+                add(customer_invoice.project_id)
+
+    payment_id = _uuid_path_value(request, "payment_id")
+    if payment_id is not None:
+        payment = db.get(SupplierPayment, payment_id)
+        if payment is not None:
+            supplier_invoice = db.get(SupplierInvoice, payment.supplier_invoice_id)
+            if supplier_invoice is not None:
+                add(supplier_invoice.project_id)
+
+    receipt_id = _uuid_path_value(request, "receipt_id")
+    if receipt_id is not None:
+        receipt = db.get(CustomerReceipt, receipt_id)
+        if receipt is not None:
+            customer_invoice = db.get(CustomerInvoice, receipt.customer_invoice_id)
+            if customer_invoice is not None:
+                add(customer_invoice.project_id)
+
+    equipment_id = _uuid_path_value(request, "equipment_id")
+    order_id = _uuid_path_value(request, "order_id")
+    if equipment_id is None and order_id is not None:
+        order = db.get(MaintenanceOrder, order_id)
+        if order is not None:
+            equipment_id = order.equipment_id
+    if equipment_id is not None:
+        equipment = db.get(Equipment, equipment_id)
+        if equipment is not None:
+            add(equipment.project_id)
+
+    time_entry_id = _uuid_path_value(request, "time_entry_id")
+    if time_entry_id is not None:
+        entry = db.get(TimeEntry, time_entry_id)
+        if entry is not None:
+            add(entry.project_id)
+
+    crew_id = _uuid_path_value(request, "crew_id")
+    if crew_id is not None:
+        crew = db.get(Crew, crew_id)
+        if crew is not None:
+            add(crew.project_id)
+
+    asset_id = _uuid_path_value(request, "asset_id")
+    depreciation_entry_id = _uuid_path_value(request, "depreciation_entry_id")
+    if asset_id is None and depreciation_entry_id is not None:
+        entry = db.get(DepreciationEntry, depreciation_entry_id)
+        if entry is not None:
+            asset_id = entry.asset_id
+    if asset_id is not None:
+        asset = db.get(FixedAsset, asset_id)
+        if asset is not None:
+            add(asset.project_id)
+
+    return project_ids
 
 
 async def _request_project_ids(request: Request) -> set[uuid.UUID]:
@@ -332,7 +450,11 @@ def require_permission(resource: str, action: str) -> Callable:
             raise NotAuthorizedError(f"No tiene permiso para {action} sobre {resource}")
 
         if _is_project_aware_resource(resource):
-            for project_id in await _request_project_ids(request):
+            project_ids = await _request_project_ids(request)
+            project_ids.update(
+                _indirect_entity_project_ids(db, resource=resource, request=request)
+            )
+            for project_id in project_ids:
                 assert_project_access(
                     db,
                     user_id=user.id,

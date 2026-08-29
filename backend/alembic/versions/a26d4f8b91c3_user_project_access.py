@@ -29,6 +29,11 @@ _PROJECT_RESOURCE_SQL = """
     OR p.resource LIKE 'inventory.%'
     OR p.resource LIKE 'ap.%'
     OR p.resource LIKE 'ar.%'
+    OR p.resource LIKE 'accounting.%'
+    OR p.resource LIKE 'treasury.%'
+    OR p.resource LIKE 'asset.%'
+    OR p.resource LIKE 'crm.%'
+    OR p.resource LIKE 'reports.%'
 )
 """
 

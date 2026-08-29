@@ -69,7 +69,11 @@ def reverse_supplier_payment(
     try:
         original_document_id = payment.accounting_document_id
         payment, invoice, reversal = payment_receipt_reversal_service.reverse_supplier_payment(
-            db, payment_id=payment_id, reason=payload.reason, commit=False
+            db,
+            payment_id=payment_id,
+            reason=payload.reason,
+            actor_user_id=user.id,
+            commit=False,
         )
         audit_service.record(
             db,
@@ -87,7 +91,9 @@ def reverse_supplier_payment(
                 "reversalAccountingDocumentId": str(reversal.id),
                 "invoiceStatus": invoice.status,
                 "amountPaid": str(invoice.amount_paid),
-                "reason": payload.reason,
+                "reason": payment.reversal_reason,
+                "reversedAt": payment.reversed_at.isoformat() if payment.reversed_at else None,
+                "reversedByUserId": str(payment.reversed_by_user_id) if payment.reversed_by_user_id else None,
             },
             correlation_id=correlation_id,
         )
@@ -159,7 +165,11 @@ def reverse_customer_receipt(
     try:
         original_document_id = receipt.accounting_document_id
         receipt, invoice, reversal = payment_receipt_reversal_service.reverse_customer_receipt(
-            db, receipt_id=receipt_id, reason=payload.reason, commit=False
+            db,
+            receipt_id=receipt_id,
+            reason=payload.reason,
+            actor_user_id=user.id,
+            commit=False,
         )
         audit_service.record(
             db,
@@ -177,7 +187,9 @@ def reverse_customer_receipt(
                 "reversalAccountingDocumentId": str(reversal.id),
                 "invoiceStatus": invoice.status,
                 "amountCollected": str(invoice.amount_collected),
-                "reason": payload.reason,
+                "reason": receipt.reversal_reason,
+                "reversedAt": receipt.reversed_at.isoformat() if receipt.reversed_at else None,
+                "reversedByUserId": str(receipt.reversed_by_user_id) if receipt.reversed_by_user_id else None,
             },
             correlation_id=correlation_id,
         )

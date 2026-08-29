@@ -21,6 +21,7 @@ from app.models.crm import Customer, Lead, Opportunity, Quotation, SalesContract
 from app.models.currency import Currency, ExchangeRate
 from app.models.document import Document, DocumentVersion
 from app.models.document_type import DocumentType
+from app.models.edit_access import EditAccessCapability, EditAccessEvent
 from app.models.equipment import Equipment, FuelLog, MaintenanceOrder, MaintenancePlan
 from app.models.evidence import Evidence
 from app.models.fiscal import FiscalPeriod, FiscalYear
@@ -106,6 +107,8 @@ __all__ = [
     "DocumentType",
     "DocumentVersion",
     "EconomicCategory",
+    "EditAccessCapability",
+    "EditAccessEvent",
     "Equipment",
     "Evidence",
     "ExchangeRate",

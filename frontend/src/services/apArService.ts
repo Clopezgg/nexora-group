@@ -21,6 +21,10 @@ export interface SupplierPayment {
   amount: number
   paymentDate: string
   accountingDocumentId: string
+  reversalAccountingDocumentId: string | null
+  reversedAt: string | null
+  reversedByUserId: string | null
+  reversalReason: string | null
 }
 
 export interface CustomerInvoice {
@@ -43,6 +47,10 @@ export interface CustomerReceipt {
   amount: number
   receiptDate: string
   accountingDocumentId: string
+  reversalAccountingDocumentId: string | null
+  reversedAt: string | null
+  reversedByUserId: string | null
+  reversalReason: string | null
 }
 
 export interface BusinessReversalResponse {

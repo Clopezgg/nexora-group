@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -48,6 +48,33 @@ def _to_response(document: AccountingDocument, lines: list[JournalLine]) -> Jour
 def _get_lines(db: Session, document_id: uuid.UUID) -> list[JournalLine]:
     stmt = select(JournalLine).where(JournalLine.accounting_document_id == document_id)
     return list(db.execute(stmt).scalars())
+
+
+@router.get("/journal-entries", response_model=list[JournalEntryResponse])
+def list_journal_entries(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=100, ge=1, le=250),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("accounting.journal_entry", "read")),
+) -> list[JournalEntryResponse]:
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="accounting.journal_entry",
+        action="read",
+        company_id=company_id,
+    )
+    stmt = (
+        select(AccountingDocument)
+        .where(AccountingDocument.company_id == company_id)
+        .order_by(AccountingDocument.posted_at.desc(), AccountingDocument.created_at.desc())
+        .limit(limit)
+    )
+    if status_filter:
+        stmt = stmt.where(AccountingDocument.status == status_filter.upper())
+    documents = list(db.execute(stmt).scalars())
+    return [_to_response(document, _get_lines(db, document.id)) for document in documents]
 
 
 @router.post("/journal-entries", response_model=JournalEntryResponse, status_code=201)

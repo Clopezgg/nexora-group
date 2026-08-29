@@ -1,3 +1,5 @@
+import uuid
+
 from app.models.accounting import AccountingDocument
 from app.models.ap import SupplierPayment
 from app.models.ar import CustomerReceipt
@@ -86,7 +88,7 @@ def test_supplier_payment_reversal_preserves_original_and_restores_invoice(clien
     assert refreshed["status"] == "APPROVED"
     assert float(refreshed["amountPaid"]) == 0
 
-    persisted_payment = db_session.get(SupplierPayment, payment["id"])
+    persisted_payment = db_session.get(SupplierPayment, uuid.UUID(payment["id"]))
     assert persisted_payment is not None
     assert persisted_payment.accounting_document_id is not None
     assert persisted_payment.reversal_accounting_document_id is not None
@@ -160,7 +162,7 @@ def test_customer_receipt_reversal_preserves_original_and_restores_invoice(clien
     assert refreshed["status"] == "APPROVED"
     assert float(refreshed["amountCollected"]) == 0
 
-    persisted_receipt = db_session.get(CustomerReceipt, receipt["id"])
+    persisted_receipt = db_session.get(CustomerReceipt, uuid.UUID(receipt["id"]))
     assert persisted_receipt is not None
     assert persisted_receipt.reversal_accounting_document_id is not None
     assert persisted_receipt.reversed_at is not None

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -79,15 +80,19 @@ def reverse_supplier_payment(
     *,
     payment_id: uuid.UUID,
     reason: str,
+    actor_user_id: uuid.UUID,
     commit: bool = True,
 ) -> tuple[SupplierPayment, SupplierInvoice, AccountingDocument]:
-    if not reason.strip():
+    normalized_reason = reason.strip()
+    if not normalized_reason:
         raise InvalidFinancialReferenceError("El motivo del reversal es obligatorio")
     payment = db.execute(
         select(SupplierPayment).where(SupplierPayment.id == payment_id).with_for_update()
     ).scalar_one_or_none()
     if payment is None:
         raise InvalidFinancialReferenceError("El pago de proveedor no existe")
+    if payment.reversal_accounting_document_id is not None or payment.reversed_at is not None:
+        raise InvalidInvoiceStateError("El pago de proveedor ya fue revertido")
     invoice = db.execute(
         select(SupplierInvoice)
         .where(SupplierInvoice.id == payment.supplier_invoice_id)
@@ -110,10 +115,14 @@ def reverse_supplier_payment(
     reversal = _reverse_posted_document(
         db,
         original=original,
-        reason=reason.strip(),
+        reason=normalized_reason,
         source_type="supplier_payment_reversal",
         source_id=payment.id,
     )
+    payment.reversal_accounting_document_id = reversal.id
+    payment.reversed_at = datetime.now(timezone.utc)
+    payment.reversed_by_user_id = actor_user_id
+    payment.reversal_reason = normalized_reason
     invoice.amount_paid = Decimal(invoice.amount_paid) - Decimal(payment.amount)
     total = Decimal(invoice.amount) + Decimal(invoice.tax_amount)
     if invoice.amount_paid == 0:
@@ -147,15 +156,19 @@ def reverse_customer_receipt(
     *,
     receipt_id: uuid.UUID,
     reason: str,
+    actor_user_id: uuid.UUID,
     commit: bool = True,
 ) -> tuple[CustomerReceipt, CustomerInvoice, AccountingDocument]:
-    if not reason.strip():
+    normalized_reason = reason.strip()
+    if not normalized_reason:
         raise InvalidFinancialReferenceError("El motivo del reversal es obligatorio")
     receipt = db.execute(
         select(CustomerReceipt).where(CustomerReceipt.id == receipt_id).with_for_update()
     ).scalar_one_or_none()
     if receipt is None:
         raise InvalidFinancialReferenceError("El cobro de cliente no existe")
+    if receipt.reversal_accounting_document_id is not None or receipt.reversed_at is not None:
+        raise InvalidInvoiceStateError("El cobro de cliente ya fue revertido")
     invoice = db.execute(
         select(CustomerInvoice)
         .where(CustomerInvoice.id == receipt.customer_invoice_id)
@@ -178,10 +191,14 @@ def reverse_customer_receipt(
     reversal = _reverse_posted_document(
         db,
         original=original,
-        reason=reason.strip(),
+        reason=normalized_reason,
         source_type="customer_receipt_reversal",
         source_id=receipt.id,
     )
+    receipt.reversal_accounting_document_id = reversal.id
+    receipt.reversed_at = datetime.now(timezone.utc)
+    receipt.reversed_by_user_id = actor_user_id
+    receipt.reversal_reason = normalized_reason
     invoice.amount_collected = Decimal(invoice.amount_collected) - Decimal(receipt.amount)
     if invoice.amount_collected == 0:
         invoice.status = "APPROVED"

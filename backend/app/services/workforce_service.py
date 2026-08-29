@@ -7,17 +7,17 @@ from sqlalchemy.orm import Session
 from app.domain.errors import CrewMembershipError, InvalidTimeEntryStateError
 from app.models.workforce import Crew, CrewMember, TimeEntry, Worker
 from app.repositories import workforce_repository
+from app.services import resource_posting_service
 from app.services.financial_validation_service import (
     assert_operation_scope,
     assert_project_belongs_to_company,
 )
 
-"""Workforce / Time (orden maestra §65-66). `labor_cost` se calcula SIEMPRE
-en el servidor al aprobar (hourly_rate * approved_hours) -- nunca se acepta
-del cliente (CLAUDE.md: no hardcoded financial data). El costo se atribuye
-al Project como costo de mano de obra; el pago real del trabajador (nómina/
-Treasury) queda fuera de alcance de este track (documentado como deuda
-intencional, ver docs/ENTERPRISE_RESOURCES.md)."""
+"""Workforce / Time.
+
+`labor_cost` is always calculated server-side. Approval also posts the cost to
+GL using the company's LABOR mapping; no account code is embedded here.
+"""
 
 
 def create_worker(
@@ -96,9 +96,7 @@ def approve_time_entry(
     approved_hours: Decimal | None = None,
     commit: bool = True,
 ) -> TimeEntry:
-    """INV-WFC-001: `labor_cost` = hourly_rate * approved_hours, calculado
-    aquí -- nunca recibido como input. Solo se puede aprobar/rechazar un
-    TimeEntry SUBMITTED (decisión única, no reversible por este servicio)."""
+    """Approve once and atomically accrue the server-computed labor cost."""
     entry = workforce_repository.get_time_entry(db, time_entry_id)
     if entry is None:
         raise ValueError(f"TimeEntry {time_entry_id} no existe")
@@ -112,6 +110,17 @@ def approve_time_entry(
     entry.status = "APPROVED"
     entry.approved_by_id = approved_by_id
     entry.approved_at = datetime.now(timezone.utc)
+    db.flush()
+    resource_posting_service.post_resource_cost(
+        db,
+        company_id=entry.company_id,
+        source_type="LABOR",
+        source_id=entry.id,
+        amount=entry.labor_cost,
+        scope=entry.scope,
+        project_id=entry.project_id,
+        description=f"Mano de obra aprobada · {entry.work_date.isoformat()}",
+    )
     if commit:
         db.commit()
         db.refresh(entry)

@@ -1,4 +1,4 @@
-import { pbkdf2Sync, randomBytes } from 'crypto'
+import { createHash, pbkdf2Sync, randomBytes } from 'crypto'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { defineConfig, devices } from '@playwright/test'
@@ -19,11 +19,13 @@ const E2E_FRONTEND_URL = `http://localhost:${E2E_FRONTEND_PORT}`
 const E2E_BACKEND_URL = `http://localhost:${E2E_BACKEND_PORT}`
 const E2E_AZURE_STORAGE_CONNECTION_STRING = process.env.E2E_AZURE_STORAGE_CONNECTION_STRING ?? ''
 
-// Protected Edit never uses a repository/test fixture secret. A fresh token,
-// salt and PBKDF2 digest are generated for each Playwright process. The token
-// remains process-local; the backend receives only its salt/digest through the
-// child-process environment, exactly like production receives Key Vault refs.
-const E2E_EDIT_ACCESS_TOKEN = randomBytes(18).toString('base64url').slice(0, 24)
+// Playwright evaluates this config separately for the web server and worker.
+// The token must therefore be reproducible by both processes; the server still
+// receives only a fresh salt/digest pair through its child-process environment.
+const E2E_EDIT_ACCESS_TOKEN = createHash('sha256')
+  .update(`nexora-e2e:${__dirname}`)
+  .digest('base64url')
+  .slice(0, 24)
 const E2E_EDIT_ACCESS_SALT_BYTES = randomBytes(16)
 const E2E_EDIT_ACCESS_SALT = E2E_EDIT_ACCESS_SALT_BYTES.toString('base64url')
 const E2E_EDIT_ACCESS_DIGEST = pbkdf2Sync(

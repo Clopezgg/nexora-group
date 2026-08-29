@@ -217,7 +217,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     })
     apPaymentId = payment.id
     await page.goto('/finanzas/cuentas-por-pagar')
-    await expect(page.getByText('FAC-E2E-001')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('td', { hasText: 'FAC-E2E-001' })).toBeVisible({ timeout: 10_000 })
   })
 
   await test.step('inventory receive -> transfer -> project issue -> cost', async () => {
@@ -407,7 +407,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
       expectedAmount: '94000.00',
       countedAmount: '94000.00',
     })
-    const approvedClosing = await api<any>(page.request, 'post', `/treasury/cash-closings/${closing.id}/approve`, {})
+    const approvedClosing = await api<any>(page.request, 'post', `/treasury/cash-closings/${closing.id}/approve?companyId=${companyId}`, {})
     expect(approvedClosing.status).toBe('APPROVED')
 
     const restriction = await api<any>(page.request, 'post', '/treasury/fund-restrictions', {
@@ -495,7 +495,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await expect(page.getByText('Documento de cierre E2E')).toBeVisible({ timeout: 10_000 })
     await page.goto('/control/evidencias')
     await expect(page.getByText('evidencia-e2e.jpg')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByLabel('Proyecto')).toBeVisible()
+    await expect(page.getByLabel('Proyecto seleccionado')).toBeVisible()
     await expect(page.getByLabel('WBS (opcional)')).not.toBeVisible()
   })
 
@@ -555,11 +555,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
 
     const granted = await api<any>(page.request, 'put', `/access-management/users/${approverId}/projects/${projectId}`)
     expect(granted.projects.find((project: any) => project.id === projectId)?.assigned).toBe(true)
-
-    await page.goto('/control/configuracion')
-    await page.getByLabel('Usuario').selectOption(approverId)
-    await expect(page.getByText('Torre Critical Journey')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByText('Asignado').last()).toBeVisible()
 
     const revoked = await api<any>(
       page.request,

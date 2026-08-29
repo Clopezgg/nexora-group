@@ -42,7 +42,12 @@ def reset_bucket(db: Session, *, bucket_key: str) -> None:
 
 
 def check_and_increment(
-    db: Session, *, bucket_key: str, limit: int, window_seconds: int
+    db: Session,
+    *,
+    bucket_key: str,
+    limit: int,
+    window_seconds: int,
+    reject_on_limit: bool = True,
 ) -> None:
     """NXR-REQ-0107: defensa de rate-limiting respaldada en PostgreSQL."""
     now = datetime.now(timezone.utc)
@@ -69,10 +74,15 @@ def check_and_increment(
         bucket.window_start = now
         bucket.count = 0
 
+    if not reject_on_limit and _locked(bucket, limit=limit, window_seconds=window_seconds):
+        raise RateLimitExceededError(
+            f"Demasiados intentos para '{bucket_key}'; espera antes de volver a intentar."
+        )
+
     bucket.count += 1
     db.flush()
 
-    if bucket.count >= limit:
+    if reject_on_limit and bucket.count >= limit:
         raise RateLimitExceededError(
             f"Demasiados intentos para '{bucket_key}'; espera antes de volver a intentar."
         )

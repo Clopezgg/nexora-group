@@ -28,7 +28,7 @@ def _add_reversal_columns(table_name: str) -> None:
     )
     op.add_column(table_name, sa.Column("reversal_reason", sa.String(length=500), nullable=True))
     op.create_foreign_key(
-        f"fk_{table_name}_reversal_accounting_document_id_accounting_documents",
+        f"fk_{table_name}_reversal_accounting_document",
         table_name,
         "accounting_documents",
         ["reversal_accounting_document_id"],
@@ -52,7 +52,7 @@ def _drop_reversal_columns(table_name: str) -> None:
         type_="foreignkey",
     )
     op.drop_constraint(
-        f"fk_{table_name}_reversal_accounting_document_id_accounting_documents",
+        f"fk_{table_name}_reversal_accounting_document",
         table_name,
         type_="foreignkey",
     )

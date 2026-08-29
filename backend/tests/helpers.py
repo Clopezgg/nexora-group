@@ -48,6 +48,34 @@ def create_account(client, *, company_id: str, code: str, name: str, account_typ
     return response.json()
 
 
+def configure_resource_posting(client, *, company_id: str, source_type: str) -> dict:
+    expense = create_account(
+        client,
+        company_id=company_id,
+        code={"FUEL": "5110", "MAINTENANCE": "5120", "LABOR": "5130"}[source_type],
+        name=f"Costo de {source_type}",
+        account_type="EXPENSE",
+    )
+    offset = create_account(
+        client,
+        company_id=company_id,
+        code="2190",
+        name="Recursos por pagar",
+        account_type="LIABILITY",
+    )
+    response = client.put(
+        f"/api/master-data/companies/{company_id}/resource-posting-configs/{source_type}",
+        json={
+            "sourceType": source_type,
+            "expenseAccountId": expense["id"],
+            "offsetAccountId": offset["id"],
+            "active": True,
+        },
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 def create_supplier(client, *, company_id: str, legal_name: str = "Proveedor de prueba") -> dict:
     response = client.post(
         "/api/procurement/suppliers",

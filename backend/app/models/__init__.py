@@ -50,6 +50,7 @@ from app.models.progress import ProgressRecord
 from app.models.project import Project
 from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
 from app.models.rate_limit import RateLimitBucket
+from app.models.resource_posting import ResourcePostingConfig
 from app.models.rfi import RequestForInformation
 from app.models.role import Role
 from app.models.safety import SafetyIncident, SafetyObservation
@@ -147,6 +148,7 @@ __all__ = [
     "Remittance",
     "RequestForInformation",
     "RequestForQuotation",
+    "ResourcePostingConfig",
     "RfqSupplier",
     "Role",
     "SafetyIncident",

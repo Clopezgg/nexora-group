@@ -131,32 +131,36 @@ def upsert_resource_posting_config(
             "active": existing.active,
         }
 
-    row = resource_posting_service.upsert_config(
-        db,
-        company_id=company_id,
-        source_type=normalized_source,
-        expense_account_id=payload.expense_account_id,
-        offset_account_id=payload.offset_account_id,
-        active=payload.active,
-        commit=False,
-    )
-    audit_service.record(
-        db,
-        actor_user_id=user.id,
-        action="accounting.resource_posting_config.upsert",
-        entity_type="accounting.resource_posting_config",
-        entity_id=row.id,
-        company_id=company_id,
-        project_id=None,
-        before=before,
-        after={
-            "sourceType": row.source_type,
-            "expenseAccountId": str(row.expense_account_id),
-            "offsetAccountId": str(row.offset_account_id),
-            "active": row.active,
-        },
-        correlation_id=correlation_id,
-    )
-    db.commit()
-    db.refresh(row)
-    return ResourcePostingConfigResponse.model_validate(row, from_attributes=True)
+    try:
+        row = resource_posting_service.upsert_config(
+            db,
+            company_id=company_id,
+            source_type=normalized_source,
+            expense_account_id=payload.expense_account_id,
+            offset_account_id=payload.offset_account_id,
+            active=payload.active,
+            commit=False,
+        )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="accounting.resource_posting_config.upsert",
+            entity_type="accounting.resource_posting_config",
+            entity_id=row.id,
+            company_id=company_id,
+            project_id=None,
+            before=before,
+            after={
+                "sourceType": row.source_type,
+                "expenseAccountId": str(row.expense_account_id),
+                "offsetAccountId": str(row.offset_account_id),
+                "active": row.active,
+            },
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        db.refresh(row)
+        return ResourcePostingConfigResponse.model_validate(row, from_attributes=True)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

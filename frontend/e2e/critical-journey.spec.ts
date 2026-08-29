@@ -18,7 +18,7 @@ const ADMIN_PASSWORD = 'NexoraAdmin123!'
 
 async function api<T = any>(
   request: APIRequestContext,
-  method: 'get' | 'post',
+  method: 'get' | 'post' | 'put',
   path: string,
   data?: unknown,
 ): Promise<T> {
@@ -87,6 +87,19 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     equityGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '3100', name: 'Aportes E2E', accountType: 'EQUITY' })).id
     revenueGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '4100', name: 'Ingresos E2E', accountType: 'REVENUE' })).id
     receivableGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '1200', name: 'CxC E2E', accountType: 'ASSET' })).id
+  })
+
+  await test.step('resource posting configuration', async () => {
+    for (const sourceType of ['FUEL', 'MAINTENANCE', 'LABOR'] as const) {
+      const config = await api<any>(
+        page.request,
+        'put',
+        `/master-data/companies/${companyId}/resource-posting-configs/${sourceType}`,
+        { sourceType, expenseAccountId: expenseGl, offsetAccountId: payableGl, active: true },
+      )
+      expect(config.sourceType).toBe(sourceType)
+      expect(config.active).toBe(true)
+    }
   })
 
   // 5. Treasury Account -> 6. CENTRAL remittance -> 7. verify GL/Treasury/context

@@ -31,3 +31,14 @@ export interface ControllingDimension {
   code: string
   name: string
 }
+
+export type ResourcePostingSource = 'FUEL' | 'MAINTENANCE' | 'LABOR'
+
+export interface ResourcePostingConfig {
+  id: string
+  companyId: string
+  sourceType: ResourcePostingSource
+  expenseAccountId: string
+  offsetAccountId: string
+  active: boolean
+}

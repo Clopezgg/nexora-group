@@ -23,7 +23,7 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
     Component: (await import('../features/treasury/AdvancedTreasuryPages')).FundRestrictionsPage,
   }),
   '/finanzas/cuentas-por-pagar': async () => ({
-    Component: (await import('../features/treasury/AccountsPayablePage')).AccountsPayablePage,
+    Component: (await import('../features/treasury/AccountsPayableWorkspace')).AccountsPayableWorkspace,
   }),
   '/finanzas/cuentas-por-cobrar': async () => ({
     Component: (await import('../features/treasury/AccountsReceivablePage')).AccountsReceivablePage,

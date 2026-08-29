@@ -105,11 +105,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite:latest
+        env:
+          AZURITE_ACCOUNTS: nexorae2e:bmV4b3JhLWUyZS1henVyaXRlLXNoYXJlZC1rZXktMDAwMQ==
+        ports:
+          - 10000:10000
     env:
       PGHOST: localhost
       PGPORT: 5432
       PGUSER: nexora
       PGPASSWORD: nexora
+      E2E_AZURE_STORAGE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=nexorae2e;AccountKey=bmV4b3JhLWUyZS1henVyaXRlLXNoYXJlZC1rZXktMDAwMQ==;BlobEndpoint=http://127.0.0.1:10000/nexorae2e;
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

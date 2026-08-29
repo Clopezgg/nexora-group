@@ -104,7 +104,7 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
     Component: (await import('../features/audit/AuditLogPage')).AuditLogPage,
   }),
   '/control/configuracion': async () => ({
-    Component: (await import('../features/settings/CompanySettingsPage')).CompanySettingsPage,
+    Component: (await import('../features/settings/CompanySettingsWorkspace')).CompanySettingsWorkspace,
   }),
   '/control/reportes': async () => ({
     Component: (await import('../features/reports/ReportsPage')).ReportsPage,

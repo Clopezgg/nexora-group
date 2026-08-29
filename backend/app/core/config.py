@@ -38,6 +38,10 @@ class Settings(BaseSettings):
 
     azure_key_vault_uri: str | None = None
     azure_storage_account_name: str | None = None
+    # Solo para desarrollo/E2E con un emulador compatible (Azurite). Producción
+    # sigue usando Managed Identity + `azure_storage_account_name`; nunca se
+    # necesita ni se commitea una connection string productiva.
+    azure_storage_connection_string: str | None = None
     applicationinsights_connection_string: str | None = None
 
     session_cookie_name: str = "nexora_session"

@@ -181,6 +181,21 @@ Housekeeping notes for whoever reads this next:
 
 ## Next priority
 
+### 2026-08-29 — PR #21 closeout y bloqueo de runner
+
+HEAD publicado: `061b0d2274ad991dc317daa18daf8880336f0f08` (será
+reemplazado por un commit documental que registra este bloqueo). PR #21
+permanece abierto contra `main`. Frontend local: typecheck, lint, 108/108
+Vitest y build verdes; backend compileall + Ruff CI verdes; Alembic tiene un
+único head `a26d4f8b91c3`.
+
+GitHub Actions CI #233 y Deploy Azure #142 fallaron antes de iniciar y sus
+reintentos reprodujeron 0 steps/0 logs. La anotación visible en backend,
+frontend, E2E, Bicep y what-if dice que pagos recientes de la cuenta fallaron
+o que debe aumentarse el spending limit. **BLOQUEADO EXTERNO:** corregir
+Billing & plans y reintentar el run del HEAD actual. No fusionar, desplegar ni
+eliminar ramas hasta obtener ejecución real verde.
+
 RESOLVED this session — do not re-do any of these: `DEFERRED-FINAL-016`
 (AP → Approval Inbox), General Ledger audit instrumentation, real AP
 accrued/paid in Budget vs Actual (`NXR-REQ-0034`/`0035`), the

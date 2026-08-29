@@ -264,3 +264,10 @@ certificar el 100%.
   up`) no puede ejecutarse localmente. La aplicación está verificada con
   PostgreSQL nativo (Homebrew). Para cerrar este item: instalar Docker
   Desktop en macOS y ejecutar `docker compose up` desde la raíz del repo.
+- `EXTERNAL-BLOCKER-003` — **BLOQUEADO EXTERNO (2026-08-29): facturación
+  de GitHub Actions.** CI run #233 y Deploy Azure run #142, incluidos sus
+  reintentos, no iniciaron ningún step. GitHub muestra en cada anotación:
+  “The job was not started because recent account payments have failed or
+  your spending limit needs to be increased.” Debe resolverse el pago o
+  límite en Billing & plans y reintentarse el mismo HEAD. Hasta entonces no
+  se permite merge, deploy final ni limpieza de ramas.

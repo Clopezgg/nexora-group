@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -51,3 +51,7 @@ class CustomerReceiptResponse(CamelModel):
     amount: Decimal
     receipt_date: date
     accounting_document_id: uuid.UUID
+    reversal_accounting_document_id: uuid.UUID | None = None
+    reversed_at: datetime | None = None
+    reversed_by_user_id: uuid.UUID | None = None
+    reversal_reason: str | None = None

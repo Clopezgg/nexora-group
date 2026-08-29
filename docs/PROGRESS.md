@@ -161,9 +161,9 @@ aislado del clon de integración). Evidencia real:
   Idempotency + catálogo completo de invariantes §130 con dueño asignado
   por invariante) y `docs/RBAC.md` (contrato del motor de permisos)
   creados.
-- **Desviaciones**: `project_scope` existe en el modelo `RolePermission`
-  pero no se aplica en ningún endpoint todavía (documentado en
-  `docs/RBAC.md` para el próximo track que lo necesite). Dimensiones
+- **Desviación histórica resuelta (2026-08-29)**: `project_scope` ya se
+  aplica como ANY/OWN/NONE en servidor, incluyendo listas, acceso directo,
+  JSON anidado, IDs indirectos y multipart Evidence. Dimensiones
   contables sin tabla propia (supplier/customer/asset/warehouse) viven en
   `JournalLine.extra_dimensions` (JSONB) como deuda intencional hasta que
   el track dueño cree la entidad real (documentado en `docs/ACCOUNTING.md`).
@@ -2040,8 +2040,9 @@ invoice has any payment/collection against it. Both `source_type`s are
 shared with a second `document_type_code` (`PAY`/`REC`) for the
 payment/receipt posting itself — reversing *those* is explicitly
 rejected for now (`InvalidInvoiceStateError`) rather than silently
-leaving inconsistent state; recorded as `DEFERRED-FINAL-018`, not
-ignored. `asset_service`/`procurement_service` post with their own
+leaving inconsistent state; this historical limitation was resolved by
+the formal AP payment and AR receipt reversal flows in the PR #21
+closeout. `asset_service`/`procurement_service` post with their own
 `source_type` and have no hook registered yet either — same entry.
 
 Verification: `cd backend && ./.venv/bin/pytest -q` → 267/267 (+3 tests);

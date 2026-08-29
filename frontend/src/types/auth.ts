@@ -19,6 +19,7 @@ export interface CurrentUser {
   email: string
   fullName: string
   roles: RoleName[]
+  permissions: string[]
 }
 
 export interface LoginPayload {

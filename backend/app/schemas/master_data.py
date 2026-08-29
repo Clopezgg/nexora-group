@@ -81,3 +81,22 @@ class UserResponse(CamelModel):
     email: str
     full_name: str
     roles: list[str]
+
+
+ResourcePostingSource = Literal["FUEL", "MAINTENANCE", "LABOR"]
+
+
+class ResourcePostingConfigRequest(CamelModel):
+    source_type: ResourcePostingSource
+    expense_account_id: uuid.UUID
+    offset_account_id: uuid.UUID
+    active: bool = True
+
+
+class ResourcePostingConfigResponse(CamelModel):
+    id: uuid.UUID
+    company_id: uuid.UUID
+    source_type: ResourcePostingSource
+    expense_account_id: uuid.UUID
+    offset_account_id: uuid.UUID
+    active: bool

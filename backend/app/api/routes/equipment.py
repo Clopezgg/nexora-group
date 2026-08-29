@@ -20,7 +20,7 @@ from app.schemas.equipment import (
     MaintenancePlanResponse,
 )
 from app.services import audit_service, equipment_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import accessible_project_ids, assert_company_access, require_permission
 
 router = APIRouter(prefix="/equipment", tags=["equipment"])
 
@@ -87,10 +87,16 @@ def list_equipment(
     assert_company_access(
         db, user_id=user.id, resource="equipment.equipment", action="read", company_id=company_id
     )
-    return [
-        EquipmentResponse.model_validate(item, from_attributes=True)
-        for item in equipment_service.list_equipment(db, company_id=company_id)
-    ]
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="equipment.equipment", action="read"
+    )
+    items = equipment_service.list_equipment(db, company_id=company_id)
+    if allowed is not None:
+        allowed_set = set(allowed)
+        items = [
+            item for item in items if item.project_id is None or item.project_id in allowed_set
+        ]
+    return [EquipmentResponse.model_validate(item, from_attributes=True) for item in items]
 
 
 @router.get("/{equipment_id}", response_model=EquipmentResponse)
@@ -243,11 +249,7 @@ def list_maintenance_plans(
 ) -> list[MaintenancePlanResponse]:
     equipment = _resolve_equipment(db, equipment_id)
     assert_company_access(
-        db,
-        user_id=user.id,
-        resource="equipment.maintenance_plan",
-        action="read",
-        company_id=equipment.company_id,
+        db, user_id=user.id, resource="equipment.maintenance_plan", action="read", company_id=equipment.company_id
     )
     return [
         MaintenancePlanResponse.model_validate(plan, from_attributes=True)
@@ -308,11 +310,7 @@ def list_maintenance_orders(
 ) -> list[MaintenanceOrderResponse]:
     equipment = _resolve_equipment(db, equipment_id)
     assert_company_access(
-        db,
-        user_id=user.id,
-        resource="equipment.maintenance_order",
-        action="read",
-        company_id=equipment.company_id,
+        db, user_id=user.id, resource="equipment.maintenance_order", action="read", company_id=equipment.company_id
     )
     return [
         MaintenanceOrderResponse.model_validate(order, from_attributes=True)

@@ -20,7 +20,7 @@ from app.schemas.workforce import (
     WorkerResponse,
 )
 from app.services import audit_service, workforce_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import accessible_project_ids, assert_company_access, require_permission
 
 router = APIRouter(prefix="/workforce", tags=["workforce"])
 
@@ -134,10 +134,16 @@ def list_time_entries(
     assert_company_access(
         db, user_id=user.id, resource="workforce.time_entry", action="read", company_id=company_id
     )
-    return [
-        TimeEntryResponse.model_validate(entry, from_attributes=True)
-        for entry in workforce_service.list_time_entries(db, company_id=company_id)
-    ]
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="workforce.time_entry", action="read"
+    )
+    entries = workforce_service.list_time_entries(db, company_id=company_id)
+    if allowed is not None:
+        allowed_set = set(allowed)
+        entries = [
+            entry for entry in entries if entry.project_id is None or entry.project_id in allowed_set
+        ]
+    return [TimeEntryResponse.model_validate(entry, from_attributes=True) for entry in entries]
 
 
 @router.post("/time-entries/{time_entry_id}/approve", response_model=TimeEntryResponse)
@@ -247,10 +253,14 @@ def list_crews(
     assert_company_access(
         db, user_id=user.id, resource="workforce.crew", action="read", company_id=company_id
     )
-    return [
-        CrewResponse.model_validate(crew, from_attributes=True)
-        for crew in workforce_service.list_crews(db, company_id=company_id)
-    ]
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="workforce.crew", action="read"
+    )
+    crews = workforce_service.list_crews(db, company_id=company_id)
+    if allowed is not None:
+        allowed_set = set(allowed)
+        crews = [crew for crew in crews if crew.project_id is None or crew.project_id in allowed_set]
+    return [CrewResponse.model_validate(crew, from_attributes=True) for crew in crews]
 
 
 @router.get("/crews/{crew_id}", response_model=CrewWithMembersResponse)

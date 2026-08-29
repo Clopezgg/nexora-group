@@ -10,6 +10,7 @@ from app.api.edit_access_guard import register_edit_access_guard
 from app.api.error_handlers import register_error_handlers
 from app.api.security_headers import register_security_headers
 from app.api.routes import (
+    access_management,
     accounting,
     ap,
     approvals,
@@ -25,6 +26,7 @@ from app.api.routes import (
     edit_access,
     equipment,
     evidence,
+    financial_reversals,
     fiscal,
     health,
     inventory,
@@ -45,6 +47,7 @@ from app.api.routes import (
     submittals,
     suppliers,
     treasury,
+    treasury_advanced,
     workforce,
 )
 from app.core.config import get_settings
@@ -123,6 +126,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(context.router, prefix="/api")
     app.include_router(master_data.router, prefix="/api")
+    app.include_router(access_management.router, prefix="/api")
     app.include_router(master_dimensions.router, prefix="/api")
     app.include_router(company_management.router, prefix="/api")
     app.include_router(fiscal.router, prefix="/api")
@@ -135,8 +139,10 @@ def create_app() -> FastAPI:
     app.include_router(project_budget_management.router, prefix="/api")
     app.include_router(project_extended_control.router, prefix="/api")
     app.include_router(treasury.router, prefix="/api")
+    app.include_router(treasury_advanced.router, prefix="/api")
     app.include_router(ap.router, prefix="/api")
     app.include_router(ar.router, prefix="/api")
+    app.include_router(financial_reversals.router, prefix="/api")
     app.include_router(assets.router, prefix="/api")
     app.include_router(equipment.router, prefix="/api")
     app.include_router(workforce.router, prefix="/api")

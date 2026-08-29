@@ -22,7 +22,14 @@ param secretKey string = ''
 @description('Password del admin de bootstrap (vacío = no se crea el secreto)')
 param bootstrapAdminPassword string = ''
 
-// Nombre <= 24 caracteres, alfanumérico + guiones.
+@secure()
+@description('Salt PBKDF2 de Protected Edit en base64url. Vacío = secreto no creado.')
+param editAccessTokenSalt string = ''
+
+@secure()
+@description('Digest PBKDF2 de Protected Edit en base64url. Vacío = secreto no creado.')
+param editAccessTokenDigest string = ''
+
 var keyVaultName = '${namePrefix}-kv-${uniqueSuffix}'
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
@@ -67,6 +74,22 @@ resource secretBootstrapAdminPassword 'Microsoft.KeyVault/vaults/secrets@2023-07
   name: 'bootstrap-admin-password'
   properties: {
     value: bootstrapAdminPassword
+  }
+}
+
+resource secretEditAccessTokenSalt 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(editAccessTokenSalt)) {
+  parent: keyVault
+  name: 'edit-access-token-salt'
+  properties: {
+    value: editAccessTokenSalt
+  }
+}
+
+resource secretEditAccessTokenDigest 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(editAccessTokenDigest)) {
+  parent: keyVault
+  name: 'edit-access-token-digest'
+  properties: {
+    value: editAccessTokenDigest
   }
 }
 

@@ -17,7 +17,12 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { fiscalService } from '../../services/fiscalService'
 import { masterDataService } from '../../services/masterDataService'
 import type { FiscalPeriod, FiscalPeriodStatus, FiscalYear } from '../../types/fiscal'
-import type { Company } from '../../types/masterData'
+import type {
+  Account,
+  Company,
+  ResourcePostingConfig,
+  ResourcePostingSource,
+} from '../../types/masterData'
 import { statusLabel } from '../../utils/statusLabels'
 
 function CompanyProfileForm({ company }: { company: Company }) {
@@ -81,6 +86,123 @@ function CompanyProfileForm({ company }: { company: Company }) {
       {updateMutation.isSuccess ? <p className="nx-field__hint" role="status">Cambios guardados.</p> : null}
       {updateMutation.isError ? <p className="nx-field__error" role="alert">{(updateMutation.error as Error).message}</p> : null}
     </form>
+  )
+}
+
+const RESOURCE_POSTING_SOURCES: Array<{ source: ResourcePostingSource; label: string; detail: string }> = [
+  { source: 'FUEL', label: 'Combustible', detail: 'Contabiliza cada registro de combustible como FUE.' },
+  { source: 'MAINTENANCE', label: 'Mantenimiento', detail: 'Contabiliza el costo total al cerrar una orden como MNT.' },
+  { source: 'LABOR', label: 'Mano de obra', detail: 'Contabiliza el costo calculado al aprobar horas como LAB.' },
+]
+
+function ResourcePostingRow({
+  companyId,
+  source,
+  label,
+  detail,
+  config,
+  expenseAccounts,
+  offsetAccounts,
+}: {
+  companyId: string
+  source: ResourcePostingSource
+  label: string
+  detail: string
+  config: ResourcePostingConfig | undefined
+  expenseAccounts: Account[]
+  offsetAccounts: Account[]
+}) {
+  const queryClient = useQueryClient()
+  const [expenseAccountId, setExpenseAccountId] = useState(config?.expenseAccountId ?? '')
+  const [offsetAccountId, setOffsetAccountId] = useState(config?.offsetAccountId ?? '')
+  const [active, setActive] = useState(config?.active ?? true)
+  const save = useMutation({
+    mutationFn: () => masterDataService.saveResourcePostingConfig(companyId, source, {
+      expenseAccountId,
+      offsetAccountId,
+      active,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['master-data', 'resource-posting-configs', companyId] })
+    },
+  })
+
+  return (
+    <Card title={label}>
+      <p className="nx-field__hint">{detail}</p>
+      <Select label="Cuenta de gasto (débito)" value={expenseAccountId} onChange={(event) => setExpenseAccountId(event.target.value)}>
+        <option value="">Selecciona una cuenta EXPENSE postable…</option>
+        {expenseAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}
+      </Select>
+      <Select label="Cuenta de contrapartida (crédito)" value={offsetAccountId} onChange={(event) => setOffsetAccountId(event.target.value)}>
+        <option value="">Selecciona una cuenta LIABILITY postable…</option>
+        {offsetAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}
+      </Select>
+      <label className="nx-field">
+        <span className="nx-field__label">Estado</span>
+        <select className="nx-select" value={active ? 'ACTIVE' : 'INACTIVE'} onChange={(event) => setActive(event.target.value === 'ACTIVE')}>
+          <option value="ACTIVE">Activo</option>
+          <option value="INACTIVE">Inactivo</option>
+        </select>
+      </label>
+      <div className="nx-treasury__actions">
+        <Badge tone={config?.active ? 'success' : 'neutral'}>{config ? (config.active ? 'Configurado' : 'Configurado · inactivo') : 'Configuración requerida'}</Badge>
+        <Button loading={save.isPending} disabled={!expenseAccountId || !offsetAccountId || expenseAccountId === offsetAccountId} onClick={() => save.mutate()}>
+          Guardar mapeo
+        </Button>
+      </div>
+      {save.isSuccess ? <p className="nx-field__hint" role="status">Mapeo contable guardado.</p> : null}
+      {save.isError ? <p className="nx-field__error" role="alert">{(save.error as Error).message}</p> : null}
+    </Card>
+  )
+}
+
+function ResourcePostingSettings({ companyId }: { companyId: string }) {
+  const accountsQuery = useQuery({
+    queryKey: ['master-data', 'accounts', companyId, 'resource-posting'],
+    queryFn: () => masterDataService.listAccounts(companyId),
+  })
+  const configsQuery = useQuery({
+    queryKey: ['master-data', 'resource-posting-configs', companyId],
+    queryFn: () => masterDataService.listResourcePostingConfigs(companyId),
+  })
+
+  if (accountsQuery.isLoading || configsQuery.isLoading) return <LoadingState label="Cargando configuración contable de recursos…" />
+  if (accountsQuery.isError || configsQuery.isError) {
+    return <ErrorState description="No se pudo cargar la configuración contable automática." onRetry={() => { accountsQuery.refetch(); configsQuery.refetch() }} />
+  }
+
+  const accounts = accountsQuery.data ?? []
+  const configs = configsQuery.data ?? []
+  const expenseAccounts = accounts.filter((account) => account.isPostable && account.accountType === 'EXPENSE')
+  const offsetAccounts = accounts.filter((account) => account.isPostable && account.accountType === 'LIABILITY')
+
+  return (
+    <Card title="Posting automático de recursos">
+      <p className="nx-field__hint">
+        Estas cuentas son propiedad de la compañía. NEXORA no utiliza códigos contables hardcodeados: si un origen no está configurado y activo, el evento financiero se bloquea antes de quedar sin asiento.
+      </p>
+      {expenseAccounts.length === 0 || offsetAccounts.length === 0 ? (
+        <p className="nx-field__error" role="alert">Necesitas al menos una cuenta EXPENSE y una LIABILITY postables para habilitar estos postings.</p>
+      ) : null}
+      <div className="nx-dashboard__kpi-grid">
+        {RESOURCE_POSTING_SOURCES.map(({ source, label, detail }) => {
+          const config = configs.find((item) => item.sourceType === source)
+          return (
+            <ResourcePostingRow
+              key={`${source}-${config?.id ?? 'new'}`}
+              companyId={companyId}
+              source={source}
+              label={label}
+              detail={detail}
+              config={config}
+              expenseAccounts={expenseAccounts}
+              offsetAccounts={offsetAccounts}
+            />
+          )
+        })}
+      </div>
+    </Card>
   )
 }
 
@@ -170,6 +292,8 @@ export function CompanySettingsPage() {
           <CompanyProfileForm key={selectedCompany.id} company={selectedCompany} />
         </Card>
       ) : null}
+
+      {activeCompanyId ? <ResourcePostingSettings key={activeCompanyId} companyId={activeCompanyId} /> : null}
 
       <Card title="Años fiscales">
         <p className="nx-field__hint">Crear un año fiscal no genera períodos automáticamente. Después confirma explícitamente “Generar períodos mensuales”.</p>

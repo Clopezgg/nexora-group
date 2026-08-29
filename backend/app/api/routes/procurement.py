@@ -27,7 +27,11 @@ from app.schemas.procurement import (
     ThreeWayMatchResponse,
 )
 from app.services import audit_service, procurement_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/procurement", tags=["procurement"])
 
@@ -57,6 +61,15 @@ def list_requisitions(
         db, user_id=user.id, resource="procurement.requisition", action="read", company_id=company_id
     )
     requisitions = procurement_repository.list_requisitions(db, company_id=company_id)
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="procurement.requisition", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        requisitions = [
+            row for row in requisitions
+            if row.project_id is None or row.project_id in allowed_set
+        ]
     return [_requisition_response(db, r) for r in requisitions]
 
 
@@ -149,6 +162,24 @@ def list_rfqs(
         db, user_id=user.id, resource="procurement.rfq", action="read", company_id=company_id
     )
     rfqs = procurement_repository.list_rfqs(db, company_id=company_id)
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="procurement.rfq", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        rfqs = [
+            row for row in rfqs
+            if row.purchase_requisition_id is None
+            or (
+                (requisition := procurement_repository.get_requisition(
+                    db, row.purchase_requisition_id
+                )) is not None
+                and (
+                    requisition.project_id is None
+                    or requisition.project_id in allowed_set
+                )
+            )
+        ]
     return [RfqResponse.model_validate(rfq, from_attributes=True) for rfq in rfqs]
 
 
@@ -300,6 +331,15 @@ def list_purchase_orders(
         db, user_id=user.id, resource="procurement.purchase_order", action="read", company_id=company_id
     )
     orders = procurement_repository.list_purchase_orders(db, company_id=company_id)
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="procurement.purchase_order", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        orders = [
+            row for row in orders
+            if row.project_id is None or row.project_id in allowed_set
+        ]
     return [_purchase_order_response(db, o) for o in orders]
 
 

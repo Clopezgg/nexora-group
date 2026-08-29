@@ -12,7 +12,7 @@ from app.schemas.document import (
     DocumentVersionResponse,
 )
 from app.services import audit_service, document_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import accessible_project_ids, assert_company_access, require_permission
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -72,10 +72,18 @@ def list_documents(
     assert_company_access(
         db, user_id=user.id, resource="document.document", action="read", company_id=company_id
     )
-    return [
-        DocumentResponse.model_validate(d, from_attributes=True)
-        for d in document_service.list_documents(db, company_id=company_id, project_id=project_id)
-    ]
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="document.document", action="read"
+    )
+    documents = document_service.list_documents(db, company_id=company_id, project_id=project_id)
+    if allowed is not None:
+        allowed_set = set(allowed)
+        documents = [
+            document
+            for document in documents
+            if document.project_id is None or document.project_id in allowed_set
+        ]
+    return [DocumentResponse.model_validate(document, from_attributes=True) for document in documents]
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)

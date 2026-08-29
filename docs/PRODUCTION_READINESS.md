@@ -13,6 +13,18 @@ The earlier Azure authorization/provisioning blocker is no longer current.
 
 Do not interpret historical BLOCKED/NOT_STARTED language below as the current Azure state; it is retained as chronology.
 
+## Closeout PR #21 — 2026-08-29
+
+**IMPLEMENTADO; verificación final en curso.** La rama
+`work/nexora-final-closeout` añade Protected Edit server-side y Key Vault,
+project_scope integral, tesorería avanzada/Vouchers, posting automático
+FUEL/MAINTENANCE/LABOR, reversals AP/AR, administración de accesos y E2E de
+cierre. La certificación solo cambia a VERIFICADO después de una ejecución
+real verde de CI, merge a `main`, Deploy Azure verde y smoke autenticado de
+la revisión desplegada. Política fiscal, política FX, cuentas empresariales
+definitivas y secretos reales de Protected Edit permanecen externos y no se
+inventan.
+
 
 Este documento registra la ORDEN MAESTRA de extensión final recibida
 2026-08-25: la definición de "100%" que prevalece sobre cualquier

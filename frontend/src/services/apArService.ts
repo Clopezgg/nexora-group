@@ -5,6 +5,7 @@ export interface SupplierInvoice {
   supplierId: string
   invoiceNumber: string
   scope: string
+  projectId: string | null
   currencyCode: string
   amount: number
   taxAmount: number
@@ -13,16 +14,52 @@ export interface SupplierInvoice {
   status: string
 }
 
+export interface SupplierPayment {
+  id: string
+  supplierInvoiceId: string
+  treasuryAccountId: string
+  amount: number
+  paymentDate: string
+  accountingDocumentId: string
+  reversalAccountingDocumentId: string | null
+  reversedAt: string | null
+  reversedByUserId: string | null
+  reversalReason: string | null
+}
+
 export interface CustomerInvoice {
   id: string
   customerId: string
   invoiceNumber: string
   scope: string
+  projectId: string | null
   currencyCode: string
   amount: number
   amountCollected: number
   dueDate: string
   status: string
+}
+
+export interface CustomerReceipt {
+  id: string
+  customerInvoiceId: string
+  treasuryAccountId: string
+  amount: number
+  receiptDate: string
+  accountingDocumentId: string
+  reversalAccountingDocumentId: string | null
+  reversedAt: string | null
+  reversedByUserId: string | null
+  reversalReason: string | null
+}
+
+export interface BusinessReversalResponse {
+  originalId: string
+  invoiceId: string
+  originalAccountingDocumentId: string
+  reversalAccountingDocumentId: string
+  invoiceStatus: string
+  appliedAmountAfterReversal: number
 }
 
 function normalizeSupplierInvoice(invoice: SupplierInvoice): SupplierInvoice {
@@ -70,10 +107,17 @@ export const apService = {
       }),
     ),
   pay: (id: string, payload: Record<string, unknown>, idempotencyKey: string) =>
-    apiFetch(`/ap/supplier-invoices/${id}/payments`, {
+    apiFetch<SupplierPayment>(`/ap/supplier-invoices/${id}/payments`, {
       method: 'POST',
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(payload),
+    }),
+  listPayments: (invoiceId: string) =>
+    apiFetch<SupplierPayment[]>(`/ap/supplier-invoices/${invoiceId}/payments`),
+  reversePayment: (paymentId: string, reason: string) =>
+    apiFetch<BusinessReversalResponse>(`/ap/supplier-payments/${paymentId}/reverse`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
     }),
 }
 
@@ -98,9 +142,16 @@ export const arService = {
       await apiFetch<CustomerInvoice>(`/ar/customer-invoices/${id}/approve`, { method: 'POST' }),
     ),
   collect: (id: string, payload: Record<string, unknown>, idempotencyKey: string) =>
-    apiFetch(`/ar/customer-invoices/${id}/receipts`, {
+    apiFetch<CustomerReceipt>(`/ar/customer-invoices/${id}/receipts`, {
       method: 'POST',
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(payload),
+    }),
+  listReceipts: (invoiceId: string) =>
+    apiFetch<CustomerReceipt[]>(`/ar/customer-invoices/${invoiceId}/receipts`),
+  reverseReceipt: (receiptId: string, reason: string) =>
+    apiFetch<BusinessReversalResponse>(`/ar/customer-receipts/${receiptId}/reverse`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
     }),
 }

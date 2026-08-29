@@ -38,13 +38,62 @@ param frontendUrl string = ''
 @description('Email del admin de bootstrap (no es secreto)')
 param bootstrapAdminEmail string = ''
 
+@description('Indica si ambos secretos de Protected Edit fueron suministrados a la plantilla.')
+param editAccessConfigured bool = false
+
 var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 
-// Identidad administrada asignada por el usuario, creada ANTES del Container App.
-// Evita la dependencia circular de usar una identidad system-assigned: esa solo
-// existe una vez creado el Container App, pero el Container App necesita el rol
-// ya concedido para poder resolver los secretos de Key Vault en su creación.
+var baseSecrets = [
+  {
+    name: 'database-url'
+    keyVaultUrl: '${keyVaultUri}secrets/database-url'
+    identity: backendIdentity.id
+  }
+  {
+    name: 'secret-key'
+    keyVaultUrl: '${keyVaultUri}secrets/secret-key'
+    identity: backendIdentity.id
+  }
+  {
+    name: 'bootstrap-admin-password'
+    keyVaultUrl: '${keyVaultUri}secrets/bootstrap-admin-password'
+    identity: backendIdentity.id
+  }
+]
+
+var editAccessSecrets = editAccessConfigured ? [
+  {
+    name: 'edit-access-token-salt'
+    keyVaultUrl: '${keyVaultUri}secrets/edit-access-token-salt'
+    identity: backendIdentity.id
+  }
+  {
+    name: 'edit-access-token-digest'
+    keyVaultUrl: '${keyVaultUri}secrets/edit-access-token-digest'
+    identity: backendIdentity.id
+  }
+] : []
+
+var baseEnvironment = [
+  { name: 'APP_ENV', value: 'production' }
+  { name: 'APP_NAME', value: 'Nexora Group' }
+  { name: 'DATABASE_URL', secretRef: 'database-url' }
+  { name: 'SECRET_KEY', secretRef: 'secret-key' }
+  { name: 'BOOTSTRAP_ADMIN_PASSWORD', secretRef: 'bootstrap-admin-password' }
+  { name: 'BOOTSTRAP_ADMIN_EMAIL', value: bootstrapAdminEmail }
+  { name: 'FRONTEND_URL', value: frontendUrl }
+  { name: 'EVIDENCE_BACKEND', value: 'azure_blob' }
+  { name: 'AZURE_STORAGE_ACCOUNT_NAME', value: storageAccountName }
+  { name: 'AZURE_KEY_VAULT_URI', value: keyVaultUri }
+  { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
+]
+
+var editAccessEnvironment = editAccessConfigured ? [
+  { name: 'EDIT_ACCESS_TOKEN_SALT', secretRef: 'edit-access-token-salt' }
+  { name: 'EDIT_ACCESS_TOKEN_DIGEST', secretRef: 'edit-access-token-digest' }
+] : []
+
 resource backendIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${namePrefix}-backend-id-${environmentName}'
   location: location
@@ -61,7 +110,6 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
         sharedKey: logAnalyticsSharedKey
       }
     }
-    // zoneRedundant por defecto en false: mantiene el entorno en el tier de menor costo.
   }
 }
 
@@ -102,8 +150,6 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
       '${backendIdentity.id}': {}
     }
   }
-  // Los role assignments deben existir antes de que el Container App intente
-  // resolver los secretos de Key Vault en su primera revisión.
   dependsOn: [
     keyVaultRoleAssignment
   ]
@@ -116,23 +162,7 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
         transport: 'auto'
         allowInsecure: false
       }
-      secrets: [
-        {
-          name: 'database-url'
-          keyVaultUrl: '${keyVaultUri}secrets/database-url'
-          identity: backendIdentity.id
-        }
-        {
-          name: 'secret-key'
-          keyVaultUrl: '${keyVaultUri}secrets/secret-key'
-          identity: backendIdentity.id
-        }
-        {
-          name: 'bootstrap-admin-password'
-          keyVaultUrl: '${keyVaultUri}secrets/bootstrap-admin-password'
-          identity: backendIdentity.id
-        }
-      ]
+      secrets: concat(baseSecrets, editAccessSecrets)
       registries: []
     }
     template: {
@@ -141,29 +171,13 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'backend'
           image: backendImage
           resources: {
-            // Producción interactiva: evita starvation del API durante cargas simultáneas
-            // de dashboard, contexto, notificaciones y módulos financieros.
             cpu: json('0.5')
             memory: '1Gi'
           }
-          env: [
-            { name: 'APP_ENV', value: 'production' }
-            { name: 'APP_NAME', value: 'Nexora Group' }
-            { name: 'DATABASE_URL', secretRef: 'database-url' }
-            { name: 'SECRET_KEY', secretRef: 'secret-key' }
-            { name: 'BOOTSTRAP_ADMIN_PASSWORD', secretRef: 'bootstrap-admin-password' }
-            { name: 'BOOTSTRAP_ADMIN_EMAIL', value: bootstrapAdminEmail }
-            { name: 'FRONTEND_URL', value: frontendUrl }
-            { name: 'EVIDENCE_BACKEND', value: 'azure_blob' }
-            { name: 'AZURE_STORAGE_ACCOUNT_NAME', value: storageAccountName }
-            { name: 'AZURE_KEY_VAULT_URI', value: keyVaultUri }
-            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
-          ]
+          env: concat(baseEnvironment, editAccessEnvironment)
         }
       ]
       scale: {
-        // Mantener una réplica caliente elimina el cold start visible al usuario.
-        // La segunda réplica sigue disponible para picos sin sobredimensionar el entorno.
         minReplicas: 1
         maxReplicas: 2
       }

@@ -13,12 +13,13 @@ from app.domain.errors import (
 from app.models.equipment import EQUIPMENT_STATUSES, MAINTENANCE_TERMINAL_STATUSES, Equipment, FuelLog, MaintenanceOrder, MaintenancePlan
 from app.repositories import equipment_repository
 from app.services.financial_validation_service import assert_project_belongs_to_company
+from app.services import resource_posting_service
 
-"""Equipment / Fuel / Maintenance (orden maestra §63-64). El costo de
-combustible y mantenimiento se atribuye a Project como costo -- nunca como
-custodia de efectivo (CLAUDE.md §1); la contabilización real hacia el Posting
-Engine queda documentada como deuda intencional (docs/ENTERPRISE_RESOURCES.md) mientras
-no exista una cuenta de gasto configurable por company como en Fixed Assets."""
+"""Equipment / Fuel / Maintenance.
+
+Resource costs are posted through company-owned configurable GL mappings. No
+financial account code is embedded here; missing configuration fails closed.
+"""
 
 
 def _assert_fuel_scope(scope: str, project_id: uuid.UUID | None) -> None:
@@ -101,9 +102,7 @@ def record_fuel_log(
     project_id: uuid.UUID | None,
     commit: bool = True,
 ) -> FuelLog:
-    """`total_cost` SIEMPRE se calcula server-side (quantity * unit_cost);
-    nunca se acepta un total hardcodeado del cliente (CLAUDE.md: no hardcoded
-    financial data)."""
+    """Persist fuel usage and post its server-computed cost exactly once."""
     _assert_fuel_scope(scope, project_id)
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
     if equipment_id is not None:
@@ -124,6 +123,17 @@ def record_fuel_log(
         total_cost=total_cost,
         scope=scope,
         project_id=project_id,
+    )
+    db.flush()
+    resource_posting_service.post_resource_cost(
+        db,
+        company_id=company_id,
+        source_type="FUEL",
+        source_id=log.id,
+        amount=total_cost,
+        scope=scope,
+        project_id=project_id,
+        description=f"Combustible {log_date.isoformat()} · {vehicle_description or equipment_id or 'equipo'}",
     )
     if commit:
         db.commit()
@@ -216,9 +226,7 @@ def update_maintenance_order(
     closed_at: date | None = None,
     commit: bool = True,
 ) -> MaintenanceOrder:
-    """INV-EQP-001: un MaintenanceOrder CLOSED/CANCELLED es terminal. Se
-    rechaza CUALQUIER mutación (incluido volver a "cerrarlo") antes de tocar
-    un solo campo -- los valores persistidos quedan exactamente igual."""
+    """Close a maintenance order atomically with its GL cost accrual."""
     order = equipment_repository.get_maintenance_order(db, order_id)
     if order is None:
         raise ValueError(f"MaintenanceOrder {order_id} no existe")
@@ -240,19 +248,29 @@ def update_maintenance_order(
     if description is not None:
         order.description = description
 
+    if order.status == "CLOSED":
+        equipment = equipment_repository.get_equipment(db, order.equipment_id)
+        if equipment is None:
+            raise InvalidFinancialReferenceError("El equipo de la orden de mantenimiento no existe")
+        if equipment.status == "UNDER_MAINTENANCE":
+            equipment.status = "AVAILABLE"
+        total_cost = (Decimal(order.parts_cost) + Decimal(order.labor_cost)).quantize(Decimal("0.01"))
+        if total_cost > 0:
+            scope = "PROJECT" if equipment.project_id else "GENERAL"
+            resource_posting_service.post_resource_cost(
+                db,
+                company_id=equipment.company_id,
+                source_type="MAINTENANCE",
+                source_id=order.id,
+                amount=total_cost,
+                scope=scope,
+                project_id=equipment.project_id,
+                description=f"Mantenimiento {order.order_type} · {equipment.name}",
+            )
+
     if commit:
         db.commit()
         db.refresh(order)
-        if order.status == "CLOSED":
-            equipment = equipment_repository.get_equipment(db, order.equipment_id)
-            if equipment is not None and equipment.status == "UNDER_MAINTENANCE":
-                equipment.status = "AVAILABLE"
-                db.commit()
     else:
-        if order.status == "CLOSED":
-            equipment = equipment_repository.get_equipment(db, order.equipment_id)
-            if equipment is not None and equipment.status == "UNDER_MAINTENANCE":
-                equipment.status = "AVAILABLE"
         db.flush()
-
     return order

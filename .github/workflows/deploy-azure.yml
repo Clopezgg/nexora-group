@@ -6,6 +6,9 @@ name: Deploy Azure
 #     -> federated credential (OIDC) apuntando a este repo/rama, sin client secret.
 #   POSTGRES_ADMIN_PASSWORD, BACKEND_SECRET_KEY, BOOTSTRAP_ADMIN_PASSWORD, BOOTSTRAP_ADMIN_EMAIL
 #     -> GitHub Secrets, nunca en este archivo ni en el repo.
+#   EDIT_ACCESS_TOKEN_SALT, EDIT_ACCESS_TOKEN_DIGEST
+#     -> opcionales. Deben ser derivados fuera del repositorio y almacenados como GitHub Secrets.
+#        Si falta cualquiera de los dos, Protected Edit permanece fail-closed en el backend.
 # El token de despliegue de Static Web Apps se obtiene en tiempo de ejecución
 # mediante la sesión OIDC y se enmascara; no se almacena como secret del repo.
 #
@@ -77,7 +80,9 @@ jobs:
               postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
               backendSecretKey='${{ secrets.BACKEND_SECRET_KEY }}' \
               bootstrapAdminPassword='${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}' \
-              bootstrapAdminEmail='${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}'
+              bootstrapAdminEmail='${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}' \
+              editAccessTokenSalt='${{ secrets.EDIT_ACCESS_TOKEN_SALT }}' \
+              editAccessTokenDigest='${{ secrets.EDIT_ACCESS_TOKEN_DIGEST }}'
 
   deploy:
     name: Deploy infra + apps
@@ -132,6 +137,8 @@ jobs:
               backendSecretKey='${{ secrets.BACKEND_SECRET_KEY }}' \
               bootstrapAdminPassword='${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}' \
               bootstrapAdminEmail='${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}' \
+              editAccessTokenSalt='${{ secrets.EDIT_ACCESS_TOKEN_SALT }}' \
+              editAccessTokenDigest='${{ secrets.EDIT_ACCESS_TOKEN_DIGEST }}' \
               backendImage='${{ env.IMAGE }}'
 
       - name: Capture deployed endpoints and performance settings
@@ -139,6 +146,7 @@ jobs:
           DEPLOYMENT_NAME="nexora-deploy-${{ github.run_number }}"
           FRONTEND_HOSTNAME="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.frontendHostname.value --output tsv)"
           BACKEND_FQDN="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.backendFqdn.value --output tsv)"
+          EDIT_ACCESS_CONFIGURED="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.editAccessConfigured.value --output tsv)"
           DEPLOYED_IMAGE="$(az containerapp show --resource-group nexora-rg-dev --name nexora-backend-dev --query 'properties.template.containers[0].image' --output tsv)"
           MIN_REPLICAS="$(az containerapp show --resource-group nexora-rg-dev --name nexora-backend-dev --query 'properties.template.scale.minReplicas' --output tsv)"
           CPU="$(az containerapp show --resource-group nexora-rg-dev --name nexora-backend-dev --query 'properties.template.containers[0].resources.cpu' --output tsv)"
@@ -169,6 +177,7 @@ jobs:
             echo "- Frontend: https://$FRONTEND_HOSTNAME"
             echo "- Backend: https://$BACKEND_FQDN"
             echo "- Container: $CPU CPU / $MEMORY / minReplicas=$MIN_REPLICAS"
+            echo "- Protected Edit server secret configured: $EDIT_ACCESS_CONFIGURED"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify latest backend revision is healthy and serving

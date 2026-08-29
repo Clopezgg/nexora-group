@@ -5,9 +5,16 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.models.project import Project
+from app.models.wbs import WBSNode
 from app.schemas.document import EvidenceResponse
 from app.services import audit_service, evidence_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    assert_project_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
 
@@ -18,6 +25,32 @@ type y tamaño ANTES de tocar Azure Blob; si el storage no está configurado
 (`EVIDENCE_BACKEND` vacío en el entorno), get_evidence_container_client
 lanza EvidenceStorageNotConfigured, registrado en error_handlers.py como un
 503 real (NXR-EVIDENCE-001) -- nunca un 200 con una URL fabricada."""
+
+
+def _project_id_for_entity(
+    db: Session, *, entity_type: str | None, entity_id: uuid.UUID | None
+) -> uuid.UUID | None:
+    if entity_id is None or not entity_type:
+        return None
+    normalized = entity_type.upper()
+    if normalized == "PROJECT":
+        project = db.get(Project, entity_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Proyecto de evidencia no encontrado")
+        return project.id
+    if normalized == "WBS":
+        node = db.get(WBSNode, entity_id)
+        if node is None:
+            raise HTTPException(status_code=404, detail="WBS de evidencia no encontrado")
+        return node.project_id
+    return None
+
+
+def _evidence_visible_for_projects(db: Session, evidence, allowed: set[uuid.UUID]) -> bool:
+    project_id = _project_id_for_entity(
+        db, entity_type=evidence.entity_type, entity_id=evidence.entity_id
+    )
+    return project_id is None or project_id in allowed
 
 
 @router.post("", response_model=EvidenceResponse, status_code=201)
@@ -34,6 +67,21 @@ async def upload_evidence(
     assert_company_access(
         db, user_id=user.id, resource="document.evidence", action="create", company_id=company_id
     )
+    project_id = _project_id_for_entity(db, entity_type=entity_type, entity_id=entity_id)
+    if project_id is not None:
+        project = db.get(Project, project_id)
+        if project is None or project.company_id != company_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El contexto de evidencia no pertenece a la compañía seleccionada",
+            )
+        assert_project_access(
+            db,
+            user_id=user.id,
+            resource="document.evidence",
+            action="create",
+            project_id=project_id,
+        )
     content = await evidence_service.read_bounded_upload(file)
     evidence = None
     try:
@@ -56,7 +104,7 @@ async def upload_evidence(
             entity_type="document.evidence",
             entity_id=evidence.id,
             company_id=company_id,
-            project_id=None,
+            project_id=project_id,
             before=None,
             after={"originalFilename": evidence.original_filename, "sizeBytes": evidence.size_bytes},
             correlation_id=correlation_id,
@@ -83,17 +131,32 @@ def list_evidence(
     assert_company_access(
         db, user_id=user.id, resource="document.evidence", action="read", company_id=company_id
     )
-    return [
-        EvidenceResponse.model_validate(e, from_attributes=True)
-        for e in evidence_service.list_evidence(
+    requested_project_id = _project_id_for_entity(
+        db, entity_type=entity_type, entity_id=entity_id
+    )
+    if requested_project_id is not None:
+        assert_project_access(
             db,
-            company_id=company_id,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            offset=offset,
-            limit=limit,
+            user_id=user.id,
+            resource="document.evidence",
+            action="read",
+            project_id=requested_project_id,
         )
-    ]
+    rows = evidence_service.list_evidence(
+        db,
+        company_id=company_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        offset=offset,
+        limit=limit,
+    )
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="document.evidence", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        rows = [row for row in rows if _evidence_visible_for_projects(db, row, allowed_set)]
+    return [EvidenceResponse.model_validate(row, from_attributes=True) for row in rows]
 
 
 @router.get("/{evidence_id}", response_model=EvidenceResponse)
@@ -108,4 +171,15 @@ def get_evidence(
     assert_company_access(
         db, user_id=user.id, resource="document.evidence", action="read", company_id=evidence.company_id
     )
+    project_id = _project_id_for_entity(
+        db, entity_type=evidence.entity_type, entity_id=evidence.entity_id
+    )
+    if project_id is not None:
+        assert_project_access(
+            db,
+            user_id=user.id,
+            resource="document.evidence",
+            action="read",
+            project_id=project_id,
+        )
     return EvidenceResponse.model_validate(evidence, from_attributes=True)

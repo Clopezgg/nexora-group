@@ -146,8 +146,9 @@ session, real PostgreSQL, real commands — not inferred):
   reachable financial-invariant gap, not speculative.
   `posting_service.register_reversal_hook` (same pattern as
   `approval_service.register_decision_adapter`) fixes it for AP/AR;
-  payment/receipt reversal explicitly deferred as `DEFERRED-FINAL-018`
-  (not silently dropped). 267/267 backend tests.
+  payment/receipt reversal was historically deferred as
+  `DEFERRED-FINAL-018`; PR #21 now implements the formal AP/AR reversal
+  services, metadata, audit, history UI and E2E coverage.
 - Traceability tally after all of the above: 0 `VERIFIED`, 101
   `IMPLEMENTED`, 16 `IN_PROGRESS`, 5 `NOT_STARTED`, 2 `BLOCKED_EXTERNAL`
   across 124 rows. **This is still far from 100\% by the CANDADO FINAL
@@ -180,6 +181,21 @@ Housekeeping notes for whoever reads this next:
 
 ## Next priority
 
+### 2026-08-29 — PR #21 closeout y bloqueo de runner
+
+HEAD publicado: `061b0d2274ad991dc317daa18daf8880336f0f08` (será
+reemplazado por un commit documental que registra este bloqueo). PR #21
+permanece abierto contra `main`. Frontend local: typecheck, lint, 108/108
+Vitest y build verdes; backend compileall + Ruff CI verdes; Alembic tiene un
+único head `a26d4f8b91c3`.
+
+GitHub Actions CI #233 y Deploy Azure #142 fallaron antes de iniciar y sus
+reintentos reprodujeron 0 steps/0 logs. La anotación visible en backend,
+frontend, E2E, Bicep y what-if dice que pagos recientes de la cuenta fallaron
+o que debe aumentarse el spending limit. **BLOQUEADO EXTERNO:** corregir
+Billing & plans y reintentar el run del HEAD actual. No fusionar, desplegar ni
+eliminar ramas hasta obtener ejecución real verde.
+
 RESOLVED this session — do not re-do any of these: `DEFERRED-FINAL-016`
 (AP → Approval Inbox), General Ledger audit instrumentation, real AP
 accrued/paid in Budget vs Actual (`NXR-REQ-0034`/`0035`), the
@@ -201,8 +217,8 @@ in the future, apply the same check yourself rather than waiting for
 another audit pass. Also `NXR-REQ-0025` Corrections (commit `6cfca55`):
 `posting_service.register_reversal_hook` now syncs
 `SupplierInvoice`/`CustomerInvoice` status when their accrual is
-reversed — see `DEFERRED-FINAL-018` for the explicitly-scoped-out
-payment/receipt-reversal follow-up. Also `NXR-REQ-0006` Tax architecture
+reversed. The formerly scoped-out payment/receipt follow-up
+(`DEFERRED-FINAL-018`) is implemented in PR #21. Also `NXR-REQ-0006` Tax architecture
 (commit `66cebf1`): `TaxCode`/`TaxLine` were pure unused scaffolding
 (model only, no service, no API, nothing ever created one or called
 `post_manual` with `tax_lines`) — now `tax_service.create_tax_code`/

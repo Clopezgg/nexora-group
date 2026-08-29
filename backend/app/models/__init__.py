@@ -21,6 +21,7 @@ from app.models.crm import Customer, Lead, Opportunity, Quotation, SalesContract
 from app.models.currency import Currency, ExchangeRate
 from app.models.document import Document, DocumentVersion
 from app.models.document_type import DocumentType
+from app.models.edit_access import EditAccessCapability, EditAccessEvent
 from app.models.equipment import Equipment, FuelLog, MaintenanceOrder, MaintenancePlan
 from app.models.evidence import Evidence
 from app.models.fiscal import FiscalPeriod, FiscalYear
@@ -29,7 +30,7 @@ from app.models.inventory import PhysicalCount, PhysicalCountLine, StockLedgerEn
 from app.models.item import Item
 from app.models.notification import Notification
 from app.models.number_sequence import NumberSequence
-from app.models.permission import Permission, RolePermission, UserCompanyAccess
+from app.models.permission import Permission, RolePermission, UserCompanyAccess, UserProjectAccess
 from app.models.procurement import (
     GoodsReceipt,
     GoodsReceiptLine,
@@ -49,6 +50,7 @@ from app.models.progress import ProgressRecord
 from app.models.project import Project
 from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
 from app.models.rate_limit import RateLimitBucket
+from app.models.resource_posting import ResourcePostingConfig
 from app.models.rfi import RequestForInformation
 from app.models.role import Role
 from app.models.safety import SafetyIncident, SafetyObservation
@@ -106,6 +108,8 @@ __all__ = [
     "DocumentType",
     "DocumentVersion",
     "EconomicCategory",
+    "EditAccessCapability",
+    "EditAccessEvent",
     "Equipment",
     "Evidence",
     "ExchangeRate",
@@ -144,6 +148,7 @@ __all__ = [
     "Remittance",
     "RequestForInformation",
     "RequestForQuotation",
+    "ResourcePostingConfig",
     "RfqSupplier",
     "Role",
     "SafetyIncident",
@@ -169,6 +174,7 @@ __all__ = [
     "TreasuryTransfer",
     "User",
     "UserCompanyAccess",
+    "UserProjectAccess",
     "UserContext",
     "UserRole",
     "Warehouse",

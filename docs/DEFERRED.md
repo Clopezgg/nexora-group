@@ -62,27 +62,20 @@ certificar el 100%.
   contables (origen en moneda A, destino en moneda B con ganancia/pérdida
   cambiaria). Esto es un feature completo, no un bug. Documentado para
   que futuras sesiones lo implementen cuando el negocio lo requiera.
-- `DEFERRED-FINAL-006` — **Test coverage gap registrado.** La UI de
-  reconciliación bancaria, cierres de caja, restricciones de fondos y
-  generación de comprobantes no tiene pantallas dedicadas en el frontend;
-  el backend cubre estos flujos a nivel API. Para cerrar este gap se
-  necesita: (a) `ReconciliationPage.tsx` con matching automático/manual
-  de transacciones bancarias contra journal lines, (b)
-  `CashClosingPage.tsx` para cierres de caja por treasury account, (c)
-  `FundRestrictionsPage.tsx` para configurar reglas de restricción.
-  Cada uno es una pantalla nueva con su test. El backend ya soporta los
-  endpoints necesarios; el gap es puramente UI/E2E.
-- `DEFERRED-FINAL-007` — **Feature diferido registrado.** El posting a GL
-  de bitácoras de combustible, costos de mantenimiento y costos de mano
-  de obra requiere: (a) cuentas de gasto configurables por company para
-  combustible/mantenimiento/labor (hoy solo existe para depreciation de
-  activos fijos), (b) llamadas a `posting_service.register()` desde
-  `equipment_service.record_fuel_log`,
-  `equipment_service.close_maintenance_order` y
-  `workforce_service.approve_time_entry`, (c) tests RED/Green para cada
-  posting. La arquitectura ya está preparada (el Posting Engine acepta
-  cualquier `source_type`); lo que falta es la configuración de cuentas
-  y la integración en los services.
+- ~~`DEFERRED-FINAL-006`~~ — **IMPLEMENTADO, pendiente de verificación CI
+  final (2026-08-29).** Existen pantallas reales dedicadas para
+  conciliación bancaria, cierres de caja, restricciones de fondos y
+  comprobantes; incluyen matching/unmatch/exclusión, aprobación de cierre,
+  disponibilidad/restricciones, selector de documento contable y descarga
+  PDF autenticada. El Critical Journey de cierre cubre los cuatro flujos
+  contra backend y PostgreSQL reales.
+- ~~`DEFERRED-FINAL-007`~~ — **IMPLEMENTADO, pendiente de verificación CI
+  final (2026-08-29).** FUEL, MAINTENANCE y LABOR usan configuración
+  contable por compañía (`ResourcePostingConfig`), validan pertenencia y
+  tipo de cuenta, postean mediante Posting Engine y enlazan el origen con
+  `AccountingSourceLink`. La restricción única por source da idempotencia;
+  si falta configuración activa el sistema falla cerrado sin inventar
+  cuentas.
 - `DEFERRED-FINAL-008` — **RESUELTO (2026-08-25, Track D Task 2,
   `track/d-workforce-ui`).** Workforce/Time todavía no tenía pantalla de
   frontend (backend/API/RBAC/tests ya estaban completos). Ahora existen
@@ -253,41 +246,28 @@ certificar el 100%.
   El warning de chunk size del build frontend (500 kB) y el
   index-signature cosmético del CSV quedan como items de performance
   menores para certificación, no son DEFERRED funcionales.
-- `DEFERRED-FINAL-018` — **Diseño registrado, no implementable localmente.**
-  Revertir un pago (`PAY`) o recibo (`REC`) requiere: (a)
-  `ap_service.reverse_payment(db, payment_id, reason)` que valide estado,
-  reduzca `amount_paid`, reabra la factura al estado correspondiente
-  (PARTIAL_PAID → APPROVED si se revierte el pago completo), y cree un
-  reversal contable; (b) `ar_service.reverse_receipt` equivalente para
-  AR; (c) hooks registrados en `posting_service` para `PAY`/`REC` que
-  llamen a estos servicios. Actualmente se rechaza explícitamente
-  (`InvalidInvoiceStateError`, 409) porque no existe caller en
-  producción que lo necesite. Cuando un dominio requiera esta capacidad,
-  construir los servicios con el mismo criterio de validación que los
-  hooks existentes de `SIN`/`CIN`. `asset_service`/`procurement_service`
-  (`DepreciationEntry`, `goods_receipt`) están en la misma situación:
-  sin hook de reversal registrado porque ningún caller lo ha necesitado.
-  corresponda) en vez de ampliar el hook existente a ciegas.
-  `asset_service`/`procurement_service` (`DepreciationEntry`,
-  `goods_receipt`) también postean con `source_type` propio y no tienen
-  hook de reversal registrado todavía -- mismo patrón, sin caller
-  reachable que lo haya necesitado en esta sesión; revisar si Enterprise
-  Resources/Procurement construyen un flujo de reversal para esos
-  documentos antes de asumir que ya está cubierto.
+- ~~`DEFERRED-FINAL-018`~~ — **IMPLEMENTADO, pendiente de verificación CI
+  final (2026-08-29).** AP conserva `SupplierPayment` y AR conserva
+  `CustomerReceipt`; ambos crean el asiento inverso, guardan motivo,
+  usuario, fecha y documento reverso, restauran monto y estado de factura,
+  rechazan doble reversal y registran auditoría. Las páginas separadas de
+  AP y Collections muestran historial, estado reversado y modal de motivo;
+  el Critical Journey ejecuta ambos reversals y comprueba la restauración.
 
 ## Bloqueos externos
 
-- `EXTERNAL-BLOCKER-001` — Los recursos de Azure (PostgreSQL Flexible
-  Server, Container Apps, Static Web Apps, Storage, Key Vault) todavía NO
-  están desplegados. La suscripción está ACTIVE, el resource group
-  bootstrap y GitHub OIDC están configurados, `az bicep build` y
-  `what-if` pasan. No ejecutar `az deployment ... create` (ni acción
-  equivalente que aprovisione recursos facturables) sin una confirmación
-  explícita puntual del usuario (`CLAUDE.md` §11.1). API Management NO debe
-  crearse. Revisar el sizing DEV cost-conscious (tier B1ms de PostgreSQL)
-  antes de ese deploy.
+- ~~`EXTERNAL-BLOCKER-001`~~ — **RESUELTO históricamente.** Azure DEV ya
+  existe y sirve frontend + API same-origin. La ejecución final de Deploy
+  Azure se certifica después de fusionar PR #21; no se crea APIM.
 - `EXTERNAL-BLOCKER-002` — Docker no está instalado en la máquina de
   desarrollo. `DEFERRED-FINAL-DOCKER-001` (verificación de `docker compose
   up`) no puede ejecutarse localmente. La aplicación está verificada con
   PostgreSQL nativo (Homebrew). Para cerrar este item: instalar Docker
   Desktop en macOS y ejecutar `docker compose up` desde la raíz del repo.
+- `EXTERNAL-BLOCKER-003` — **BLOQUEADO EXTERNO (2026-08-29): facturación
+  de GitHub Actions.** CI run #233 y Deploy Azure run #142, incluidos sus
+  reintentos, no iniciaron ningún step. GitHub muestra en cada anotación:
+  “The job was not started because recent account payments have failed or
+  your spending limit needs to be increased.” Debe resolverse el pago o
+  límite en Billing & plans y reintentarse el mismo HEAD. Hasta entonces no
+  se permite merge, deploy final ni limpieza de ramas.

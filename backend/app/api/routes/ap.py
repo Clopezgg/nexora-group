@@ -15,6 +15,7 @@ from app.schemas.ap import (
 )
 from app.services import ap_service, audit_service, idempotency_service
 from app.services.permission_service import (
+    accessible_project_ids,
     assert_company_access,
     require_permission,
     user_has_any_company_scope,
@@ -111,9 +112,20 @@ def list_supplier_invoices(
         action="read",
         company_id=company_id,
     )
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="ap.supplier_invoice", action="read"
+    )
+    invoices = ap_service.list_supplier_invoices(db, company_id=company_id)
+    if allowed is not None:
+        allowed_set = set(allowed)
+        invoices = [
+            invoice
+            for invoice in invoices
+            if invoice.project_id is None or invoice.project_id in allowed_set
+        ]
     return [
         SupplierInvoiceResponse.model_validate(invoice, from_attributes=True)
-        for invoice in ap_service.list_supplier_invoices(db, company_id=company_id)
+        for invoice in invoices
     ]
 
 

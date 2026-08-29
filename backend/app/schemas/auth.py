@@ -16,3 +16,4 @@ class CurrentUserResponse(CamelModel):
     email: EmailStr
     full_name: str
     roles: list[str]
+    permissions: list[str]

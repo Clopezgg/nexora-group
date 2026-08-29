@@ -7,12 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
-# Motor de permisos central (ver docs/RBAC.md). company_scope/project_scope
-# determinan si el permiso aplica a CUALQUIER company/project o solo a
-# los que el usuario tiene asignados explícitamente vía UserCompanyAccess
-# (ver permission_service.py). "conditions" es un JSONB abierto para reglas
-# adicionales que un módulo de dominio pueda necesitar (p.ej. límites de
-# monto) sin tener que alterar el esquema del motor.
 SCOPE_ANY = "ANY"
 SCOPE_OWN = "OWN"
 SCOPE_NONE = "NONE"
@@ -47,8 +41,7 @@ class RolePermission(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 class UserCompanyAccess(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Compañías a las que un usuario tiene acceso explícito. Usado por
-    company_scope=OWN y por el aislamiento de company (INV-COMP-001)."""
+    """Compañías asignadas explícitamente cuando company_scope=OWN."""
 
     __tablename__ = "user_company_access"
     __table_args__ = (
@@ -60,4 +53,30 @@ class UserCompanyAccess(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
+    )
+
+
+class UserProjectAccess(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Proyectos asignados explícitamente cuando project_scope=OWN.
+
+    La pertenencia de cada proyecto a una compañía sigue siendo autoridad del
+    modelo Project; esta tabla nunca reemplaza el aislamiento por compañía.
+    """
+
+    __tablename__ = "user_project_access"
+    __table_args__ = (
+        UniqueConstraint("user_id", "project_id", name="uq_user_project_access_user_project"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )

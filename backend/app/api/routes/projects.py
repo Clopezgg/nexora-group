@@ -32,7 +32,13 @@ from app.schemas.project_control import (
 )
 from app.services import audit_service, budget_service, forecast_service
 from app.services.financial_validation_service import assert_evidence_belongs_to_company
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    assert_project_access,
+    grant_project_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -76,6 +82,12 @@ def list_projects(
 ) -> list[ProjectResponse]:
     assert_company_access(db, user_id=user.id, resource="project", action="read", company_id=company_id)
     projects = project_repository.list_projects_for_company(db, company_id)
+    allowed_project_ids = accessible_project_ids(
+        db, user_id=user.id, resource="project", action="read"
+    )
+    if allowed_project_ids is not None:
+        allowed = set(allowed_project_ids)
+        projects = [project for project in projects if project.id in allowed]
     return [ProjectResponse.model_validate(project, from_attributes=True) for project in projects]
 
 
@@ -104,6 +116,10 @@ def create_project(
         description=payload.description,
     )
     db.flush()
+    # The creator must be able to continue operating the project when their
+    # role has project_scope=OWN. Administrator/ANY can also carry the row;
+    # it never grants a permission by itself.
+    grant_project_access(db, user_id=user.id, project_id=project.id)
     audit_service.record(
         db,
         actor_user_id=user.id,
@@ -479,6 +495,13 @@ def submit_change_order(
     assert_company_access(
         db, user_id=user.id, resource="project.change_order", action="submit", company_id=project.company_id
     )
+    assert_project_access(
+        db,
+        user_id=user.id,
+        resource="project.change_order",
+        action="submit",
+        project_id=project.id,
+    )
     if change_order.status != "DRAFT":
         raise HTTPException(status_code=409, detail=f"Solo se puede enviar una ChangeOrder en DRAFT (actual: {change_order.status})")
     before_status = change_order.status
@@ -513,6 +536,13 @@ def approve_change_order(
     project = _get_project_or_404(db, change_order.project_id)
     assert_company_access(
         db, user_id=user.id, resource="project.change_order", action="approve", company_id=project.company_id
+    )
+    assert_project_access(
+        db,
+        user_id=user.id,
+        resource="project.change_order",
+        action="approve",
+        project_id=project.id,
     )
     before_status = change_order.status
     budget = budget_service.approve_change_order(db, change_order_id=change_order_id, approved_by=user.id, commit=False)

@@ -1,7 +1,7 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -14,7 +14,12 @@ from app.schemas.accounting import (
     JournalLineResponse,
 )
 from app.services import audit_service, posting_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    assert_project_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
@@ -48,6 +53,94 @@ def _to_response(document: AccountingDocument, lines: list[JournalLine]) -> Jour
 def _get_lines(db: Session, document_id: uuid.UUID) -> list[JournalLine]:
     stmt = select(JournalLine).where(JournalLine.accounting_document_id == document_id)
     return list(db.execute(stmt).scalars())
+
+
+def _assert_document_project_access(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    resource: str,
+    action: str,
+    document: AccountingDocument,
+    lines: list[JournalLine] | None = None,
+) -> None:
+    project_ids = {document.project_id} if document.project_id is not None else set()
+    for line in lines if lines is not None else _get_lines(db, document.id):
+        if line.project_id is not None:
+            project_ids.add(line.project_id)
+    for project_id in project_ids:
+        assert_project_access(
+            db,
+            user_id=user_id,
+            resource=resource,
+            action=action,
+            project_id=project_id,
+        )
+
+
+def _project_scoped_document_query(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    resource: str,
+    action: str,
+):
+    allowed = accessible_project_ids(
+        db,
+        user_id=user_id,
+        resource=resource,
+        action=action,
+    )
+    if allowed is None:
+        return None
+
+    unauthorized_line = exists(
+        select(JournalLine.id).where(
+            JournalLine.accounting_document_id == AccountingDocument.id,
+            JournalLine.project_id.is_not(None),
+            JournalLine.project_id.not_in(allowed),
+        )
+    )
+    return and_(
+        or_(
+            AccountingDocument.project_id.is_(None),
+            AccountingDocument.project_id.in_(allowed),
+        ),
+        ~unauthorized_line,
+    )
+
+
+@router.get("/journal-entries", response_model=list[JournalEntryResponse])
+def list_journal_entries(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=100, ge=1, le=250),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("accounting.journal_entry", "read")),
+) -> list[JournalEntryResponse]:
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="accounting.journal_entry",
+        action="read",
+        company_id=company_id,
+    )
+    stmt = select(AccountingDocument).where(AccountingDocument.company_id == company_id)
+    project_filter = _project_scoped_document_query(
+        db,
+        user_id=user.id,
+        resource="accounting.journal_entry",
+        action="read",
+    )
+    if project_filter is not None:
+        stmt = stmt.where(project_filter)
+    if status_filter:
+        stmt = stmt.where(AccountingDocument.status == status_filter.upper())
+    stmt = stmt.order_by(
+        AccountingDocument.posted_at.desc(), AccountingDocument.created_at.desc()
+    ).limit(limit)
+    documents = list(db.execute(stmt).scalars())
+    return [_to_response(document, _get_lines(db, document.id)) for document in documents]
 
 
 @router.post("/journal-entries", response_model=JournalEntryResponse, status_code=201)
@@ -118,7 +211,16 @@ def get_journal_entry(
         action="read",
         company_id=document.company_id,
     )
-    return _to_response(document, _get_lines(db, document.id))
+    lines = _get_lines(db, document.id)
+    _assert_document_project_access(
+        db,
+        user_id=user.id,
+        resource="accounting.journal_entry",
+        action="read",
+        document=document,
+        lines=lines,
+    )
+    return _to_response(document, lines)
 
 
 @router.post("/journal-entries/{document_id}/reverse", response_model=JournalEntryResponse)
@@ -138,6 +240,13 @@ def reverse_journal_entry(
         resource="accounting.journal_entry",
         action="reverse",
         company_id=document.company_id,
+    )
+    _assert_document_project_access(
+        db,
+        user_id=user.id,
+        resource="accounting.journal_entry",
+        action="reverse",
+        document=document,
     )
     before_status = document.status
     reversal = posting_service.reverse_document(db, document_id=document_id, reason=payload.reason)

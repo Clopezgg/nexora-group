@@ -19,13 +19,14 @@ let editCapability = ''
 
 async function api<T = any>(
   request: APIRequestContext,
-  method: 'get' | 'post' | 'put',
+  method: 'get' | 'post' | 'put' | 'patch' | 'delete',
   path: string,
   data?: unknown,
 ): Promise<T> {
+  const protectedMutation = method === 'put' || method === 'patch' || method === 'delete'
   const options = {
     ...(data !== undefined ? { data } : {}),
-    ...(method === 'put' && editCapability
+    ...(protectedMutation && editCapability
       ? { headers: { 'X-Nexora-Edit-Access': editCapability } }
       : {}),
   }
@@ -38,7 +39,6 @@ async function api<T = any>(
 test.describe.configure({ mode: 'serial' })
 
 test('Critical Journey: login through GL/reports/audit, one continuous real recorrido', async ({ page }) => {
-  // 1. login
   await test.step('login', async () => {
     await page.goto('/login')
     await page.getByLabel('Correo electrónico').fill(ADMIN_EMAIL)
@@ -47,7 +47,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await expect(page).toHaveURL(/\/inicio/, { timeout: 15_000 })
   })
 
-  // 2. company/context -> 3. project -> ActiveUIContext
   let companyId = ''
   let projectId = ''
   await test.step('company + project + ActiveUIContext', async () => {
@@ -59,12 +58,10 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
 
     await page.goto('/proyectos')
     await expect(page.getByText('Nuevo proyecto')).toBeVisible({ timeout: 10_000 })
-
     await page.getByLabel('Nombre', { exact: true }).fill('Torre Critical Journey')
     await page.getByLabel('Código (opcional)').fill('CJ-001')
     await page.getByRole('button', { name: 'Crear proyecto' }).click()
     await expect(page.getByRole('button', { name: 'Torre Critical Journey', exact: true })).toBeVisible({ timeout: 10_000 })
-
     await page.getByRole('button', { name: 'Seleccionar', exact: true }).click()
     await expect(page.getByLabel('Proyecto seleccionado')).toHaveValue(/.+/)
 
@@ -74,7 +71,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     projectId = project.id
   })
 
-  // 4. WBS
   await test.step('WBS', async () => {
     await page.goto('/proyectos/wbs')
     await page.getByLabel('Código', { exact: true }).fill('01')
@@ -85,7 +81,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     })
   })
 
-  // Chart of accounts (API -- master data, no dedicated screen)
   let bankGl = '', expenseGl = '', payableGl = '', equityGl = '', revenueGl = '', receivableGl = ''
   await test.step('chart of accounts (API)', async () => {
     bankGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '1100', name: 'Bancos E2E', accountType: 'ASSET' })).id
@@ -108,7 +103,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     const unlock = await api<any>(page.request, 'post', '/edit-access/verify', { token: runtimeToken })
     editCapability = unlock.capability
     expect(editCapability).toBeTruthy()
-    expect(unlock.usesRemaining).toBeGreaterThanOrEqual(3)
+    expect(unlock.usesRemaining).toBeGreaterThanOrEqual(4)
 
     for (const sourceType of ['FUEL', 'MAINTENANCE', 'LABOR'] as const) {
       const config = await api<any>(
@@ -122,7 +117,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     }
   })
 
-  // 5. Treasury Account -> 6. CENTRAL remittance -> 7. verify GL/Treasury/context
   let treasuryAccountId = ''
   await test.step('Treasury Account + CENTRAL remittance', async () => {
     await page.goto('/finanzas/tesoreria')
@@ -131,9 +125,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     })).id
     await page.reload()
     await page.getByRole('button', { name: 'Registrar remesa' }).click()
-    // Contrapartida debe ser Aportes de socios (equity), nunca la misma
-    // cuenta GL del banco -- eso anularía el movimiento neto (INV-TRE bug
-    // real encontrado por este mismo test, corregido en treasury_service).
     await page.getByLabel('Cuenta contable de origen').selectOption({ label: '3100 · Aportes E2E' })
     await page.getByLabel('Remitente').selectOption('__OTHER__')
     await page.getByLabel('Nombre completo del remitente').fill('Socio fundador E2E')
@@ -147,17 +138,14 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     expect(Number(trialBalance.totalDebit)).toBeGreaterThanOrEqual(100000)
   })
 
-  // 8. GENERAL expense: scope GENERAL, project=null, no toca project budget
   await test.step('GENERAL expense never touches project budget', async () => {
     await api(page.request, 'post', '/treasury/general-expenses', {
       companyId, treasuryAccountId, expenseAccountId: expenseGl, category: 'papeleria',
       amount: '500.00', currencyCode: 'HNL', expenseDate: new Date().toISOString().slice(0, 10),
       description: 'Gasto general E2E',
     })
-    // asserted via journal entries: journal must be scope GENERAL, project_id null (INV-OPS invariant)
   })
 
-  // 9. project budget -> 10. PR -> 11. approval
   let requisitionId = ''
   await test.step('project budget + PR + approval', async () => {
     await api(page.request, 'post', `/projects/${projectId}/budgets/baseline`, {
@@ -170,12 +158,10 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     requisitionId = pr.id
     const approved = await api<any>(page.request, 'post', `/procurement/requisitions/${requisitionId}/approve`)
     expect(approved.status).toBe('APPROVED')
-
     await page.goto('/proyectos/presupuestos')
     await expect(page.getByText('Comprometido')).toBeVisible({ timeout: 10_000 })
   })
 
-  // 12. RFQ -> 13. supplier quote -> 14. comparison -> 15. PO
   let supplierId = '', poId = ''
   await test.step('RFQ -> quote -> comparison -> PO', async () => {
     supplierId = (await api(page.request, 'post', '/procurement/suppliers', { companyId, legalName: 'Proveedor E2E S.A.' })).id
@@ -200,7 +186,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await api(page.request, 'post', `/procurement/purchase-orders/${poId}/send`)
   })
 
-  // 16. receipt/service entry -> 17. supplier invoice -> 18. 3-way match -> 19. supplier payment
   let warehouseId = '', itemId = '', apInvoiceId = '', apPaymentId = ''
   await test.step('receipt -> invoice -> 3-way match -> payment', async () => {
     warehouseId = (await api(page.request, 'post', '/inventory/warehouses', { companyId, code: 'ALM-E2E', name: 'Almacén E2E' })).id
@@ -229,14 +214,12 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
 
     const payment = await api<any>(page.request, 'post', `/ap/supplier-invoices/${invoice.id}/payments`, {
       treasuryAccountId, amount: '1000.00', paymentDate: new Date().toISOString().slice(0, 10),
-    }, )
+    })
     apPaymentId = payment.id
-
     await page.goto('/finanzas/cuentas-por-pagar')
     await expect(page.getByText('FAC-E2E-001')).toBeVisible({ timeout: 10_000 })
   })
 
-  // 20. inventory receipt -> 21. warehouse transfer -> 22. project issue -> 23. project cost
   await test.step('inventory receive -> transfer -> project issue -> cost', async () => {
     await api(page.request, 'post', '/inventory/stock/receive', {
       companyId, itemId, warehouseId, quantity: '100.0000', unitCost: '10.0000',
@@ -249,12 +232,10 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
       companyId, itemId, warehouseId, projectId, quantity: '20.0000',
     })
     expect(issue.projectId).toBe(projectId)
-
     const summary = await api<any>(page.request, 'get', `/projects/${projectId}/budgets/summary`)
     expect(Number(summary.authorized)).toBe(50000)
   })
 
-  // 24. workforce -> 25. crew -> 26. time
   await test.step('workforce + crew + time entry', async () => {
     const worker = await api<any>(page.request, 'post', '/workforce/workers', {
       companyId, fullName: 'Trabajador E2E', standardHourlyRate: '100.00',
@@ -267,60 +248,74 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     })
     const approved = await api<any>(page.request, 'post', `/workforce/time-entries/${entry.id}/approve`, {})
     expect(Number(approved.laborCost)).toBe(800)
-
     await page.goto('/recursos/cuadrillas')
     await expect(page.getByText('Cuadrilla E2E')).toBeVisible({ timeout: 10_000 })
   })
 
-  // 27-29. equipment / fuel / maintenance (API -- confirmed no receive/issue-style dedicated screens beyond list/create)
-  await test.step('equipment + fuel + maintenance', async () => {
+  await test.step('equipment + fuel + maintenance + automatic GL', async () => {
     const equipment = await api<any>(page.request, 'post', '/equipment', {
-      companyId, name: 'Mezcladora E2E', equipmentType: 'MACHINERY',
+      companyId, name: 'Mezcladora E2E', equipmentType: 'MACHINERY', projectId,
     })
     await api(page.request, 'post', '/equipment/fuel-logs', {
       companyId, equipmentId: equipment.id, scope: 'PROJECT', projectId,
       logDate: new Date().toISOString().slice(0, 10), quantity: '20.00', unitCost: '5.00',
     })
-    await api(page.request, 'post', `/equipment/${equipment.id}/maintenance-orders`, {
+    const maintenance = await api<any>(page.request, 'post', `/equipment/${equipment.id}/maintenance-orders`, {
       orderType: 'PREVENTIVE', description: 'Mantenimiento preventivo E2E',
       openedAt: new Date().toISOString().slice(0, 10),
     })
+    const closed = await api<any>(
+      page.request,
+      'patch',
+      `/equipment/maintenance-orders/${maintenance.id}`,
+      {
+        status: 'CLOSED',
+        partsCost: '80.00',
+        laborCost: '20.00',
+        downtimeHours: '2.00',
+        closedAt: new Date().toISOString().slice(0, 10),
+      },
+    )
+    expect(closed.status).toBe('CLOSED')
+
+    const resourceDocuments = await api<any[]>(
+      page.request,
+      'get',
+      `/accounting/journal-entries?companyId=${companyId}&limit=250`,
+    )
+    const resourceTypes = new Set(resourceDocuments.map((document: any) => document.documentTypeCode))
+    expect(resourceTypes.has('FUE')).toBe(true)
+    expect(resourceTypes.has('MNT')).toBe(true)
+    expect(resourceTypes.has('LAB')).toBe(true)
   })
 
-  // 30. progress -> evidence/documents -> daily reports -> quality -> safety -> RFI -> submittal -> change order -> correction
   await test.step('progress, quality, safety, RFI, submittal, change order, correction', async () => {
     await api(page.request, 'post', `/projects/${projectId}/progress`, {
       recordDate: new Date().toISOString().slice(0, 10), plannedPercent: '10.00', actualPercent: '8.00',
     })
-
     const dailyReport = await api<any>(page.request, 'post', '/site-reports', {
       projectId, reportDate: new Date().toISOString().slice(0, 10),
       weather: 'Soleado', activitiesPerformed: 'Avance normal E2E',
     })
     expect(dailyReport.id).toBeTruthy()
-
     const inspection = await api<any>(page.request, 'post', '/quality/inspections', {
       projectId, inspectionType: 'Vaciado de concreto', notes: 'Inspección de vaciado E2E',
       inspectionDate: new Date().toISOString().slice(0, 10),
     })
     expect(inspection.id).toBeTruthy()
-
     const observation = await api<any>(page.request, 'post', '/safety/observations', {
       projectId, category: 'EPP', description: 'Observación de EPP E2E',
       observationDate: new Date().toISOString().slice(0, 10),
     })
     expect(observation.id).toBeTruthy()
-
     const rfi = await api<any>(page.request, 'post', '/rfis', {
       companyId, projectId, subject: 'RFI E2E', question: '¿Especificación de acero?',
     })
     expect(rfi.id).toBeTruthy()
-
     const submittal = await api<any>(page.request, 'post', '/submittals', {
       companyId, projectId, title: 'Ficha técnica E2E', submittedAt: new Date().toISOString().slice(0, 10),
     })
     expect(submittal.id).toBeTruthy()
-
     const changeOrder = await api<any>(page.request, 'post', `/projects/${projectId}/change-orders`, {
       reason: 'Orden de cambio E2E', budgetChangeAmount: '1000.00',
     })
@@ -329,12 +324,10 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
 
     await page.goto('/proyectos/ordenes-de-cambio')
     await expect(page.getByText('Orden de cambio E2E')).toBeVisible({ timeout: 10_000 })
-
     await page.goto('/proyectos/rfi-submittals')
     await expect(page.getByText('RFI E2E')).toBeVisible({ timeout: 10_000 })
   })
 
-  // Correction/reversal (NXR-REQ-0025)
   await test.step('correction / reversal', async () => {
     const journal = await api<any>(page.request, 'post', '/accounting/journal-entries', {
       companyId, scope: 'GENERAL', currencyCode: 'HNL', description: 'Asiento a corregir E2E',
@@ -349,7 +342,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     expect(reversal.documentNumber).toMatch(/^ANU-/)
   })
 
-  // 31. CRM lead -> convert (opportunity+customer) -> quote -> accept -> sales contract -> bill -> AR receipt
   let arInvoiceId = '', arReceiptId = ''
   await test.step('CRM: lead -> opportunity -> quote -> sales contract -> AR', async () => {
     const lead = await api<any>(page.request, 'post', '/crm/leads', {
@@ -358,7 +350,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     const conversion = await api<any>(page.request, 'post', `/crm/leads/${lead.id}/convert`)
     const customer = conversion.customer
     const opportunity = conversion.opportunity
-
     const quotation = await api<any>(page.request, 'post', '/crm/quotations', {
       companyId, opportunityId: opportunity.id, customerId: customer.id,
       quotationNumber: 'COT-E2E-001', amount: '5000.00', currencyCode: 'HNL',
@@ -380,47 +371,31 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
       treasuryAccountId, amount: '5000.00', receiptDate: new Date().toISOString().slice(0, 10),
     })
     arReceiptId = receipt.id
-
     await page.goto('/comercial/contratos')
     await expect(page.getByRole('cell', { name: 'SC-E2E-001', exact: true })).toBeVisible({ timeout: 10_000 })
   })
 
   await test.step('AP payment + AR receipt formal reversals', async () => {
-    const apReversal = await api<any>(
-      page.request,
-      'post',
-      `/ap/supplier-payments/${apPaymentId}/reverse`,
-      { reason: 'Pago duplicado detectado E2E' },
-    )
+    const apReversal = await api<any>(page.request, 'post', `/ap/supplier-payments/${apPaymentId}/reverse`, {
+      reason: 'Pago duplicado detectado E2E',
+    })
     expect(Number(apReversal.appliedAmountAfterReversal)).toBe(0)
     expect(apReversal.invoiceStatus).toBe('APPROVED')
 
-    const arReversal = await api<any>(
-      page.request,
-      'post',
-      `/ar/customer-receipts/${arReceiptId}/reverse`,
-      { reason: 'Cobro bancario rechazado E2E' },
-    )
+    const arReversal = await api<any>(page.request, 'post', `/ar/customer-receipts/${arReceiptId}/reverse`, {
+      reason: 'Cobro bancario rechazado E2E',
+    })
     expect(Number(arReversal.appliedAmountAfterReversal)).toBe(0)
     expect(arReversal.invoiceStatus).toBe('APPROVED')
 
-    const duplicate = await page.request.post(
-      `/api/ap/supplier-payments/${apPaymentId}/reverse`,
-      { data: { reason: 'Segundo intento no permitido' } },
-    )
+    const duplicate = await page.request.post(`/api/ap/supplier-payments/${apPaymentId}/reverse`, {
+      data: { reason: 'Segundo intento no permitido' },
+    })
     expect(duplicate.status()).toBe(409)
 
-    const paymentHistory = await api<any[]>(
-      page.request,
-      'get',
-      `/ap/supplier-invoices/${apInvoiceId}/payments`,
-    )
+    const paymentHistory = await api<any[]>(page.request, 'get', `/ap/supplier-invoices/${apInvoiceId}/payments`)
     expect(paymentHistory[0].reversalAccountingDocumentId).toBeTruthy()
-    const receiptHistory = await api<any[]>(
-      page.request,
-      'get',
-      `/ar/customer-invoices/${arInvoiceId}/receipts`,
-    )
+    const receiptHistory = await api<any[]>(page.request, 'get', `/ar/customer-invoices/${arInvoiceId}/receipts`)
     expect(receiptHistory[0].reversalAccountingDocumentId).toBeTruthy()
   })
 
@@ -432,12 +407,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
       expectedAmount: '94000.00',
       countedAmount: '94000.00',
     })
-    const approvedClosing = await api<any>(
-      page.request,
-      'post',
-      `/treasury/cash-closings/${closing.id}/approve`,
-      {},
-    )
+    const approvedClosing = await api<any>(page.request, 'post', `/treasury/cash-closings/${closing.id}/approve`, {})
     expect(approvedClosing.status).toBe('APPROVED')
 
     const restriction = await api<any>(page.request, 'post', '/treasury/fund-restrictions', {
@@ -446,18 +416,9 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
       amount: '100.00',
       description: 'Reserva contractual E2E',
     })
-    const availability = await api<any>(
-      page.request,
-      'get',
-      `/treasury/accounts/${treasuryAccountId}/availability`,
-    )
+    const availability = await api<any>(page.request, 'get', `/treasury/accounts/${treasuryAccountId}/availability`)
     expect(Number(availability.reservedAmount)).toBeGreaterThanOrEqual(100)
-    const released = await api<any>(
-      page.request,
-      'post',
-      `/treasury/fund-restrictions/${restriction.id}/release`,
-      {},
-    )
+    const released = await api<any>(page.request, 'post', `/treasury/fund-restrictions/${restriction.id}/release`, {})
     expect(released.active).toBe(false)
 
     const statement = await api<any>(page.request, 'post', '/treasury/bank-statements', {
@@ -467,42 +428,22 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
       closingBalance: '10.00',
       reference: 'EST-E2E-001',
     })
-    const line = await api<any>(
-      page.request,
-      'post',
-      `/treasury/bank-statements/${statement.id}/lines`,
-      {
-        lineDate: new Date().toISOString().slice(0, 10),
-        description: 'Movimiento conciliable E2E',
-        amount: '10.00',
-      },
-    )
-    const candidates = await api<any[]>(
-      page.request,
-      'get',
-      `/treasury/bank-statement-lines/${line.id}/candidates`,
-    )
+    const line = await api<any>(page.request, 'post', `/treasury/bank-statements/${statement.id}/lines`, {
+      lineDate: new Date().toISOString().slice(0, 10),
+      description: 'Movimiento conciliable E2E',
+      amount: '10.00',
+    })
+    const candidates = await api<any[]>(page.request, 'get', `/treasury/bank-statement-lines/${line.id}/candidates`)
     expect(candidates.length).toBeGreaterThan(0)
-    const matched = await api<any>(
-      page.request,
-      'post',
-      `/treasury/bank-statement-lines/${line.id}/match`,
-      { accountingDocumentId: candidates[0].accountingDocumentId, matchedAmount: '10.00' },
-    )
+    const matched = await api<any>(page.request, 'post', `/treasury/bank-statement-lines/${line.id}/match`, {
+      accountingDocumentId: candidates[0].accountingDocumentId,
+      matchedAmount: '10.00',
+    })
     expect(['MATCHED', 'PARTIAL']).toContain(matched.status)
-    const unmatched = await api<any>(
-      page.request,
-      'post',
-      `/treasury/bank-statement-lines/${line.id}/unmatch`,
-      {},
-    )
+    const unmatched = await api<any>(page.request, 'post', `/treasury/bank-statement-lines/${line.id}/unmatch`, {})
     expect(unmatched.status).toBe('UNMATCHED')
 
-    const documents = await api<any[]>(
-      page.request,
-      'get',
-      `/accounting/journal-entries?companyId=${companyId}&limit=250`,
-    )
+    const documents = await api<any[]>(page.request, 'get', `/accounting/journal-entries?companyId=${companyId}&limit=250`)
     const voucherResponse = await page.request.get(
       `/api/treasury/vouchers/${documents[0].id}?beneficiary=Nexora%20Group&payer=Administracion&paymentMethod=TRANSFER`,
     )
@@ -528,9 +469,12 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
         entityId: projectId,
         category: 'PHOTO',
         file: {
-          name: 'evidencia-e2e.txt',
-          mimeType: 'text/plain',
-          buffer: Buffer.from('Evidencia E2E'),
+          name: 'evidencia-e2e.jpg',
+          mimeType: 'image/jpeg',
+          buffer: Buffer.concat([
+            Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x4a, 0x46, 0x49, 0x46, 0x00]),
+            Buffer.from('Evidencia E2E'),
+          ]),
         },
       },
     })
@@ -550,12 +494,11 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await page.goto('/control/documentos')
     await expect(page.getByText('Documento de cierre E2E')).toBeVisible({ timeout: 10_000 })
     await page.goto('/control/evidencias')
-    await expect(page.getByText('evidencia-e2e.txt')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('evidencia-e2e.jpg')).toBeVisible({ timeout: 10_000 })
     await expect(page.getByLabel('Proyecto')).toBeVisible()
     await expect(page.getByLabel('WBS (opcional)')).not.toBeVisible()
   })
 
-  // 32. workflow/approvals UI -> 33. notifications
   let approverId = ''
   await test.step('Approval Inbox + Notifications (real UI)', async () => {
     const pendingInvoice = await api<any>(page.request, 'post', '/ap/supplier-invoices', {
@@ -564,8 +507,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
       amount: '250.00', invoiceDate: new Date().toISOString().slice(0, 10),
       dueDate: new Date().toISOString().slice(0, 10),
     })
-    // INV-SOD-001: self-assignment must be rejected (real guard, not a
-    // company-access side effect -- see NXR-WORKFLOW-001).
     const me = await api<any>(page.request, 'get', '/auth/me')
     const selfAssign = await page.request.post('/api/ap/supplier-invoices/' + pendingInvoice.id + '/submit-for-approval', {
       data: { assignedTo: me.id },
@@ -573,9 +514,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     expect(selfAssign.status()).toBe(422)
     expect((await selfAssign.json()).error.code).toBe('NXR-WORKFLOW-001')
 
-    // DEFERRED-FINAL-015: real user-management API now exists -- create
-    // the second approver through it (same as any other admin action in
-    // this journey), not a backend-internal workaround.
     const approverEmail = 'aprobador-e2e@nexora.group'
     const approverPassword = 'AprobadorE2E123!'
     const approver = await api<any>(page.request, 'post', '/master-data/users', {
@@ -601,7 +539,6 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await page.getByRole('button', { name: /Notificaciones/ }).click()
     await expect(page.getByRole('dialog', { name: 'Notificaciones' })).toBeVisible({ timeout: 10_000 })
 
-    // switch back to the primary admin session for the rest of the journey
     await api(page.request, 'post', '/auth/logout')
     await page.goto('/login')
     await page.getByLabel('Correo electrónico').fill(ADMIN_EMAIL)
@@ -613,39 +550,25 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
   await test.step('Users, roles, company and project access management', async () => {
     const runtimeToken = process.env.E2E_EDIT_ACCESS_TOKEN
     expect(runtimeToken).toBeTruthy()
-    const unlock = await api<any>(
-      page.request,
-      'post',
-      '/edit-access/verify',
-      { token: runtimeToken },
-    )
+    const unlock = await api<any>(page.request, 'post', '/edit-access/verify', { token: runtimeToken })
     editCapability = unlock.capability
 
-    const granted = await api<any>(
-      page.request,
-      'put',
-      `/access-management/users/${approverId}/projects/${projectId}`,
-    )
-    expect(
-      granted.projects.find((project: any) => project.id === projectId)?.assigned,
-    ).toBe(true)
+    const granted = await api<any>(page.request, 'put', `/access-management/users/${approverId}/projects/${projectId}`)
+    expect(granted.projects.find((project: any) => project.id === projectId)?.assigned).toBe(true)
 
     await page.goto('/control/configuracion')
     await page.getByLabel('Usuario').selectOption(approverId)
     await expect(page.getByText('Torre Critical Journey')).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText('Asignado').last()).toBeVisible()
 
-    const revoked = await page.request.delete(
-      `/api/access-management/users/${approverId}/projects/${projectId}`,
-      { headers: { 'X-Nexora-Edit-Access': editCapability } },
+    const revoked = await api<any>(
+      page.request,
+      'delete',
+      `/access-management/users/${approverId}/projects/${projectId}`,
     )
-    expect(revoked.ok(), await revoked.text()).toBeTruthy()
-    expect(
-      (await revoked.json()).projects.find((project: any) => project.id === projectId)?.assigned,
-    ).toBe(false)
+    expect(revoked.projects.find((project: any) => project.id === projectId)?.assigned).toBe(false)
   })
 
-  // 34. global search
   await test.step('global search', async () => {
     await page.goto('/inicio')
     await page.getByRole('button', { name: 'Búsqueda global' }).click()
@@ -654,28 +577,22 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await page.keyboard.press('Escape')
   })
 
-  // 35-38. reports: trial balance, general ledger, balance sheet, income statement (real UI)
   await test.step('reports: TB, GL, Balance Sheet, Income Statement', async () => {
     await page.goto('/control/reportes')
     await expect(page.getByText(/Total débito/)).toBeVisible({ timeout: 10_000 })
-
     await page.getByRole('tab', { name: /libro mayor/i }).click()
     await expect(page.getByText(/Total débito/)).toBeVisible({ timeout: 10_000 })
-
     await page.getByRole('tab', { name: /balance general/i }).click()
     await expect(page.getByText(/Diferencia: 0\.00/)).toBeVisible({ timeout: 10_000 })
-
     await page.getByRole('tab', { name: /estado de resultados/i }).click()
     await expect(page.getByText(/Utilidad neta/)).toBeVisible({ timeout: 10_000 })
   })
 
-  // 39. audit trail (real UI)
   await test.step('audit trail', async () => {
     await page.goto('/control/auditoria')
     await expect(page.getByText(/ap\.supplier_invoice/).first()).toBeVisible({ timeout: 10_000 })
   })
 
-  // 40. logout/login/persistence
   await test.step('logout -> login -> persistence', async () => {
     await page.goto('/inicio')
     await api(page.request, 'post', '/auth/logout')

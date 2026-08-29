@@ -24,7 +24,6 @@ from app.services.permission_service import (
     grant_project_access,
     require_permission,
     revoke_project_access,
-    user_has_any_company_scope,
     user_has_company_access,
 )
 
@@ -50,6 +49,15 @@ def _project_or_404(db: Session, project_id: uuid.UUID) -> Project:
     if project is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
     return project
+
+
+def _is_administrator(db: Session, user_id: uuid.UUID) -> bool:
+    stmt = (
+        select(UserRole.id)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(UserRole.user_id == user_id, Role.name == "Administrator")
+    )
+    return db.execute(stmt).first() is not None
 
 
 def _summary(db: Session, *, user_id: uuid.UUID, company_id: uuid.UUID | None) -> UserAccessSummaryResponse:
@@ -105,14 +113,14 @@ def get_user_access(
     user_id: uuid.UUID,
     company_id: uuid.UUID | None = Query(default=None, alias="companyId"),
     db: Session = Depends(get_db),
-    requesting_user=Depends(require_permission("core.user", "read")),
+    requesting_user=Depends(require_permission("core.user", "create")),
 ) -> UserAccessSummaryResponse:
     if company_id is not None:
         assert_company_access(
             db,
             user_id=requesting_user.id,
             resource="core.user",
-            action="read",
+            action="create",
             company_id=company_id,
         )
     return _summary(db, user_id=user_id, company_id=company_id)
@@ -305,9 +313,7 @@ def grant_user_project(
     )
     target_has_company = user_has_company_access(
         db, user_id=user_id, company_id=project.company_id
-    ) or user_has_any_company_scope(
-        db, user_id=user_id, resource="core.company", action="read"
-    )
+    ) or _is_administrator(db, user_id)
     if not target_has_company:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

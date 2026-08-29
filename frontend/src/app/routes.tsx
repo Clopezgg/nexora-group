@@ -13,6 +13,15 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
   '/finanzas/tesoreria': async () => ({
     Component: (await import('../features/treasury/TreasuryPage')).TreasuryPage,
   }),
+  '/finanzas/conciliacion': async () => ({
+    Component: (await import('../features/treasury/AdvancedTreasuryPages')).BankReconciliationPage,
+  }),
+  '/finanzas/cierres-caja': async () => ({
+    Component: (await import('../features/treasury/AdvancedTreasuryPages')).CashClosingsPage,
+  }),
+  '/finanzas/restricciones-fondos': async () => ({
+    Component: (await import('../features/treasury/AdvancedTreasuryPages')).FundRestrictionsPage,
+  }),
   '/finanzas/cuentas-por-pagar': async () => ({
     Component: (await import('../features/treasury/AccountsPayablePage')).AccountsPayablePage,
   }),
@@ -89,7 +98,7 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
     Component: (await import('../features/documents/DocumentsPage')).DocumentsPage,
   }),
   '/control/evidencias': async () => ({
-    Component: (await import('../features/documents/DocumentsPage')).DocumentsPage,
+    Component: (await import('../features/documents/EvidencePage')).EvidencePage,
   }),
   '/control/auditoria': async () => ({
     Component: (await import('../features/audit/AuditLogPage')).AuditLogPage,
@@ -128,10 +137,10 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
     Component: (await import('../features/commercial/SalesContractsPage')).SalesContractsPage,
   }),
   '/comercial/facturacion': async () => ({
-    Component: (await import('../features/treasury/AccountsReceivablePage')).AccountsReceivablePage,
+    Component: (await import('../features/commercial/BillingPage')).BillingPage,
   }),
   '/comercial/cobros': async () => ({
-    Component: (await import('../features/treasury/AccountsReceivablePage')).AccountsReceivablePage,
+    Component: (await import('../features/commercial/CollectionsPage')).CollectionsPage,
   }),
 }
 

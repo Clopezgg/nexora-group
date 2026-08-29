@@ -4,10 +4,17 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.models.accounting import AccountingDocument
+from app.models.accounting import AccountingDocument, JournalLine
 from app.models.asset import FixedAsset
-from app.models.permission import UserCompanyAccess
-from tests.helpers import create_account, create_company, create_user_with_role, login_admin, login_as
+from app.models.permission import UserCompanyAccess, UserProjectAccess
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_supplier,
+    create_user_with_role,
+    login_admin,
+    login_as,
+)
 
 
 def _setup_asset_company(client):
@@ -63,6 +70,192 @@ def test_generate_depreciation_entry_posts_balanced_dep_document(client):
     response = client.get(f"/api/assets/{asset['id']}/depreciation-entries")
     assert response.status_code == 200
     assert len(response.json()) == 1
+
+
+def test_approved_supplier_invoice_capitalizes_one_project_asset_through_gl(client, db_session):
+    login_admin(client)
+    company, depreciation_expense, accumulated = _setup_asset_company(client)
+    project = client.post(
+        "/api/projects",
+        json={"companyId": company["id"], "name": "Proyecto activo", "code": "AST-PRJ"},
+    ).json()
+    supplier = create_supplier(client, company_id=company["id"])
+    purchase_expense = create_account(
+        client,
+        company_id=company["id"],
+        code="5200",
+        name="Compra por capitalizar",
+        account_type="EXPENSE",
+    )
+    payable = create_account(
+        client,
+        company_id=company["id"],
+        code="2100",
+        name="Proveedor por pagar",
+        account_type="LIABILITY",
+    )
+    fixed_asset_account = create_account(
+        client,
+        company_id=company["id"],
+        code="1500",
+        name="Maquinaria",
+        account_type="ASSET",
+    )
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "ASSET-AP-001",
+            "scope": "PROJECT",
+            "projectId": project["id"],
+            "expenseAccountId": purchase_expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "12000.00",
+            "taxAmount": "0.00",
+            "invoiceDate": "2026-01-01",
+            "dueDate": "2026-01-31",
+        },
+    )
+    assert invoice.status_code == 201, invoice.text
+    approved = client.post(f"/api/ap/supplier-invoices/{invoice.json()['id']}/approve")
+    assert approved.status_code == 200, approved.text
+
+    response = client.post(
+        f"/api/assets/from-supplier-invoice/{invoice.json()['id']}",
+        json={
+            "category": "Maquinaria pesada",
+            "name": "Excavadora capitalizada",
+            "usefulLifeMonths": 12,
+            "salvageValue": "0.00",
+            "assetAccountId": fixed_asset_account["id"],
+            "depreciationExpenseAccountId": depreciation_expense["id"],
+            "accumulatedDepreciationAccountId": accumulated["id"],
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    asset = response.json()
+    assert asset["supplierInvoiceId"] == invoice.json()["id"]
+    assert asset["projectId"] == project["id"]
+    assert asset["scope"] == "PROJECT"
+    assert Decimal(asset["cost"]) == Decimal("12000.00")
+    assert asset["capitalizationDocumentId"] is not None
+
+    document = db_session.get(
+        AccountingDocument,
+        asset["capitalizationDocumentId"],
+    )
+    assert document is not None
+    assert document.document_type_code == "CAP"
+    assert str(document.project_id) == project["id"]
+    lines = db_session.execute(
+        select(JournalLine).where(JournalLine.accounting_document_id == document.id)
+    ).scalars().all()
+    assert sum((line.debit_amount for line in lines), Decimal("0")) == Decimal("12000.00")
+    assert sum((line.credit_amount for line in lines), Decimal("0")) == Decimal("12000.00")
+    debit = next(line for line in lines if line.debit_amount > 0)
+    credit = next(line for line in lines if line.credit_amount > 0)
+    assert str(debit.account_id) == fixed_asset_account["id"]
+    assert str(credit.account_id) == purchase_expense["id"]
+
+    duplicate = client.post(
+        f"/api/assets/from-supplier-invoice/{invoice.json()['id']}",
+        json={
+            "category": "Maquinaria pesada",
+            "name": "Duplicado",
+            "usefulLifeMonths": 12,
+            "salvageValue": "0.00",
+            "assetAccountId": fixed_asset_account["id"],
+            "depreciationExpenseAccountId": depreciation_expense["id"],
+            "accumulatedDepreciationAccountId": accumulated["id"],
+        },
+    )
+    assert duplicate.status_code == 409, duplicate.text
+    assert db_session.query(FixedAsset).count() == 1
+
+    blocked_accrual_reversal = client.post(
+        f"/api/accounting/journal-entries/{approved.json()['accrualDocumentId']}/reverse",
+        json={"reason": "No debe dejar un activo sin origen contable"},
+    )
+    assert blocked_accrual_reversal.status_code == 409, blocked_accrual_reversal.text
+    assert blocked_accrual_reversal.json()["error"]["code"] == "NXR-AP-001"
+
+    capitalization_reversal = client.post(
+        f"/api/accounting/journal-entries/{asset['capitalizationDocumentId']}/reverse",
+        json={"reason": "Capitalización registrada por error"},
+    )
+    assert capitalization_reversal.status_code == 200, capitalization_reversal.text
+    retired = client.get(f"/api/assets/{asset['id']}")
+    assert retired.status_code == 200
+    assert retired.json()["status"] == "RETIRED"
+    assert retired.json()["supplierInvoiceId"] == invoice.json()["id"]
+
+    accrual_reversal = client.post(
+        f"/api/accounting/journal-entries/{approved.json()['accrualDocumentId']}/reverse",
+        json={"reason": "Factura y capitalización anuladas formalmente"},
+    )
+    assert accrual_reversal.status_code == 200, accrual_reversal.text
+    cancelled_invoice = client.get(f"/api/ap/supplier-invoices/{invoice.json()['id']}")
+    assert cancelled_invoice.status_code == 200
+    assert cancelled_invoice.json()["status"] == "CANCELLED"
+
+    allowed_project = client.post(
+        "/api/projects",
+        json={"companyId": company["id"], "name": "Proyecto permitido", "code": "AST-OK"},
+    ).json()
+    scoped_finance = create_user_with_role(
+        db_session,
+        email="finance-project-isolation-assets@nexora.group",
+        role_name="Finance Manager",
+    )
+    db_session.add_all(
+        [
+            UserCompanyAccess(user_id=scoped_finance.id, company_id=company["id"]),
+            UserProjectAccess(user_id=scoped_finance.id, project_id=allowed_project["id"]),
+        ]
+    )
+    db_session.commit()
+    login_as(client, email="finance-project-isolation-assets@nexora.group")
+
+    assert client.get(f"/api/assets/{asset['id']}").status_code == 403
+    assert client.post(
+        f"/api/assets/{asset['id']}/status", json={"status": "ACTIVE"}
+    ).status_code == 403
+    assert client.get(f"/api/assets/{asset['id']}/depreciation-entries").status_code == 403
+    assert client.post(
+        f"/api/assets/from-supplier-invoice/{invoice.json()['id']}",
+        json={
+            "category": "No autorizado",
+            "name": "No autorizado",
+            "usefulLifeMonths": 12,
+            "salvageValue": "0.00",
+            "assetAccountId": fixed_asset_account["id"],
+            "depreciationExpenseAccountId": depreciation_expense["id"],
+            "accumulatedDepreciationAccountId": accumulated["id"],
+        },
+    ).status_code == 403
+    assert client.post(
+        "/api/assets",
+        json={
+            "companyId": company["id"],
+            "category": "No autorizado",
+            "name": "Alta proyecto bloqueado",
+            "acquisitionDate": "2026-01-01",
+            "cost": "100.00",
+            "currencyCode": "HNL",
+            "usefulLifeMonths": 12,
+            "salvageValue": "0.00",
+            "scope": "PROJECT",
+            "projectId": project["id"],
+            "depreciationExpenseAccountId": depreciation_expense["id"],
+            "accumulatedDepreciationAccountId": accumulated["id"],
+        },
+    ).status_code == 403
+    visible = client.get(f"/api/assets?companyId={company['id']}")
+    assert visible.status_code == 200
+    assert all(row["id"] != asset["id"] for row in visible.json())
 
 
 def test_depreciation_period_cannot_be_posted_twice(client, db_session):

@@ -233,7 +233,7 @@ def post_manual(
 
 
 def reverse_document(
-    db: Session, *, document_id: uuid.UUID, reason: str
+    db: Session, *, document_id: uuid.UUID, reason: str, commit: bool = True
 ) -> AccountingDocument:
     """Reversal completo (orden maestra §83): el original se preserva
     intacto (nunca se le tocan sus líneas/montos), se crea un nuevo
@@ -241,7 +241,12 @@ def reverse_document(
     enlazados. La única mutación permitida sobre el original es la
     transición de estado POSTED -> REVERSED + el link al reversal; sus
     JournalLine nunca se tocan."""
-    original = db.get(AccountingDocument, document_id)
+    original = db.execute(
+        select(AccountingDocument)
+        .where(AccountingDocument.id == document_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
     if original is None:
         raise ValueError(f"AccountingDocument {document_id} no existe")
     if original.status != "POSTED":
@@ -284,12 +289,16 @@ def reverse_document(
         fx_rate=original.fx_rate,
         lines=reversal_lines,
         description=f"Reversal de {original.document_number}: {reason}",
+        commit=False,
     )
 
     original.status = "REVERSED"
     original.reversed_document_id = reversal.id
     original.reversal_reason = reason
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(original)
     return reversal
 

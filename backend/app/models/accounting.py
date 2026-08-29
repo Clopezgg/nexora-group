@@ -16,6 +16,10 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 OPERATION_SCOPES = ("CENTRAL", "GENERAL", "PROJECT")
 
 ACCOUNTING_DOCUMENT_STATUSES = ("DRAFT", "POSTED", "REVERSED")
+# Both sides of a formal reversal remain part of the General Ledger. Excluding
+# the original REVERSED document while including its POSTED reversal in an
+# aggregate fabricates a negative balance instead of netting the operation.
+LEDGER_EFFECTIVE_STATUSES = ("POSTED", "REVERSED")
 
 
 class AccountingDocument(UUIDPrimaryKeyMixin, TimestampMixin, Base):

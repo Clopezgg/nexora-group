@@ -36,6 +36,11 @@ class FixedAsset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "OR (scope = 'PROJECT' AND project_id IS NOT NULL)",
             name="ck_fixed_assets_operation_scope",
         ),
+        UniqueConstraint("supplier_invoice_id", name="uq_fixed_assets_supplier_invoice_id"),
+        UniqueConstraint(
+            "capitalization_document_id",
+            name="uq_fixed_assets_capitalization_document_id",
+        ),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -63,6 +68,19 @@ class FixedAsset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     accumulated_depreciation_account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False
+    )
+    supplier_invoice_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("supplier_invoices.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    capitalization_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=True
+    )
+    capitalization_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("accounting_documents.id", ondelete="RESTRICT"),
+        nullable=True,
     )
 
 

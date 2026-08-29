@@ -2,8 +2,12 @@ import base64
 import hashlib
 import os
 import secrets
+import uuid
 
-from app.core.config import get_settings
+import pytest
+from pydantic import ValidationError
+
+from app.core.config import Settings, get_settings
 from app.models.edit_access import EditAccessEvent
 from app.services import edit_access_service
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
@@ -173,3 +177,60 @@ def test_edit_access_rate_limit_locks_repeated_failures(client):
         settings.edit_access_token_digest = old_digest
         settings.edit_access_max_attempts = old_attempts
         settings.edit_access_window_seconds = old_window
+
+
+def test_edit_guard_rejection_keeps_security_and_correlation_headers(client, db_session):
+    settings = get_settings()
+    old_required = settings.edit_access_required
+    old_salt = settings.edit_access_token_salt
+    old_digest = settings.edit_access_token_digest
+    test_pin = secrets.token_urlsafe(12)
+    try:
+        settings.edit_access_required = True
+        _configure_test_pin(settings, test_pin)
+        login = client.post(
+            "/api/auth/login",
+            json={"email": BOOTSTRAP_ADMIN_EMAIL, "password": BOOTSTRAP_ADMIN_PASSWORD},
+        )
+        assert login.status_code == 200, login.text
+
+        response = client.patch(
+            f"/api/master-data/companies/{uuid.uuid4()}/profile",
+            json={"legalName": "Test"},
+        )
+
+        assert response.status_code == 428, response.text
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert response.headers["x-frame-options"] == "DENY"
+        correlation_id = response.headers["x-correlation-id"]
+        assert correlation_id
+        event = (
+            db_session.query(EditAccessEvent)
+            .filter(EditAccessEvent.outcome == "MUTATION_DENIED")
+            .one()
+        )
+        assert event.correlation_id == correlation_id
+    finally:
+        settings.edit_access_required = old_required
+        settings.edit_access_token_salt = old_salt
+        settings.edit_access_token_digest = old_digest
+
+
+def test_production_settings_reject_the_development_signing_key():
+    with pytest.raises(ValidationError, match="SECRET_KEY"):
+        Settings(
+            app_env="production",
+            secret_key="dev-secret-key-change-me",
+            edit_access_required=False,
+        )
+
+
+def test_production_settings_require_protected_edit_server_secrets():
+    with pytest.raises(ValidationError, match="EDIT_ACCESS_TOKEN"):
+        Settings(
+            app_env="production",
+            secret_key=secrets.token_urlsafe(48),
+            edit_access_required=True,
+            edit_access_token_salt="",
+            edit_access_token_digest="",
+        )

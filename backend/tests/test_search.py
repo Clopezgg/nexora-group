@@ -2,9 +2,18 @@ import uuid
 
 import pytest
 
+from app.models.permission import UserCompanyAccess, UserProjectAccess
 from app.repositories import evidence_repository, user_repository
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL
-from tests.helpers import create_account, create_company, create_customer, create_supplier, login_admin
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_customer,
+    create_supplier,
+    create_user_with_role,
+    login_admin,
+    login_as,
+)
 
 
 def test_search_finds_project_by_name(client, db_session):
@@ -263,6 +272,71 @@ def test_search_never_returns_another_companys_results(client, db_session):
     response = client.get(f"/api/search?companyId={company_b['id']}&q=Alpha")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_search_never_returns_an_unassigned_project_in_the_same_company(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Search Project Scope")
+    allowed = client.post(
+        "/api/projects",
+        json={"companyId": company["id"], "name": "Torre Permitida", "code": "SEARCH-ALLOW"},
+    ).json()
+    client.post(
+        "/api/projects",
+        json={"companyId": company["id"], "name": "Torre Confidencial", "code": "SEARCH-DENY"},
+    )
+
+    manager = create_user_with_role(
+        db_session,
+        email="search-project-scope@nexora.group",
+        role_name="Project Manager",
+    )
+    db_session.add(UserCompanyAccess(user_id=manager.id, company_id=company["id"]))
+    db_session.add(UserProjectAccess(user_id=manager.id, project_id=allowed["id"]))
+    db_session.commit()
+
+    login_as(client, email="search-project-scope@nexora.group")
+    response = client.get(f"/api/search?companyId={company['id']}&q=Confidencial")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == []
+
+
+def test_search_does_not_reveal_entity_types_without_their_read_permission(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Search Permission Scope")
+    supplier = create_supplier(client, company_id=company["id"])
+    expense, payable = _setup_ap_accounts(client, company_id=company["id"])
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "CONFIDENTIAL-AP-900",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "100.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    )
+    assert invoice.status_code == 201, invoice.text
+
+    warehouse_manager = create_user_with_role(
+        db_session,
+        email="search-module-scope@nexora.group",
+        role_name="Warehouse Manager",
+    )
+    db_session.add(UserCompanyAccess(user_id=warehouse_manager.id, company_id=company["id"]))
+    db_session.commit()
+
+    login_as(client, email="search-module-scope@nexora.group")
+    response = client.get(f"/api/search?companyId={company['id']}&q=CONFIDENTIAL")
+
+    assert response.status_code == 200, response.text
+    assert not any(row["entityType"] == "supplier_invoice" for row in response.json())
 
 
 # Company-isolation coverage beyond Project (code-review follow-up): all

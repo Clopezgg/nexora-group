@@ -86,13 +86,20 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
     register_csrf_guard(app)
+    register_edit_access_guard(app)
     app.add_middleware(CorrelationIdMiddleware)
     register_security_headers(app)
-    register_edit_access_guard(app)
 
     register_error_handlers(app)
 
-    from app.services import ap_service, approval_service, ar_service, posting_service, submittal_service
+    from app.services import (
+        ap_service,
+        approval_service,
+        ar_service,
+        asset_service,
+        posting_service,
+        submittal_service,
+    )
 
     posting_service.register_reversal_hook(
         "supplier_invoice",
@@ -104,6 +111,12 @@ def create_app() -> FastAPI:
         "customer_invoice",
         lambda db, source_id, document_type_code: ar_service.apply_invoice_reversal(
             db, invoice_id=source_id, document_type_code=document_type_code
+        ),
+    )
+    posting_service.register_reversal_hook(
+        "fixed_asset",
+        lambda db, source_id, document_type_code: asset_service.apply_capitalization_reversal(
+            db, asset_id=source_id, document_type_code=document_type_code
         ),
     )
 

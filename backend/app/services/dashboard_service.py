@@ -4,16 +4,16 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import case, extract, func, select
+from sqlalchemy import case, extract, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.accounting import AccountingDocument, JournalLine
+from app.models.accounting import LEDGER_EFFECTIVE_STATUSES, AccountingDocument, JournalLine
 from app.models.ap import SupplierInvoice
 from app.models.approval_request import ApprovalRequest
 from app.models.ar import CustomerInvoice
 from app.models.chart_of_accounts import Account
+from app.models.project import Project
 from app.models.treasury import TreasuryAccount
-from app.repositories import project_repository
 from app.schemas.dashboard import CashFlowPointResponse, DashboardSummaryResponse, ScopeAmountResponse
 from app.services import fiscal_service, permission_service
 
@@ -86,12 +86,21 @@ def get_summary(
     project_company_ids = _scope_for_company(
         db, user_id=user_id, resource="project", company_id=company_id
     )
-    if project_company_ids is None:
-        active_projects = project_repository.count_active_projects(db)
-    else:
-        active_projects = project_repository.count_active_projects_for_companies(
-            db, company_ids=project_company_ids
-        )
+    project_ids = permission_service.accessible_project_ids(
+        db,
+        user_id=user_id,
+        resource="project",
+        action="read",
+    )
+    active_project_stmt = select(func.count()).select_from(Project).where(Project.status == "ACTIVE")
+    active_project_stmt = _apply_company_scope(
+        active_project_stmt,
+        Project.company_id,
+        project_company_ids,
+    )
+    if project_ids is not None:
+        active_project_stmt = active_project_stmt.where(Project.id.in_(project_ids))
+    active_projects = db.execute(active_project_stmt).scalar_one()
 
     can_view_financials = permission_service.user_has_permission(
         db, user_id=user_id, resource="treasury.account", action="read"
@@ -109,6 +118,26 @@ def get_summary(
         company_ids = _scope_for_company(
             db, user_id=user_id, resource="treasury.account", company_id=company_id
         )
+        financial_project_ids = permission_service.accessible_project_ids(
+            db,
+            user_id=user_id,
+            resource="treasury.account",
+            action="read",
+        )
+
+        def apply_financial_project_scope(statement):
+            if financial_project_ids is None:
+                return statement
+            return statement.where(
+                or_(
+                    AccountingDocument.project_id.is_(None),
+                    AccountingDocument.project_id.in_(financial_project_ids),
+                ),
+                or_(
+                    JournalLine.project_id.is_(None),
+                    JournalLine.project_id.in_(financial_project_ids),
+                ),
+            )
 
         balance_stmt = (
             select(func.coalesce(func.sum(JournalLine.debit_amount - JournalLine.credit_amount), 0))
@@ -118,11 +147,12 @@ def get_summary(
             )
             .join(TreasuryAccount, TreasuryAccount.gl_account_id == JournalLine.account_id)
             .where(
-                AccountingDocument.status == "POSTED",
+                AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
                 TreasuryAccount.currency_code == "HNL",
             )
         )
         balance_stmt = _apply_company_scope(balance_stmt, TreasuryAccount.company_id, company_ids)
+        balance_stmt = apply_financial_project_scope(balance_stmt)
         treasury_balance = Decimal(db.execute(balance_stmt).scalar_one())
 
         movement_amount = case(
@@ -145,7 +175,7 @@ def get_summary(
             )
             .join(Account, Account.id == JournalLine.account_id)
             .where(
-                AccountingDocument.status == "POSTED",
+                AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
                 AccountingDocument.currency_code == "HNL",
                 AccountingDocument.posted_at.is_not(None),
                 AccountingDocument.posted_at >= metric_start,
@@ -155,6 +185,7 @@ def get_summary(
             .group_by(AccountingDocument.scope, Account.account_type)
         )
         period_stmt = _apply_company_scope(period_stmt, AccountingDocument.company_id, company_ids)
+        period_stmt = apply_financial_project_scope(period_stmt)
         scope_totals: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
         for scope, account_type, raw_amount in db.execute(period_stmt):
             amount = Decimal(raw_amount)
@@ -184,7 +215,7 @@ def get_summary(
             )
             .join(Account, Account.id == JournalLine.account_id)
             .where(
-                AccountingDocument.status == "POSTED",
+                AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
                 AccountingDocument.currency_code == "HNL",
                 AccountingDocument.posted_at.is_not(None),
                 AccountingDocument.posted_at >= month_starts[0],
@@ -193,6 +224,7 @@ def get_summary(
             .group_by(year_expr, month_expr, Account.account_type)
         )
         chart_stmt = _apply_company_scope(chart_stmt, AccountingDocument.company_id, company_ids)
+        chart_stmt = apply_financial_project_scope(chart_stmt)
         monthly: dict[str, dict[str, Decimal]] = defaultdict(
             lambda: {"income": Decimal("0"), "expense": Decimal("0")}
         )
@@ -228,6 +260,13 @@ def get_summary(
             SupplierInvoice.status.in_(("REVIEW", "APPROVED", "SCHEDULED", "PARTIALLY_PAID")),
         )
         payable_stmt = _apply_company_scope(payable_stmt, SupplierInvoice.company_id, company_ids)
+        if financial_project_ids is not None:
+            payable_stmt = payable_stmt.where(
+                or_(
+                    SupplierInvoice.project_id.is_(None),
+                    SupplierInvoice.project_id.in_(financial_project_ids),
+                )
+            )
         overdue_payables, payable_amount = db.execute(payable_stmt).one()
         overdue_payables_amount = Decimal(payable_amount)
 
@@ -238,6 +277,13 @@ def get_summary(
             CustomerInvoice.status.in_(("APPROVED", "PARTIALLY_COLLECTED")),
         )
         receivable_stmt = _apply_company_scope(receivable_stmt, CustomerInvoice.company_id, company_ids)
+        if financial_project_ids is not None:
+            receivable_stmt = receivable_stmt.where(
+                or_(
+                    CustomerInvoice.project_id.is_(None),
+                    CustomerInvoice.project_id.in_(financial_project_ids),
+                )
+            )
         receivables_outstanding = Decimal(db.execute(receivable_stmt).scalar_one())
 
     pending_approvals = 0

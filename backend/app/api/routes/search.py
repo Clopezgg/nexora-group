@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.schemas.search import SearchResultResponse
 from app.services import search_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    list_user_permissions,
+    require_permission,
+)
 
 # Global Search (NXR-REQ-0092). GET /api/search -- ojo, NO /api/v1/search
 # (ningún router de este backend usa prefijo /api/v1, ver CommandPalette.tsx
@@ -26,7 +31,18 @@ def global_search(
     )
     if not q or len(q.strip()) < 2:
         return []
-    results = search_service.search(db, company_id=company_id, query=q.strip())
+    results = search_service.search(
+        db,
+        company_id=company_id,
+        query=q.strip(),
+        allowed_project_ids=accessible_project_ids(
+            db,
+            user_id=user.id,
+            resource="search.global",
+            action="read",
+        ),
+        user_permissions=set(list_user_permissions(db, user_id=user.id)),
+    )
     return [
         SearchResultResponse(
             id=r.id, label=r.label, group=r.group, path=r.path, entity_type=r.entity_type

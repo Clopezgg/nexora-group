@@ -11,6 +11,8 @@ from app.domain.errors import (
     OverpaymentError,
 )
 from app.models.ap import SupplierInvoice, SupplierPayment
+from app.models.accounting import AccountingDocument
+from app.models.asset import FixedAsset
 from app.models.supplier import Supplier
 from app.models.treasury import TreasuryAccount
 from app.services import approval_service, posting_service
@@ -352,6 +354,22 @@ def apply_accrual_reversal(db: Session, *, invoice_id: uuid.UUID, document_type_
     if invoice.amount_paid > 0:
         raise InvalidInvoiceStateError(
             "No se puede revertir el accrual de una factura con pagos registrados"
+        )
+    active_capitalized_asset_id = db.execute(
+        select(FixedAsset.id)
+        .join(
+            AccountingDocument,
+            AccountingDocument.id == FixedAsset.capitalization_document_id,
+        )
+        .where(
+            FixedAsset.supplier_invoice_id == invoice.id,
+            AccountingDocument.status == "POSTED",
+        )
+    ).scalar_one_or_none()
+    if active_capitalized_asset_id is not None:
+        raise InvalidInvoiceStateError(
+            "No se puede revertir el accrual mientras la factura conserve una "
+            "capitalización de activo; revierta primero el asiento CAP"
         )
     if invoice.status != "APPROVED":
         raise InvalidInvoiceStateError(

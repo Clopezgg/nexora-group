@@ -12,10 +12,8 @@ from app.models.role import Role
 from app.models.user import User
 from app.models.user_role import UserRole
 
-"""Motor de permisos central (orden maestra §87, docs/RBAC.md). Backend
-autoritativo: el frontend puede ocultar botones por UX, pero la decisión
-real siempre pasa por aquí. resource + action + company_scope +
-project_scope + conditions."""
+"""Motor de permisos central. Backend autoritativo: el frontend puede ocultar
+navegación/acciones por UX, pero la decisión real siempre pasa por aquí."""
 
 
 def user_has_permission(
@@ -35,6 +33,24 @@ def user_has_permission(
     return db.execute(stmt).first() is not None
 
 
+def list_user_permissions(db: Session, *, user_id: uuid.UUID) -> list[str]:
+    """Return deduplicated effective resource/action grants for UX filtering.
+
+    This does not encode company/project authorization and must never be used as
+    an authorization decision by the client. Route dependencies remain final.
+    """
+    stmt = (
+        select(Permission.resource, Permission.action)
+        .join(RolePermission, RolePermission.permission_id == Permission.id)
+        .join(Role, RolePermission.role_id == Role.id)
+        .join(UserRole, UserRole.role_id == Role.id)
+        .where(UserRole.user_id == user_id)
+        .distinct()
+        .order_by(Permission.resource, Permission.action)
+    )
+    return [f"{resource}:{action}" for resource, action in db.execute(stmt).all()]
+
+
 def user_has_company_access(db: Session, *, user_id: uuid.UUID, company_id: uuid.UUID) -> bool:
     stmt = select(UserCompanyAccess).where(
         UserCompanyAccess.user_id == user_id, UserCompanyAccess.company_id == company_id
@@ -43,8 +59,6 @@ def user_has_company_access(db: Session, *, user_id: uuid.UUID, company_id: uuid
 
 
 def _has_any_scope_grant(db: Session, *, user_id: uuid.UUID, resource: str, action: str) -> bool:
-    """True si AL MENOS UNO de los roles del usuario otorga este
-    resource/action con company_scope=ANY (p.ej. Administrator, Auditor)."""
     stmt = (
         select(RolePermission)
         .join(Permission, RolePermission.permission_id == Permission.id)
@@ -61,7 +75,6 @@ def _has_any_scope_grant(db: Session, *, user_id: uuid.UUID, resource: str, acti
 
 
 def user_has_any_company_scope(db: Session, *, user_id: uuid.UUID, resource: str, action: str) -> bool:
-    """Whether a permission grants visibility to every company."""
     return _has_any_scope_grant(db, user_id=user_id, resource=resource, action=action)
 
 
@@ -73,10 +86,6 @@ def list_user_company_ids(db: Session, *, user_id: uuid.UUID) -> list[uuid.UUID]
 def assert_company_access(
     db: Session, *, user_id: uuid.UUID, resource: str, action: str, company_id: uuid.UUID
 ) -> None:
-    """INV-COMP-001: aislamiento de company. Si el usuario tiene, para este
-    resource/action, al menos un rol con company_scope=ANY, pasa sin más
-    (Administrator/Auditor). Si no, se exige acceso explícito vía
-    UserCompanyAccess a esa company puntual."""
     if _has_any_scope_grant(db, user_id=user_id, resource=resource, action=action):
         return
     if user_has_company_access(db, user_id=user_id, company_id=company_id):
@@ -87,8 +96,6 @@ def assert_company_access(
 
 
 def require_permission(resource: str, action: str) -> Callable:
-    """Factory de dependencia FastAPI: `Depends(require_permission("accounting.journal_entry", "create"))`."""
-
     def _dependency(
         db: Session = Depends(get_db),
         current: tuple[User, list[str]] = Depends(get_current_user),

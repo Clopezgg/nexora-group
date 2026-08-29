@@ -115,7 +115,7 @@ def test_supplier_payment_reversal_preserves_original_and_metadata(client, db_se
         f"/api/ap/supplier-payments/{payment['id']}/reverse",
         json={"reason": "Segundo intento no permitido"},
     )
-    assert second.status_code == 422, second.text
+    assert second.status_code == 409, second.text
 
 
 def test_customer_receipt_reversal_preserves_original_and_metadata(client, db_session):
@@ -188,4 +188,4 @@ def test_customer_receipt_reversal_preserves_original_and_metadata(client, db_se
         f"/api/ar/customer-receipts/{receipt['id']}/reverse",
         json={"reason": "Segundo intento no permitido"},
     )
-    assert second.status_code == 422, second.text
+    assert second.status_code == 409, second.text

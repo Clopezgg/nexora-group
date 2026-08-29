@@ -212,9 +212,6 @@ function ReceiptHistoryModal({ invoice, treasuryAccounts, onClose, onReversed }:
     queryFn: () => arService.listReceipts(invoice.id),
   })
   const accountNames = new Map(treasuryAccounts.map((account) => [account.id, account.name]))
-  const reverse = useMutation({
-    mutationFn: () => arService.reverseReceipt(reverseReceipt as CustomerReceipt extends never ? never : string, reason),
-  })
 
   const executeReverse = useMutation({
     mutationFn: ({ receiptId, reasonText }: { receiptId: string; reasonText: string }) => arService.reverseReceipt(receiptId, reasonText),
@@ -225,7 +222,6 @@ function ReceiptHistoryModal({ invoice, treasuryAccounts, onClose, onReversed }:
     },
     onError: (error) => handleMutationError(error, 'Revertir cobro'),
   })
-  void reverse
 
   const columns: TableColumn<CustomerReceipt>[] = [
     { key: 'date', header: 'Fecha', render: (row) => row.receiptDate },

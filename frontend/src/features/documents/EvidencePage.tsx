@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Badge,
@@ -79,15 +79,14 @@ export function EvidencePage() {
   const projectNames = new Map(projects.map((project) => [project.id, `${project.code ? `${project.code} — ` : ''}${project.name}`]))
   const wbsNames = new Map(wbsNodes.map((node) => [node.id, `${node.code} — ${node.name}`]))
   const categoryLabels = new Map<string, string>(EVIDENCE_CATEGORIES)
-
-  const filteredEvidence = useMemo(() => {
-    if (wbsNodeId) return evidence.filter((item) => item.entityType === 'WBS' && item.entityId === wbsNodeId)
-    if (projectId) return evidence.filter((item) => (
-      (item.entityType === 'PROJECT' && item.entityId === projectId)
-      || (item.entityType === 'WBS' && wbsNodes.some((node) => node.id === item.entityId))
-    ))
-    return evidence
-  }, [evidence, projectId, wbsNodeId, wbsNodes])
+  const filteredEvidence = wbsNodeId
+    ? evidence.filter((item) => item.entityType === 'WBS' && item.entityId === wbsNodeId)
+    : projectId
+      ? evidence.filter((item) => (
+          (item.entityType === 'PROJECT' && item.entityId === projectId)
+          || (item.entityType === 'WBS' && wbsNodes.some((node) => node.id === item.entityId))
+        ))
+      : evidence
 
   const columns: TableColumn<Evidence>[] = [
     { key: 'file', header: 'Archivo', render: (row) => <strong>{row.originalFilename}</strong> },

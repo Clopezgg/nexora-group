@@ -15,11 +15,15 @@ logger = logging.getLogger(__name__)
 
 
 def bootstrap_admin_if_needed(db: Session) -> None:
-    """Crea el usuario Administrator inicial una sola vez, si no existen usuarios
-    y las variables BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD están definidas."""
+    """Crea catálogos/RBAC base y el Administrator inicial cuando corresponde."""
     settings = get_settings()
     role_repository.ensure_base_roles(db)
     permission_repository.ensure_base_permissions(db)
+    # Local import avoids turning the central permission dependency graph into
+    # an import cycle during application module loading.
+    from app.services.permission_service import normalize_project_scopes
+
+    normalize_project_scopes(db)
     catalog_repository.ensure_base_currencies(db)
     catalog_repository.ensure_base_document_types(db)
     db.commit()

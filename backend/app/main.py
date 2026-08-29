@@ -10,6 +10,7 @@ from app.api.edit_access_guard import register_edit_access_guard
 from app.api.error_handlers import register_error_handlers
 from app.api.security_headers import register_security_headers
 from app.api.routes import (
+    access_management,
     accounting,
     ap,
     approvals,
@@ -125,6 +126,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(context.router, prefix="/api")
     app.include_router(master_data.router, prefix="/api")
+    app.include_router(access_management.router, prefix="/api")
     app.include_router(master_dimensions.router, prefix="/api")
     app.include_router(company_management.router, prefix="/api")
     app.include_router(fiscal.router, prefix="/api")

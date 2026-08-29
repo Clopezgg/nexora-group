@@ -8,9 +8,19 @@ from app.core.config import get_settings
 from app.domain.errors import AccountLockedError, InvalidCredentialsError
 from app.models.user import User
 from app.schemas.auth import CurrentUserResponse, LoginRequest
-from app.services import auth_service
+from app.services import auth_service, permission_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _response(db: Session, user: User, roles: list[str]) -> CurrentUserResponse:
+    return CurrentUserResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        roles=roles,
+        permissions=permission_service.list_user_permissions(db, user_id=user.id),
+    )
 
 
 @router.post("/login", response_model=CurrentUserResponse, dependencies=[Depends(enforce_login_rate_limit)])
@@ -36,10 +46,6 @@ def login(
         raise HTTPException(status_code=status.HTTP_423_LOCKED, detail=str(error)) from error
 
     max_age = int((expires_at - datetime.now(timezone.utc)).total_seconds())
-    # En producción frontend y backend viven en subdominios distintos (Render):
-    # el cookie debe poder viajar cross-site, lo que exige SameSite=None + Secure.
-    # En local ambos son "localhost" (mismo site), así que Lax es suficiente y
-    # no requiere HTTPS.
     response.set_cookie(
         key=settings.session_cookie_name,
         value=raw_token,
@@ -49,7 +55,7 @@ def login(
         max_age=max(max_age, 0),
         path="/",
     )
-    return CurrentUserResponse(id=user.id, email=user.email, full_name=user.full_name, roles=roles)
+    return _response(db, user, roles)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -66,6 +72,9 @@ def logout(
 
 
 @router.get("/me", response_model=CurrentUserResponse)
-def me(current: tuple[User, list[str]] = Depends(get_current_user)) -> CurrentUserResponse:
+def me(
+    current: tuple[User, list[str]] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CurrentUserResponse:
     user, roles = current
-    return CurrentUserResponse(id=user.id, email=user.email, full_name=user.full_name, roles=roles)
+    return _response(db, user, roles)

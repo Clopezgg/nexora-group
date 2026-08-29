@@ -14,7 +14,7 @@ from app.schemas.asset import (
     FixedAssetResponse,
 )
 from app.services import asset_service, audit_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import accessible_project_ids, assert_company_access, require_permission
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -80,10 +80,14 @@ def list_fixed_assets(
     assert_company_access(
         db, user_id=user.id, resource="asset.fixed_asset", action="read", company_id=company_id
     )
-    return [
-        FixedAssetResponse.model_validate(asset, from_attributes=True)
-        for asset in asset_service.list_fixed_assets(db, company_id=company_id)
-    ]
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="asset.fixed_asset", action="read"
+    )
+    assets = asset_service.list_fixed_assets(db, company_id=company_id)
+    if allowed is not None:
+        allowed_set = set(allowed)
+        assets = [asset for asset in assets if asset.project_id is None or asset.project_id in allowed_set]
+    return [FixedAssetResponse.model_validate(asset, from_attributes=True) for asset in assets]
 
 
 @router.get("/{asset_id}", response_model=FixedAssetResponse)

@@ -48,6 +48,7 @@ def enforce_login_rate_limit(request: Request, db: Session = Depends(get_db)) ->
             bucket_key=f"login:{_client_ip(request)}",
             limit=settings.login_rate_limit_max_attempts,
             window_seconds=settings.login_rate_limit_window_seconds,
+            reject_on_limit=False,
         )
     finally:
         db.commit()

@@ -377,7 +377,17 @@ async def _request_project_ids(request: Request) -> set[uuid.UUID]:
     content_type = request.headers.get("content-type", "").lower()
     if request.method.upper() in {"POST", "PUT", "PATCH", "DELETE"} and "application/json" in content_type:
         try:
-            raw_values.extend(_collect_project_values(await request.json()))
+            payload = await request.json()
+            if isinstance(payload, dict) and str(payload.get("scope", "")).upper() in {"CENTRAL", "GENERAL"}:
+                # Invalid global scopes with a top-level project must reach the
+                # domain guard, which returns the scope-invariant 422 response.
+                # Nested dimensions remain authorization-checked below.
+                payload = {
+                    key: value
+                    for key, value in payload.items()
+                    if not _normalized_key(str(key)).endswith("projectid")
+                }
+            raw_values.extend(_collect_project_values(payload))
         except (ValueError, TypeError):
             # Request validation remains FastAPI/Pydantic's responsibility. We
             # only inspect valid JSON contexts for authorization hints.

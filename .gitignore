@@ -32,3 +32,8 @@ infra/main.json
 .nexora-context/
 .recovery/
 node_modules/.vite/
+frontend/AzuriteConfig
+frontend/__azurite_db_*.json
+frontend/__blobstorage__/
+frontend/__queuestorage__/
+frontend/__tablestorage__/

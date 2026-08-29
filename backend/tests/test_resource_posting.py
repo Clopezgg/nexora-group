@@ -149,7 +149,7 @@ def test_fuel_maintenance_and_labor_post_through_configured_engine(client, db_se
         f"/api/equipment/maintenance-orders/{maintenance['id']}",
         json={"status": "CLOSED", "partsCost": "80.00", "laborCost": "20.00"},
     )
-    assert second_close.status_code == 422, second_close.text
+    assert second_close.status_code == 409, second_close.text
     assert db_session.query(AccountingSourceLink).filter_by(
         source_type="maintenance_order", source_id=maintenance["id"]
     ).count() == 1
@@ -198,7 +198,7 @@ def test_fuel_maintenance_and_labor_post_through_configured_engine(client, db_se
         f"/api/workforce/time-entries/{entry['id']}/approve",
         json={},
     )
-    assert second_approve.status_code == 422, second_approve.text
+    assert second_approve.status_code == 409, second_approve.text
     assert db_session.query(AccountingSourceLink).filter_by(
         source_type="time_entry", source_id=entry["id"]
     ).count() == 1

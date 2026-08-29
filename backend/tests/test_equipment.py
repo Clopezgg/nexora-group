@@ -5,7 +5,13 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models.equipment import FuelLog
 from app.models.permission import UserCompanyAccess
-from tests.helpers import create_company, create_user_with_role, login_admin, login_as
+from tests.helpers import (
+    configure_resource_posting,
+    create_company,
+    create_user_with_role,
+    login_admin,
+    login_as,
+)
 
 
 def _create_project(client, *, company_id: str, name: str = "Torre Nexora III") -> dict:
@@ -75,6 +81,7 @@ def test_fuel_log_db_constraint_rejects_project_scope_without_project(db_session
 def test_fuel_log_total_cost_is_computed_server_side(client):
     login_admin(client)
     company = create_company(client)
+    configure_resource_posting(client, company_id=company["id"], source_type="FUEL")
     equipment = _create_equipment(client, company_id=company["id"])
 
     response = client.post(
@@ -95,6 +102,7 @@ def test_fuel_log_total_cost_is_computed_server_side(client):
 def test_project_fuel_log_accepted_with_project_id(client):
     login_admin(client)
     company = create_company(client)
+    configure_resource_posting(client, company_id=company["id"], source_type="FUEL")
     equipment = _create_equipment(client, company_id=company["id"])
     project = _create_project(client, company_id=company["id"])
 
@@ -118,6 +126,7 @@ def test_closed_maintenance_order_is_immutable(client):
     persisted values remain unchanged."""
     login_admin(client)
     company = create_company(client)
+    configure_resource_posting(client, company_id=company["id"], source_type="MAINTENANCE")
     equipment = _create_equipment(client, company_id=company["id"])
 
     created = client.post(

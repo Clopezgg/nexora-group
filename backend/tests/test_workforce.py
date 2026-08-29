@@ -1,5 +1,11 @@
 from app.models.permission import UserCompanyAccess
-from tests.helpers import create_company, create_user_with_role, login_admin, login_as
+from tests.helpers import (
+    configure_resource_posting,
+    create_company,
+    create_user_with_role,
+    login_admin,
+    login_as,
+)
 
 
 def _create_worker(client, *, company_id: str, name: str = "Juan Pérez") -> dict:
@@ -17,6 +23,7 @@ def test_labor_cost_equals_approved_rate_times_hours(client):
     nunca aceptado del cliente."""
     login_admin(client)
     company = create_company(client)
+    configure_resource_posting(client, company_id=company["id"], source_type="LABOR")
     worker = _create_worker(client, company_id=company["id"])
 
     submitted = client.post(
@@ -48,6 +55,7 @@ def test_time_entry_labor_cost_uses_approved_hours_not_submitted_hours(client):
     costo usa las horas APROBADAS, no las originalmente reportadas."""
     login_admin(client)
     company = create_company(client)
+    configure_resource_posting(client, company_id=company["id"], source_type="LABOR")
     worker = _create_worker(client, company_id=company["id"])
 
     submitted = client.post(
@@ -75,6 +83,7 @@ def test_time_entry_labor_cost_uses_approved_hours_not_submitted_hours(client):
 def test_time_entry_cannot_be_approved_twice(client):
     login_admin(client)
     company = create_company(client)
+    configure_resource_posting(client, company_id=company["id"], source_type="LABOR")
     worker = _create_worker(client, company_id=company["id"])
 
     submitted = client.post(

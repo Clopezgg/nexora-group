@@ -33,6 +33,7 @@ export const navGroups: NavGroup[] = [
       { path: '/finanzas/conciliacion', label: 'Conciliación bancaria', icon: 'shuffle', requiredAny: read('treasury.bank_reconciliation:read') },
       { path: '/finanzas/cierres-caja', label: 'Cierres de caja', icon: 'receipt', requiredAny: read('treasury.cash_closing:read') },
       { path: '/finanzas/restricciones-fondos', label: 'Restricciones de fondos', icon: 'shield', requiredAny: read('treasury.fund_restriction:read') },
+      { path: '/finanzas/comprobantes', label: 'Comprobantes', icon: 'receipt', requiredAny: read('treasury.voucher:read') },
       { path: '/finanzas/cuentas-por-pagar', label: 'Cuentas por pagar', icon: 'card', requiredAny: read('ap.supplier_invoice:read') },
       { path: '/finanzas/cuentas-por-cobrar', label: 'Cuentas por cobrar', icon: 'receipt', requiredAny: read('ar.customer_invoice:read') },
       { path: '/finanzas/activos', label: 'Activos', icon: 'tag', requiredAny: read('asset.fixed_asset:read') },

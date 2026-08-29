@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Callable
+from typing import Any
 
 from fastapi import Depends, Request
 from sqlalchemy import select
@@ -42,11 +43,75 @@ PROJECT_AWARE_RESOURCE_PREFIXES = (
     "inventory.",
     "ap.",
     "ar.",
+    "accounting.",
+    "treasury.",
+    "asset.",
+    "crm.",
+    "reports.",
 )
 
 
 def _is_project_aware_resource(resource: str) -> bool:
     return resource == "project" or resource.startswith(PROJECT_AWARE_RESOURCE_PREFIXES)
+
+
+def _normalized_key(value: str) -> str:
+    return "".join(character for character in value.lower() if character.isalnum())
+
+
+def _collect_project_values(value: Any) -> list[Any]:
+    """Collect project identifiers from arbitrary JSON without trusting aliases.
+
+    Both snake_case and camelCase are accepted. Keys such as
+    `restrictedForProjectId` also count because they end in `projectId`. Nested
+    journal lines and other arrays are inspected so one request cannot smuggle a
+    second unauthorized project through a child object.
+    """
+    result: list[Any] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            normalized = _normalized_key(str(key))
+            if normalized.endswith("projectid"):
+                if child not in (None, ""):
+                    result.append(child)
+                continue
+            if normalized.endswith("projectids") and isinstance(child, list):
+                result.extend(item for item in child if item not in (None, ""))
+                continue
+            result.extend(_collect_project_values(child))
+    elif isinstance(value, list):
+        for child in value:
+            result.extend(_collect_project_values(child))
+    return result
+
+
+async def _request_project_ids(request: Request) -> set[uuid.UUID]:
+    raw_values: list[Any] = []
+
+    for key, value in request.path_params.items():
+        if _normalized_key(str(key)).endswith("projectid") and value not in (None, ""):
+            raw_values.append(value)
+
+    for key, value in request.query_params.multi_items():
+        if _normalized_key(str(key)).endswith("projectid") and value not in (None, ""):
+            raw_values.append(value)
+
+    content_type = request.headers.get("content-type", "").lower()
+    if request.method.upper() in {"POST", "PUT", "PATCH", "DELETE"} and "application/json" in content_type:
+        try:
+            raw_values.extend(_collect_project_values(await request.json()))
+        except (ValueError, TypeError):
+            # Request validation remains FastAPI/Pydantic's responsibility. We
+            # only inspect valid JSON contexts for authorization hints.
+            pass
+
+    project_ids: set[uuid.UUID] = set()
+    for value in raw_values:
+        try:
+            project_ids.add(uuid.UUID(str(value)))
+        except (TypeError, ValueError) as exc:
+            raise NotAuthorizedError("Identificador de proyecto inválido") from exc
+    return project_ids
 
 
 def user_has_permission(
@@ -257,7 +322,7 @@ def normalize_project_scopes(db: Session) -> None:
 
 
 def require_permission(resource: str, action: str) -> Callable:
-    def _dependency(
+    async def _dependency(
         request: Request,
         db: Session = Depends(get_db),
         current: tuple[User, list[str]] = Depends(get_current_user),
@@ -266,19 +331,15 @@ def require_permission(resource: str, action: str) -> Callable:
         if not user_has_permission(db, user_id=user.id, resource=resource, action=action):
             raise NotAuthorizedError(f"No tiene permiso para {action} sobre {resource}")
 
-        project_value = request.path_params.get("project_id")
-        if project_value and _is_project_aware_resource(resource):
-            try:
-                project_id = uuid.UUID(str(project_value))
-            except ValueError as exc:
-                raise NotAuthorizedError("Identificador de proyecto inválido") from exc
-            assert_project_access(
-                db,
-                user_id=user.id,
-                resource=resource,
-                action=action,
-                project_id=project_id,
-            )
+        if _is_project_aware_resource(resource):
+            for project_id in await _request_project_ids(request):
+                assert_project_access(
+                    db,
+                    user_id=user.id,
+                    resource=resource,
+                    action=action,
+                    project_id=project_id,
+                )
         return user
 
     return _dependency

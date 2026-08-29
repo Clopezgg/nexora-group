@@ -15,6 +15,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test'
 
 const ADMIN_EMAIL = 'admin@nexora.group'
 const ADMIN_PASSWORD = 'NexoraAdmin123!'
+let editCapability = ''
 
 async function api<T = any>(
   request: APIRequestContext,
@@ -22,7 +23,13 @@ async function api<T = any>(
   path: string,
   data?: unknown,
 ): Promise<T> {
-  const response = await request[method](`/api${path}`, data !== undefined ? { data } : undefined)
+  const options = {
+    ...(data !== undefined ? { data } : {}),
+    ...(method === 'put' && editCapability
+      ? { headers: { 'X-Nexora-Edit-Access': editCapability } }
+      : {}),
+  }
+  const response = await request[method](`/api${path}`, options)
   expect(response.ok(), `${method.toUpperCase()} ${path} -> ${response.status()}: ${await response.text()}`).toBeTruthy()
   if (response.status() === 204) return undefined as T
   return response.json()
@@ -89,7 +96,20 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     receivableGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '1200', name: 'CxC E2E', accountType: 'ASSET' })).id
   })
 
-  await test.step('resource posting configuration', async () => {
+  await test.step('Protected Edit + resource posting configuration', async () => {
+    const rejected = await page.request.put(
+      `/api/master-data/companies/${companyId}/resource-posting-configs/FUEL`,
+      { data: { sourceType: 'FUEL', expenseAccountId: expenseGl, offsetAccountId: payableGl, active: true } },
+    )
+    expect(rejected.status()).toBe(428)
+
+    const runtimeToken = process.env.E2E_EDIT_ACCESS_TOKEN
+    expect(runtimeToken).toBeTruthy()
+    const unlock = await api<any>(page.request, 'post', '/edit-access/verify', { token: runtimeToken })
+    editCapability = unlock.capability
+    expect(editCapability).toBeTruthy()
+    expect(unlock.usesRemaining).toBeGreaterThanOrEqual(3)
+
     for (const sourceType of ['FUEL', 'MAINTENANCE', 'LABOR'] as const) {
       const config = await api<any>(
         page.request,

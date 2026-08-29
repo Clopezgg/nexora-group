@@ -45,6 +45,7 @@ from app.api.routes import (
     submittals,
     suppliers,
     treasury,
+    treasury_advanced,
     workforce,
 )
 from app.core.config import get_settings
@@ -135,6 +136,7 @@ def create_app() -> FastAPI:
     app.include_router(project_budget_management.router, prefix="/api")
     app.include_router(project_extended_control.router, prefix="/api")
     app.include_router(treasury.router, prefix="/api")
+    app.include_router(treasury_advanced.router, prefix="/api")
     app.include_router(ap.router, prefix="/api")
     app.include_router(ar.router, prefix="/api")
     app.include_router(assets.router, prefix="/api")

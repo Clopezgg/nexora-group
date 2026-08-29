@@ -13,7 +13,7 @@ from app.schemas.ar import (
     CustomerReceiptResponse,
 )
 from app.services import ar_service, audit_service, idempotency_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services.permission_service import accessible_project_ids, assert_company_access, require_permission
 
 router = APIRouter(prefix="/ar", tags=["accounts-receivable"])
 
@@ -101,9 +101,20 @@ def list_customer_invoices(
         action="read",
         company_id=company_id,
     )
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="ar.customer_invoice", action="read"
+    )
+    invoices = ar_service.list_customer_invoices(db, company_id=company_id)
+    if allowed is not None:
+        allowed_set = set(allowed)
+        invoices = [
+            invoice
+            for invoice in invoices
+            if invoice.project_id is None or invoice.project_id in allowed_set
+        ]
     return [
         CustomerInvoiceResponse.model_validate(invoice, from_attributes=True)
-        for invoice in ar_service.list_customer_invoices(db, company_id=company_id)
+        for invoice in invoices
     ]
 
 

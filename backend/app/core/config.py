@@ -1,5 +1,6 @@
 import os
 from functools import lru_cache
+from urllib.parse import urlparse
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -70,6 +71,24 @@ class Settings(BaseSettings):
         if self.edit_access_required and not self.edit_access_configured:
             raise ValueError(
                 "EDIT_ACCESS_TOKEN_SALT and EDIT_ACCESS_TOKEN_DIGEST are required in production"
+            )
+
+        # FRONTEND_URL is both the CORS allow-origin and the CSRF Origin
+        # authority. In production it must therefore be one exact HTTPS
+        # origin, never a path, wildcard-like value or cleartext URL.
+        frontend = urlparse(self.frontend_url)
+        if (
+            frontend.scheme != "https"
+            or not frontend.netloc
+            or frontend.path
+            or frontend.params
+            or frontend.query
+            or frontend.fragment
+            or frontend.username
+            or frontend.password
+        ):
+            raise ValueError(
+                "FRONTEND_URL must be an exact HTTPS origin without path, query, fragment, or credentials in production"
             )
         return self
 

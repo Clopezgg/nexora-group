@@ -335,6 +335,7 @@ jobs:
           COOKIE_JAR="$RUNNER_TEMP/nexora-production-cookies.txt"
           LOGIN_HEADERS="$RUNNER_TEMP/nexora-login-headers.txt"
           CORS_HEADERS="$RUNNER_TEMP/nexora-cors-headers.txt"
+          CORS_HEADERS_NORMALIZED="$RUNNER_TEMP/nexora-cors-headers-normalized.txt"
 
           wait_for_status() {
             local url="$1"
@@ -359,14 +360,42 @@ jobs:
           wait_for_status "$BACKEND_URL/api/readyz" "200" "Database readiness"
           wait_for_status "$BACKEND_URL/api/edit-access/verify" "405" "Protected Edit route"
 
-          curl --silent --show-error --output /dev/null --dump-header "$CORS_HEADERS" \
+          RUNTIME_FRONTEND_URL="$(az containerapp show \
+            -g nexora-rg-dev \
+            -n nexora-backend-dev \
+            --query "properties.template.containers[0].env[?name=='FRONTEND_URL'].value | [0]" \
+            -o tsv)"
+          if [ "$RUNTIME_FRONTEND_URL" != "$FRONTEND_URL" ]; then
+            echo "::error::Container App FRONTEND_URL does not match deployed Static Web Apps origin"
+            echo "Expected frontend origin: $FRONTEND_URL"
+            echo "Runtime frontend origin: ${RUNTIME_FRONTEND_URL:-<empty>}"
+            exit 1
+          fi
+
+          CORS_CODE="$(curl --silent --show-error --output /dev/null --dump-header "$CORS_HEADERS" \
+            --write-out '%{http_code}' \
             --request OPTIONS \
             --header "Origin: $FRONTEND_URL" \
             --header 'Access-Control-Request-Method: POST' \
             --header 'Access-Control-Request-Headers: content-type' \
-            "$BACKEND_URL/api/auth/login"
-          grep -Eiq "^access-control-allow-origin: ${FRONTEND_URL//./\.}\r?$" "$CORS_HEADERS"
-          grep -Eiq '^access-control-allow-credentials: true\r?$' "$CORS_HEADERS"
+            "$BACKEND_URL/api/auth/login")"
+          tr -d '\r' < "$CORS_HEADERS" > "$CORS_HEADERS_NORMALIZED"
+          if [ "$CORS_CODE" != "200" ]; then
+            echo "::error::Production login CORS preflight returned HTTP $CORS_CODE"
+            grep -Ei '^(access-control-|vary:)' "$CORS_HEADERS_NORMALIZED" || true
+            exit 1
+          fi
+          if ! grep -Fqi "access-control-allow-origin: $FRONTEND_URL" "$CORS_HEADERS_NORMALIZED"; then
+            echo "::error::Production CORS preflight did not return the exact frontend Access-Control-Allow-Origin"
+            grep -Ei '^(access-control-|vary:)' "$CORS_HEADERS_NORMALIZED" || true
+            exit 1
+          fi
+          if ! grep -Fqi 'access-control-allow-credentials: true' "$CORS_HEADERS_NORMALIZED"; then
+            echo "::error::Production CORS preflight did not allow credentials"
+            grep -Ei '^(access-control-|vary:)' "$CORS_HEADERS_NORMALIZED" || true
+            exit 1
+          fi
+          echo "Production CORS preflight: HTTP 200 with exact origin and credentials"
 
           LOGIN_PAYLOAD="$(jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email:$email,password:$password}')"
           LOGIN_CODE="$(curl --silent --show-error \

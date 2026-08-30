@@ -2,8 +2,7 @@
   "routes": [
     {
       "route": "/api/*",
-      "allowedRoles": ["anonymous"],
-      "backend": "nexora-api"
+      "allowedRoles": ["anonymous"]
     },
     {
       "route": "/assets/*",
@@ -19,6 +18,7 @@
     }
   ],
   "navigationFallback": {
-    "rewrite": "/index.html"
+    "rewrite": "/index.html",
+    "exclude": ["/api/*"]
   }
 }

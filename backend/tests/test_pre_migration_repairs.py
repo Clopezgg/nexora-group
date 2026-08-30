@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from app.models.company import Company
 from app.models.currency import Currency
+from app.models.equipment import FuelLog
 from app.models.project import Project
 from app.models.supplier import Supplier, SupplierContract
 from app.pre_migration_repairs import run_authorized_project_reset_preflight
@@ -95,4 +96,35 @@ def test_preflight_aborts_if_a_mandatory_reference_exists(db_session):
         assert contract.project_id == project_id
     finally:
         db_session.execute(text("DROP TABLE IF EXISTS project_reset_blocker"))
+        _drop_alembic_version(db_session)
+
+def test_preflight_converts_project_scoped_history_to_general(db_session):
+    project_id, _contract_id = _seed_target_with_nullable_contract(db_session)
+    company_id = db_session.execute(
+        text("SELECT company_id FROM projects WHERE id=:project_id"),
+        {"project_id": project_id},
+    ).scalar_one()
+    fuel_log = FuelLog(
+        company_id=company_id,
+        vehicle_description="Equipo histórico",
+        log_date=date(2026, 8, 5),
+        quantity=Decimal("5.000"),
+        unit_cost=Decimal("102.9500"),
+        total_cost=Decimal("514.75"),
+        scope="PROJECT",
+        project_id=project_id,
+    )
+    db_session.add(fuel_log)
+    db_session.commit()
+    fuel_log_id = fuel_log.id
+
+    try:
+        run_authorized_project_reset_preflight()
+
+        db_session.expire_all()
+        preserved = db_session.get(FuelLog, fuel_log_id)
+        assert preserved is not None
+        assert preserved.project_id is None
+        assert preserved.scope == "GENERAL"
+    finally:
         _drop_alembic_version(db_session)

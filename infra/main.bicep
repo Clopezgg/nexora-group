@@ -138,18 +138,14 @@ module containerApps 'modules/containerapps.bicep' = {
   }
 }
 
-module linkedBackend 'modules/linkedbackend.bicep' = {
-  name: 'linkedbackend'
-  scope: rg
-  params: {
-    staticWebAppName: staticWebApp.outputs.staticWebAppName
-    backendResourceId: containerApps.outputs.backendResourceId
-    backendRegion: location
-  }
-}
+// The Static Web Apps -> Container Apps association is intentionally managed by
+// `az staticwebapp backends link` in the deployment workflow. The GA command
+// performs the complete linking/auth handshake for Container Apps, which a raw
+// ARM child resource alone does not reliably establish.
 
 output resourceGroupName string = rg.name
 output backendFqdn string = containerApps.outputs.backendFqdn
+output backendResourceId string = containerApps.outputs.backendResourceId
 output frontendHostname string = staticWebApp.outputs.defaultHostname
 output keyVaultUri string = keyVault.outputs.keyVaultUri
 output storageAccountName string = storage.outputs.storageAccountName

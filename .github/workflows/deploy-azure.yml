@@ -160,6 +160,36 @@ jobs:
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
 
+      - name: Run database migrations with backend quiesced
+        run: |
+          set -euo pipefail
+          APP=nexora-backend-dev
+          RG=nexora-rg-dev
+          KEY_VAULT_NAME="$(az keyvault list -g "$RG" --query '[0].name' -o tsv)"
+          DATABASE_URL="$(az keyvault secret show --vault-name "$KEY_VAULT_NAME" --name database-url --query value -o tsv)"
+
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Database URL could not be resolved from Key Vault"
+            exit 1
+          fi
+          echo "::add-mask::$DATABASE_URL"
+
+          restore_backend() {
+            az containerapp start -g "$RG" -n "$APP" >/dev/null || true
+          }
+          trap restore_backend EXIT
+
+          # Alembic needs exclusive schema locks. Quiescing the serving
+          # revision prevents an old pooled transaction from blocking startup
+          # of the new revision indefinitely.
+          az containerapp stop -g "$RG" -n "$APP"
+          docker run --rm \
+            --env DATABASE_URL="$DATABASE_URL" \
+            "$IMAGE" \
+            sh -ec 'python -u -m app.pre_migration_repairs && alembic upgrade head'
+          restore_backend
+          trap - EXIT
+
       - name: Deploy infraestructura (Bicep)
         run: |
           az deployment sub create \

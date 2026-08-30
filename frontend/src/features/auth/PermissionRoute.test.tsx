@@ -5,12 +5,12 @@ import type { CurrentUser } from '../../types/auth'
 import { AuthContext, type AuthContextValue } from './auth-context'
 import { PermissionRoute } from './PermissionRoute'
 
-function renderRoute(permissions: string[]) {
+function renderRoute(permissions: string[], roles: CurrentUser['roles'] = ['Viewer']) {
   const user = {
     id: 'user-1',
     email: 'user@nexora.group',
     fullName: 'User',
-    roles: ['Viewer'],
+    roles,
     permissions,
   } satisfies CurrentUser
   const auth: AuthContextValue = {
@@ -50,5 +50,11 @@ describe('PermissionRoute', () => {
 
     expect(screen.queryByText('Contabilidad privada')).toBeNull()
     expect(screen.getByText('Inicio autorizado')).toBeTruthy()
+  })
+
+  it('keeps the canonical Administrator role accessible while grants refresh', () => {
+    renderRoute([], ['Administrator'])
+
+    expect(screen.getByText('Contabilidad privada')).toBeTruthy()
   })
 })

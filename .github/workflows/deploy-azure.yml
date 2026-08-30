@@ -380,7 +380,9 @@ jobs:
             "$BACKEND_URL/api/auth/login")"
           if [ "$LOGIN_CODE" != "200" ]; then
             echo "::error::Production login returned HTTP $LOGIN_CODE"
-            jq -c '{detail: .detail?, error: .error?}' "$RUNNER_TEMP/login.json" || true
+            if ! jq -c '{detail: .detail?, error: .error?}' "$RUNNER_TEMP/login.json"; then
+              echo 'Unable to parse production login error body.'
+            fi
             exit 1
           fi
           if ! grep -Eiq '^set-cookie:.*Secure.*SameSite=None' "$LOGIN_HEADERS"; then
@@ -397,7 +399,9 @@ jobs:
             "$BACKEND_URL/api/dashboard/summary")"
           if [ "$DASHBOARD_CODE" != "200" ]; then
             echo "::error::Authenticated dashboard returned HTTP $DASHBOARD_CODE"
-            jq -c '{detail: .detail?, error: .error?}' "$RUNNER_TEMP/dashboard-summary.json" || true
+            if ! jq -c '{detail: .detail?, error: .error?}' "$RUNNER_TEMP/dashboard-summary.json"; then
+              echo 'Unable to parse authenticated dashboard error body.'
+            fi
             exit 1
           fi
           jq -e '.currency == "HNL"' "$RUNNER_TEMP/dashboard-summary.json" >/dev/null

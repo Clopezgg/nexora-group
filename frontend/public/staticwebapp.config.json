@@ -1,10 +1,6 @@
 {
   "routes": [
     {
-      "route": "/api/*",
-      "allowedRoles": ["anonymous"]
-    },
-    {
       "route": "/assets/*",
       "headers": {
         "Cache-Control": "public, max-age=31536000, immutable"
@@ -18,7 +14,6 @@
     }
   ],
   "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": ["/api/*"]
+    "rewrite": "/index.html"
   }
 }

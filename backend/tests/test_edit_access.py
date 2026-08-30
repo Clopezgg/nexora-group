@@ -72,6 +72,21 @@ def test_edit_pin_is_hashed_and_capability_is_signed_tamper_proof_and_session_bo
         settings.edit_access_ttl_seconds = old_ttl
 
 
+def test_edit_pin_accepts_strong_long_reauthentication_secret():
+    settings = get_settings()
+    old_salt = settings.edit_access_token_salt
+    old_digest = settings.edit_access_token_digest
+    strong_secret = secrets.token_urlsafe(64)
+    assert len(strong_secret) > 32
+    try:
+        _configure_test_pin(settings, strong_secret)
+        assert edit_access_service.verify_pin(strong_secret, settings)
+        assert not edit_access_service.verify_pin(strong_secret + "x", settings)
+    finally:
+        settings.edit_access_token_salt = old_salt
+        settings.edit_access_token_digest = old_digest
+
+
 def test_edit_guard_requires_unlock_then_allows_request_to_reach_route(client, db_session):
     settings = get_settings()
     old_required = settings.edit_access_required

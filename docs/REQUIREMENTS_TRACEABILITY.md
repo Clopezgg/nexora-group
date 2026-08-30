@@ -287,9 +287,16 @@ todavía).
 | NXR-REQ-0121 | Monitor / Application Insights | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep + wiring opcional en `main.py`, sin desplegar |
 | NXR-REQ-0122 | OIDC deployment (federated credentials) | ➖➖⬜➖➖➖➖⬜⬜ | NOT_STARTED | workflow escrito, falta configurar credenciales federadas en GitHub |
 | NXR-REQ-0123 | Production smoke | ⬜ | BLOCKED_EXTERNAL | requiere confirmación puntual de despliegue real (`CLAUDE.md` §11.1) |
-| NXR-REQ-0124 | Production E2E | ⬜ | BLOCKED_EXTERNAL | requiere confirmación puntual de despliegue real (`CLAUDE.md` §11.1) |
+| NXR-REQ-0124 | Production E2E | ➖➖✅✅✅✅✅✅✅ | IMPLEMENTED | 2026-08-30: despliegue real confirmado puntualmente y ejecutado (Deploy Azure run `33341601256`, `main@2b1cbe4`). Producción verificada: Container App `nexora-backend-dev--0000039` `Running`/`Healthy`/`latestRevision==latestReadyRevision`, imagen = SHA exacto de `main`, `healthz`/`readyz` 200, CORS exact-origin + credentials, login real → cookie `Secure`+`HttpOnly`+`SameSite=None`+`Path=/`, dashboard autenticado 200 con `currency=="HNL"`. Ver `docs/PROGRESS.md` (entrada 2026-08-30). |
 
 ## Resumen
+
+**Actualización 2026-08-30 (auditoría destructiva controlada):** `NXR-REQ-0124`
+(Production E2E) pasa de `BLOCKED_EXTERNAL` a `IMPLEMENTED` — despliegue real
+confirmado y ejecutado, producción certificada extremo a extremo (ver
+`docs/PROGRESS.md`). Se corrigieron 3 defectos reproducibles de timezone de
+negocio / bootstrap de base limpia (PRs #34, #35). El resto de los conteos
+abajo sigue vigente.
 
 Recontado contra las 124 filas reales el 2026-08-26 (no derivado del resumen
 histórico):
@@ -301,7 +308,8 @@ histórico):
   pero mover cada fila individual a `VERIFIED` exige mapear su alcance
   exacto contra lo que el recorrido realmente cubre, fila por fila — pasada
   pendiente, no asumida aquí.
-- **IMPLEMENTED:** 110 / 124. `NXR-REQ-0016` (Financial statements,
+- **IMPLEMENTED:** 111 / 124 (2026-08-30: +`NXR-REQ-0124` Production E2E).
+  `NXR-REQ-0016` (Financial statements,
   incluyendo Cash Flow), `NXR-REQ-0106` (Migrations), `NXR-REQ-0105`
   (Accessibility), `NXR-REQ-0108` (Observability), `NXR-REQ-0109`
   (Backup/Restore), `NXR-REQ-0058` (Supplier Performance) movieron a
@@ -309,12 +317,15 @@ histórico):
   `NXR-REQ-0107` (Security) movieron a `IMPLEMENTED` el 2026-08-26
   tras Playwright E2E 3/3.
 - **IN_PROGRESS:** 8 / 124 — NXR-REQ-0114/0115/0116/0117/0118/
-  0119/0120/0121 (todos Azure infrastructure, BLOCKED por deployment).
+  0119/0120/0121 (Azure infrastructure). El blocker de "deployment real" ya
+  no aplica (Deploy Azure ejecuta y certifica producción, ver
+  `docs/PROGRESS.md` 2026-08-30); pendiente una pasada de re-mapeo fila por
+  fila antes de moverlos a `IMPLEMENTED` — no se infla aquí.
 - **NOT_STARTED:** 1 / 124 — NXR-REQ-0122 (OIDC, BLOCKED por Azure AD tenant).
-- **BLOCKED_EXTERNAL:** 2 / 124 — NXR-REQ-0123/0124, ambos dependientes del
-  despliegue Azure real sujeto a `CLAUDE.md` §11.1.
+- **BLOCKED_EXTERNAL:** 1 / 124 — NXR-REQ-0123 (production smoke pipeline;
+  re-evaluar contra el gate de `Verify production` del run `33341601256`).
 
-Suma verificada contra las 124 filas reales: 3+110+8+1+2 = 124 (recontar con
+Suma verificada contra las 124 filas reales: 3+111+8+1+1 = 124 (recontar con
 `grep -oE '\| (NOT_STARTED|IN_PROGRESS|IMPLEMENTED|VERIFIED|BLOCKED_EXTERNAL) \|' docs/REQUIREMENTS_TRACEABILITY.md | sort | uniq -c`
 antes de fiarse de este resumen prosa, que puede desincronizarse de la
 tabla real). El sistema combinado pasó 338 pruebas backend sobre

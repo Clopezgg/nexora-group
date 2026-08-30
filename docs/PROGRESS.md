@@ -3133,3 +3133,45 @@ all documentation before final commit.
 - `vite build` OK (PWA precache 7 entries)
 - Playwright E2E 3/3 (Critical Journey + Accessibility)
 - Git: `feat/nexora-greenfield` clean, synced to origin, `main` untouched
+
+---
+
+## 2026-08-30 — Auditoría destructiva controlada + certificación de producción
+
+Pasada de auditoría profunda sobre `main` (backend, frontend, seguridad, DB,
+multi-tenancy, contabilidad, DevOps/Azure). Estado: la mayoría de los
+endurecimientos ya estaban implementados y verificados por PRs #21–#33; se
+encontraron y corrigieron **3 defectos reproducibles**:
+
+1. **PR #34** — `pre_migration_repairs` fallaba con `UndefinedTable` contra una
+   base de datos limpia (job `docker-compose` de CI, primer bootstrap Azure),
+   dejando el contenedor muerto antes de `alembic upgrade head`. Fix:
+   `to_regclass('public.alembic_version')` → no-op si la tabla no existe.
+   Cierra `DEFERRED-FINAL-DOCKER-001` / `EXTERNAL-BLOCKER-002`.
+2. **PR #35** — el Posting Engine resolvía el período fiscal (`INV-ACC-003`)
+   con `datetime.now(timezone.utc).date()`; entre las 18:00 y 23:59 en
+   `America/Tegucigalpa` un asiento se evaluaba contra el período del día
+   siguiente. Fix: `business_today()`.
+3. **PR #35** — `numbering_service` estampaba el año del número de documento
+   (`PREFIX-YYYY-NNNNNN`) en UTC; un documento contabilizado el 31-dic en
+   Honduras recibía el año siguiente. Fix: `business_today().year`.
+
+`EXTERNAL-BLOCKER-003` (facturación GitHub Actions) resuelto: CI y `Deploy
+Azure` ejecutan steps reales.
+
+**Certificación de producción (2026-08-30):**
+- `main` @ `2b1cbe4` — CI verde (backend, frontend, e2e, Docker Compose smoke, Bicep).
+- Deploy Azure run `33341601256` verde; migraciones Alembic OK.
+- Container App `nexora-backend-dev--0000039`: `Running`, `latestRevision == latestReadyRevision`, `Healthy`.
+- Imagen = `ghcr.io/clopezgg/nexora-backend:2b1cbe4e7e6f8efd7294dc77ddb919e0d19e2e92` (SHA exacto de `main`).
+- `GET /api/healthz` 200 · `GET /api/readyz` 200 · frontend 200.
+- `OPTIONS /api/auth/login` con `Origin` del frontend → 200, `Access-Control-Allow-Origin` exacto, `Access-Control-Allow-Credentials: true`.
+- Login real → cookie `nexora_session` `Secure` + `HttpOnly` + `SameSite=None` + `Path=/`.
+- `GET /api/auth/me` + dashboard autenticado 200, contrato `currency == "HNL"`.
+- Bundle productivo llama al FQDN HTTPS absoluto de Container Apps (nunca `/api` relativo); HTML `no-store`; headers `X-Frame-Options`/`X-Content-Type-Options`/`Referrer-Policy`/`Permissions-Policy`; SW sin precache de app-shell.
+
+**Verificación local:** 426/426 backend pytest (PostgreSQL real).
+
+**No bloqueante (documentado, no oculto):**
+- CSP en Static Web Apps (el backend ya envía `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` + HSTS; el frontend cubre clickjacking con `X-Frame-Options: DENY`).
+- Paginación explícita en ~56 consultas de listado (todas ya acotadas por tenant; sin problema de performance demostrado).

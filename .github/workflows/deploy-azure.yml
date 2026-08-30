@@ -206,6 +206,35 @@ jobs:
               editAccessTokenDigest="$EDIT_ACCESS_TOKEN_DIGEST" \
               backendImage="$IMAGE"
 
+      - name: Start backend when a prior migration rollout left it stopped
+        run: |
+          set -euo pipefail
+          APP=nexora-backend-dev
+          RG=nexora-rg-dev
+          API_VERSION=2025-07-01
+          SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+          APP_RESOURCE_URL="https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG}/providers/Microsoft.App/containerApps/${APP}"
+
+          running_status="$(az rest --method get --url "${APP_RESOURCE_URL}?api-version=${API_VERSION}" --query properties.runningStatus -o tsv)"
+          echo "Container App running status after deployment: $running_status"
+          if [ "$running_status" = "Stopped" ]; then
+            az rest --method post --url "${APP_RESOURCE_URL}/start?api-version=${API_VERSION}" >/dev/null
+          elif [ "$running_status" != "Running" ]; then
+            echo "::error::Container App is in unexpected running status: $running_status"
+            exit 1
+          fi
+
+          for attempt in $(seq 1 36); do
+            running_status="$(az rest --method get --url "${APP_RESOURCE_URL}?api-version=${API_VERSION}" --query properties.runningStatus -o tsv)"
+            echo "attempt=$attempt runningStatus=$running_status"
+            if [ "$running_status" = "Running" ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Container App did not reach Running after deployment"
+          exit 1
+
       - name: Remove failing Static Web Apps linked backend
         run: |
           set -euo pipefail
@@ -242,10 +271,11 @@ jobs:
           for attempt in $(seq 1 36); do
             LATEST_REVISION="$(az containerapp show -g "$RG" -n "$APP" --query properties.latestRevisionName -o tsv)"
             READY_REVISION="$(az containerapp show -g "$RG" -n "$APP" --query properties.latestReadyRevisionName -o tsv)"
+            RUNNING_STATUS="$(az containerapp show -g "$RG" -n "$APP" --query properties.runningStatus -o tsv)"
             HEALTH="$(az containerapp revision list -g "$RG" -n "$APP" --query "[?name=='$LATEST_REVISION'] | [0].properties.healthState" -o tsv)"
             REV_IMAGE="$(az containerapp revision list -g "$RG" -n "$APP" --query "[?name=='$LATEST_REVISION'] | [0].properties.template.containers[0].image" -o tsv)"
-            echo "attempt=$attempt latest=$LATEST_REVISION ready=$READY_REVISION health=$HEALTH"
-            if [ -n "$LATEST_REVISION" ] && [ "$LATEST_REVISION" = "$READY_REVISION" ] && [ "$HEALTH" = "Healthy" ] && [[ "$REV_IMAGE" == *"$EXPECTED_SHA"* ]]; then
+            echo "attempt=$attempt running=$RUNNING_STATUS latest=$LATEST_REVISION ready=$READY_REVISION health=$HEALTH"
+            if [ "$RUNNING_STATUS" = "Running" ] && [ -n "$LATEST_REVISION" ] && [ "$LATEST_REVISION" = "$READY_REVISION" ] && [ "$HEALTH" = "Healthy" ] && [[ "$REV_IMAGE" == *"$EXPECTED_SHA"* ]]; then
               exit 0
             fi
             sleep 10

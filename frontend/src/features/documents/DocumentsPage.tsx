@@ -225,6 +225,22 @@ function DocumentVersionsModal({
     onError: (error) => handleMutationError(error, 'Agregar versión de documento'),
   })
 
+  const downloadMutation = useMutation({
+    mutationFn: (evidenceId: string) => documentService.downloadEvidence(evidenceId),
+    onSuccess: ({ blob, filename }, evidenceId) => {
+      const objectUrl = URL.createObjectURL(blob)
+      const link = window.document.createElement('a')
+      link.href = objectUrl
+      link.download = filename || `evidencia-${evidenceId}`
+      link.style.display = 'none'
+      window.document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(objectUrl)
+    },
+    onError: (error) => handleMutationError(error, 'Descargar versión de documento'),
+  })
+
   return (
     <Modal open={Boolean(document)} title={document ? `Versiones — ${document.title}` : ''} onClose={onClose}>
       {versionsQuery.isLoading ? (
@@ -236,11 +252,24 @@ function DocumentVersionsModal({
               v{version.versionNumber} —{' '}
               <Badge tone={VERSION_STATUS_TONE[version.status]}>{version.status}</Badge>
               {version.notes ? ` — ${version.notes}` : ''}
+              {' '}
+              <Button
+                variant="secondary"
+                onClick={() => downloadMutation.mutate(version.evidenceId)}
+                loading={downloadMutation.isPending && downloadMutation.variables === version.evidenceId}
+                disabled={downloadMutation.isPending}
+              >
+                Descargar
+              </Button>
             </li>
           ))}
           {(versionsQuery.data ?? []).length === 0 ? <li>Sin versiones todavía.</li> : null}
         </ul>
       )}
+
+      {downloadMutation.isError ? (
+        <p className="nx-field__error">{String(downloadMutation.error)}</p>
+      ) : null}
 
       <form
         onSubmit={(event) => {

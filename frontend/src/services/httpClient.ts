@@ -99,6 +99,16 @@ export interface ApiDownload {
   filename: string | null
 }
 
+function safeDownloadFilename(filename: string | null): string | null {
+  if (!filename) return null
+  const normalized = filename.replace(/\\/g, '/').split('/').pop() ?? ''
+  const withoutControls = Array.from(normalized)
+    .filter((character) => character.charCodeAt(0) > 31 && character.charCodeAt(0) !== 127)
+    .join('')
+  const safe = withoutControls.trim().replace(/^\.+/, '')
+  return safe.slice(0, 255) || null
+}
+
 function downloadFilename(response: Response): string | null {
   const disposition = response.headers.get('content-disposition')
   if (!disposition) return null
@@ -106,14 +116,14 @@ function downloadFilename(response: Response): string | null {
   const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
   if (encoded) {
     try {
-      return decodeURIComponent(encoded)
+      return safeDownloadFilename(decodeURIComponent(encoded))
     } catch {
-      return encoded
+      return safeDownloadFilename(encoded)
     }
   }
 
   const quoted = disposition.match(/filename="([^"]+)"/i)?.[1]
-  return quoted ?? null
+  return safeDownloadFilename(quoted ?? null)
 }
 
 export async function apiFetchBlob(path: string): Promise<ApiDownload> {

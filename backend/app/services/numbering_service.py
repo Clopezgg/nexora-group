@@ -1,10 +1,10 @@
 import uuid
-from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.business_time import business_today
 from app.models.document_type import DocumentType
 from app.models.number_sequence import NumberSequence
 
@@ -30,7 +30,10 @@ def next_document_number(db: Session, *, company_id: uuid.UUID, document_type_co
     externa, p.ej. `posting_service.post_manual` ya pudo haber agregado
     otros objetos antes de llamar aquí) y se relee la fila que el
     ganador ya creó, con FOR UPDATE, como si siempre hubiera existido."""
-    year = datetime.now(timezone.utc).year
+    # The year stamped into the document number (PREFIX-YYYY-NNNNNN) is a
+    # business-calendar year, so it must follow the Nexora business timezone
+    # (America/Tegucigalpa) rather than the container's UTC clock.
+    year = business_today().year
 
     document_type = db.execute(
         select(DocumentType).where(DocumentType.code == document_type_code)

@@ -76,6 +76,9 @@ dejarla en JSONB indefinidamente. Registrado aquí para que no se olvide.
 
 `backend/app/services/numbering_service.py`. Formato:
 `{PREFIX}-{AÑO}-{consecutivo de 6 dígitos}` (p.ej. `JRN-2026-000001`).
+El `{AÑO}` es el año del calendario de negocio (`America/Tegucigalpa`,
+`business_today()`), igual que el gate de período fiscal en el Posting
+Engine — nunca el reloj UTC del contenedor.
 Cada `document_type_code` nuevo que un track agregue debe registrar una
 fila en `document_types` (código + prefijo) antes de poder numerar
 documentos de ese tipo — ver `app/repositories/catalog_repository.py` para
@@ -116,7 +119,7 @@ Ver `docs/RBAC.md` para el catálogo de roles y el contrato de
 |---|---|---|---|---|
 | INV-ACC-001 | Débitos = Créditos en cada AccountingDocument | `posting_service._validate_balance` | `test_posting_engine.py::test_unbalanced_journal_entry_is_rejected` | ✅ VERIFIED |
 | INV-ACC-002 | Documento posted es inmutable | `posting_service.reverse_document` / `assert_document_is_mutable_or_raise` | `test_posting_engine.py::test_reverse_preserves_original_and_swaps_debit_credit`, `::test_reverse_of_already_reversed_document_is_rejected` | ✅ VERIFIED |
-| INV-ACC-003 | Período CLOSED no admite posting nuevo | `posting_service._assert_fiscal_period_open` | `test_fiscal_period_closed.py` | ✅ VERIFIED |
+| INV-ACC-003 | Período CLOSED no admite posting nuevo (fecha evaluada en timezone de negocio `America/Tegucigalpa`) | `posting_service._assert_fiscal_period_open` + `business_today()` | `test_fiscal_period_closed.py` | ✅ VERIFIED |
 | INV-TRE-001 | El dinero real pertenece a Treasury | — (Track A) | — | NOT_STARTED — dueño: Track A |
 | INV-TRE-002 | Project nunca posee saldo monetario | — (Track A/B) | — | NOT_STARTED — dueño: Track A + B |
 | INV-OPS-001 | scope=CENTRAL ⇒ project_id NULL | CHECK constraint `ck_accounting_documents_operation_scope` + `posting_service._validate_scope` | `test_operation_scope_constraint.py::test_check_constraint_rejects_central_scope_with_project` | ✅ VERIFIED |

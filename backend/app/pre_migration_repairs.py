@@ -105,7 +105,7 @@ def run_authorized_project_reset_preflight() -> None:
             )
             references = cur.fetchall()
 
-            nullable_refs: list[tuple[str, str, str, int]] = []
+            nullable_refs: list[tuple[str, str, str, int, bool]] = []
             mandatory_refs: list[tuple[str, str, str, int]] = []
             for schema, table, column, is_nullable, _delete_rule in references:
                 count_query = sql.SQL("SELECT count(*) FROM {}.{} WHERE {} = ANY(%s)").format(
@@ -119,7 +119,19 @@ def run_authorized_project_reset_preflight() -> None:
                     continue
                 item = (schema, table, column, count)
                 if is_nullable == "YES":
-                    nullable_refs.append(item)
+                    cur.execute(
+                        """
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM information_schema.columns
+                            WHERE table_schema = %s
+                              AND table_name = %s
+                              AND column_name = 'scope'
+                        )
+                        """,
+                        (schema, table),
+                    )
+                    nullable_refs.append((*item, bool(cur.fetchone()[0])))
                 else:
                     mandatory_refs.append(item)
 
@@ -133,13 +145,30 @@ def run_authorized_project_reset_preflight() -> None:
                 )
 
             detached_counts: dict[str, int] = defaultdict(int)
-            for schema, table, column, _count in nullable_refs:
-                update_query = sql.SQL("UPDATE {}.{} SET {} = NULL WHERE {} = ANY(%s)").format(
-                    sql.Identifier(schema),
-                    sql.Identifier(table),
-                    sql.Identifier(column),
-                    sql.Identifier(column),
-                )
+            for schema, table, column, _count, has_scope in nullable_refs:
+                if has_scope:
+                    # A nullable project_id can still be coupled to an
+                    # operation-scope CHECK. Preserve the business record as
+                    # company-general history instead of violating the CHECK
+                    # while detaching the deleted project.
+                    update_query = sql.SQL(
+                        "UPDATE {}.{} SET {} = NULL, {} = 'GENERAL' WHERE {} = ANY(%s)"
+                    ).format(
+                        sql.Identifier(schema),
+                        sql.Identifier(table),
+                        sql.Identifier(column),
+                        sql.Identifier("scope"),
+                        sql.Identifier(column),
+                    )
+                else:
+                    update_query = sql.SQL(
+                        "UPDATE {}.{} SET {} = NULL WHERE {} = ANY(%s)"
+                    ).format(
+                        sql.Identifier(schema),
+                        sql.Identifier(table),
+                        sql.Identifier(column),
+                        sql.Identifier(column),
+                    )
                 cur.execute(update_query, (target_ids,))
                 detached_counts[f"{schema}.{table}.{column}"] += cur.rowcount
 
@@ -176,7 +205,7 @@ def run_authorized_project_reset_preflight() -> None:
     if nullable_refs:
         summary = ", ".join(
             f"{schema}.{table}.{column}={count}"
-            for schema, table, column, count in nullable_refs
+            for schema, table, column, count, _has_scope in nullable_refs
         )
         print(f"[pre-migration-repair] detached nullable references: {summary}")
     print(f"[pre-migration-repair] authorized target projects prepared: {len(projects)}")

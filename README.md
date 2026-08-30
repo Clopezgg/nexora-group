@@ -43,7 +43,7 @@ scripts/    Scripts de desarrollo local
    ```
 
    Levanta Vite en `http://localhost:5173`, con proxy de `/api` hacia el
-   backend.
+   backend exclusivamente para desarrollo local.
 
 ### Con Docker
 
@@ -67,8 +67,13 @@ Frontend:
 
 ```bash
 cd frontend
-npm run typecheck && npm run lint && npm run test && npm run build
+npm run typecheck && npm run lint && npm run test
+VITE_API_BASE_URL=https://ci.invalid/api npm run build
 ```
+
+El build de producción **falla cerrado** si `VITE_API_BASE_URL` no es una URL
+HTTPS absoluta. El fallback relativo `/api` existe únicamente en modo de
+desarrollo/test para el proxy local de Vite.
 
 ## Deploy
 
@@ -76,21 +81,45 @@ Plataforma oficial: **Microsoft Azure**. Render fue descartado como destino
 de despliegue (ver `CLAUDE.md`).
 
 - Frontend → Azure Static Web Apps (Free tier)
-- Backend → Azure Container Apps (consumption plan, scale-to-zero)
+- Backend → Azure Container Apps (consumption plan, `minReplicas=1` para el backend productivo actual)
 - Base de datos → Azure Database for PostgreSQL Flexible Server (Burstable B1ms)
 - Evidencias/documentos → Azure Blob Storage
 - Secrets → Azure Key Vault
 - Observabilidad → Azure Monitor + Application Insights + Log Analytics
-- Infraestructura → Bicep (`infra/`), ver `infra/README.md` para el
-  procedimiento completo de despliegue y el detalle de cada módulo.
-- CI/CD → GitHub Actions con Azure OIDC/federated credentials
-  (`.github/workflows/deploy-azure.yml`); requiere que el usuario configure
-  los secrets del repo y apruebe el environment `production` antes de que
-  el deploy real se ejecute.
+- Infraestructura → Bicep (`infra/`), ver `infra/README.md` para el procedimiento completo
+- CI/CD → GitHub Actions con Azure OIDC/federated credentials (`.github/workflows/deploy-azure.yml`)
 
-Azure DEV está provisionado y disponible en
-`https://jolly-plant-0d6bf700f.7.azurestaticapps.net/`, con API same-origin,
-Container Apps, PostgreSQL, Blob Storage y Key Vault administrados por el
-workflow `Deploy Azure`. Los secretos de Protected Edit se pasan como
-parámetros seguros de Bicep y referencias de Key Vault; si no están
-provisionados, el backend falla cerrado.
+### Contrato de red de producción
+
+El frontend **no** usa un proxy same-origin `/api` en Azure. Durante el deploy
+se compila con:
+
+```text
+VITE_API_BASE_URL=https://<container-app-fqdn>/api
+```
+
+El navegador llama directamente al HTTPS público de Container Apps. El backend
+acepta exactamente el origen de Azure Static Web Apps mediante CORS con
+credenciales y el guard CSRF valida el mismo `Origin`. La sesión se transporta
+en una cookie `Secure`, `HttpOnly`, `SameSite=None`, `Path=/`.
+
+Para evitar que una versión antigua vuelva a llamar al proxy `/api`, el HTML de
+Static Web Apps se entrega `no-store` y el service worker no precachea HTML,
+JavaScript ni CSS del shell transaccional.
+
+### Autorización del despliegue
+
+Un `push` a `main` solo ejecuta el job que modifica Azure cuando el mensaje del
+commit de cabeza contiene `[deploy]`. También existe `workflow_dispatch` con
+la confirmación `deploy=true`. Los PR ejecutan Bicep what-if y las validaciones,
+pero no modifican Azure.
+
+El gate productivo comprueba, entre otros puntos: migraciones Alembic, imagen
+correspondiente al SHA, Container App `Running`, revisión `Healthy`, health y
+readiness HTTP, frontend desplegado, CORS exact-origin, login real, atributos de
+la cookie de sesión, dashboard autenticado, contrato HNL y Protected Edit.
+
+Azure DEV está provisionado en
+`https://jolly-plant-0d6bf700f.7.azurestaticapps.net/`. El backend se publica a
+través del FQDN HTTPS de `nexora-backend-dev` y ese endpoint se inyecta en el
+build del frontend; no debe sustituirse por `/api` en producción.

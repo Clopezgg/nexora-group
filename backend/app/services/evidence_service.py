@@ -2,6 +2,7 @@ import logging
 import re
 import unicodedata
 import uuid
+from collections.abc import Iterable
 
 from sqlalchemy.orm import Session
 
@@ -11,16 +12,12 @@ from app.integrations.azure_blob import delete_blob_if_exists, get_evidence_cont
 from app.models.evidence import EVIDENCE_ALLOWED_MIME_TYPES, Evidence
 from app.repositories import evidence_repository
 
-"""Evidence upload (bloque CONSTRUCTION CONTROL, orden maestra §79,
-docs/DOCUMENTS_EVIDENCE.md). Regla "no mocks presentados como
-funcionalidad real": este servicio SOLO crea una fila `Evidence` después de
-un upload real y exitoso contra Azure Blob Storage. Si el storage no está
-configurado, `get_evidence_container_client` lanza
-`EvidenceStorageNotConfigured` (RuntimeError real, registrado en
-error_handlers.py como 503 NXR-EVIDENCE-001) -- nunca se fabrica una URL ni
-una fila falsa. MIME type y tamaño se validan ANTES de tocar el cliente de
-Blob, para no gastar una llamada de red en un archivo que de todos modos se
-va a rechazar."""
+"""Evidence upload/download service (CONSTRUCTION CONTROL).
+
+Evidence is stored only in Azure Blob Storage (or the explicitly configured
+Azurite-compatible development backend). The application never fabricates a
+public URL and never persists evidence payloads to local disk.
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +116,6 @@ def upload_evidence(
         )
 
     settings = get_settings()
-    # Puede lanzar EvidenceStorageNotConfigured -- se deja propagar tal cual,
-    # nunca se atrapa aquí para fabricar una respuesta de éxito falsa.
     container_client = get_evidence_container_client(settings)
 
     safe_filename = normalize_filename(filename)
@@ -158,6 +153,19 @@ def upload_evidence(
         db.rollback()
         _compensate_uploaded_blob(container_client, blob_key)
         raise
+
+
+def download_evidence(evidence: Evidence) -> Iterable[bytes]:
+    """Return a private Blob stream for an already-authorized evidence row.
+
+    Authorization deliberately lives in the API layer because it requires the
+    current principal and project grants. This function only resolves the
+    configured private container and starts the Blob download; storage
+    configuration errors propagate to the standard NXR-EVIDENCE-001 handler.
+    """
+    container_client = get_evidence_container_client(get_settings())
+    downloader = container_client.download_blob(evidence.blob_key)
+    return downloader.chunks()
 
 
 def get_evidence(db: Session, evidence_id: uuid.UUID) -> Evidence | None:

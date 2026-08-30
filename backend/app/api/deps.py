@@ -20,14 +20,19 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def _client_ip(request: Request) -> str:
-    """En Azure Container Apps (y cualquier reverse proxy real) la IP real
-    del cliente llega en `X-Forwarded-For` (primer hop = el cliente
-    original); `request.client.host` es la IP del proxy, no del usuario.
-    En local/dev sin proxy no hay ese header, así que cae a
-    `request.client.host` (p.ej. el loopback de TestClient)."""
+    """Return the rate-limit identity supplied by the trusted ingress hop.
+
+    Azure Container Apps appends the address it observes to
+    ``X-Forwarded-For`` and documents that only the *rightmost* value is
+    provided by Container Apps; values to its left can originate in the
+    client request and must not be trusted for anti-abuse decisions. Local
+    development without ingress falls back to ``request.client.host``.
+    """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        addresses = [value.strip() for value in forwarded.split(",") if value.strip()]
+        if addresses:
+            return addresses[-1]
     return request.client.host if request.client else "unknown"
 
 

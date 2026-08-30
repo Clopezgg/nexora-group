@@ -47,6 +47,14 @@ def run_authorized_project_reset_preflight() -> None:
 
     with psycopg.connect(_dsn()) as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('public.alembic_version')")
+            if cur.fetchone()[0] is None:
+                # Fresh database (e.g. Docker Compose smoke, first Azure
+                # bootstrap): Alembic has not stamped a revision yet, so this
+                # one-time legacy repair cannot apply. Let ``alembic upgrade
+                # head`` build the schema from scratch.
+                print("[pre-migration-repair] no alembic_version table; preflight not required")
+                return
             cur.execute("SELECT version_num FROM alembic_version")
             versions = {row[0] for row in cur.fetchall()}
             if _PRE_RESET_REVISION not in versions:

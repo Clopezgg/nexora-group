@@ -369,19 +369,37 @@ jobs:
           grep -Eiq '^access-control-allow-credentials: true\r?$' "$CORS_HEADERS"
 
           LOGIN_PAYLOAD="$(jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email:$email,password:$password}')"
-          curl --fail --silent --show-error \
+          LOGIN_CODE="$(curl --silent --show-error \
             --dump-header "$LOGIN_HEADERS" \
             --cookie-jar "$COOKIE_JAR" \
             --header "Origin: $FRONTEND_URL" \
             --header 'Content-Type: application/json' \
             --data "$LOGIN_PAYLOAD" \
-            "$BACKEND_URL/api/auth/login" > "$RUNNER_TEMP/login.json"
-          grep -Eiq '^set-cookie:.*Secure.*SameSite=None' "$LOGIN_HEADERS"
+            --output "$RUNNER_TEMP/login.json" \
+            --write-out '%{http_code}' \
+            "$BACKEND_URL/api/auth/login")"
+          if [ "$LOGIN_CODE" != "200" ]; then
+            echo "::error::Production login returned HTTP $LOGIN_CODE"
+            jq -c '{detail: .detail?, error: .error?}' "$RUNNER_TEMP/login.json" || true
+            exit 1
+          fi
+          if ! grep -Eiq '^set-cookie:.*Secure.*SameSite=None' "$LOGIN_HEADERS"; then
+            echo "::error::Production login did not issue a Secure SameSite=None session cookie"
+            sed -E 's/^(set-cookie:).*/\\1 [redacted]/I' "$LOGIN_HEADERS"
+            exit 1
+          fi
 
-          curl --fail --silent --show-error \
+          DASHBOARD_CODE="$(curl --silent --show-error \
             --cookie "$COOKIE_JAR" \
             --header "Origin: $FRONTEND_URL" \
-            "$BACKEND_URL/api/dashboard/summary" > "$RUNNER_TEMP/dashboard-summary.json"
+            --output "$RUNNER_TEMP/dashboard-summary.json" \
+            --write-out '%{http_code}' \
+            "$BACKEND_URL/api/dashboard/summary")"
+          if [ "$DASHBOARD_CODE" != "200" ]; then
+            echo "::error::Authenticated dashboard returned HTTP $DASHBOARD_CODE"
+            jq -c '{detail: .detail?, error: .error?}' "$RUNNER_TEMP/dashboard-summary.json" || true
+            exit 1
+          fi
           jq -e '.currency == "HNL"' "$RUNNER_TEMP/dashboard-summary.json" >/dev/null
 
           if [ "${EDIT_ACCESS_FALLBACK:-false}" = "true" ]; then

@@ -206,6 +206,56 @@ jobs:
               editAccessTokenDigest="$EDIT_ACCESS_TOKEN_DIGEST" \
               backendImage="$IMAGE"
 
+      - name: Relink Static Web Apps backend through GA CLI
+        run: |
+          set -euo pipefail
+          RG=nexora-rg-dev
+          SWA=nexora-frontend-dev
+          DEPLOYMENT_NAME="nexora-deploy-${{ github.run_number }}"
+          BACKEND_RESOURCE_ID="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.backendResourceId.value -o tsv)"
+          if [ -z "$BACKEND_RESOURCE_ID" ] || [ "$BACKEND_RESOURCE_ID" = "null" ]; then
+            echo "::error::Backend resource ID was not returned by deployment"
+            exit 1
+          fi
+
+          # Remove the historical raw ARM link and its generated auth state, then
+          # let the GA Static Web Apps command establish the supported handshake.
+          az staticwebapp backends unlink \
+            --name "$SWA" \
+            --resource-group "$RG" \
+            --environment-name default \
+            --remove-backend-auth \
+            --only-show-errors \
+            >/dev/null 2>&1 || true
+
+          az staticwebapp backends validate \
+            --name "$SWA" \
+            --resource-group "$RG" \
+            --environment-name default \
+            --backend-resource-id "$BACKEND_RESOURCE_ID" \
+            --backend-region eastus2 \
+            --only-show-errors \
+            >/dev/null
+
+          az staticwebapp backends link \
+            --name "$SWA" \
+            --resource-group "$RG" \
+            --environment-name default \
+            --backend-resource-id "$BACKEND_RESOURCE_ID" \
+            --backend-region eastus2 \
+            --only-show-errors \
+            >/dev/null
+
+          LINKED_ID="$(az staticwebapp backends show --name "$SWA" --resource-group "$RG" --environment-name default --query backendResourceId -o tsv 2>/dev/null || true)"
+          if [ -z "$LINKED_ID" ]; then
+            LINKED_ID="$(az staticwebapp backends show --name "$SWA" --resource-group "$RG" --environment-name default --query properties.backendResourceId -o tsv 2>/dev/null || true)"
+          fi
+          if [ -z "$LINKED_ID" ] || [ "$LINKED_ID" = "null" ]; then
+            echo "::error::Static Web Apps backend link could not be verified"
+            exit 1
+          fi
+          echo "Static Web Apps backend linked through supported GA command"
+
       - name: Capture deployed endpoints
         run: |
           set -euo pipefail
@@ -300,10 +350,6 @@ jobs:
           }
 
           wait_for_status "$FRONTEND_URL/" "200" "Frontend"
-
-          DIRECT_CODE="$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' "$BACKEND_URL/healthz" || true)"
-          echo "Direct Container Apps endpoint: HTTP $DIRECT_CODE (informational only; production traffic uses the linked same-origin /api path)"
-
           wait_for_status "$FRONTEND_URL/api/healthz" "200" "Same-origin API health"
           wait_for_status "$FRONTEND_URL/api/readyz" "200" "Database readiness"
           wait_for_status "$FRONTEND_URL/api/edit-access/verify" "405" "Protected Edit route"

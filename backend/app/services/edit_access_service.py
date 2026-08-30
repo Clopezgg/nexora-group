@@ -41,7 +41,9 @@ def _session_fingerprint(session_token: str, settings: Settings) -> str:
 
 
 def verify_pin(pin: str, settings: Settings) -> bool:
-    if not settings.edit_access_configured or not pin or len(pin) > 32:
+    # Bound hostile payload size, but permit strong password-manager generated
+    # re-authentication credentials used as the production fallback PIN.
+    if not settings.edit_access_configured or not pin or len(pin) > 256:
         return False
     try:
         salt = _b64decode(settings.edit_access_token_salt)

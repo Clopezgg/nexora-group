@@ -321,3 +321,20 @@ tabla real). El sistema combinado pasó 338 pruebas backend sobre
 PostgreSQL, 92 pruebas frontend, typecheck, lint, build, y el Critical Journey
 + Accessibility E2E real en verde (3/3). Playwright E2E cubre reporting
 (steps 35-38) y audit trail (step 39) del Critical Journey.
+
+## Certificación remota 2026-08-30 — PR #24
+
+- Recuento vigente confirmado: **124 requisitos**.
+- Documents/Evidence quedó cerrado en la rama de certificación: descarga
+  privada autenticada por `evidenceId`, streaming de bytes reales, company y
+  project isolation, cabeceras `private, no-store`/`nosniff`, filename seguro
+  y acción `Descargar` por cada `DocumentVersion`.
+- Frontend completo: **115/115 PASS**; typecheck, ESLint y build de producción
+  PASS; `npm audit --audit-level=high` sin vulnerabilidades.
+- Backend estático: compileall y Ruff E9/F63/F7/F82 PASS; pip-audit sin
+  vulnerabilidades; Alembic reporta un único head `d4e5f6a7b8c9`.
+- La reclasificación masiva a `VERIFIED` queda expresamente prohibida mientras
+  backend PostgreSQL, migraciones y E2E del HEAD del PR #24 no se ejecuten en
+  un runner real. GitHub Actions run `33286924542` falló antes de ejecutar
+  steps en sus cuatro jobs; se conserva el estado granular previo y se
+  registra `BLOCKED_EXTERNAL_GITHUB_ACTIONS` sin fabricar evidencia.

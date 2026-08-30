@@ -271,3 +271,13 @@ certificar el 100%.
   your spending limit needs to be increased.” Debe resolverse el pago o
   límite en Billing & plans y reintentarse el mismo HEAD. Hasta entonces no
   se permite merge, deploy final ni limpieza de ramas.
+
+  **Reconfirmado 2026-08-30 en `2445d8e3771afda6e95110982e46bd7824e8030b`:**
+  PR #24 disparó CI run `33286924542` (run number 241). Los cuatro jobs
+  (`backend`, `frontend`, `e2e`, `Compile Azure Bicep`) finalizaron `failure`
+  con `steps=[]`; GitHub no ejecutó checkout ni código. Acción manual exacta:
+  corregir el pago o elevar el spending limit de GitHub Actions en la cuenta
+  propietaria de `Clopezgg/nexora-group`, y re-ejecutar los jobs fallidos del
+  run `33286924542`. Criterio de cierre: los cuatro jobs reciben runner,
+  ejecutan steps reales y concluyen `success` sobre este HEAD o uno posterior
+  que solo contenga correcciones verificadas.

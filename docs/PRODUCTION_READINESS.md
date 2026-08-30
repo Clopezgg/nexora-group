@@ -248,3 +248,19 @@ real máximo alcanzado, con `BLOCKED_EXTERNAL` único: "Azure production
 provisioning authorization". Todo lo demás debe estar completo. Al
 recibir la autorización: continuar automáticamente con deploy PROD →
 certificación → main/post-main → release → 100%.
+
+## Último intento de cierre remoto — 2026-08-30
+
+- Rama: `work/nexora-final-certification-20260829`
+- HEAD ejecutable del intento: `2445d8e3771afda6e95110982e46bd7824e8030b`
+  (la reconciliación documental posterior no cambia código ejecutable)
+- PR: #24, mergeable, abierto contra `main`
+- Frontend local: 115/115 tests, typecheck, lint, build y audit PASS
+- Backend estático: compileall, Ruff y pip-audit PASS; Alembic un head
+- CI remoto: run `33286924542`, bloqueado antes de steps en los cuatro jobs
+- Merge/deploy/smoke/limpieza: no ejecutados porque no existe certificación
+  backend+E2E del HEAD y AGENTS.md exige confirmación puntual antes de una
+  operación Azure que pueda provisionar recursos facturables.
+
+No declarar 100%, no fusionar y no eliminar ramas hasta que CI ejecute de
+verdad y el despliegue productivo quede autorizado y certificado.

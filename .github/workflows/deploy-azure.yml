@@ -75,6 +75,33 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Prepare Protected Edit credentials
+        run: |
+          set -euo pipefail
+          if [ -n "$EDIT_ACCESS_TOKEN_SALT" ] && [ -n "$EDIT_ACCESS_TOKEN_DIGEST" ]; then
+            echo "Protected Edit uses dedicated GitHub secrets."
+            echo "EDIT_ACCESS_FALLBACK=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [ -n "$EDIT_ACCESS_TOKEN_SALT" ] || [ -n "$EDIT_ACCESS_TOKEN_DIGEST" ]; then
+            echo "::error::EDIT_ACCESS_TOKEN_SALT and EDIT_ACCESS_TOKEN_DIGEST must be configured together"
+            exit 1
+          fi
+
+          IFS=$'\t' read -r DERIVED_SALT DERIVED_DIGEST < <(
+            python -c 'import base64,hashlib,os,secrets; pin=os.environ["BOOTSTRAP_ADMIN_PASSWORD"]; salt=secrets.token_bytes(16); digest=hashlib.pbkdf2_hmac("sha256", pin.encode("utf-8"), salt, 250000); print(base64.urlsafe_b64encode(salt).decode("ascii")+"\t"+base64.urlsafe_b64encode(digest).decode("ascii"))'
+          )
+          if [ -z "$DERIVED_SALT" ] || [ -z "$DERIVED_DIGEST" ]; then
+            echo "::error::Could not derive Protected Edit credentials"
+            exit 1
+          fi
+          echo "::add-mask::$DERIVED_SALT"
+          echo "::add-mask::$DERIVED_DIGEST"
+          echo "EDIT_ACCESS_TOKEN_SALT=$DERIVED_SALT" >> "$GITHUB_ENV"
+          echo "EDIT_ACCESS_TOKEN_DIGEST=$DERIVED_DIGEST" >> "$GITHUB_ENV"
+          echo "EDIT_ACCESS_FALLBACK=true" >> "$GITHUB_ENV"
+          echo "Protected Edit fallback is enabled through bootstrap-admin re-authentication."
+
       - name: What-if (no crea recursos)
         run: |
           set -euo pipefail
@@ -159,6 +186,33 @@ jobs:
 
       - name: Ensure Container Apps CLI extension
         run: az extension add --name containerapp --upgrade --yes
+
+      - name: Prepare Protected Edit credentials
+        run: |
+          set -euo pipefail
+          if [ -n "$EDIT_ACCESS_TOKEN_SALT" ] && [ -n "$EDIT_ACCESS_TOKEN_DIGEST" ]; then
+            echo "Protected Edit uses dedicated GitHub secrets."
+            echo "EDIT_ACCESS_FALLBACK=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [ -n "$EDIT_ACCESS_TOKEN_SALT" ] || [ -n "$EDIT_ACCESS_TOKEN_DIGEST" ]; then
+            echo "::error::EDIT_ACCESS_TOKEN_SALT and EDIT_ACCESS_TOKEN_DIGEST must be configured together"
+            exit 1
+          fi
+
+          IFS=$'\t' read -r DERIVED_SALT DERIVED_DIGEST < <(
+            python -c 'import base64,hashlib,os,secrets; pin=os.environ["BOOTSTRAP_ADMIN_PASSWORD"]; salt=secrets.token_bytes(16); digest=hashlib.pbkdf2_hmac("sha256", pin.encode("utf-8"), salt, 250000); print(base64.urlsafe_b64encode(salt).decode("ascii")+"\t"+base64.urlsafe_b64encode(digest).decode("ascii"))'
+          )
+          if [ -z "$DERIVED_SALT" ] || [ -z "$DERIVED_DIGEST" ]; then
+            echo "::error::Could not derive Protected Edit credentials"
+            exit 1
+          fi
+          echo "::add-mask::$DERIVED_SALT"
+          echo "::add-mask::$DERIVED_DIGEST"
+          echo "EDIT_ACCESS_TOKEN_SALT=$DERIVED_SALT" >> "$GITHUB_ENV"
+          echo "EDIT_ACCESS_TOKEN_DIGEST=$DERIVED_DIGEST" >> "$GITHUB_ENV"
+          echo "EDIT_ACCESS_FALLBACK=true" >> "$GITHUB_ENV"
+          echo "Protected Edit fallback is enabled through bootstrap-admin re-authentication."
 
       - name: Build and push backend image to GHCR
         run: |
@@ -255,6 +309,7 @@ jobs:
           DEPLOYMENT_NAME="nexora-deploy-${{ github.run_number }}"
           FRONTEND_HOSTNAME="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.frontendHostname.value -o tsv)"
           BACKEND_FQDN="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.backendFqdn.value -o tsv)"
+          EDIT_ACCESS_CONFIGURED="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.editAccessConfigured.value -o tsv)"
           DEPLOYED_IMAGE="$(az containerapp show -g nexora-rg-dev -n nexora-backend-dev --query 'properties.template.containers[0].image' -o tsv)"
           MIN_REPLICAS="$(az containerapp show -g nexora-rg-dev -n nexora-backend-dev --query 'properties.template.scale.minReplicas' -o tsv)"
 
@@ -270,6 +325,10 @@ jobs:
             echo "::error::Container App minReplicas is $MIN_REPLICAS, expected 1"
             exit 1
           fi
+          if [ "${EDIT_ACCESS_CONFIGURED,,}" != "true" ]; then
+            echo "::error::Protected Edit was not configured by the deployment"
+            exit 1
+          fi
 
           echo "FRONTEND_URL=https://$FRONTEND_HOSTNAME" >> "$GITHUB_ENV"
           echo "BACKEND_URL=https://$BACKEND_FQDN" >> "$GITHUB_ENV"
@@ -280,6 +339,7 @@ jobs:
           APP=nexora-backend-dev
           RG=nexora-rg-dev
           EXPECTED_SHA="${{ github.sha }}"
+          LATEST_REVISION=""
 
           for attempt in $(seq 1 36); do
             LATEST_REVISION="$(az containerapp show -g "$RG" -n "$APP" --query properties.latestRevisionName -o tsv)"
@@ -298,8 +358,16 @@ jobs:
           done
 
           echo "::error::Newest backend revision never became healthy/ready"
+          az containerapp show -g "$RG" -n "$APP" \
+            --query '{provisioning:properties.provisioningState,running:properties.runningStatus,latest:properties.latestRevisionName,ready:properties.latestReadyRevisionName,traffic:properties.configuration.ingress.traffic}' -o json || true
           az containerapp revision list -g "$RG" -n "$APP" \
             --query '[].{name:name,active:properties.active,health:properties.healthState,image:properties.template.containers[0].image}' -o table || true
+          if [ -n "$LATEST_REVISION" ]; then
+            az containerapp revision show -g "$RG" -n "$APP" --revision "$LATEST_REVISION" \
+              --query '{health:properties.healthState,running:properties.runningState,details:properties.runningStateDetails,error:properties.provisioningError,image:properties.template.containers[0].image}' -o json || true
+            az containerapp logs show -g "$RG" -n "$APP" --revision "$LATEST_REVISION" --type console --tail 120 || true
+          fi
+          az containerapp logs show -g "$RG" -n "$APP" --type system --tail 100 || true
           exit 1
 
       - name: Build frontend
@@ -380,6 +448,16 @@ jobs:
 
           jq -e '.currency == "HNL"' "$RUNNER_TEMP/dashboard-summary.json" >/dev/null
 
+          if [ "${EDIT_ACCESS_FALLBACK:-false}" = "true" ]; then
+            EDIT_PAYLOAD="$(jq -n --arg token "$ADMIN_PASSWORD" '{token:$token}')"
+            curl --fail --silent --show-error \
+              --cookie "$COOKIE_JAR" \
+              --header 'Content-Type: application/json' \
+              --data "$EDIT_PAYLOAD" \
+              "$FRONTEND_URL/api/edit-access/verify" > "$RUNNER_TEMP/edit-access.json"
+            jq -e '.capability and .expiresAt and .usesRemaining' "$RUNNER_TEMP/edit-access.json" >/dev/null
+          fi
+
           {
             echo "### Production verification"
             echo "- Frontend: $FRONTEND_URL"
@@ -387,4 +465,9 @@ jobs:
             echo "- Same-origin API: healthy"
             echo "- Authenticated dashboard: healthy"
             echo "- HNL contract: verified"
+            if [ "${EDIT_ACCESS_FALLBACK:-false}" = "true" ]; then
+              echo "- Protected Edit fallback: verified by authenticated re-authorization"
+            else
+              echo "- Protected Edit: configured with dedicated secrets"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

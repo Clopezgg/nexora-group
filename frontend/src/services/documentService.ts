@@ -1,4 +1,4 @@
-import { apiFetch } from './httpClient'
+import { apiFetch, apiFetchBlob } from './httpClient'
 import type { Document, DocumentVersion, Evidence } from '../types/document'
 
 export const documentService = {
@@ -43,4 +43,5 @@ export const documentService = {
     formData.append('file', file)
     return apiFetch<Evidence>('/evidence', { method: 'POST', body: formData })
   },
+  downloadEvidence: (evidenceId: string) => apiFetchBlob(`/evidence/${evidenceId}/download`),
 }

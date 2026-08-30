@@ -7,6 +7,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.business_time import business_today
 from app.domain.errors import (
     FiscalPeriodClosedError,
     ImmutableDocumentError,
@@ -172,7 +173,10 @@ def post_manual(
         document_project_id=project_id,
         lines=lines,
     )
-    _assert_fiscal_period_open(db, company_id=company_id, as_of=datetime.now(timezone.utc).date())
+    # INV-ACC-003: the fiscal period is a business-calendar concept, so it
+    # must be resolved in the Nexora business timezone (America/Tegucigalpa),
+    # not the UTC wall clock the container runs on.
+    _assert_fiscal_period_open(db, company_id=company_id, as_of=business_today())
 
     document_number = numbering_service.next_document_number(
         db, company_id=company_id, document_type_code=document_type_code

@@ -17,8 +17,13 @@ de Docker, así que la aplicación en sí está probada — lo que falta es
 confirmar que `docker-compose.yml` y `backend/Dockerfile` funcionan tal cual
 están escritos.
 
-**Estado:** pendiente. Requiere Docker Desktop instalado. Marcado como
-`EXTERNAL-BLOCKER-002` en la sección de bloqueos externos.
+**Estado:** ~~RESUELTO~~ (2026-08-30). El job `docker-compose` de
+`.github/workflows/ci.yml` levanta Postgres + backend con
+`docker compose up -d --build`, aplica migraciones Alembic, verifica
+`/api/healthz` y `/api/readyz` == 200 y destruye el entorno
+(`docker compose down -v`). Verde en CI a partir del arreglo de
+`pre_migration_repairs` (PR #34): el preflight pre-Alembic ya no falla
+contra una base de datos limpia. `EXTERNAL-BLOCKER-002` cerrado.
 
 ---
 
@@ -259,14 +264,21 @@ certificar el 100%.
 - ~~`EXTERNAL-BLOCKER-001`~~ — **RESUELTO históricamente.** Azure DEV ya
   existe y sirve frontend + API same-origin. La ejecución final de Deploy
   Azure se certifica después de fusionar PR #21; no se crea APIM.
-- `EXTERNAL-BLOCKER-002` — Docker no está instalado en la máquina de
-  desarrollo. `DEFERRED-FINAL-DOCKER-001` (verificación de `docker compose
-  up`) no puede ejecutarse localmente. La aplicación está verificada con
-  PostgreSQL nativo (Homebrew). Para cerrar este item: instalar Docker
-  Desktop en macOS y ejecutar `docker compose up` desde la raíz del repo.
-- `EXTERNAL-BLOCKER-003` — **BLOQUEADO EXTERNO (2026-08-29): facturación
-  de GitHub Actions.** CI run #233 y Deploy Azure run #142, incluidos sus
-  reintentos, no iniciaron ningún step. GitHub muestra en cada anotación:
+- ~~`EXTERNAL-BLOCKER-002`~~ — **RESUELTO (2026-08-30).** Ya no depende de
+  Docker local: el job `docker-compose` de CI construye y arranca el stack
+  real (`docker compose up -d --build`), corre migraciones y comprueba
+  `healthz`/`readyz`. Verde tras el arreglo de `pre_migration_repairs`
+  (PR #34). Ver `DEFERRED-FINAL-DOCKER-001`.
+- ~~`EXTERNAL-BLOCKER-003`~~ — **RESUELTO (2026-08-30).** La facturación de
+  GitHub Actions volvió a estar activa: CI y `Deploy Azure` reciben runner y
+  ejecutan steps reales sobre `main`. Certificado con el run de `Deploy
+  Azure` `33340196708` sobre `main@124cebe` (imagen = SHA exacto, Container
+  App `Running`/`Healthy`, `latestRevision == latestReadyRevision`,
+  producción verificada: healthz/readyz/CORS/login/cookie/dashboard).
+  Historial del bloqueo abajo.
+- `EXTERNAL-BLOCKER-003` (histórico) — **BLOQUEADO EXTERNO (2026-08-29):
+  facturación de GitHub Actions.** CI run #233 y Deploy Azure run #142,
+  incluidos sus reintentos, no iniciaron ningún step. GitHub muestra en cada anotación:
   “The job was not started because recent account payments have failed or
   your spending limit needs to be increased.” Debe resolverse el pago o
   límite en Billing & plans y reintentarse el mismo HEAD. Hasta entonces no

@@ -1,6 +1,6 @@
 import uuid
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -81,7 +81,19 @@ def get_summary(
         )
     metric_start = fiscal_period.start_date if fiscal_period else month_start
     metric_end = fiscal_period.end_date if fiscal_period else today
-    metric_end_exclusive = metric_end + timedelta(days=1)
+    # AccountingDocument.posted_at is stored as an aware UTC timestamp. Build
+    # reporting boundaries in the business timezone and convert them to UTC;
+    # otherwise evening postings in Honduras fall on the next UTC date and
+    # disappear from the current period.
+    metric_start_utc = datetime.combine(
+        metric_start, time.min, tzinfo=BUSINESS_TZ
+    ).astimezone(timezone.utc)
+    metric_end_exclusive_utc = datetime.combine(
+        metric_end + timedelta(days=1), time.min, tzinfo=BUSINESS_TZ
+    ).astimezone(timezone.utc)
+    chart_start_utc = datetime.combine(
+        month_starts[0], time.min, tzinfo=BUSINESS_TZ
+    ).astimezone(timezone.utc)
 
     project_company_ids = _scope_for_company(
         db, user_id=user_id, resource="project", company_id=company_id
@@ -178,8 +190,8 @@ def get_summary(
                 AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
                 AccountingDocument.currency_code == "HNL",
                 AccountingDocument.posted_at.is_not(None),
-                AccountingDocument.posted_at >= metric_start,
-                AccountingDocument.posted_at < metric_end_exclusive,
+                AccountingDocument.posted_at >= metric_start_utc,
+                AccountingDocument.posted_at < metric_end_exclusive_utc,
                 Account.account_type.in_(("REVENUE", "EXPENSE")),
             )
             .group_by(AccountingDocument.scope, Account.account_type)
@@ -218,7 +230,7 @@ def get_summary(
                 AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
                 AccountingDocument.currency_code == "HNL",
                 AccountingDocument.posted_at.is_not(None),
-                AccountingDocument.posted_at >= month_starts[0],
+                AccountingDocument.posted_at >= chart_start_utc,
                 Account.account_type.in_(("REVENUE", "EXPENSE")),
             )
             .group_by(year_expr, month_expr, Account.account_type)

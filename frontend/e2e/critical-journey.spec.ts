@@ -452,13 +452,13 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     expect(voucherResponse.headers()['content-disposition']).toContain('NEXORA-Comprobante-')
 
     await page.goto('/finanzas/conciliacion')
-    await expect(page.getByText('Conciliación bancaria')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: 'Conciliación bancaria' })).toBeVisible({ timeout: 10_000 })
     await page.goto('/finanzas/cierres-caja')
-    await expect(page.getByText('Cierres de caja')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: 'Cierres de caja' })).toBeVisible({ timeout: 10_000 })
     await page.goto('/finanzas/restricciones-fondos')
-    await expect(page.getByText('Restricciones de fondos')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: 'Restricciones de fondos' })).toBeVisible({ timeout: 10_000 })
     await page.goto('/finanzas/comprobantes')
-    await expect(page.getByText('Comprobantes / Vouchers')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: 'Comprobantes / Vouchers' })).toBeVisible({ timeout: 10_000 })
   })
 
   await test.step('Documents + multipart Evidence with real selectors', async () => {

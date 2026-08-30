@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.domain.errors import (
     InvalidApprovalDecisionError,
     InvalidApprovalStateError,
+    NotAuthorizedError,
     SegregationOfDutiesError,
 )
 from app.models.approval_policy import ApprovalPolicy
@@ -113,6 +114,12 @@ def decide(
     if request.status != "PENDING":
         raise InvalidApprovalStateError(
             f"ApprovalRequest {request_id} ya fue decidido (estado: {request.status})"
+        )
+    if not approval_repository.user_matches_assignment(
+        db, request=request, user_id=decided_by
+    ):
+        raise NotAuthorizedError(
+            "La solicitud de aprobación está asignada a otro usuario o rol"
         )
     if request.requested_by == decided_by:
         raise SegregationOfDutiesError(

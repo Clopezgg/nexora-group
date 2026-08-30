@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.core.business_time import business_today
 from app.domain.errors import (
     ImmutableMaintenanceOrderError,
     InvalidEquipmentStatusError,
@@ -238,7 +239,7 @@ def update_maintenance_order(
     if status is not None:
         order.status = status
         if status == "CLOSED":
-            order.closed_at = closed_at or date.today()
+            order.closed_at = closed_at or business_today()
     if parts_cost is not None:
         order.parts_cost = parts_cost
     if labor_cost is not None:

@@ -35,6 +35,11 @@ on:
         required: true
         type: boolean
         default: false
+      diagnose:
+        description: "Recopilar diagnóstico seguro de la revisión actual sin desplegar"
+        required: true
+        type: boolean
+        default: false
       reason:
         description: "Motivo o cambio que autoriza este despliegue"
         required: true
@@ -83,6 +88,35 @@ jobs:
               bootstrapAdminEmail='${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}' \
               editAccessTokenSalt='${{ secrets.EDIT_ACCESS_TOKEN_SALT }}' \
               editAccessTokenDigest='${{ secrets.EDIT_ACCESS_TOKEN_DIGEST }}'
+
+  diagnose:
+    name: Diagnose Azure backend revision
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && inputs.diagnose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Collect revision state and non-secret logs
+        run: |
+          set -uo pipefail
+          APP=nexora-backend-dev
+          RG=nexora-rg-dev
+          LATEST_REVISION="$(az containerapp show -g "$RG" -n "$APP" --query properties.latestRevisionName -o tsv)"
+
+          echo "latest_revision=$LATEST_REVISION"
+          az containerapp show -g "$RG" -n "$APP" \
+            --query '{provisioning:properties.provisioningState,running:properties.runningStatus,latest:properties.latestRevisionName,ready:properties.latestReadyRevisionName,traffic:properties.configuration.ingress.traffic}' -o json
+          az containerapp revision show -g "$RG" -n "$APP" --revision "$LATEST_REVISION" \
+            --query '{health:properties.healthState,running:properties.runningState,details:properties.runningStateDetails,error:properties.provisioningError,image:properties.template.containers[0].image,probes:properties.template.containers[0].probes}' -o json
+          az containerapp replica list -g "$RG" -n "$APP" --revision "$LATEST_REVISION" -o table || true
+          az containerapp logs show -g "$RG" -n "$APP" --type system --tail 100 || true
+          az containerapp logs show -g "$RG" -n "$APP" --revision "$LATEST_REVISION" --type console --tail 120 || true
 
   deploy:
     name: Deploy infra + apps
@@ -213,6 +247,10 @@ jobs:
           az containerapp revision list -g "$RG" -n "$APP" \
             --query '[].{name:name,active:properties.active,health:properties.healthState,image:properties.template.containers[0].image}' -o table || true
           if [ -n "${LATEST_REVISION:-}" ]; then
+            az containerapp revision show -g "$RG" -n "$APP" --revision "$LATEST_REVISION" \
+              --query '{health:properties.healthState,running:properties.runningState,details:properties.runningStateDetails,error:properties.provisioningError,image:properties.template.containers[0].image,probes:properties.template.containers[0].probes}' -o json || true
+            az containerapp replica list -g "$RG" -n "$APP" --revision "$LATEST_REVISION" -o table || true
+            az containerapp logs show -g "$RG" -n "$APP" --type system --tail 100 || true
             az containerapp logs show -g "$RG" -n "$APP" --revision "$LATEST_REVISION" --type console --tail 120 || true
           fi
           exit 1

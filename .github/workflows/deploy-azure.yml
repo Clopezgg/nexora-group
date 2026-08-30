@@ -175,6 +175,9 @@ jobs:
           set -euo pipefail
           APP=nexora-backend-dev
           RG=nexora-rg-dev
+          API_VERSION=2025-07-01
+          SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+          APP_RESOURCE_URL="https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG}/providers/Microsoft.App/containerApps/${APP}"
 
           POSTGRES_FQDN="$(az postgres flexible-server list -g "$RG" --query '[0].fullyQualifiedDomainName' -o tsv)"
           if [ -z "$POSTGRES_FQDN" ] || [ "$POSTGRES_FQDN" = "null" ]; then
@@ -187,12 +190,41 @@ jobs:
           echo "::add-mask::$POSTGRES_ADMIN_PASSWORD"
           echo "::add-mask::$DATABASE_URL"
 
+          wait_running_status() {
+            local desired="$1"
+            local status=""
+            for attempt in $(seq 1 36); do
+              status="$(az rest \
+                --method get \
+                --url "${APP_RESOURCE_URL}?api-version=${API_VERSION}" \
+                --query properties.runningStatus \
+                -o tsv)"
+              echo "Container App status=$status, waiting for $desired ($attempt/36)"
+              if [ "$status" = "$desired" ]; then
+                return 0
+              fi
+              sleep 5
+            done
+            echo "::error::Container App did not reach $desired state"
+            return 1
+          }
+
+          containerapp_action() {
+            local action="$1"
+            local desired="$2"
+            az rest \
+              --method post \
+              --url "${APP_RESOURCE_URL}/${action}?api-version=${API_VERSION}" \
+              >/dev/null
+            wait_running_status "$desired"
+          }
+
           restore_backend() {
-            az containerapp start -g "$RG" -n "$APP" >/dev/null || true
+            containerapp_action start Running || true
           }
           trap restore_backend EXIT
 
-          az containerapp stop -g "$RG" -n "$APP"
+          containerapp_action stop Stopped
           docker run --rm \
             --env DATABASE_URL="$DATABASE_URL" \
             "$IMAGE" \

@@ -11,10 +11,12 @@ from app.domain.errors import (
     InvalidFinancialReferenceError,
     InvalidOperationScopeError,
 )
+from app.models.asset import FixedAsset
 from app.models.equipment import EQUIPMENT_STATUSES, MAINTENANCE_TERMINAL_STATUSES, Equipment, FuelLog, MaintenanceOrder, MaintenancePlan
+from app.models.supplier import Supplier
 from app.repositories import equipment_repository
-from app.services.financial_validation_service import assert_project_belongs_to_company
 from app.services import resource_posting_service
+from app.services.financial_validation_service import assert_project_belongs_to_company
 
 """Equipment / Fuel / Maintenance.
 
@@ -48,6 +50,12 @@ def create_equipment(
     commit: bool = True,
 ) -> Equipment:
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
+    if asset_id is not None:
+        asset = db.get(FixedAsset, asset_id)
+        if asset is None or asset.company_id != company_id:
+            raise InvalidFinancialReferenceError(
+                "asset_id debe pertenecer a la compañía propietaria del equipo"
+            )
     equipment = equipment_repository.create_equipment(
         db,
         company_id=company_id,
@@ -190,6 +198,24 @@ def create_maintenance_order(
     description: str | None,
     commit: bool = True,
 ) -> MaintenanceOrder:
+    equipment = equipment_repository.get_equipment(db, equipment_id)
+    if equipment is None:
+        raise InvalidFinancialReferenceError("El equipo de la orden de mantenimiento no existe")
+
+    if plan_id is not None:
+        plan = db.get(MaintenancePlan, plan_id)
+        if plan is None or plan.equipment_id != equipment_id:
+            raise InvalidFinancialReferenceError(
+                "plan_id debe pertenecer al mismo equipo de la orden de mantenimiento"
+            )
+
+    if supplier_id is not None:
+        supplier = db.get(Supplier, supplier_id)
+        if supplier is None or supplier.company_id != equipment.company_id:
+            raise InvalidFinancialReferenceError(
+                "supplier_id debe pertenecer a la compañía propietaria del equipo"
+            )
+
     order = equipment_repository.create_maintenance_order(
         db,
         equipment_id=equipment_id,
@@ -200,9 +226,7 @@ def create_maintenance_order(
         supplier_ref=supplier_ref,
         description=description,
     )
-    equipment = equipment_repository.get_equipment(db, equipment_id)
-    if equipment is not None:
-        equipment.status = "UNDER_MAINTENANCE"
+    equipment.status = "UNDER_MAINTENANCE"
     if commit:
         db.commit()
         db.refresh(order)

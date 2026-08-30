@@ -16,7 +16,10 @@ router = APIRouter(prefix="/edit-access", tags=["edit-access"])
 
 
 class EditAccessRequest(BaseModel):
-    token: str = Field(min_length=1, max_length=32)
+    # Protected Edit may reuse a strong account re-authentication secret when
+    # a dedicated PIN has not been provisioned. Keep the bound finite while
+    # allowing password-manager generated credentials longer than 32 chars.
+    token: str = Field(min_length=1, max_length=256)
 
 
 class EditAccessResponse(BaseModel):

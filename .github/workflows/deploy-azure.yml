@@ -206,42 +206,16 @@ jobs:
               editAccessTokenDigest="$EDIT_ACCESS_TOKEN_DIGEST" \
               backendImage="$IMAGE"
 
-      - name: Link Static Web Apps backend through GA CLI
+      - name: Remove failing Static Web Apps linked backend
         run: |
           set -euo pipefail
-          RG=nexora-rg-dev
-          SWA=nexora-frontend-dev
-          DEPLOYMENT_NAME="nexora-deploy-${{ github.run_number }}"
-          BACKEND_RESOURCE_ID="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.backendResourceId.value -o tsv)"
-          if [ -z "$BACKEND_RESOURCE_ID" ] || [ "$BACKEND_RESOURCE_ID" = "null" ]; then
-            echo "::error::Backend resource ID was not returned by deployment"
-            exit 1
-          fi
-
           az staticwebapp backends unlink \
-            --name "$SWA" \
-            --resource-group "$RG" \
+            --name nexora-frontend-dev \
+            --resource-group nexora-rg-dev \
             --remove-backend-auth \
             --only-show-errors \
             >/dev/null 2>&1 || true
-
-          az staticwebapp backends validate \
-            --name "$SWA" \
-            --resource-group "$RG" \
-            --backend-resource-id "$BACKEND_RESOURCE_ID" \
-            --backend-region eastus2 \
-            --only-show-errors \
-            >/dev/null
-
-          az staticwebapp backends link \
-            --name "$SWA" \
-            --resource-group "$RG" \
-            --backend-resource-id "$BACKEND_RESOURCE_ID" \
-            --backend-region eastus2 \
-            --only-show-errors \
-            >/dev/null
-
-          echo "Static Web Apps backend link command completed; production smoke test is authoritative"
+          echo "Static Web Apps linked-backend proxy removed; frontend will use the Container Apps HTTPS API directly"
 
       - name: Capture deployed endpoints
         run: |
@@ -277,17 +251,29 @@ jobs:
             sleep 10
           done
           echo "::error::Newest backend revision never became healthy/ready"
-          az containerapp revision list -g "$RG" -n "$APP" --query '[].{name:name,active:properties.active,health:properties.healthState,image:properties.template.containers[0].image}' -o table || true
+          exit 1
+
+      - name: Verify direct Container Apps API
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            code="$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' "$BACKEND_URL/api/healthz" || true)"
+            if [ "$code" = "200" ]; then
+              echo "Direct Container Apps API: HTTP 200"
+              exit 0
+            fi
+            echo "Direct Container Apps API not ready (HTTP $code), attempt $attempt/30"
+            sleep 10
+          done
+          echo "::error::Direct Container Apps API did not become reachable"
           exit 1
 
       - name: Build frontend
-        env:
-          VITE_API_BASE_URL: /api
         run: |
           set -euo pipefail
           cd frontend
           npm ci
-          npm run build
+          VITE_API_BASE_URL="${BACKEND_URL}/api" npm run build
 
       - name: Get Static Web Apps deployment token
         id: swa-token
@@ -317,6 +303,8 @@ jobs:
         run: |
           set -euo pipefail
           COOKIE_JAR="$RUNNER_TEMP/nexora-production-cookies.txt"
+          LOGIN_HEADERS="$RUNNER_TEMP/nexora-login-headers.txt"
+          CORS_HEADERS="$RUNNER_TEMP/nexora-cors-headers.txt"
 
           wait_for_status() {
             local url="$1"
@@ -337,29 +325,43 @@ jobs:
           }
 
           wait_for_status "$FRONTEND_URL/" "200" "Frontend"
-          wait_for_status "$FRONTEND_URL/api/healthz" "200" "Same-origin API health"
-          wait_for_status "$FRONTEND_URL/api/readyz" "200" "Database readiness"
-          wait_for_status "$FRONTEND_URL/api/edit-access/verify" "405" "Protected Edit route"
+          wait_for_status "$BACKEND_URL/api/healthz" "200" "API health"
+          wait_for_status "$BACKEND_URL/api/readyz" "200" "Database readiness"
+          wait_for_status "$BACKEND_URL/api/edit-access/verify" "405" "Protected Edit route"
+
+          curl --silent --show-error --output /dev/null --dump-header "$CORS_HEADERS" \
+            --request OPTIONS \
+            --header "Origin: $FRONTEND_URL" \
+            --header 'Access-Control-Request-Method: POST' \
+            --header 'Access-Control-Request-Headers: content-type' \
+            "$BACKEND_URL/api/auth/login"
+          grep -Eiq "^access-control-allow-origin: ${FRONTEND_URL//./\.}\r?$" "$CORS_HEADERS"
+          grep -Eiq '^access-control-allow-credentials: true\r?$' "$CORS_HEADERS"
 
           LOGIN_PAYLOAD="$(jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email:$email,password:$password}')"
           curl --fail --silent --show-error \
+            --dump-header "$LOGIN_HEADERS" \
             --cookie-jar "$COOKIE_JAR" \
+            --header "Origin: $FRONTEND_URL" \
             --header 'Content-Type: application/json' \
             --data "$LOGIN_PAYLOAD" \
-            "$FRONTEND_URL/api/auth/login" > "$RUNNER_TEMP/login.json"
+            "$BACKEND_URL/api/auth/login" > "$RUNNER_TEMP/login.json"
+          grep -Eiq '^set-cookie:.*Secure.*SameSite=None' "$LOGIN_HEADERS"
 
           curl --fail --silent --show-error \
             --cookie "$COOKIE_JAR" \
-            "$FRONTEND_URL/api/dashboard/summary" > "$RUNNER_TEMP/dashboard-summary.json"
+            --header "Origin: $FRONTEND_URL" \
+            "$BACKEND_URL/api/dashboard/summary" > "$RUNNER_TEMP/dashboard-summary.json"
           jq -e '.currency == "HNL"' "$RUNNER_TEMP/dashboard-summary.json" >/dev/null
 
           if [ "${EDIT_ACCESS_FALLBACK:-false}" = "true" ]; then
             EDIT_PAYLOAD="$(jq -n --arg token "$ADMIN_PASSWORD" '{token:$token}')"
             curl --fail --silent --show-error \
               --cookie "$COOKIE_JAR" \
+              --header "Origin: $FRONTEND_URL" \
               --header 'Content-Type: application/json' \
               --data "$EDIT_PAYLOAD" \
-              "$FRONTEND_URL/api/edit-access/verify" > "$RUNNER_TEMP/edit-access.json"
+              "$BACKEND_URL/api/edit-access/verify" > "$RUNNER_TEMP/edit-access.json"
             jq -e '.capability and .expiresAt and .usesRemaining' "$RUNNER_TEMP/edit-access.json" >/dev/null
           fi
 
@@ -367,7 +369,8 @@ jobs:
             echo "### Production verification"
             echo "- Frontend: $FRONTEND_URL"
             echo "- Backend revision: healthy"
-            echo "- Same-origin API: healthy"
+            echo "- Direct HTTPS API: healthy"
+            echo "- CORS + credentialed browser session: verified"
             echo "- Database readiness: healthy"
             echo "- Authenticated dashboard: healthy"
             echo "- HNL contract: verified"

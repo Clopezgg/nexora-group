@@ -1,0 +1,352 @@
+name: Deploy Azure
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/deploy-azure.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/deploy-azure.yml"
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Confirmo que este run puede desplegar recursos Azure DEV"
+        required: true
+        type: boolean
+        default: false
+      diagnose:
+        description: "Recopilar diagnóstico seguro de la revisión actual sin desplegar"
+        required: true
+        type: boolean
+        default: false
+      reason:
+        description: "Motivo o cambio que autoriza este despliegue"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
+concurrency:
+  group: nexora-azure-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Bicep what-if
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+      BACKEND_SECRET_KEY: ${{ secrets.BACKEND_SECRET_KEY }}
+      BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+      BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+      EDIT_ACCESS_TOKEN_SALT: ${{ secrets.EDIT_ACCESS_TOKEN_SALT }}
+      EDIT_ACCESS_TOKEN_DIGEST: ${{ secrets.EDIT_ACCESS_TOKEN_DIGEST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Azure OIDC and deployment secrets
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID POSTGRES_ADMIN_PASSWORD BACKEND_SECRET_KEY BOOTSTRAP_ADMIN_PASSWORD BOOTSTRAP_ADMIN_EMAIL; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Required secret $name is not configured"
+              exit 1
+            fi
+          done
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: What-if (no crea recursos)
+        run: |
+          set -euo pipefail
+          az deployment sub what-if \
+            --name nexora-ci-whatif \
+            --location eastus2 \
+            --template-file infra/main.bicep \
+            --parameters \
+              postgresAdminPassword="$POSTGRES_ADMIN_PASSWORD" \
+              backendSecretKey="$BACKEND_SECRET_KEY" \
+              bootstrapAdminPassword="$BOOTSTRAP_ADMIN_PASSWORD" \
+              bootstrapAdminEmail="$BOOTSTRAP_ADMIN_EMAIL" \
+              editAccessTokenSalt="$EDIT_ACCESS_TOKEN_SALT" \
+              editAccessTokenDigest="$EDIT_ACCESS_TOKEN_DIGEST"
+
+  diagnose:
+    name: Diagnose Azure backend revision
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && inputs.diagnose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Collect revision state and non-secret logs
+        run: |
+          set -uo pipefail
+          APP=nexora-backend-dev
+          RG=nexora-rg-dev
+          LATEST_REVISION="$(az containerapp show -g "$RG" -n "$APP" --query properties.latestRevisionName -o tsv)"
+
+          echo "latest_revision=$LATEST_REVISION"
+          az containerapp show -g "$RG" -n "$APP" \
+            --query '{provisioning:properties.provisioningState,running:properties.runningStatus,latest:properties.latestRevisionName,ready:properties.latestReadyRevisionName,traffic:properties.configuration.ingress.traffic}' -o json
+          az containerapp revision show -g "$RG" -n "$APP" --revision "$LATEST_REVISION" \
+            --query '{health:properties.healthState,running:properties.runningState,details:properties.runningStateDetails,error:properties.provisioningError,image:properties.template.containers[0].image}' -o json || true
+          az containerapp logs show -g "$RG" -n "$APP" --type system --tail 100 || true
+          az containerapp logs show -g "$RG" -n "$APP" --revision "$LATEST_REVISION" --type console --tail 120 || true
+
+  deploy:
+    name: Deploy infra + apps
+    needs: validate
+    if: (github.event_name == 'workflow_dispatch' && inputs.deploy) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+      BACKEND_SECRET_KEY: ${{ secrets.BACKEND_SECRET_KEY }}
+      BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+      BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+      EDIT_ACCESS_TOKEN_SALT: ${{ secrets.EDIT_ACCESS_TOKEN_SALT }}
+      EDIT_ACCESS_TOKEN_DIGEST: ${{ secrets.EDIT_ACCESS_TOKEN_DIGEST }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record deployment authorization
+        env:
+          DEPLOY_REASON: ${{ github.event_name == 'workflow_dispatch' && inputs.reason || github.event.head_commit.message }}
+        run: |
+          {
+            echo "### Deployment authorization"
+            echo "- Requested by: ${{ github.actor }}"
+            echo "- Reason: $DEPLOY_REASON"
+            echo "- Target: Azure DEV (nexora-rg-dev)"
+            echo "- SHA: ${{ github.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push backend image to GHCR
+        run: |
+          set -euo pipefail
+          OWNER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE="ghcr.io/${OWNER}/nexora-backend:${{ github.sha }}"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$OWNER" --password-stdin
+          docker build -t "$IMAGE" ./backend
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Run database migrations with backend quiesced
+        run: |
+          set -euo pipefail
+          APP=nexora-backend-dev
+          RG=nexora-rg-dev
+
+          POSTGRES_FQDN="$(az postgres flexible-server list -g "$RG" --query '[0].fullyQualifiedDomainName' -o tsv)"
+          if [ -z "$POSTGRES_FQDN" ] || [ "$POSTGRES_FQDN" = "null" ]; then
+            echo "::error::PostgreSQL FQDN could not be resolved from Azure control plane"
+            exit 1
+          fi
+
+          ENCODED_PASSWORD="$(python -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["POSTGRES_ADMIN_PASSWORD"], safe=""))')"
+          DATABASE_URL="postgresql+psycopg://nexoraadmin:${ENCODED_PASSWORD}@${POSTGRES_FQDN}:5432/nexora?sslmode=require"
+          echo "::add-mask::$POSTGRES_ADMIN_PASSWORD"
+          echo "::add-mask::$DATABASE_URL"
+
+          restore_backend() {
+            az containerapp start -g "$RG" -n "$APP" >/dev/null || true
+          }
+          trap restore_backend EXIT
+
+          az containerapp stop -g "$RG" -n "$APP"
+          docker run --rm \
+            --env DATABASE_URL="$DATABASE_URL" \
+            "$IMAGE" \
+            sh -ec 'python -u -m app.pre_migration_repairs && alembic upgrade head'
+
+          restore_backend
+          trap - EXIT
+
+      - name: Deploy infraestructura (Bicep)
+        run: |
+          set -euo pipefail
+          az deployment sub create \
+            --name "nexora-deploy-${{ github.run_number }}" \
+            --location eastus2 \
+            --template-file infra/main.bicep \
+            --parameters \
+              postgresAdminPassword="$POSTGRES_ADMIN_PASSWORD" \
+              backendSecretKey="$BACKEND_SECRET_KEY" \
+              bootstrapAdminPassword="$BOOTSTRAP_ADMIN_PASSWORD" \
+              bootstrapAdminEmail="$BOOTSTRAP_ADMIN_EMAIL" \
+              editAccessTokenSalt="$EDIT_ACCESS_TOKEN_SALT" \
+              editAccessTokenDigest="$EDIT_ACCESS_TOKEN_DIGEST" \
+              backendImage="$IMAGE"
+
+      - name: Capture deployed endpoints
+        run: |
+          set -euo pipefail
+          DEPLOYMENT_NAME="nexora-deploy-${{ github.run_number }}"
+          FRONTEND_HOSTNAME="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.frontendHostname.value -o tsv)"
+          BACKEND_FQDN="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.backendFqdn.value -o tsv)"
+          DEPLOYED_IMAGE="$(az containerapp show -g nexora-rg-dev -n nexora-backend-dev --query 'properties.template.containers[0].image' -o tsv)"
+          MIN_REPLICAS="$(az containerapp show -g nexora-rg-dev -n nexora-backend-dev --query 'properties.template.scale.minReplicas' -o tsv)"
+
+          if [ -z "$FRONTEND_HOSTNAME" ] || [ -z "$BACKEND_FQDN" ]; then
+            echo "::error::Deployment did not return frontend/backend endpoints"
+            exit 1
+          fi
+          if [[ "$DEPLOYED_IMAGE" != *"${{ github.sha }}"* ]]; then
+            echo "::error::Container App does not reference expected Git SHA"
+            exit 1
+          fi
+          if [ "$MIN_REPLICAS" != "1" ]; then
+            echo "::error::Container App minReplicas is $MIN_REPLICAS, expected 1"
+            exit 1
+          fi
+
+          echo "FRONTEND_URL=https://$FRONTEND_HOSTNAME" >> "$GITHUB_ENV"
+          echo "BACKEND_URL=https://$BACKEND_FQDN" >> "$GITHUB_ENV"
+
+      - name: Verify newest backend revision is healthy
+        run: |
+          set -euo pipefail
+          APP=nexora-backend-dev
+          RG=nexora-rg-dev
+          EXPECTED_SHA="${{ github.sha }}"
+
+          for attempt in $(seq 1 36); do
+            LATEST_REVISION="$(az containerapp show -g "$RG" -n "$APP" --query properties.latestRevisionName -o tsv)"
+            READY_REVISION="$(az containerapp show -g "$RG" -n "$APP" --query properties.latestReadyRevisionName -o tsv)"
+            LATEST_HEALTH="$(az containerapp revision list -g "$RG" -n "$APP" --query "[?name=='$LATEST_REVISION'] | [0].properties.healthState" -o tsv)"
+            LATEST_IMAGE="$(az containerapp revision list -g "$RG" -n "$APP" --query "[?name=='$LATEST_REVISION'] | [0].properties.template.containers[0].image" -o tsv)"
+            echo "attempt=$attempt latest=$LATEST_REVISION ready=$READY_REVISION health=$LATEST_HEALTH"
+
+            if [ -n "$LATEST_REVISION" ] \
+              && [ "$LATEST_REVISION" = "$READY_REVISION" ] \
+              && [ "$LATEST_HEALTH" = "Healthy" ] \
+              && [[ "$LATEST_IMAGE" == *"$EXPECTED_SHA"* ]]; then
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "::error::Newest backend revision never became healthy/ready"
+          az containerapp revision list -g "$RG" -n "$APP" \
+            --query '[].{name:name,active:properties.active,health:properties.healthState,image:properties.template.containers[0].image}' -o table || true
+          exit 1
+
+      - name: Build frontend
+        env:
+          VITE_API_BASE_URL: /api
+        run: |
+          set -euo pipefail
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Get Static Web Apps deployment token
+        id: swa-token
+        run: |
+          set -euo pipefail
+          token="$(az staticwebapp secrets list \
+            --name nexora-frontend-dev \
+            --resource-group nexora-rg-dev \
+            --query properties.apiKey \
+            -o tsv)"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "::error::Azure did not return a Static Web Apps deployment token"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy frontend a Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa-token.outputs.token }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: frontend/dist
+          skip_app_build: true
+
+      - name: Verify production
+        env:
+          ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          COOKIE_JAR="$RUNNER_TEMP/nexora-production-cookies.txt"
+
+          wait_for_status() {
+            local url="$1"
+            local expected="$2"
+            local label="$3"
+            local code=""
+            for attempt in $(seq 1 24); do
+              code="$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' "$url" || true)"
+              if [ "$code" = "$expected" ]; then
+                return 0
+              fi
+              echo "$label not ready (HTTP $code, expected $expected), attempt $attempt/24"
+              sleep 10
+            done
+            echo "::error::$label did not return HTTP $expected"
+            return 1
+          }
+
+          wait_for_status "$FRONTEND_URL/" "200" "Frontend"
+          wait_for_status "$BACKEND_URL/healthz" "401" "Backend direct ingress protection"
+          wait_for_status "$FRONTEND_URL/api/healthz" "200" "Same-origin API health"
+          wait_for_status "$FRONTEND_URL/api/readyz" "200" "Database readiness"
+          wait_for_status "$FRONTEND_URL/api/edit-access/verify" "405" "Edit-access API route"
+
+          LOGIN_PAYLOAD="$(jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email:$email,password:$password}')"
+          curl --fail --silent --show-error \
+            --cookie-jar "$COOKIE_JAR" \
+            --header 'Content-Type: application/json' \
+            --data "$LOGIN_PAYLOAD" \
+            "$FRONTEND_URL/api/auth/login" >/dev/null
+
+          curl --fail --silent --show-error \
+            --cookie "$COOKIE_JAR" \
+            "$FRONTEND_URL/api/dashboard/summary" > "$RUNNER_TEMP/dashboard-summary.json"
+
+          jq -e '.currency == "HNL"' "$RUNNER_TEMP/dashboard-summary.json" >/dev/null
+
+          {
+            echo "### Production verification"
+            echo "- Frontend: $FRONTEND_URL"
+            echo "- Backend: $BACKEND_URL"
+            echo "- Same-origin API: healthy"
+            echo "- Authenticated dashboard: healthy"
+            echo "- HNL contract: verified"
+          } >> "$GITHUB_STEP_SUMMARY"

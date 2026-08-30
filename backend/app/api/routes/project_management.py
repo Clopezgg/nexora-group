@@ -1,11 +1,11 @@
 import uuid
-from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.core.business_time import business_today
 from app.models.cost_center import CostCenter
 from app.models.crm import Customer
 from app.models.project import Project
@@ -134,7 +134,11 @@ def transition_project_status(
             detail=f"Transición de proyecto no permitida: {project.status} → {target}",
         )
     before_status = project.status
-    actual_end = date.today() if target in {"COMPLETED", "CLOSED"} and project.actual_end is None else None
+    actual_end = (
+        business_today()
+        if target in {"COMPLETED", "CLOSED"} and project.actual_end is None
+        else None
+    )
     project_repository.set_project_status(db, project=project, status=target, actual_end=actual_end)
     audit_service.record(
         db,

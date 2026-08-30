@@ -1,6 +1,4 @@
-import { ApiError, apiFetch } from './httpClient'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+import { apiFetch, apiFetchBlob } from './httpClient'
 
 export interface JournalDocumentOption {
   id: string
@@ -29,20 +27,9 @@ export const voucherService = {
       paymentMethod: input.paymentMethod,
     })
     if (input.approvedBy?.trim()) params.set('approvedBy', input.approvedBy.trim())
-    const response = await fetch(
-      `${API_BASE_URL}/treasury/vouchers/${accountingDocumentId}?${params.toString()}`,
-      { credentials: 'include' },
+    const result = await apiFetchBlob(
+      `/treasury/vouchers/${accountingDocumentId}?${params.toString()}`,
     )
-    if (!response.ok) {
-      let message = `Error ${response.status}`
-      try {
-        const body = await response.json()
-        message = body.detail ?? body.error?.message ?? message
-      } catch {
-        // PDF endpoint can return a non-JSON failure from the proxy.
-      }
-      throw new ApiError(message, response.status)
-    }
-    return response.blob()
+    return result.blob
   },
 }

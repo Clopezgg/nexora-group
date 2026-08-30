@@ -17,6 +17,22 @@ export const assetService = {
     depreciationExpenseAccountId: string
     accumulatedDepreciationAccountId: string
   }) => apiFetch<FixedAsset>('/assets', { method: 'POST', body: JSON.stringify(payload) }),
+  createFromSupplierInvoice: (
+    supplierInvoiceId: string,
+    payload: {
+      category: string
+      name: string
+      usefulLifeMonths: number
+      salvageValue: string
+      assetAccountId: string
+      depreciationExpenseAccountId: string
+      accumulatedDepreciationAccountId: string
+    },
+  ) =>
+    apiFetch<FixedAsset>(`/assets/from-supplier-invoice/${supplierInvoiceId}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   changeStatus: (assetId: string, status: FixedAsset['status']) =>
     apiFetch<FixedAsset>(`/assets/${assetId}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
 

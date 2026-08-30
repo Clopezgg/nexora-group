@@ -1,11 +1,14 @@
 import uuid
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
 from app.models.change_order import ChangeOrder
+from app.models.evidence import Evidence
 from app.models.procurement import GoodsReceipt, PurchaseOrder, ServiceEntry
 from app.models.progress import ProgressRecord
 from app.models.project import Project
@@ -26,19 +29,11 @@ from app.services.permission_service import (
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
 
-"""Evidence upload API (bloque CONSTRUCTION CONTROL, docs/DOCUMENTS_EVIDENCE.md).
-multipart/form-data (no JSON): el archivo va como bytes reales, no como
-base64 en un payload JSON. `evidence_service.upload_evidence` valida MIME
-type y tamaño ANTES de tocar Azure Blob; si el storage no está configurado
-(`EVIDENCE_BACKEND` vacío en el entorno), get_evidence_container_client
-lanza EvidenceStorageNotConfigured, registrado en error_handlers.py como un
-503 real (NXR-EVIDENCE-001) -- nunca un 200 con una URL fabricada.
+"""Evidence upload/download API (CONSTRUCTION CONTROL).
 
-`entity_type`/`entity_id` forman un enlace polimórfico. Todo contexto nuevo
-con ID debe ser uno de los tipos resueltos abajo para que el backend pueda
-probar company/project ownership antes de persistir el blob. Los enlaces
-legacy desconocidos se tratan fail-closed para usuarios con project_scope
-restringido en lugar de asumir que son evidencia GENERAL.
+Uploads are multipart bytes backed by private Azure Blob Storage. Downloads
+are authenticated streams from the private container; the API never exposes a
+public Blob URL and never persists payloads to local disk.
 """
 
 EvidenceContext = tuple[uuid.UUID, uuid.UUID | None]
@@ -62,13 +57,7 @@ def _resolve_evidence_context(
     entity_id: uuid.UUID | None,
     strict: bool,
 ) -> EvidenceContext | None:
-    """Resolve polymorphic evidence context to (company_id, project_id).
-
-    `project_id=None` means a real company-scoped entity with no project (for
-    example a GENERAL purchase order), not an unresolved entity. In strict
-    mode malformed/unknown links are rejected so new uploads cannot create an
-    authorization context the server cannot later prove.
-    """
+    """Resolve polymorphic evidence context to (company_id, project_id)."""
     if entity_type is None and entity_id is None:
         return None
     if not entity_type or entity_id is None:
@@ -153,7 +142,7 @@ def _resolve_evidence_context(
     return None
 
 
-def _evidence_visible_for_projects(db: Session, evidence, allowed: set[uuid.UUID]) -> bool:
+def _evidence_visible_for_projects(db: Session, evidence: Evidence, allowed: set[uuid.UUID]) -> bool:
     if evidence.entity_type is None and evidence.entity_id is None:
         return True
     context = _resolve_evidence_context(
@@ -163,11 +152,55 @@ def _evidence_visible_for_projects(db: Session, evidence, allowed: set[uuid.UUID
         strict=False,
     )
     if context is None:
-        # Unknown/malformed legacy polymorphic links are not silently promoted
-        # to company-general visibility for OWN/NONE users.
         return False
     _company_id, project_id = context
     return project_id is None or project_id in allowed
+
+
+def _authorize_evidence_read(db: Session, *, evidence_id: uuid.UUID, user) -> Evidence:
+    evidence = evidence_service.get_evidence(db, evidence_id)
+    if evidence is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence no encontrada")
+
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="document.evidence",
+        action="read",
+        company_id=evidence.company_id,
+    )
+
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="document.evidence", action="read"
+    )
+    if allowed is not None and not _evidence_visible_for_projects(db, evidence, set(allowed)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene acceso al contexto de proyecto de esta evidencia",
+        )
+
+    context = _resolve_evidence_context(
+        db,
+        entity_type=evidence.entity_type,
+        entity_id=evidence.entity_id,
+        strict=False,
+    )
+    if context is not None:
+        entity_company_id, project_id = context
+        if entity_company_id != evidence.company_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El contexto persistido de evidencia no pertenece a su compañía",
+            )
+        if project_id is not None:
+            assert_project_access(
+                db,
+                user_id=user.id,
+                resource="document.evidence",
+                action="read",
+                project_id=project_id,
+            )
+    return evidence
 
 
 @router.post("", response_model=EvidenceResponse, status_code=201)
@@ -287,45 +320,34 @@ def list_evidence(
     return [EvidenceResponse.model_validate(row, from_attributes=True) for row in rows]
 
 
+@router.get("/{evidence_id}/download")
+def download_evidence(
+    evidence_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("document.evidence", "read")),
+) -> StreamingResponse:
+    evidence = _authorize_evidence_read(db, evidence_id=evidence_id, user=user)
+    stream = evidence_service.download_evidence(evidence)
+    encoded_filename = quote(evidence.original_filename, safe="")
+    return StreamingResponse(
+        stream,
+        media_type=evidence.mime_type,
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+            "Content-Length": str(evidence.size_bytes),
+            "Content-Encoding": "identity",
+            "Cache-Control": "private, no-store",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.get("/{evidence_id}", response_model=EvidenceResponse)
 def get_evidence(
     evidence_id: uuid.UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("document.evidence", "read")),
 ) -> EvidenceResponse:
-    evidence = evidence_service.get_evidence(db, evidence_id)
-    if evidence is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence no encontrada")
-    assert_company_access(
-        db, user_id=user.id, resource="document.evidence", action="read", company_id=evidence.company_id
-    )
-    allowed = accessible_project_ids(
-        db, user_id=user.id, resource="document.evidence", action="read"
-    )
-    if allowed is not None and not _evidence_visible_for_projects(db, evidence, set(allowed)):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tiene acceso al contexto de proyecto de esta evidencia",
-        )
-    context = _resolve_evidence_context(
-        db,
-        entity_type=evidence.entity_type,
-        entity_id=evidence.entity_id,
-        strict=False,
-    )
-    if context is not None:
-        entity_company_id, project_id = context
-        if entity_company_id != evidence.company_id:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="El contexto persistido de evidencia no pertenece a su compañía",
-            )
-        if project_id is not None:
-            assert_project_access(
-                db,
-                user_id=user.id,
-                resource="document.evidence",
-                action="read",
-                project_id=project_id,
-            )
+    evidence = _authorize_evidence_read(db, evidence_id=evidence_id, user=user)
     return EvidenceResponse.model_validate(evidence, from_attributes=True)

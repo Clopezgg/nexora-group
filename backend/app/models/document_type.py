@@ -21,6 +21,7 @@ DOCUMENT_TYPE_SEEDS = (
     ("GR", "Recepción de mercadería", "GR"),
     ("SEN", "Entrada de servicio", "SEN"),
     ("DEP", "Depreciación de activo fijo", "DEP"),
+    ("CAP", "Capitalización de activo fijo", "CAP"),
     ("FUE", "Costo de combustible", "FUE"),
     ("MNT", "Costo de mantenimiento", "MNT"),
     ("LAB", "Costo de mano de obra aprobada", "LAB"),

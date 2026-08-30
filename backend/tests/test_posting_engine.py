@@ -1,5 +1,7 @@
 import uuid
 
+import pytest
+
 from app.models.accounting import AccountingDocument
 from app.models.audit import AuditLog
 from app.models.cost_center import CostCenter
@@ -363,6 +365,73 @@ def test_reversing_journal_entry_creates_audit_log_entry(client, db_session):
     assert rows[0].before["status"] == "POSTED"
     assert rows[0].after["status"] == "REVERSED"
     assert rows[0].after["reversalDocumentId"] == reversal.json()["id"]
+
+
+def test_journal_creation_rolls_back_when_audit_write_fails(client, db_session, monkeypatch):
+    login_admin(client)
+    company, debit_account, credit_account = _setup_company_and_accounts(client)
+
+    def fail_record(*args, **kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr("app.api.routes.accounting.audit_service.record", fail_record)
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        client.post(
+            "/api/accounting/journal-entries",
+            json={
+                "companyId": company["id"],
+                "scope": "GENERAL",
+                "currencyCode": "HNL",
+                "description": "Must roll back with audit",
+                "lines": [
+                    {"accountId": debit_account["id"], "debitAmount": "10.00"},
+                    {"accountId": credit_account["id"], "creditAmount": "10.00"},
+                ],
+            },
+        )
+
+    db_session.rollback()
+    rows = (
+        db_session.query(AccountingDocument)
+        .filter(AccountingDocument.description == "Must roll back with audit")
+        .all()
+    )
+    assert rows == []
+
+
+def test_journal_reversal_rolls_back_when_audit_write_fails(client, db_session, monkeypatch):
+    login_admin(client)
+    company, debit_account, credit_account = _setup_company_and_accounts(client)
+    created = client.post(
+        "/api/accounting/journal-entries",
+        json={
+            "companyId": company["id"],
+            "scope": "GENERAL",
+            "currencyCode": "HNL",
+            "lines": [
+                {"accountId": debit_account["id"], "debitAmount": "10.00"},
+                {"accountId": credit_account["id"], "creditAmount": "10.00"},
+            ],
+        },
+    ).json()
+    document_count = db_session.query(AccountingDocument).count()
+
+    def fail_record(*args, **kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr("app.api.routes.accounting.audit_service.record", fail_record)
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        client.post(
+            f"/api/accounting/journal-entries/{created['id']}/reverse",
+            json={"reason": "Must roll back with audit"},
+        )
+
+    db_session.rollback()
+    original = db_session.get(AccountingDocument, uuid.UUID(created["id"]))
+    assert original is not None
+    assert original.status == "POSTED"
+    assert original.reversed_document_id is None
+    assert db_session.query(AccountingDocument).count() == document_count
 
 
 def _create_ap_setup(client):

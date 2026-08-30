@@ -2,10 +2,14 @@ import uuid
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.errors import DepreciationAlreadyPostedError, InvalidAssetStateError
+from app.models.accounting import AccountingDocument
+from app.models.ap import SupplierInvoice
 from app.models.asset import ASSET_STATUSES, DepreciationEntry, FixedAsset
+from app.models.chart_of_accounts import Account
 from app.repositories import asset_repository
 from app.services import posting_service
 from app.services.financial_validation_service import (
@@ -23,6 +27,34 @@ sí pasa por el Posting Engine central (posting_service.post_manual), nunca
 construye JournalLine a mano (CLAUDE.md §8)."""
 
 _ASSET_TERMINAL_STATUSES = ("DISPOSED", "RETIRED")
+_CAPITALIZABLE_INVOICE_STATUSES = (
+    "APPROVED",
+    "SCHEDULED",
+    "PARTIALLY_PAID",
+    "PAID",
+    "RECONCILED",
+)
+
+
+def _assert_account_type(
+    db: Session,
+    *,
+    account_id: uuid.UUID,
+    company_id: uuid.UUID,
+    expected_type: str,
+    field_name: str,
+) -> None:
+    assert_account_belongs_to_company(
+        db,
+        account_id=account_id,
+        company_id=company_id,
+        field_name=field_name,
+    )
+    account = db.get(Account, account_id)
+    if account is None or account.account_type != expected_type or not account.is_postable:
+        raise InvalidAssetStateError(
+            f"{field_name} debe ser una cuenta registrable {expected_type} de la compañía"
+        )
 
 
 def create_fixed_asset(
@@ -48,16 +80,18 @@ def create_fixed_asset(
     assert_operation_scope(scope, project_id)
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
     assert_cost_center_belongs_to_company(db, cost_center_id=cost_center_id, company_id=company_id)
-    assert_account_belongs_to_company(
+    _assert_account_type(
         db,
         account_id=depreciation_expense_account_id,
         company_id=company_id,
+        expected_type="EXPENSE",
         field_name="depreciation_expense_account_id",
     )
-    assert_account_belongs_to_company(
+    _assert_account_type(
         db,
         account_id=accumulated_depreciation_account_id,
         company_id=company_id,
+        expected_type="ASSET",
         field_name="accumulated_depreciation_account_id",
     )
     asset = asset_repository.create_fixed_asset(
@@ -78,6 +112,113 @@ def create_fixed_asset(
         depreciation_expense_account_id=depreciation_expense_account_id,
         accumulated_depreciation_account_id=accumulated_depreciation_account_id,
     )
+    if commit:
+        db.commit()
+        db.refresh(asset)
+    else:
+        db.flush()
+    return asset
+
+
+def capitalize_supplier_invoice_as_asset(
+    db: Session,
+    *,
+    supplier_invoice_id: uuid.UUID,
+    category: str,
+    name: str,
+    useful_life_months: int,
+    salvage_value: Decimal,
+    location: str | None,
+    responsible: str | None,
+    asset_account_id: uuid.UUID,
+    depreciation_expense_account_id: uuid.UUID,
+    accumulated_depreciation_account_id: uuid.UUID,
+    commit: bool = True,
+) -> FixedAsset:
+    invoice = db.execute(
+        select(SupplierInvoice)
+        .where(SupplierInvoice.id == supplier_invoice_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if invoice is None:
+        raise ValueError(f"SupplierInvoice {supplier_invoice_id} no existe")
+    if invoice.status not in _CAPITALIZABLE_INVOICE_STATUSES:
+        raise InvalidAssetStateError(
+            f"La factura debe estar aprobada para capitalizarse (estado actual: {invoice.status})"
+        )
+    if invoice.accrual_document_id is None:
+        raise InvalidAssetStateError("La factura aprobada no tiene un accrual contable trazable")
+    accrual = db.get(AccountingDocument, invoice.accrual_document_id)
+    if accrual is None or accrual.status != "POSTED":
+        raise InvalidAssetStateError("El accrual de la factura no está POSTED y no puede capitalizarse")
+    existing = db.execute(
+        select(FixedAsset.id).where(FixedAsset.supplier_invoice_id == invoice.id)
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise InvalidAssetStateError("La factura ya fue capitalizada como activo fijo")
+
+    _assert_account_type(
+        db,
+        account_id=asset_account_id,
+        company_id=invoice.company_id,
+        expected_type="ASSET",
+        field_name="asset_account_id",
+    )
+    total = invoice.amount + invoice.tax_amount
+    if salvage_value >= total:
+        raise InvalidAssetStateError("salvage_value debe ser menor que el costo capitalizado")
+
+    asset = create_fixed_asset(
+        db,
+        company_id=invoice.company_id,
+        category=category,
+        name=name,
+        acquisition_date=invoice.invoice_date,
+        cost=total,
+        currency_code=invoice.currency_code,
+        useful_life_months=useful_life_months,
+        salvage_value=salvage_value,
+        location=location,
+        responsible=responsible,
+        scope=invoice.scope,
+        project_id=invoice.project_id,
+        cost_center_id=invoice.cost_center_id,
+        depreciation_expense_account_id=depreciation_expense_account_id,
+        accumulated_depreciation_account_id=accumulated_depreciation_account_id,
+        commit=False,
+    )
+    asset.supplier_invoice_id = invoice.id
+    asset.capitalization_account_id = asset_account_id
+    capitalization = posting_service.post_manual(
+        db,
+        company_id=invoice.company_id,
+        document_type_code="CAP",
+        scope=invoice.scope,
+        project_id=invoice.project_id,
+        currency_code=invoice.currency_code,
+        lines=[
+            posting_service.JournalLineInput(
+                account_id=asset_account_id,
+                debit_amount=total,
+                description=f"Capitalización {asset.name} desde factura {invoice.invoice_number}",
+                project_id=invoice.project_id,
+                cost_center_id=invoice.cost_center_id,
+            ),
+            posting_service.JournalLineInput(
+                account_id=invoice.expense_account_id,
+                credit_amount=total,
+                description=f"Reclasificación factura {invoice.invoice_number}",
+                project_id=invoice.project_id,
+                cost_center_id=invoice.cost_center_id,
+            ),
+        ],
+        description=f"Capitalización activo {asset.name} desde factura {invoice.invoice_number}",
+        source_type="fixed_asset",
+        source_id=asset.id,
+        commit=False,
+    )
+    asset.capitalization_document_id = capitalization.id
     if commit:
         db.commit()
         db.refresh(asset)
@@ -111,6 +252,36 @@ def change_asset_status(db: Session, *, asset_id: uuid.UUID, status: str, commit
     else:
         db.flush()
     return asset
+
+
+def apply_capitalization_reversal(
+    db: Session, *, asset_id: uuid.UUID, document_type_code: str
+) -> None:
+    """Synchronize a formal CAP reversal with the source asset.
+
+    A capitalized asset remains immutable historical evidence, but it can no
+    longer be active once its capitalization leaves the ledger. Depreciation
+    must be reversed first because silently retiring an asset with posted DEP
+    entries would leave the asset subledger inconsistent with GL.
+    """
+    if document_type_code != "CAP":
+        return
+    asset = db.execute(
+        select(FixedAsset)
+        .where(FixedAsset.id == asset_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if asset is None:
+        raise ValueError(f"FixedAsset {asset_id} no existe")
+    has_depreciation = db.execute(
+        select(DepreciationEntry.id).where(DepreciationEntry.asset_id == asset.id).limit(1)
+    ).first()
+    if has_depreciation is not None:
+        raise InvalidAssetStateError(
+            "No se puede revertir la capitalización de un activo con depreciaciones registradas"
+        )
+    asset.status = "RETIRED"
 
 
 def _monthly_depreciation_amount(asset: FixedAsset) -> Decimal:

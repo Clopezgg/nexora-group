@@ -52,10 +52,24 @@ export function hasEditCapability(): boolean {
   return Boolean(getEditCapability())
 }
 
+async function throwApiError(response: Response): Promise<never> {
+  let message = `Error ${response.status}`
+  try {
+    const body = await response.json()
+    message = body.detail ?? body.error?.message ?? message
+  } catch {
+    // response without JSON body
+  }
+  if (response.status === 428 && typeof window !== 'undefined') {
+    clearEditCapability()
+    window.dispatchEvent(new CustomEvent('nexora:edit-access-required'))
+  }
+  throw new ApiError(message, response.status)
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  // Un body FormData (subida de archivos, ver documentService.uploadEvidence)
-  // nunca debe forzar Content-Type: application/json -- el navegador debe
-  // fijar el `multipart/form-data; boundary=...` correcto por sí mismo.
+  // A FormData body (evidence uploads) must not force application/json; the
+  // browser owns the multipart boundary.
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
   const method = (options.method ?? 'GET').toUpperCase()
   const editCapability = ['PUT', 'PATCH', 'DELETE'].includes(method) ? getEditCapability() : null
@@ -70,21 +84,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   })
 
   if (!response.ok) {
-    let message = `Error ${response.status}`
-    try {
-      const body = await response.json()
-      // `detail` es el formato de FastAPI/HTTPException; `error.message` es
-      // el estándar NXR-* (orden maestra §108) que usan los endpoints de
-      // dominio (Track A en adelante). Se soportan ambos.
-      message = body.detail ?? body.error?.message ?? message
-    } catch {
-      // response without JSON body
-    }
-    if (response.status === 428 && typeof window !== 'undefined') {
-      clearEditCapability()
-      window.dispatchEvent(new CustomEvent('nexora:edit-access-required'))
-    }
-    throw new ApiError(message, response.status)
+    return throwApiError(response)
   }
 
   if (response.status === 204) {
@@ -92,4 +92,52 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   return (await response.json()) as T
+}
+
+export interface ApiDownload {
+  blob: Blob
+  filename: string | null
+}
+
+function safeDownloadFilename(filename: string | null): string | null {
+  if (!filename) return null
+  const normalized = filename.replace(/\\/g, '/').split('/').pop() ?? ''
+  const withoutControls = Array.from(normalized)
+    .filter((character) => character.charCodeAt(0) > 31 && character.charCodeAt(0) !== 127)
+    .join('')
+  const safe = withoutControls.trim().replace(/^\.+/, '')
+  return safe.slice(0, 255) || null
+}
+
+function downloadFilename(response: Response): string | null {
+  const disposition = response.headers.get('content-disposition')
+  if (!disposition) return null
+
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  if (encoded) {
+    try {
+      return safeDownloadFilename(decodeURIComponent(encoded))
+    } catch {
+      return safeDownloadFilename(encoded)
+    }
+  }
+
+  const quoted = disposition.match(/filename="([^"]+)"/i)?.[1]
+  return safeDownloadFilename(quoted ?? null)
+}
+
+export async function apiFetchBlob(path: string): Promise<ApiDownload> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: 'include',
+    headers: { Accept: 'application/octet-stream,*/*' },
+  })
+
+  if (!response.ok) {
+    return throwApiError(response)
+  }
+
+  return {
+    blob: await response.blob(),
+    filename: downloadFilename(response),
+  }
 }

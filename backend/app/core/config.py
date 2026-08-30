@@ -1,6 +1,7 @@
 import os
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,6 +60,18 @@ class Settings(BaseSettings):
     @property
     def edit_access_configured(self) -> bool:
         return bool(self.edit_access_token_salt.strip() and self.edit_access_token_digest.strip())
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if not self.is_production:
+            return self
+        if self.secret_key == "dev-secret-key-change-me" or len(self.secret_key) < 32:
+            raise ValueError("SECRET_KEY must be a unique value of at least 32 characters in production")
+        if self.edit_access_required and not self.edit_access_configured:
+            raise ValueError(
+                "EDIT_ACCESS_TOKEN_SALT and EDIT_ACCESS_TOKEN_DIGEST are required in production"
+            )
+        return self
 
 
 @lru_cache

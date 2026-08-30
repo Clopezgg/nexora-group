@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom'
 import { Navigate } from 'react-router-dom'
 import { AppLayout } from '../layouts/AppLayout'
+import { PermissionRoute } from '../features/auth/PermissionRoute'
 import { ProtectedRoute } from '../features/auth/ProtectedRoute'
 import { navItems } from './navigation'
 
@@ -152,7 +153,10 @@ const applicationRoutes: RouteObject[] = navItems
   .map((item) => {
     const lazy = IMPLEMENTED_ROUTES[item.path]
     return lazy
-      ? { path: item.path.replace(/^\//, ''), lazy }
+      ? {
+          element: <PermissionRoute requiredAny={item.requiredAny ?? []} />,
+          children: [{ path: item.path.replace(/^\//, ''), lazy }],
+        }
       : { path: item.path.replace(/^\//, ''), element: <Navigate to="/inicio" replace /> }
   })
 
@@ -175,10 +179,16 @@ export const routes: RouteObject[] = [
             }),
           },
           {
-            path: 'proyectos/:projectId',
-            lazy: async () => ({
-              Component: (await import('../features/projects/ProjectDetailPage')).ProjectDetailPage,
-            }),
+            element: <PermissionRoute requiredAny={['project:read']} />,
+            children: [
+              {
+                path: 'proyectos/:projectId',
+                lazy: async () => ({
+                  Component: (await import('../features/projects/ProjectDetailPage'))
+                    .ProjectDetailPage,
+                }),
+              },
+            ],
           },
           ...applicationRoutes,
         ],

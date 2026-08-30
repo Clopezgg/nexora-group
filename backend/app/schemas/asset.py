@@ -44,6 +44,21 @@ class FixedAssetResponse(CamelModel):
     cost_center_id: uuid.UUID | None
     depreciation_expense_account_id: uuid.UUID
     accumulated_depreciation_account_id: uuid.UUID
+    supplier_invoice_id: uuid.UUID | None
+    capitalization_account_id: uuid.UUID | None
+    capitalization_document_id: uuid.UUID | None
+
+
+class SupplierInvoiceAssetCreateRequest(CamelModel):
+    category: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=255)
+    useful_life_months: int = Field(gt=0)
+    salvage_value: Decimal = Field(default=Decimal("0"), ge=0, max_digits=18, decimal_places=2)
+    location: str | None = Field(default=None, max_length=255)
+    responsible: str | None = Field(default=None, max_length=255)
+    asset_account_id: uuid.UUID
+    depreciation_expense_account_id: uuid.UUID
+    accumulated_depreciation_account_id: uuid.UUID
 
 
 class AssetStatusChangeRequest(CamelModel):

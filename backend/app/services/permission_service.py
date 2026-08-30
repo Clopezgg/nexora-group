@@ -75,6 +75,7 @@ PROJECT_AWARE_RESOURCE_PREFIXES = (
     "asset.",
     "crm.",
     "reports.",
+    "search.",
 )
 
 

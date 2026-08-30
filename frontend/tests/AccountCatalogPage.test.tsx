@@ -47,6 +47,10 @@ function stubCatalogFetch({
             email: 'user@nexora.group',
             fullName: 'Usuario',
             roles: [role],
+            permissions:
+              role === 'Viewer'
+                ? ['accounting.journal_entry:read', 'accounting.account:read']
+                : [],
           }),
         } as Response)
       }

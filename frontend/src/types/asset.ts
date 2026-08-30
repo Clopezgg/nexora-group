@@ -16,6 +16,9 @@ export interface FixedAsset {
   costCenterId: string | null
   depreciationExpenseAccountId: string
   accumulatedDepreciationAccountId: string
+  supplierInvoiceId: string | null
+  capitalizationAccountId: string | null
+  capitalizationDocumentId: string | null
 }
 
 export interface DepreciationEntry {

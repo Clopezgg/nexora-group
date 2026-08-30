@@ -1,10 +1,9 @@
-import uuid
-
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal
+from app.core.logging import get_correlation_id
 from app.domain.errors import NotAuthenticatedError
 from app.models.edit_access import EditAccessEvent
 from app.services import auth_service, edit_access_service
@@ -34,7 +33,7 @@ def register_edit_access_guard(app: FastAPI) -> None:
                 )
             capability = request.headers.get("x-nexora-edit-access")
             session_token = request.cookies.get(settings.session_cookie_name)
-            correlation_id = request.headers.get("x-correlation-id") or str(uuid.uuid4())
+            correlation_id = get_correlation_id()
             with SessionLocal() as db:
                 try:
                     try:

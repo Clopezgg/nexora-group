@@ -179,6 +179,7 @@ def create_journal_entry(
         fx_rate=payload.fx_rate,
         lines=lines,
         description=payload.description,
+        commit=False,
     )
     audit_service.record(
         db,
@@ -250,7 +251,12 @@ def reverse_journal_entry(
         document=document,
     )
     before_status = document.status
-    reversal = posting_service.reverse_document(db, document_id=document_id, reason=payload.reason)
+    reversal = posting_service.reverse_document(
+        db,
+        document_id=document_id,
+        reason=payload.reason,
+        commit=False,
+    )
     audit_service.record(
         db,
         actor_user_id=user.id,

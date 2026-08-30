@@ -909,3 +909,18 @@ on real deployment). DOCKER-001 is EXTERNAL-BLOCKER (Docker not installed).
 **All local implementable work is complete.** The domain-logic backlog
 is fully closed. What remains is exclusively Azure provisioning +
 OIDC + production deployment — all gated by external authorization.
+
+## 2026-08-30 — PR final #24; billing continúa bloqueando runners
+
+El HEAD ejecutable certificado localmente es
+`2445d8e3771afda6e95110982e46bd7824e8030b`, ocho commits delante de `main`;
+la reconciliación documental que sigue no altera código ejecutable.
+PR #24 está abierto y mergeable. Documents/Evidence incluye descarga privada
+completa en backend y frontend; frontend pasó 115/115, typecheck, lint, build
+y audit. Compileall/Ruff/pip-audit pasan y Alembic tiene un head.
+
+CI run `33286924542` terminó con los cuatro jobs en failure y `steps=[]`:
+GitHub no asignó ejecución efectiva. No fusionar, desplegar ni limpiar ramas
+hasta resolver Billing/spending limit y re-ejecutar el run. Después: corregir
+cualquier fallo real, fusionar PR #24, certificar CI/deploy del SHA de main,
+smoke productivo y solo entonces limpiar ramas con `ahead_by=0`.

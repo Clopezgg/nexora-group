@@ -5,7 +5,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.accounting import AccountingDocument, JournalLine
+from app.models.accounting import LEDGER_EFFECTIVE_STATUSES, AccountingDocument, JournalLine
 from app.models.ar import CustomerInvoice
 from app.models.chart_of_accounts import Account
 from app.models.crm import SalesContract
@@ -64,7 +64,7 @@ def _posted_gl_total(
         )
         .join(Account, Account.id == JournalLine.account_id)
         .where(
-            AccountingDocument.status == "POSTED",
+            AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
             AccountingDocument.scope == "PROJECT",
             AccountingDocument.project_id == project_id,
             JournalLine.project_id == project_id,

@@ -185,6 +185,23 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
+// Static Web Apps backend linking can provision Container Apps platform
+// authentication outside this module. Nexora owns authentication in FastAPI
+// (session cookie + RBAC + CORS/CSRF), so keep EasyAuth disabled declaratively
+// for the direct HTTPS API used by the browser.
+resource backendAuthConfig 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
+  parent: backendApp
+  name: 'current'
+  properties: {
+    platform: {
+      enabled: false
+    }
+    globalValidation: {
+      unauthenticatedClientAction: 'AllowAnonymous'
+    }
+  }
+}
+
 output backendFqdn string = backendApp.properties.configuration.ingress.fqdn
 output backendResourceId string = backendApp.id
 output backendPrincipalId string = backendIdentity.properties.principalId

@@ -334,6 +334,7 @@ jobs:
           set -euo pipefail
           COOKIE_JAR="$RUNNER_TEMP/nexora-production-cookies.txt"
           LOGIN_HEADERS="$RUNNER_TEMP/nexora-login-headers.txt"
+          LOGIN_HEADERS_NORMALIZED="$RUNNER_TEMP/nexora-login-headers-normalized.txt"
           CORS_HEADERS="$RUNNER_TEMP/nexora-cors-headers.txt"
           CORS_HEADERS_NORMALIZED="$RUNNER_TEMP/nexora-cors-headers-normalized.txt"
 
@@ -414,11 +415,35 @@ jobs:
             fi
             exit 1
           fi
-          if ! grep -Eiq '^set-cookie:.*Secure.*SameSite=None' "$LOGIN_HEADERS"; then
-            echo "::error::Production login did not issue a Secure SameSite=None session cookie"
-            sed -E 's/^(set-cookie:).*/\\1 [redacted]/I' "$LOGIN_HEADERS"
+
+          tr -d '\r' < "$LOGIN_HEADERS" > "$LOGIN_HEADERS_NORMALIZED"
+          SESSION_COOKIE_HEADER="$(grep -Ei '^set-cookie:[[:space:]]*nexora_session=' "$LOGIN_HEADERS_NORMALIZED" | head -n 1 || true)"
+          if [ -z "$SESSION_COOKIE_HEADER" ]; then
+            echo "::error::Production login did not issue the nexora_session cookie"
             exit 1
           fi
+          SESSION_COOKIE_ATTRIBUTES="${SESSION_COOKIE_HEADER#*:}"
+          if ! grep -Eiq '(^|;[[:space:]]*)Secure([;[:space:]]|$)' <<< "$SESSION_COOKIE_ATTRIBUTES"; then
+            echo "::error::Production session cookie is missing Secure"
+            echo 'set-cookie: [redacted]'
+            exit 1
+          fi
+          if ! grep -Eiq '(^|;[[:space:]]*)HttpOnly([;[:space:]]|$)' <<< "$SESSION_COOKIE_ATTRIBUTES"; then
+            echo "::error::Production session cookie is missing HttpOnly"
+            echo 'set-cookie: [redacted]'
+            exit 1
+          fi
+          if ! grep -Eiq '(^|;[[:space:]]*)SameSite=None([;[:space:]]|$)' <<< "$SESSION_COOKIE_ATTRIBUTES"; then
+            echo "::error::Production session cookie is missing SameSite=None"
+            echo 'set-cookie: [redacted]'
+            exit 1
+          fi
+          if ! grep -Eiq '(^|;[[:space:]]*)Path=/([;[:space:]]|$)' <<< "$SESSION_COOKIE_ATTRIBUTES"; then
+            echo "::error::Production session cookie is missing Path=/"
+            echo 'set-cookie: [redacted]'
+            exit 1
+          fi
+          echo "Production session cookie: Secure + HttpOnly + SameSite=None + Path=/ verified"
 
           DASHBOARD_CODE="$(curl --silent --show-error \
             --cookie "$COOKIE_JAR" \

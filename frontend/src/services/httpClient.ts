@@ -6,7 +6,28 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+function resolveApiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim()
+
+  if (import.meta.env.PROD) {
+    if (!configured) {
+      throw new Error('VITE_API_BASE_URL is required for the Nexora production build')
+    }
+    let parsed: URL
+    try {
+      parsed = new URL(configured)
+    } catch {
+      throw new Error('VITE_API_BASE_URL must be an absolute HTTPS URL in production')
+    }
+    if (parsed.protocol !== 'https:') {
+      throw new Error('VITE_API_BASE_URL must use HTTPS in production')
+    }
+  }
+
+  return (configured || '/api').replace(/\/+$/, '')
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 const EDIT_CAPABILITY_KEY = 'nexora.edit-access.capability'
 const EDIT_EXPIRY_KEY = 'nexora.edit-access.expires-at'
 

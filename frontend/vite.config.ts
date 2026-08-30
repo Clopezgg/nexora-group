@@ -33,27 +33,20 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Only shell/static metadata is precached. Route JS/CSS chunks are
-        // cached on demand so the service worker does not download the whole
-        // ERP immediately after login and compete with interactive API calls.
-        globPatterns: ['**/*.{html,svg,png,webmanifest}'],
+        // Nexora is an online transactional ERP. Never precache the SPA HTML
+        // or JavaScript/CSS application shell: doing so can keep an old bundle
+        // alive after a deployment and make it call the obsolete same-origin
+        // /api proxy. Static Web Apps owns navigation fallback and HTTP cache
+        // headers; the service worker only keeps install metadata/icons.
+        globPatterns: ['**/*.{svg,png,webmanifest}'],
+        navigateFallback: null,
         cleanupOutdatedCaches: true,
-        navigateFallbackDenylist: [/^\/api\//],
+        clientsClaim: true,
+        skipWaiting: true,
         runtimeCaching: [
           {
             urlPattern: /\/api\//,
             handler: 'NetworkOnly',
-          },
-          {
-            urlPattern: /\/assets\/.*\.(?:js|css)$/,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'nexora-static-assets',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30,
-              },
-            },
           },
         ],
       },

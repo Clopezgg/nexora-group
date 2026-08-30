@@ -68,6 +68,10 @@ describe('VouchersPage', () => {
           return Promise.resolve({
             ok: true,
             status: 200,
+            headers: new Headers({
+              'content-type': 'application/pdf',
+              'content-disposition': 'attachment; filename="comprobante.pdf"',
+            }),
             blob: async () => new Blob(['pdf-runtime'], { type: 'application/pdf' }),
           } as Response)
         }

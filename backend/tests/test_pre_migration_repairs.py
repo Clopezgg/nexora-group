@@ -44,6 +44,17 @@ def _drop_alembic_version(db_session):
     db_session.commit()
 
 
+def test_preflight_is_a_noop_on_a_fresh_database(db_session):
+    """A clean DB (Docker Compose smoke, first bootstrap) has no
+    alembic_version table yet; the preflight must return quietly instead of
+    crashing before ``alembic upgrade head`` can build the schema."""
+
+    _drop_alembic_version(db_session)
+
+    # Must not raise psycopg.errors.UndefinedTable.
+    run_authorized_project_reset_preflight()
+
+
 def test_preflight_detaches_nullable_reference_and_records_audit(db_session):
     project_id, contract_id = _seed_target_with_nullable_contract(db_session)
 

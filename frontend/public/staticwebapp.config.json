@@ -7,12 +7,32 @@
       }
     },
     {
+      "route": "/",
+      "headers": {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache"
+      }
+    },
+    {
       "route": "/index.html",
       "headers": {
-        "Cache-Control": "no-cache"
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache"
+      }
+    },
+    {
+      "route": "/deployment.json",
+      "headers": {
+        "Cache-Control": "no-store, max-age=0"
       }
     }
   ],
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()"
+  },
   "navigationFallback": {
     "rewrite": "/index.html"
   }

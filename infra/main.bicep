@@ -37,7 +37,7 @@ param editAccessTokenSalt string = ''
 @description('Digest PBKDF2 de Protected Edit codificado base64url. Vacío mantiene Protected Edit fail-closed.')
 param editAccessTokenDigest string = ''
 
-@description('Imagen de contenedor del backend publicada por CI en GHCR. Placeholder hasta el primer build real.')
+@description('Imagen de contenedor del backend. CI siempre sobrescribe este valor con ghcr.io/<owner>/nexora-backend:<git-sha> en despliegues reales.')
 param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Usuario administrador de PostgreSQL. No es secreto (el password sí lo es).')
@@ -138,10 +138,10 @@ module containerApps 'modules/containerapps.bicep' = {
   }
 }
 
-// The Static Web Apps -> Container Apps association is intentionally managed by
-// `az staticwebapp backends link` in the deployment workflow. The GA command
-// performs the complete linking/auth handshake for Container Apps, which a raw
-// ARM child resource alone does not reliably establish.
+// No se declara ni se conserva una asociación Static Web Apps -> Container Apps.
+// El navegador usa el FQDN HTTPS directo del backend, compilado en el frontend.
+// El workflow de despliegue elimina cualquier linked backend residual antes de
+// publicar Static Web Apps para que /api nunca vuelva a ser una ruta ambigua.
 
 output resourceGroupName string = rg.name
 output backendFqdn string = containerApps.outputs.backendFqdn

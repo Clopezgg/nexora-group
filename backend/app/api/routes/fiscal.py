@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.core.business_time import business_today
 from app.repositories import company_repository
 from app.schemas.fiscal import (
     CurrentFiscalPeriodResponse,
@@ -148,7 +149,7 @@ def current_period(
         db, user_id=user.id, resource="core.company", action="read", company_id=company_id
     )
     year, period = fiscal_service.get_current_period(
-        db, company_id=company_id, on_date=on_date or date.today()
+        db, company_id=company_id, on_date=on_date or business_today()
     )
     return CurrentFiscalPeriodResponse(
         fiscal_year=FiscalYearResponse.model_validate(year, from_attributes=True) if year else None,

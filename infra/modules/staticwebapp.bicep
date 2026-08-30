@@ -15,8 +15,10 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
     tier: 'Standard'
   }
   properties: {
-    // Standard habilita el backend enlazado de Container Apps. El repositorio
-    // no se liga aquí: el frontend se publica con el token obtenido por OIDC.
+    // El repositorio no se liga aquí: el frontend se publica con el token
+    // obtenido por OIDC. La aplicación productiva consume el HTTPS directo
+    // de Container Apps; el workflow elimina cualquier linked backend
+    // residual para evitar un proxy /api ambiguo.
     stagingEnvironmentPolicy: 'Enabled'
     allowConfigFileUpdates: true
   }

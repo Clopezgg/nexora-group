@@ -3244,3 +3244,37 @@ first-party, Safari/WebKit ITP ya no aplica (ITP bloquea cookies de
 *terceros*, no de primera parte). Chromium ya funcionaba con la cookie
 cross-site y sigue funcionando con la first-party. Pendiente de añadir: un
 recorrido Playwright WebKit contra producción en `Verify production`.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 2 (Comprobantes / Money) — incremento 2
+
+Rama: `feat/phase2-comprobantes-enterprise`.
+
+- **`backend/app/core/money.py`** (nuevo): `format_money(value, currency)` →
+  `L 150,000.00` (símbolo + miles + 2 decimales, signo antepuesto en
+  negativos). Es el equivalente backend de `frontend/src/utils/currency.ts`;
+  ambos comparten la misma convención. Usado por el PDF de comprobantes y
+  disponible para manifiestos/exportes futuros.
+- **Comprobante PDF profesional** (`voucher_service.py`, orden maestra
+  §120-125):
+  - Cuentas del asiento salen como `código - nombre` (join real a `accounts`),
+    nunca el UUID.
+  - Proyecto por su nombre; operaciones centrales/generales muestran
+    "No aplica", no un UUID ni "N/A".
+  - Tipo de cambio se imprime **solo** cuando es conversión real
+    (`fx_rate != 1` y moneda ≠ funcional de la compañía). HNL→HNL ya no
+    imprime "1.000000".
+  - Todos los importes por `format_money`.
+  - Encabezado con identidad NEXORA (banda), número de documento, fecha
+    posteo.
+  - Bloque de firmas: Preparado por / Aprobado por / Recibí conforme.
+  - Totales de débito y crédito al pie (doble partida visible).
+  - `setPageCompression(0)`: el comprobante es artefacto de auditoría y su
+    texto debe poder extraerse sin herramientas externas.
+- **Money formatter global** — fuga corregida en
+  `frontend/src/features/workforce/TimeEntriesPage.tsx`: costo de mano de
+  obra y tarifa/hora ahora por `formatMoney` (antes `L. 1004.00` /
+  `1004.00` crudo).
+- Tests: `backend/tests/test_money.py` (8 casos), aserción reforzada en
+  `test_voucher_pdf_is_generated_for_a_remittance` (cuenta con código+nombre,
+  importe formateado, sin UUID, sin `1.000000`), `frontend/tests/currency.test.ts`
+  (4), `TimeEntriesPage.test.tsx` actualizado a la salida formateada.

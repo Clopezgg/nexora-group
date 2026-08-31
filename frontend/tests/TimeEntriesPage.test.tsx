@@ -116,9 +116,9 @@ describe('TimeEntriesPage', () => {
 
     await user.click(within(row as HTMLElement).getByRole('button', { name: /aprobar/i }))
 
-    const approvedRow = (await screen.findByText('1004.00')).closest('tr')
-    expect(approvedRow).not.toBeNull()
-    expect(within(approvedRow as HTMLElement).getByText('Aprobado')).toBeInTheDocument()
-    expect(within(approvedRow as HTMLElement).getByText('1004.00')).toBeInTheDocument()
+    const approvedRow = (await screen.findByText('Juan Pérez')).closest('tr') as HTMLElement
+    await within(approvedRow).findByText('Aprobado')
+    // Money is rendered through the global formatter: symbol + thousands + 2 decimals.
+    expect(within(approvedRow).getByText(/^L\s?1,004\.00$/)).toBeInTheDocument()
   })
 })

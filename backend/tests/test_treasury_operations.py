@@ -212,6 +212,18 @@ def test_voucher_pdf_is_generated_for_a_remittance(client):
     assert response.headers["content-disposition"].endswith('.pdf"')
     assert response.content.startswith(b"%PDF")
 
+    # Phase 2 (orden maestra §120-125): el comprobante es profesional --
+    # cuentas con código + nombre, importes formateados, sin UUID visibles,
+    # sin tipo de cambio 1.000000 en operaciones HNL->HNL.
+    text = response.content.decode("latin-1")
+    assert "1110 - Caja" in text
+    assert "3100 - Aportes" in text
+    assert "L 1,000.00" in text
+    assert "1.000000" not in text
+    assert str(funding_doc) not in text
+    assert "Asiento contable" in text
+    assert "conforme" in text  # bloque de firmas "Recib\xed conforme"
+
 
 def test_reconciliation_uses_cumulative_matches_and_blocks_overmatch(client, db_session):
     login_admin(client)

@@ -16,6 +16,7 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { formatMoney } from '../../utils/currency'
 import { projectService } from '../../services/projectService'
 import { workforceService } from '../../services/workforceService'
 import type { TimeEntry, TimeEntryStatus, Worker } from '../../types/workforce'
@@ -32,9 +33,8 @@ const STATUS_LABEL: Record<TimeEntryStatus, string> = {
   REJECTED: 'Rechazado',
 }
 
-function sumLaborCost(entries: TimeEntry[]): string {
-  const total = entries.reduce((acc, entry) => acc + (entry.laborCost ? Number(entry.laborCost) : 0), 0)
-  return total.toFixed(2)
+function sumLaborCost(entries: TimeEntry[]): number {
+  return entries.reduce((acc, entry) => acc + (entry.laborCost ? Number(entry.laborCost) : 0), 0)
 }
 
 function ApproveControl({
@@ -68,7 +68,8 @@ function ApproveControl({
 }
 
 export function TimeEntriesPage() {
-  const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const { activeCompanyId, activeCompany, isLoading: loadingCompanies } = useActiveCompany()
+  const currencyCode = activeCompany?.functionalCurrencyCode ?? undefined
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({
@@ -173,14 +174,14 @@ export function TimeEntriesPage() {
       render: (row) => (row.projectId ? projectById.get(row.projectId) ?? row.projectId : '—'),
     },
     { key: 'hoursWorked', header: 'Horas reportadas', render: (row) => row.hoursWorked },
-    { key: 'hourlyRate', header: 'Tarifa / hora', render: (row) => row.hourlyRate },
+    { key: 'hourlyRate', header: 'Tarifa / hora', render: (row) => (row.hourlyRate != null ? formatMoney(Number(row.hourlyRate), currencyCode) : '—') },
     {
       key: 'status',
       header: 'Estado',
       render: (row) => <Badge tone={STATUS_TONE[row.status]}>{STATUS_LABEL[row.status]}</Badge>,
     },
     { key: 'approvedHours', header: 'Horas aprobadas', render: (row) => row.approvedHours ?? '—' },
-    { key: 'laborCost', header: 'Costo de mano de obra', render: (row) => row.laborCost ?? '—' },
+    { key: 'laborCost', header: 'Costo de mano de obra', render: (row) => (row.laborCost != null ? formatMoney(Number(row.laborCost), currencyCode) : '—') },
     {
       key: 'actions',
       header: '',
@@ -218,7 +219,7 @@ export function TimeEntriesPage() {
         <Button onClick={() => setModalOpen(true)}>Nuevo registro de tiempo</Button>
       </header>
 
-      <StatCard label="Costo de mano de obra aprobado (filtro actual)" value={`L. ${approvedTotal}`} />
+      <StatCard label="Costo de mano de obra aprobado (filtro actual)" value={formatMoney(approvedTotal, currencyCode)} />
 
       <Card>
         <FilterBar

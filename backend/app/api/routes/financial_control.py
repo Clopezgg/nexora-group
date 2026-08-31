@@ -110,3 +110,16 @@ def cash_forecast(
         first_negative_week_index=fc.first_negative_week_index,
         has_liquidity_alert=fc.has_liquidity_alert,
     )
+
+
+@router.get("/ar-metrics", response_model=None)
+def ar_metrics(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    db: Session = Depends(get_db),
+    current: tuple = Depends(get_current_user),
+):
+    user, _roles = current
+    assert_company_access(
+        db, user_id=user.id, resource="core.company", action="read", company_id=company_id
+    )
+    return financial_control_service.ar_metrics(db, company_id=company_id)

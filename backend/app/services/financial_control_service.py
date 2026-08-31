@@ -6,7 +6,7 @@ hardcodeadas: cada número se deriva de la base de datos.
 """
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta as _timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -216,3 +216,57 @@ def daily_status(db: Session, *, company_id, as_of: date | None = None) -> Daily
         fiscal_period_status=period_status,
         kpis=kpis,
     )
+
+
+def ar_metrics(db: Session, *, company_id, as_of: date | None = None) -> dict:
+    """DSO + aging de cuentas por cobrar (orden maestra Phase 7).
+
+    DSO simple = (AR pendiente / ventas a crédito de los últimos 90 días) * 90.
+    """
+    as_of = as_of or business_today()
+    trailing_start = as_of - _timedelta(days=90)
+
+    open_rows = db.execute(
+        select(CustomerInvoice.due_date, CustomerInvoice.amount, CustomerInvoice.amount_collected)
+        .where(CustomerInvoice.company_id == company_id)
+        .where(CustomerInvoice.status.in_(_AR_OPEN_STATUSES))
+    ).all()
+    ar_outstanding = Decimal("0")
+    aging = {"current": Decimal("0"), "1_30": Decimal("0"), "31_60": Decimal("0"), "61_90": Decimal("0"), "over_90": Decimal("0")}
+    for due_date, amount, amount_collected in open_rows:
+        remaining = amount - amount_collected
+        if remaining <= 0:
+            continue
+        ar_outstanding += remaining
+        overdue_days = (as_of - due_date).days
+        if overdue_days <= 0:
+            aging["current"] += remaining
+        elif overdue_days <= 30:
+            aging["1_30"] += remaining
+        elif overdue_days <= 60:
+            aging["31_60"] += remaining
+        elif overdue_days <= 90:
+            aging["61_90"] += remaining
+        else:
+            aging["over_90"] += remaining
+
+    trailing_sales = db.execute(
+        select(func.coalesce(func.sum(CustomerInvoice.amount), Decimal("0")))
+        .where(CustomerInvoice.company_id == company_id)
+        .where(CustomerInvoice.status != "CANCELLED")
+        .where(CustomerInvoice.invoice_date >= trailing_start)
+        .where(CustomerInvoice.invoice_date <= as_of)
+    ).scalar_one()
+    trailing_sales = Decimal(trailing_sales)
+
+    dso = None
+    if trailing_sales > 0:
+        dso = (ar_outstanding / trailing_sales * Decimal("90")).quantize(Decimal("0.1"))
+
+    return {
+        "asOf": as_of.isoformat(),
+        "arOutstanding": str(ar_outstanding),
+        "trailingCreditSales90d": str(trailing_sales),
+        "dso": str(dso) if dso is not None else None,
+        "aging": {k: str(v) for k, v in aging.items()},
+    }

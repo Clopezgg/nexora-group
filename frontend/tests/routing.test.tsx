@@ -15,7 +15,7 @@ describe('routing', () => {
 
     render(renderApp('/dashboard'))
 
-    expect(await screen.findByRole('heading', { name: /iniciar sesión/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /bienvenido a nexora/i })).toBeInTheDocument()
   })
 
   it('renders the role-based home for authenticated users at the root path', async () => {

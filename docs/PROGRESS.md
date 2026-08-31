@@ -3681,3 +3681,39 @@ Rama: `feat/phase9-reporting-drilldown`.
   Mayor filtrado por esa cuenta solo trae sus líneas); frontend
   `ReportsDrilldown.test.tsx`; `TrialBalancePage.test.tsx` actualizado; e2e
   `critical-journey` ejerce el drill-down.
+
+### 2026-08-31 — ORDEN MAESTRA DEFINITIVA · FASE 1 (Design System 2.0 + Login + shell responsive)
+
+Rama: `feat/od-fase1-designsystem-login-shell`.
+
+- **Design System 2.0** (`tokens.css`): capa semántica
+  `--nx-color-*` (default NEXORA HORIZON LIGHT), escala tipográfica
+  `--nx-text-*` (más pequeña en móvil, sube en ≥720px), helpers de
+  safe-area `--nx-safe-*` y `--nx-bottom-nav-height`. Adiciones no
+  disruptivas — el Theme Engine sobrescribe solo esta capa.
+- **Login — Opción 1 minimalista**: una sola tarjeta centrada, misma
+  identidad en desktop y iPhone (una columna, `100dvh`, safe-area,
+  completable con una mano). Eliminado el panel hero, la ilustración y el
+  enlace "¿Olvidaste tu contraseña?" (no hay autoservicio real, §8).
+  `autoComplete="email"` / `current-password`, `inputMode="email"`,
+  toggle mostrar/ocultar contraseña. UX de error §10: 401 →
+  "Correo o contraseña incorrectos.", cualquier otro →
+  "No fue posible iniciar sesión." (nunca 405/500/stack).
+- **Shell responsive**:
+  - `BottomNav` — navegación inferior móvil (≤1024px), 5 slots: Inicio +
+    3 centrales filtrados por RBAC + "Más" (abre el drawer). Safe-area
+    inferior; el contenido reserva espacio para no quedar tapado.
+  - `NavList` variante `drawer`: buscador de módulos + secciones
+    colapsables (`<details>`), abiertas si contienen la ruta activa.
+  - Drawer con footer de usuario + "Cerrar sesión"; en móvil el "Salir"
+    permanente desaparece de la cabecera.
+  - `tokens`/`AppLayout.css`: `env(safe-area-inset-*)` en topbar y
+    contenido.
+- Tests: `LoginPage.test.tsx` (5 — card minimalista, sin "olvidaste",
+  toggle contraseña, validación, mensaje seguro de error),
+  `BottomNav.test.tsx` (1 — slots RBAC + "Más" abre drawer),
+  `routing.test.tsx` / `accessibility.spec.ts` actualizados al nuevo
+  heading. Frontend 156 passed; typecheck / lint / build verdes.
+- Deploy Azure de Phases 2–9 (SHA c938168) ejecutado y verificado en
+  producción: frontend 200, `/api/healthz` 200, `/api/readyz` ok,
+  `/api/auth/login` 401 con credenciales inválidas (first-party, sin 405).

@@ -76,7 +76,7 @@ test.describe('Accessibility and responsive acceptance', () => {
     for (const width of acceptanceWidths) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/login')
-      await expect(page.getByRole('heading', { name: 'Iniciar sesión' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Bienvenido a NEXORA' })).toBeVisible()
       await expect(page.getByLabel('Correo electrónico')).toBeVisible()
       await expect(page.getByLabel('Contraseña')).toBeVisible()
       await expect(page.getByRole('button', { name: 'Iniciar sesión' })).toBeVisible()

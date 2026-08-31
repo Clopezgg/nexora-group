@@ -73,6 +73,7 @@ from app.models.treasury import (
 from app.models.user import User
 from app.models.user_context import UserContext
 from app.models.user_role import UserRole
+from app.models.user_preference import UserPreference
 from app.models.warehouse import Warehouse
 from app.models.wbs import WBSNode
 from app.models.workforce import Crew, CrewMember, TimeEntry, Worker
@@ -177,6 +178,7 @@ __all__ = [
     "UserProjectAccess",
     "UserContext",
     "UserRole",
+    "UserPreference",
     "Warehouse",
     "WBSNode",
     "Worker",

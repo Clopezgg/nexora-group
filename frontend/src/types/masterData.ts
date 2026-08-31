@@ -7,6 +7,8 @@ export interface Company {
   country: string | null
   fiscalId: string | null
   voucherPayerName: string | null
+  defaultThemeId: string | null
+  defaultDensity: string | null
   voucherApproverName: string | null
 }
 

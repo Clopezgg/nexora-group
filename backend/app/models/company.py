@@ -32,5 +32,9 @@ class Company(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # aprobador es configurable. Se imprimen en el PDF -- nunca hardcodeados.
     voucher_payer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     voucher_approver_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Theme Engine (orden maestra Phase 8) -- SOLO presentación. Predeterminados
+    # de la compañía; cada usuario puede sobreescribirlos en sus preferencias.
+    default_theme_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    default_density: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     projects: Mapped[list["Project"]] = relationship(back_populates="company")

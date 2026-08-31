@@ -3621,3 +3621,36 @@ Rama: `feat/phase7-ap-proposal-ar-dso`.
 - Tests: `test_ap_proposal_ar_dso.py` (2): propuesta ordena vencidas primero
   y excluye lo fuera de horizonte, total correcto; DSO = 90 días para
   cartera == ventas 90d, factura vencida hace 3 días cae en bucket 1-30.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 8 (Enterprise Theme Engine)
+
+Rama: `feat/phase8-theme-engine`.
+
+- **§68 respetado**: el tema es PURAMENTE presentación (variables CSS +
+  densidad). Nunca toca moneda, cálculos, permisos, contabilidad, workflow ni
+  estado de negocio. Test `themeEngine.test.ts` lo verifica (todas las claves
+  de cada preset empiezan por `--nx-theme-`; `formatMoney` idéntico bajo
+  cualquier preset).
+- **Backend**: migración `f453d24d2120` — `user_preferences(user_id, theme_id,
+  density)` + `companies.default_theme_id` / `default_density`. Rutas
+  `GET/PUT /me/preferences` (density validada: comfortable|compact). El
+  default de la compañía se expone en `CompanyResponse` y lo resuelve el
+  frontend.
+- **Frontend**:
+  - `src/theme/themes.ts` — 9 presets: NEXORA Classic (default), NEXORA Dark,
+    Horizon claro/oscuro, Quartz claro/oscuro, Alto contraste (negro/blanco),
+    NEXORA Executive, NEXORA Compact Finance. Sin CSS/logos SAP; tipografías
+    del sistema u open-source.
+  - `src/theme/themes.css` — capa que re-pinta contenedores principales
+    (body, app-shell, sidebar, topbar, cards, KPIs, tablas, botón primario)
+    con las variables `--nx-theme-*`; densidad `[data-nx-density=compact]`
+    comprime padding de cards/tablas.
+  - `ThemeProvider` — cascada usuario > compañía > default; aplica al
+    `<html>` (`data-nx-theme`, `data-nx-density`, `color-scheme`, custom
+    props); `preview()` para vista previa en vivo.
+  - `ThemeSettingsCard` en Configuración — galería de presets con **live
+    preview** (hover/click), selector de densidad, "Guardar como mi
+    preferencia", "Volver a heredar", y (solo Administrator) "Fijar como
+    predeterminado de la compañía".
+- Tests: `test_theme_preferences.py` (2); `themeEngine.test.ts` (4);
+  `ThemeSettingsCard.test.tsx` (2). `testUtils` envuelve con `ThemeProvider`.

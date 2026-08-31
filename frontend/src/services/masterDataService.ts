@@ -17,6 +17,8 @@ export interface CompanyProfileInput {
   fiscalId?: string
   voucherPayerName?: string
   voucherApproverName?: string
+  defaultThemeId?: string
+  defaultDensity?: string
 }
 
 export const masterDataService = {

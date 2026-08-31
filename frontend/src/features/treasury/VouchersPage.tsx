@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Card,
+  Combobox,
   EmptyState,
   ErrorState,
   Input,
@@ -21,7 +22,7 @@ export function VouchersPage() {
   const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
   const activeCompany = companies.find((company) => company.id === activeCompanyId) ?? null
   const [documentId, setDocumentId] = useState('')
-  const [beneficiary, setBeneficiary] = useState('')
+  const [beneficiaryKey, setBeneficiaryKey] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState('TRANSFER')
   const [approvedBy, setApprovedBy] = useState('')
 
@@ -31,9 +32,20 @@ export function VouchersPage() {
     enabled: Boolean(activeCompanyId),
   })
 
+  const beneficiariesQuery = useQuery({
+    queryKey: ['treasury', 'beneficiaries', activeCompanyId],
+    queryFn: () => voucherService.listBeneficiaries(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+
+  const selectedBeneficiary = (beneficiariesQuery.data ?? []).find(
+    (row) => `${row.beneficiaryType}:${row.id}` === beneficiaryKey,
+  )
+
   const download = useMutation({
     mutationFn: () => voucherService.download(documentId, {
-      beneficiary: beneficiary.trim(),
+      beneficiaryType: selectedBeneficiary?.beneficiaryType,
+      beneficiaryId: selectedBeneficiary?.id,
       paymentMethod,
       approvedBy: approvedBy.trim() || activeCompany?.voucherApproverName || undefined,
     }),
@@ -99,7 +111,20 @@ export function VouchersPage() {
 
       <Card title="Datos impresos en el comprobante">
         <div className="nx-treasury__form">
-          <Input label="Beneficiario" value={beneficiary} onChange={(event) => setBeneficiary(event.target.value)} required />
+          <div>
+            <Combobox
+              label="Beneficiario"
+              placeholder="Buscar proveedor, trabajador o cliente…"
+              options={(beneficiariesQuery.data ?? []).map((row) => ({
+                value: `${row.beneficiaryType}:${row.id}`,
+                label: row.reference ? `${row.name} · ${row.reference}` : row.name,
+              }))}
+              value={beneficiaryKey}
+              onChange={setBeneficiaryKey}
+              emptyMessage={beneficiariesQuery.isLoading ? 'Cargando…' : 'Sin beneficiarios registrados.'}
+            />
+            <p className="nx-field__hint">El beneficiario se toma del registro real (Proveedores, Personal o Comercial). No se captura texto libre.</p>
+          </div>
           <div>
             <Input
               label="Pagador"
@@ -129,7 +154,7 @@ export function VouchersPage() {
           </div>
           <Button
             loading={download.isPending}
-            disabled={!documentId || !beneficiary.trim() || !paymentMethod}
+            disabled={!documentId || !selectedBeneficiary || !paymentMethod}
             onClick={() => download.mutate()}
           >
             Generar PDF

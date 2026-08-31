@@ -9,6 +9,9 @@ from app.api.deps_correlation import get_correlation_id
 from app.domain.errors import InvalidFinancialReferenceError
 from app.models.accounting import AccountingDocument
 from app.models.company import Company
+from app.models.crm import Customer
+from app.models.supplier import Supplier
+from app.models.workforce import Worker
 from app.models.treasury import (
     BankStatementLine,
     FundRestriction,
@@ -17,6 +20,7 @@ from app.models.treasury import (
 )
 from app.schemas.treasury import (
     BankStatementCreateRequest,
+    BeneficiaryOption,
     BankStatementLineCreateRequest,
     BankStatementLineResponse,
     CashClosingApproveRequest,
@@ -744,10 +748,85 @@ def list_fund_restrictions(
     return [FundRestrictionResponse.model_validate(r, from_attributes=True) for r in restrictions]
 
 
+def _resolve_beneficiary_name(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    beneficiary_type: str,
+    beneficiary_id: uuid.UUID,
+) -> str:
+    """Traduce (tipo, id) a un nombre, validando pertenencia a la compañía.
+    Reutiliza las entidades existentes -- no hay tabla `beneficiary`."""
+    normalized = beneficiary_type.upper()
+    if normalized == "SUPPLIER":
+        row = db.get(Supplier, beneficiary_id)
+        name = row.trade_name or row.legal_name if row else None
+    elif normalized == "WORKER":
+        row = db.get(Worker, beneficiary_id)
+        name = row.full_name if row else None
+    elif normalized == "CUSTOMER":
+        row = db.get(Customer, beneficiary_id)
+        name = row.trade_name or row.legal_name if row else None
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"beneficiaryType inválido: {beneficiary_type}",
+        )
+    if row is None or row.company_id != company_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El beneficiario no existe o no pertenece a esta compañía",
+        )
+    return name
+
+
+@router.get("/beneficiaries", response_model=list[BeneficiaryOption])
+def list_beneficiaries(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("treasury.voucher", "read")),
+) -> list[BeneficiaryOption]:
+    assert_company_access(
+        db, user_id=user.id, resource="treasury.voucher", action="read", company_id=company_id
+    )
+    options: list[BeneficiaryOption] = []
+    for supplier in db.query(Supplier).filter(Supplier.company_id == company_id):
+        options.append(
+            BeneficiaryOption(
+                beneficiary_type="SUPPLIER",
+                id=supplier.id,
+                name=supplier.trade_name or supplier.legal_name,
+                reference=supplier.tax_id,
+            )
+        )
+    for worker in db.query(Worker).filter(Worker.company_id == company_id):
+        options.append(
+            BeneficiaryOption(
+                beneficiary_type="WORKER",
+                id=worker.id,
+                name=worker.full_name,
+                reference=worker.role_title,
+            )
+        )
+    for customer in db.query(Customer).filter(Customer.company_id == company_id):
+        options.append(
+            BeneficiaryOption(
+                beneficiary_type="CUSTOMER",
+                id=customer.id,
+                name=customer.trade_name or customer.legal_name,
+                reference=customer.tax_id,
+            )
+        )
+    options.sort(key=lambda option: option.name.lower())
+    return options
+
+
 @router.get("/vouchers/{accounting_document_id}")
 def download_voucher(
     accounting_document_id: uuid.UUID,
-    beneficiary: str,
+    beneficiary: str | None = Query(default=None),
+    beneficiary_type: str | None = Query(default=None, alias="beneficiaryType"),
+    beneficiary_id: uuid.UUID | None = Query(default=None, alias="beneficiaryId"),
     payer: str | None = Query(default=None),
     payment_method: str = Query(alias="paymentMethod"),
     approved_by: str | None = Query(default=None, alias="approvedBy"),
@@ -768,6 +847,24 @@ def download_voucher(
         company_id=document.company_id,
     )
     company = db.get(Company, document.company_id)
+
+    # Beneficiario: preferimos el registro real (Supplier/Worker/Customer);
+    # el texto libre `beneficiary` solo se usa como fallback.
+    if beneficiary_type and beneficiary_id:
+        resolved_beneficiary = _resolve_beneficiary_name(
+            db,
+            company_id=document.company_id,
+            beneficiary_type=beneficiary_type,
+            beneficiary_id=beneficiary_id,
+        )
+    elif beneficiary and beneficiary.strip():
+        resolved_beneficiary = beneficiary.strip()
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Indica un beneficiario (registro o texto).",
+        )
+
     # Pagador: dato fijo de la compañía (orden maestra Phase 2). Solo se usa el
     # `payer` del cliente como fallback cuando la compañía todavía no lo fijó.
     resolved_payer = (
@@ -782,7 +879,7 @@ def download_voucher(
             accounting_document_id=accounting_document_id,
             prepared_by=user.full_name,
             approved_by=resolved_approver,
-            beneficiary=beneficiary,
+            beneficiary=resolved_beneficiary,
             payer=resolved_payer,
             payment_method=payment_method,
         )

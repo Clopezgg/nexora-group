@@ -47,6 +47,15 @@ describe('VouchersPage', () => {
             ],
           } as Response)
         }
+        if (url.includes('/treasury/beneficiaries')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              { beneficiaryType: 'SUPPLIER', id: 'sup-1', name: 'Ferretería El Clavo', reference: 'RTN-123' },
+            ],
+          } as Response)
+        }
         if (url.includes('/accounting/journal-entries')) {
           return Promise.resolve({
             ok: true,
@@ -98,7 +107,11 @@ describe('VouchersPage', () => {
     expect(screen.getByRole('option', { name: 'Remesa' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Otro' })).toBeInTheDocument()
 
-    await user.type(screen.getByLabelText('Beneficiario'), 'Proveedor real')
+    // Beneficiario: selector buscable sobre entidades reales, no texto libre.
+    const beneficiaryBox = screen.getByRole('combobox', { name: 'Beneficiario' })
+    await user.type(beneficiaryBox, 'Ferre')
+    await user.click(await screen.findByText(/Ferretería El Clavo/))
+
     // El pagador es fijo desde Company Settings: se muestra read-only, no se captura.
     const payerField = screen.getByLabelText('Pagador') as HTMLInputElement
     expect(payerField).toBeDisabled()
@@ -114,6 +127,9 @@ describe('VouchersPage', () => {
       String(u).includes('/treasury/vouchers/document-runtime'),
     )
     expect(voucherCall).toBeDefined()
-    expect(String(voucherCall?.[0])).not.toContain('payer=')
+    const voucherUrl = String(voucherCall?.[0])
+    expect(voucherUrl).not.toContain('payer=')
+    expect(voucherUrl).toContain('beneficiaryType=SUPPLIER')
+    expect(voucherUrl).toContain('beneficiaryId=sup-1')
   })
 })

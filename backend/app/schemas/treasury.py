@@ -178,3 +178,14 @@ class FundRestrictionResponse(CamelModel):
     amount: Decimal
     description: str
     active: bool
+
+
+class BeneficiaryOption(CamelModel):
+    """Beneficiario elegible para un comprobante. Reúne Supplier / Worker /
+    Customer en una lista buscable (orden maestra Phase 2) sin duplicar
+    entidades: el `id` sigue siendo el de la tabla de origen."""
+
+    beneficiary_type: str  # SUPPLIER | WORKER | CUSTOMER
+    id: uuid.UUID
+    name: str
+    reference: str | None = None

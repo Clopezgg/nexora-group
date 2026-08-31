@@ -35,6 +35,38 @@ function stubAuthenticatedFetch(roles: string[], dashboard?: Record<string, unkn
       if (url.includes('/dashboard/summary') && dashboard) {
         return Promise.resolve({ ok: true, status: 200, json: async () => dashboard } as Response)
       }
+      if (url.includes('/financial-control/cash-forecast')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            asOf: '2026-08-31',
+            currencyCode: 'HNL',
+            openingBalance: 100000,
+            weeks: Array.from({ length: 13 }, (_, i) => ({
+              weekIndex: i,
+              weekStart: '2026-09-01',
+              weekEnd: '2026-09-07',
+              inflows: 5000,
+              outflows: 3000,
+              net: 2000,
+              projectedBalance: 100000 + 2000 * (i + 1),
+            })),
+            minProjectedBalance: 102000,
+            firstNegativeWeekIndex: null,
+            hasLiquidityAlert: false,
+          }),
+        } as Response)
+      }
+      if (url.includes('/treasury/accounts')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [
+            { id: 'ta-1', companyId: 'c1', name: 'Operativa', kind: 'BANK', institution: 'Banco Atlántida', accountReference: '12345852', currencyCode: 'HNL', glAccountId: 'gl-1', status: 'ACTIVE', balance: '450250.32' },
+          ],
+        } as Response)
+      }
       return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response)
     }),
   )
@@ -86,6 +118,11 @@ describe('HomePage', () => {
       'href',
       '/inicio/aprobaciones',
     )
+
+    // Forecast 13 semanas y cuentas bancarias en el Home (OC PR B).
+    expect(await screen.findByText(/Flujo de caja proyectado · 13 semanas/i)).toBeInTheDocument()
+    expect(await screen.findByText('Banco Atlántida')).toBeInTheDocument()
+    expect(screen.getByText('••••5852 · HNL')).toBeInTheDocument()
   })
 
   it('shows the project home with real module shortcuts for Project Manager', async () => {

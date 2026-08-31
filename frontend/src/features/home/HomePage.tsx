@@ -10,7 +10,9 @@ import { useActiveContext } from '../context/useActiveContext'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { resolveHomeConfig } from './roleHomes'
 import { MiTrabajoHoy } from './MiTrabajoHoy'
-import { Card, EmptyState, ErrorState, LoadingState, StatCard } from '../../design-system'
+import { HomeForecastCard } from './HomeForecastCard'
+import { HomeBankAccountsCard } from './HomeBankAccountsCard'
+import { Card, EmptyState, ErrorState, Icon, LoadingState, StatCard } from '../../design-system'
 import './HomePage.css'
 
 const FinancialCharts = lazy(() => import('./FinancialCharts'))
@@ -116,16 +118,26 @@ export function HomePage() {
         ) : (
           <>
             <section className="nx-home__grid nx-home__grid--kpi" aria-label="Indicadores financieros">
-              <StatCard label="Tesorería · disponible" value={formatMoney(companySummaryQuery.data.treasuryBalance, companySummaryQuery.data.currency)} />
               <StatCard
+                icon={<span className="nx-kpi-tile nx-kpi-tile--treasury"><Icon name="bank" /></span>}
+                label="Tesorería · disponible"
+                value={formatMoney(companySummaryQuery.data.treasuryBalance, companySummaryQuery.data.currency)}
+              />
+              <StatCard
+                icon={<span className="nx-kpi-tile nx-kpi-tile--income"><Icon name="chart" /></span>}
                 label={companySummaryQuery.data.fiscalPeriodLabel ? `Ingresos · ${companySummaryQuery.data.fiscalPeriodLabel}` : 'Ingresos del mes calendario'}
                 value={formatMoney(companySummaryQuery.data.periodIncome, companySummaryQuery.data.currency)}
               />
               <StatCard
+                icon={<span className="nx-kpi-tile nx-kpi-tile--expense"><Icon name="receipt" /></span>}
                 label={companySummaryQuery.data.fiscalPeriodLabel ? `Gastos · ${companySummaryQuery.data.fiscalPeriodLabel}` : 'Gastos del mes calendario'}
                 value={formatMoney(companySummaryQuery.data.periodExpense, companySummaryQuery.data.currency)}
               />
-              <StatCard label="Proyectos en ejecución" value={companySummaryQuery.data.activeProjects} />
+              <StatCard
+                icon={<span className="nx-kpi-tile nx-kpi-tile--projects"><Icon name="project" /></span>}
+                label="Proyectos en ejecución"
+                value={companySummaryQuery.data.activeProjects}
+              />
             </section>
 
             {!companySummaryQuery.data.fiscalPeriodLabel ? (
@@ -135,6 +147,12 @@ export function HomePage() {
               </Card>
             ) : null}
 
+            <MiTrabajoHoy summary={companySummaryQuery.data} />
+
+            <HomeForecastCard companyId={activeCompanyId} />
+
+            <HomeBankAccountsCard companyId={activeCompanyId} />
+
             <Suspense fallback={<LoadingState label="Preparando gráficos…" />}>
               <FinancialCharts
                 cashFlow={companySummaryQuery.data.cashFlow ?? []}
@@ -142,8 +160,6 @@ export function HomePage() {
                 currency={companySummaryQuery.data.currency}
               />
             </Suspense>
-
-            <MiTrabajoHoy summary={companySummaryQuery.data} />
           </>
         )
       ) : null}

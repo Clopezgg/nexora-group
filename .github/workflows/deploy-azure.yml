@@ -308,21 +308,6 @@ jobs:
           echo "::error::Newest backend revision never became healthy/ready"
           exit 1
 
-      - name: Verify direct Container Apps API is locked down
-        run: |
-          set -euo pipefail
-          # Linking the Static Web Apps backend enables authentication on the
-          # Container App: the public *.azurecontainerapps.io FQDN must now
-          # reject anonymous traffic (401/403). All real traffic goes through
-          # the first-party Static Web Apps /api proxy. A 200 here would mean
-          # the backend is still publicly reachable and the lockdown failed.
-          code="$(curl --silent --max-time 15 --output /dev/null --write-out '%{http_code}' "$BACKEND_URL/api/healthz" || true)"
-          case "$code" in
-            401|403) echo "Direct Container Apps API correctly locked down (HTTP $code)";;
-            200) echo "::error::Direct Container Apps API still answers anonymously (HTTP 200); linked-backend auth did not apply"; exit 1;;
-            *) echo "::error::Direct Container Apps API returned unexpected HTTP $code"; exit 1;;
-          esac
-
       - name: Build frontend
         run: |
           set -euo pipefail
@@ -352,6 +337,36 @@ jobs:
           action: upload
           app_location: frontend/dist
           skip_app_build: true
+
+      - name: Verify direct Container Apps API is locked down
+        run: |
+          set -euo pipefail
+          # Linking the Static Web Apps backend enables authentication on the
+          # Container App: the public *.azurecontainerapps.io FQDN must now
+          # reject anonymous traffic (401/403). All real traffic goes through
+          # the first-party Static Web Apps /api proxy. Retry so a transient
+          # 503/000 while the new revision is still routing does not fail the
+          # gate; only a settled 200 (still public) is fatal. Runs AFTER the
+          # frontend deploy so a flake here never blocks shipping the SPA.
+          for attempt in $(seq 1 18); do
+            code="$(curl --silent --max-time 15 --output /dev/null --write-out '%{http_code}' "$BACKEND_URL/api/healthz" || true)"
+            case "$code" in
+              401|403)
+                echo "Direct Container Apps API correctly locked down (HTTP $code)"
+                exit 0
+                ;;
+              200)
+                echo "::error::Direct Container Apps API still answers anonymously (HTTP 200); linked-backend auth did not apply"
+                exit 1
+                ;;
+              *)
+                echo "Direct Container Apps API transient HTTP $code (attempt $attempt/18); retrying"
+                sleep 10
+                ;;
+            esac
+          done
+          echo "::error::Direct Container Apps API never settled to a locked-down (401/403) state"
+          exit 1
 
       - name: Verify production
         env:

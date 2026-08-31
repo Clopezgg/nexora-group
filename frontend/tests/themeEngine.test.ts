@@ -17,7 +17,13 @@ describe('Theme Engine — §68: solo presentación', () => {
     expect(THEME_PRESETS.some((p) => p.id === 'high-contrast')).toBe(true)
   })
 
-  it('getThemePreset cae en NEXORA Classic ante un id desconocido', () => {
+  it('el default es NEXORA Horizon Light y es el primer preset', () => {
+    expect(DEFAULT_THEME_ID).toBe('nexora-horizon-light')
+    expect(THEME_PRESETS[0].id).toBe(DEFAULT_THEME_ID)
+    expect(THEME_PRESETS.some((p) => p.id === 'nexora-classic')).toBe(true)
+  })
+
+  it('getThemePreset cae en el default ante un id desconocido', () => {
     expect(getThemePreset('no-existe').id).toBe(DEFAULT_THEME_ID)
     expect(getThemePreset(null).id).toBe(DEFAULT_THEME_ID)
   })

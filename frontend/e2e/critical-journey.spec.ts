@@ -585,7 +585,16 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
 
   await test.step('audit trail', async () => {
     await page.goto('/control/auditoria')
-    await expect(page.getByText(/ap\.supplier_invoice/).first()).toBeVisible({ timeout: 10_000 })
+    // Primary view is human language, not raw codes/UUIDs.
+    await expect(page.getByText(/Factura de proveedor · /).first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/ap\.supplier_invoice/)).toHaveCount(0)
+    // The technical fields are available on demand in the detail drawer.
+    await page.getByRole('button', { name: /ver detalles/i }).first().click()
+    const drawer = page.getByRole('dialog', { name: /detalle de auditoría/i })
+    await expect(drawer).toBeVisible({ timeout: 10_000 })
+    await expect(drawer.getByText('Código técnico del evento')).toBeVisible()
+    await expect(drawer.getByText('ID de correlación')).toBeVisible()
+    await expect(drawer.locator('code').first()).toBeVisible()
   })
 
   await test.step('logout -> login -> persistence', async () => {

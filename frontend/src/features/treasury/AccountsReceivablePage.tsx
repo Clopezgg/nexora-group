@@ -375,7 +375,7 @@ function CollectButton({
         onClick={() => setOpen(true)}
         disabled={eligibleTreasuryAccounts.length === 0}
       >
-        Cobrar saldo ({remaining.toFixed(2)})
+        Cobrar saldo ({formatMoney(remaining, currencyCode)})
       </Button>
       {open ? (
         <Modal open title="Registrar cobro de cliente" onClose={() => setOpen(false)}>

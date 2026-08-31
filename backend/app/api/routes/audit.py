@@ -32,4 +32,21 @@ def list_audit_logs(
         offset=offset,
         limit=limit,
     )
-    return [AuditLogResponse.model_validate(r, from_attributes=True) for r in rows]
+    return [
+        AuditLogResponse(
+            id=r.id,
+            actor_user_id=r.actor_user_id,
+            actor_full_name=r.actor.full_name if r.actor else None,
+            actor_email=r.actor.email if r.actor else None,
+            action=r.action,
+            entity_type=r.entity_type,
+            entity_id=r.entity_id,
+            company_id=r.company_id,
+            project_id=r.project_id,
+            before=r.before,
+            after=r.after,
+            correlation_id=r.correlation_id,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]

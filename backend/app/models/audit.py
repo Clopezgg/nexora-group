@@ -1,12 +1,16 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.models.mixins import UUIDPrimaryKeyMixin
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 # Append-only: no service/route ever UPDATEs or DELETEs a row after
 # insert. Deliberately does NOT use TimestampMixin (its onupdate would
@@ -34,6 +38,10 @@ class AuditLog(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    # Read-only convenience for the human audit view. The FK already exists;
+    # this adds no column and never writes.
+    actor: Mapped["User | None"] = relationship("User", viewonly=True, lazy="raise")
 
 
 Index(

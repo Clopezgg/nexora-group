@@ -128,3 +128,49 @@ def test_audit_feed_order_is_stable_when_timestamps_match(client, db_session):
 
     assert [row["id"] for row in first] == [row["id"] for row in second]
     assert [row["id"] for row in first] == sorted(row["id"] for row in first)
+
+
+def test_audit_feed_includes_actor_name_and_email(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Audit Actor Co")
+    _record_page_entries(db_session, company_id=company["id"], count=1)
+
+    rows = client.get(
+        f"/api/audit?companyId={company['id']}&entityType=test.page"
+    ).json()
+
+    assert len(rows) == 1
+    entry = rows[0]
+    # Human audit view needs a name, not just a UUID.
+    assert entry["actorFullName"] == "Administrador Nexora"
+    assert entry["actorEmail"] == BOOTSTRAP_ADMIN_EMAIL
+    assert entry["actorUserId"] is not None
+    # Technical fields still present for the detail drawer.
+    assert entry["action"] == "test.page.create"
+    assert entry["correlationId"] == "page-0"
+
+
+def test_audit_feed_actor_is_null_for_system_events(client, db_session):
+    from app.services import audit_service
+
+    login_admin(client)
+    company = create_company(client, name="Audit System Co")
+    audit_service.record(
+        db_session,
+        actor_user_id=None,
+        action="test.page.create",
+        entity_type="test.page",
+        entity_id=uuid.uuid4(),
+        company_id=uuid.UUID(company["id"]),
+        before=None,
+        after=None,
+        correlation_id="sys-1",
+    )
+    db_session.commit()
+
+    rows = client.get(
+        f"/api/audit?companyId={company['id']}&entityType=test.page"
+    ).json()
+    assert rows[0]["actorUserId"] is None
+    assert rows[0]["actorFullName"] is None
+    assert rows[0]["actorEmail"] is None

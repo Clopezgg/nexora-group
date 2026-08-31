@@ -37,6 +37,7 @@ export const voucherService = {
       beneficiary?: string
       paymentMethod: string
       approvedBy?: string
+      treasuryAccountId?: string
     },
   ): Promise<Blob> => {
     // El pagador ya no se envía desde el cliente: es un dato fijo de la
@@ -50,6 +51,7 @@ export const voucherService = {
       params.set('beneficiary', input.beneficiary.trim())
     }
     if (input.approvedBy?.trim()) params.set('approvedBy', input.approvedBy.trim())
+    if (input.treasuryAccountId) params.set('treasuryAccountId', input.treasuryAccountId)
     const result = await apiFetchBlob(
       `/treasury/vouchers/${accountingDocumentId}?${params.toString()}`,
     )

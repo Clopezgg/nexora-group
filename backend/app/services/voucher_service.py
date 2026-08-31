@@ -1,5 +1,7 @@
+import hashlib
 import io
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from reportlab.lib.pagesizes import letter
@@ -36,6 +38,26 @@ def _account_label(account: Account | None, account_id: uuid.UUID) -> str:
     return f"{account.code} - {account.name}"
 
 
+def _mask_reference(reference: str | None) -> str | None:
+    """`"1234567890"` -> `"******7890"`. La cuenta bancaria nunca se imprime
+    completa en el comprobante (orden maestra Phase 2 -- identidad bancaria
+    segura)."""
+    if not reference:
+        return None
+    tail = reference[-4:]
+    return f"{'*' * max(len(reference) - 4, 0)}{tail}"
+
+
+def approval_verification_code(
+    *, document_number: str, approved_by: str | None, issued_on: date
+) -> str:
+    """Código determinista de verificación de la aprobación. No es una firma
+    criptográfica con clave, pero permite re-derivar y contrastar que el
+    (documento, aprobador, fecha de emisión) impreso no fue alterado."""
+    raw = f"{document_number}|{(approved_by or '').strip().upper()}|{issued_on.isoformat()}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12].upper()
+
+
 def generate_voucher_pdf(
     db: Session,
     *,
@@ -45,6 +67,9 @@ def generate_voucher_pdf(
     beneficiary: str,
     payer: str,
     payment_method: str,
+    bank_label: str | None = None,
+    bank_reference: str | None = None,
+    issued_on: date | None = None,
 ) -> bytes:
     document = db.get(AccountingDocument, accounting_document_id)
     if document is None:
@@ -61,6 +86,13 @@ def generate_voucher_pdf(
     if account_ids:
         for account in db.query(Account).filter(Account.id.in_(account_ids)):
             accounts[account.id] = account
+
+    issued_on = issued_on or date.today()
+    verification_code = approval_verification_code(
+        document_number=document.document_number,
+        approved_by=approved_by,
+        issued_on=issued_on,
+    )
 
     total = sum((line.debit_amount for line in lines), Decimal("0"))
     currency = document.currency_code
@@ -110,6 +142,11 @@ def generate_voucher_pdf(
         ("Ámbito (scope)", document.scope),
         ("Proyecto", project.name if project else "No aplica (operación central/general)"),
     ]
+    if bank_label:
+        masked = _mask_reference(bank_reference)
+        fields.append(
+            ("Cuenta / banco", f"{bank_label}{f' · {masked}' if masked else ''}")
+        )
     if is_fx_conversion:
         fields.append(
             ("Tipo de cambio", f"1 {currency} = {document.fx_rate} {functional_currency}")
@@ -170,13 +207,23 @@ def generate_voucher_pdf(
         pdf.drawString(x, sign_y - 1.0 * cm, name[:40])
         pdf.setFont("Helvetica", 9)
 
+    # -- Firma de aprobación (orden maestra Phase 2) --------------------
+    pdf.setFont("Helvetica", 8)
+    pdf.drawString(
+        2 * cm,
+        2.6 * cm,
+        f"Aprobación: {approved_by or 'PENDIENTE'} · emitido {issued_on.strftime('%d/%m/%Y')} "
+        f"· código de verificación {verification_code}",
+    )
+
     pdf.setFont("Helvetica-Oblique", 7)
     pdf.setFillColorRGB(0.4, 0.4, 0.4)
     pdf.drawString(
         2 * cm,
         1.6 * cm,
         "Documento generado por NEXORA GROUP a partir del asiento contable posteado. "
-        "TOTAL DÉBITO = TOTAL CRÉDITO (doble partida).",
+        "TOTAL DÉBITO = TOTAL CRÉDITO (doble partida). El código de verificación "
+        "se re-deriva de (número de documento, aprobador, fecha de emisión).",
     )
 
     pdf.showPage()

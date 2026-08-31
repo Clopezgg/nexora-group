@@ -841,6 +841,7 @@ def download_voucher(
     payer: str | None = Query(default=None),
     payment_method: str = Query(alias="paymentMethod"),
     approved_by: str | None = Query(default=None, alias="approvedBy"),
+    treasury_account_id: uuid.UUID | None = Query(default=None, alias="treasuryAccountId"),
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_current_user_id),
     user=Depends(require_permission("treasury.voucher", "read")),
@@ -885,6 +886,18 @@ def download_voucher(
     )
     resolved_approver = approved_by or (company.voucher_approver_name if company else None)
 
+    bank_label: str | None = None
+    bank_reference: str | None = None
+    if treasury_account_id is not None:
+        account = db.get(TreasuryAccount, treasury_account_id)
+        if account is None or account.company_id != document.company_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="La cuenta de tesorería no existe o no pertenece a esta compañía",
+            )
+        bank_label = account.institution or account.name
+        bank_reference = account.account_reference
+
     # Evidencia obligatoria para transferencia / depósito / cheque
     # (orden maestra Phase 2). Debe existir al menos una Evidence adjunta al
     # documento contable de este comprobante.
@@ -916,6 +929,8 @@ def download_voucher(
             beneficiary=resolved_beneficiary,
             payer=resolved_payer,
             payment_method=payment_method,
+            bank_label=bank_label,
+            bank_reference=bank_reference,
         )
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error

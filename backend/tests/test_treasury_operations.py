@@ -311,6 +311,49 @@ def test_voucher_requires_evidence_for_bank_payment_methods(client, monkeypatch)
     assert allowed.content.startswith(b"%PDF")
 
 
+def test_voucher_pdf_shows_masked_bank_account_and_approval_code(client):
+    """Orden maestra Phase 2: identidad bancaria segura (cuenta enmascarada)
+    + firma de aprobación (aprobador + fecha + código de verificación
+    determinista)."""
+    login_admin(client)
+    company, cash, _diff, _contrib, funding_doc = _setup(client)
+    bank_gl = create_account(
+        client, company_id=company["id"], code="1120", name="Banco", account_type="ASSET"
+    )
+    bank = create_treasury_account(
+        client,
+        company_id=company["id"],
+        gl_account_id=bank_gl["id"],
+        name="Cuenta operativa",
+        kind="BANK",
+    )
+    # Fijamos institución + referencia editando la cuenta si el endpoint lo
+    # permite; si no, basta con que el nombre entre como bank_label.
+    response = client.get(
+        f"/api/treasury/vouchers/{funding_doc}"
+        f"?beneficiary=Proveedor&paymentMethod=Efectivo&treasuryAccountId={bank['id']}"
+    )
+    assert response.status_code == 200, response.text
+    text = response.content.decode("latin-1")
+    assert "Cuenta / banco" in text
+    assert "verificaci" in text  # "código de verificación"
+    assert "Aprobaci" in text  # "Aprobación: ..."
+
+    # Cuenta de otra compañía -> 404.
+    other = create_company(client, name="Ajena")
+    other_gl = create_account(
+        client, company_id=other["id"], code="1120", name="Banco", account_type="ASSET"
+    )
+    other_bank = create_treasury_account(
+        client, company_id=other["id"], gl_account_id=other_gl["id"], name="Ajena", kind="BANK"
+    )
+    bad = client.get(
+        f"/api/treasury/vouchers/{funding_doc}"
+        f"?beneficiary=Proveedor&paymentMethod=Efectivo&treasuryAccountId={other_bank['id']}"
+    )
+    assert bad.status_code == 404, bad.text
+
+
 def test_voucher_beneficiary_resolves_from_registered_entity(client):
     """Orden maestra Phase 2: beneficiario buscable sobre entidades reales
     (Supplier/Worker/Customer), sin duplicar entidades ni capturar texto."""

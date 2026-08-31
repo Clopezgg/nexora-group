@@ -14,6 +14,7 @@ import {
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { useMutationError } from '../../hooks/useMutationError'
 import { documentService } from '../../services/documentService'
+import { treasuryService } from '../../services/treasuryService'
 import { voucherService } from '../../services/voucherService'
 import { statusLabel } from '../../utils/statusLabels'
 import './TreasuryPage.css'
@@ -28,6 +29,7 @@ export function VouchersPage() {
   const [beneficiaryKey, setBeneficiaryKey] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState('TRANSFER')
   const [approvedBy, setApprovedBy] = useState('')
+  const [treasuryAccountId, setTreasuryAccountId] = useState('')
 
   const documentsQuery = useQuery({
     queryKey: ['accounting', 'journal-documents', activeCompanyId],
@@ -38,6 +40,12 @@ export function VouchersPage() {
   const beneficiariesQuery = useQuery({
     queryKey: ['treasury', 'beneficiaries', activeCompanyId],
     queryFn: () => voucherService.listBeneficiaries(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+
+  const accountsQuery = useQuery({
+    queryKey: ['treasury', 'accounts', activeCompanyId],
+    queryFn: () => treasuryService.listAccounts(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
 
@@ -77,6 +85,7 @@ export function VouchersPage() {
       beneficiaryId: selectedBeneficiary?.id,
       paymentMethod,
       approvedBy: approvedBy.trim() || activeCompany?.voucherApproverName || undefined,
+      treasuryAccountId: treasuryAccountId || undefined,
     }),
     onSuccess: (blob) => {
       const document = (documentsQuery.data ?? []).find((row) => row.id === documentId)
@@ -170,6 +179,18 @@ export function VouchersPage() {
             <option value="CASH">Efectivo</option>
             <option value="REMITTANCE">Remesa</option>
             <option value="OTHER">Otro</option>
+          </Select>
+          <Select
+            label="Cuenta de tesorería (banco)"
+            value={treasuryAccountId}
+            onChange={(event) => setTreasuryAccountId(event.target.value)}
+          >
+            <option value="">Sin especificar</option>
+            {(accountsQuery.data ?? []).map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.institution ? `${account.institution} · ` : ''}{account.name}
+              </option>
+            ))}
           </Select>
           {documentId && needsEvidence ? (
             <div>

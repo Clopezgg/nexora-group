@@ -61,6 +61,7 @@ def create_supplier_invoice(
         invoice_date=payload.invoice_date,
         due_date=payload.due_date,
         description=payload.description,
+        supplier_contract_id=payload.supplier_contract_id,
         commit=False,
     )
     audit_service.record(
@@ -291,6 +292,12 @@ def pay_supplier_invoice(
             treasury_account_id=payload.treasury_account_id,
             amount=payload.amount,
             payment_date=payload.payment_date,
+            contract_allocations=(
+                [a.model_dump(mode="json") for a in payload.contract_allocations]
+                if payload.contract_allocations
+                else None
+            ),
+            contract_override_reason=payload.contract_override_reason,
             commit=outcome is None,
         )
         audit_service.record(

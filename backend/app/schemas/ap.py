@@ -23,6 +23,7 @@ class SupplierInvoiceCreateRequest(CamelModel):
     invoice_date: date
     due_date: date
     description: str | None = None
+    supplier_contract_id: uuid.UUID | None = None
 
 
 class SupplierInvoiceSubmitRequest(CamelModel):
@@ -44,12 +45,22 @@ class SupplierInvoiceResponse(CamelModel):
     due_date: date
     status: str
     accrual_document_id: uuid.UUID | None
+    supplier_contract_id: uuid.UUID | None = None
+
+
+class ContractAllocationInput(CamelModel):
+    installment_id: uuid.UUID
+    amount_applied: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
 
 
 class SupplierPaymentCreateRequest(CamelModel):
     treasury_account_id: uuid.UUID
     amount: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
     payment_date: date
+    # Asignación a cuotas contractuales (orden maestra final §8/§17). La suma
+    # debe igualar `amount`. Opcional: sólo aplica a facturas de contrato.
+    contract_allocations: list[ContractAllocationInput] | None = None
+    contract_override_reason: str | None = None
 
 
 class SupplierPaymentResponse(CamelModel):

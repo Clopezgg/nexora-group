@@ -123,6 +123,10 @@ def reverse_supplier_payment(
     payment.reversed_at = datetime.now(timezone.utc)
     payment.reversed_by_user_id = actor_user_id
     payment.reversal_reason = normalized_reason
+    # Reabre las cuotas contractuales que este pago había liquidado (§57/§58).
+    from app.services import contract_payment_service
+
+    contract_payment_service.reverse_payment_allocations(db, supplier_payment_id=payment.id)
     invoice.amount_paid = Decimal(invoice.amount_paid) - Decimal(payment.amount)
     total = Decimal(invoice.amount) + Decimal(invoice.tax_amount)
     if invoice.amount_paid == 0:

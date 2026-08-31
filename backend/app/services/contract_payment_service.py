@@ -407,3 +407,76 @@ def allocate_payment(
     if commit:
         db.commit()
     return created
+
+
+def reverse_payment_allocations(db: Session, *, supplier_payment_id: uuid.UUID) -> int:
+    """Marca como revertidas todas las asignaciones contractuales activas de un
+    pago (§57/§58). Reabre el saldo de las cuotas: como
+    `installment_summaries` sólo suma allocations con `reversed_at IS NULL`,
+    el estado de la cuota se recalcula solo."""
+    rows = list(
+        db.execute(
+            select(ContractPaymentAllocation).where(
+                ContractPaymentAllocation.supplier_payment_id == supplier_payment_id,
+                ContractPaymentAllocation.reversed_at.is_(None),
+            )
+        ).scalars()
+    )
+    now = datetime.now(timezone.utc)
+    for row in rows:
+        row.reversed_at = now
+    db.flush()
+    return len(rows)
+
+
+def resolve_schedule_for_invoice(db: Session, invoice) -> ContractPaymentSchedule | None:
+    contract_id = getattr(invoice, "supplier_contract_id", None)
+    if contract_id is None:
+        return None
+    return db.execute(
+        select(ContractPaymentSchedule).where(
+            ContractPaymentSchedule.supplier_contract_id == contract_id
+        )
+    ).scalar_one_or_none()
+
+
+def prior_unpaid_before(
+    db: Session,
+    *,
+    schedule_id: uuid.UUID,
+    period_year: int,
+    period_month: int,
+    as_of: date | None = None,
+) -> list[InstallmentSummary]:
+    """Cuotas anteriores al período dado que aún tienen saldo (§11)."""
+    cutoff = period_year * 12 + period_month
+    return [
+        s
+        for s in installment_summaries(db, schedule_id=schedule_id, as_of=as_of)
+        if s.period_year * 12 + s.period_month < cutoff and s.remaining > _ZERO
+        and s.status != "CANCELLED"
+    ]
+
+
+def propose_fifo(
+    db: Session, *, schedule_id: uuid.UUID, amount: Decimal, as_of: date | None = None
+) -> list[dict]:
+    """Distribución FIFO contractual: aplica el monto a las cuotas más antiguas
+    con saldo primero (§12). Devuelve el preview, NO persiste."""
+    remaining = _q(amount)
+    proposal: list[dict] = []
+    for s in installment_summaries(db, schedule_id=schedule_id, as_of=as_of):
+        if remaining <= _ZERO:
+            break
+        if s.status == "CANCELLED" or s.remaining <= _ZERO:
+            continue
+        applied = min(remaining, s.remaining)
+        proposal.append(
+            {
+                "installment_id": s.installment_id,
+                "period_label": s.period_label,
+                "amount_applied": applied,
+            }
+        )
+        remaining -= applied
+    return proposal

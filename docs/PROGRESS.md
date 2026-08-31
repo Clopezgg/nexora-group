@@ -4024,3 +4024,28 @@ el pago sigue generando su `AccountingDocument` por el Posting Engine.
   historial acumulativo Ago/Sep/Oct sin meses futuros (§60), pago parcial
   → PARCIAL → PAGADO + sobrepago bloqueado (§61). Regresión: AP 23,
   migrations verdes.
+
+### 2026-09-01 — ORDEN MAESTRA FINAL · CPC PR 2 (allocation vía pago AP + reversal contractual)
+
+Rama: `feat/cpc-2-allocation-ap-reversal`.
+
+- **`supplier_invoices.supplier_contract_id`** ahora se acepta y valida en
+  `POST /api/ap/supplier-invoices` (mismo company/supplier/proyecto/moneda
+  que el contrato — §4/§5).
+- **`POST /api/ap/supplier-invoices/{id}/payments`** acepta
+  `contractAllocations: [{installmentId, amountApplied}]`: la suma debe
+  igualar el monto del pago; se crean `ContractPaymentAllocation` reales
+  (§8) validando sin sobrepago por cuota (§10). El pago sigue contabilizando
+  por el Posting Engine (§46).
+- **Reversal**: `payment_receipt_reversal_service.reverse_supplier_payment`
+  ahora marca `reversed_at` en las asignaciones contractuales del pago
+  (§57/§58) → el saldo de la cuota se reabre (las sumas sólo cuentan
+  allocations no revertidas) y `invoice.amount_paid` baja.
+- **`contract_payment_service`**: `resolve_schedule_for_invoice`,
+  `prior_unpaid_before` (advertencia de cuota anterior pendiente — §11),
+  `propose_fifo` (preview FIFO contractual, no persiste — §12),
+  `reverse_payment_allocations`.
+- Tests: `test_contract_payment_control.py` +4 — allocation vía endpoint AP
+  + reversal reabre cuota y baja amount_paid; suma ≠ monto → 422; propuesta
+  FIFO sobre cuotas más antiguas; factura con contrato de otro proveedor →
+  422. Regresión: AP/reversals/migrations 25 verdes.

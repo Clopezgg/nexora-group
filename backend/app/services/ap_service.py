@@ -50,6 +50,7 @@ def create_supplier_invoice(
     invoice_date: date,
     due_date: date,
     description: str | None,
+    supplier_contract_id: uuid.UUID | None = None,
     commit: bool = True,
 ) -> SupplierInvoice:
     if amount <= 0 or tax_amount < 0:
@@ -72,6 +73,26 @@ def create_supplier_invoice(
         db, cost_center_id=cost_center_id, company_id=company_id
     )
     assert_supplier_belongs_to_company(db, supplier_id=supplier_id, company_id=company_id)
+    if supplier_contract_id is not None:
+        from app.models.supplier import SupplierContract
+
+        contract = db.get(SupplierContract, supplier_contract_id)
+        if contract is None or contract.company_id != company_id:
+            raise InvalidFinancialReferenceError(
+                "supplier_contract_id no existe o pertenece a otra compañía"
+            )
+        if contract.supplier_id != supplier_id:
+            raise InvalidFinancialReferenceError(
+                "El contrato pertenece a otro proveedor"
+            )
+        if contract.project_id is not None and contract.project_id != project_id:
+            raise InvalidFinancialReferenceError(
+                "El proyecto de la factura no coincide con el del contrato"
+            )
+        if contract.currency_code != currency_code:
+            raise InvalidFinancialReferenceError(
+                "La moneda de la factura no coincide con la del contrato"
+            )
     invoice = SupplierInvoice(
         company_id=company_id,
         supplier_id=supplier_id,
@@ -87,6 +108,7 @@ def create_supplier_invoice(
         invoice_date=invoice_date,
         due_date=due_date,
         description=description,
+        supplier_contract_id=supplier_contract_id,
         status="DRAFT",
     )
     db.add(invoice)
@@ -227,6 +249,8 @@ def pay_supplier_invoice(
     treasury_account_id: uuid.UUID,
     amount: Decimal,
     payment_date: date,
+    contract_allocations: list[dict] | None = None,
+    contract_override_reason: str | None = None,
     commit: bool = True,
 ) -> SupplierPayment:
     """Pago simple contra UNA factura (sin allocation multi-factura --
@@ -296,6 +320,28 @@ def pay_supplier_invoice(
         accounting_document_id=document.id,
     )
     db.add(payment)
+    db.flush()
+
+    # Subledger contractual (orden maestra final §8): si la factura está
+    # ligada a un contrato con plan de pagos, se registran las asignaciones
+    # a las cuotas contractuales. NO reemplaza la contabilidad.
+    if contract_allocations:
+        from app.services import contract_payment_service
+
+        total_allocated = sum(
+            Decimal(str(a["amount_applied"])) for a in contract_allocations
+        )
+        if total_allocated != amount:
+            raise InvalidFinancialReferenceError(
+                "La suma de las asignaciones contractuales debe igualar el monto del pago."
+            )
+        contract_payment_service.allocate_payment(
+            db,
+            supplier_payment_id=payment.id,
+            allocations=contract_allocations,
+            override_reason=contract_override_reason,
+            commit=False,
+        )
 
     invoice.amount_paid += amount
     invoice.status = "PAID" if invoice.amount_paid == total else "PARTIALLY_PAID"

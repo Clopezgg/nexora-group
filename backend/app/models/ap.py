@@ -72,6 +72,11 @@ class SupplierInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     accrual_document_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounting_documents.id", ondelete="SET NULL"), nullable=True
     )
+    # Enlace explícito con el contrato de origen (orden maestra final §4).
+    # Nullable sólo cuando la obligación realmente no proviene de un contrato.
+    supplier_contract_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("supplier_contracts.id", ondelete="RESTRICT"), nullable=True
+    )
 
 
 class SupplierPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):

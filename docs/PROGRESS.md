@@ -3991,3 +3991,36 @@ en navegador real):
   evidencia → Generar PDF → 200 → el PDF abre con QR escaneable, página 2
   con la fotografía, sin UUID; escanear el QR abre `/verificar/comprobante/…`
   con "✓ Comprobante válido".
+
+### 2026-09-01 — ORDEN MAESTRA FINAL · CPC PR 1 (Contract Payment Control — dominio + migración)
+
+Rama: `feat/cpc-1-contract-payment-domain`.
+
+Fundación del subledger contractual (§1-§16, §46-§53). No toca contabilidad:
+el pago sigue generando su `AccountingDocument` por el Posting Engine.
+
+- **Modelos nuevos** (`contract_payment.py`): `ContractPaymentSchedule`
+  (por contrato, único), `ContractPaymentInstallment` (período contractual
+  `period_year`/`period_month` **independiente** de payment_date y del
+  período contable — §52/§53; estados
+  UPCOMING/DUE/PARTIALLY_PAID/PAID/OVERDUE/CANCELLED — §7),
+  `ContractPaymentAllocation` (qué SupplierPayment liquidó qué cuota y por
+  cuánto — §8).
+- **`supplier_invoices.supplier_contract_id`** (FK, nullable sólo si la
+  obligación no viene de contrato — §4).
+- **Servicio** `contract_payment_service`: `build_monthly_installments`
+  (cuotas iguales, última absorbe redondeo — §14), `create_schedule`
+  (valida mismo contrato/moneda, sin duplicado, suma ≤ valor contractual),
+  `installment_summaries` (paid/remaining/estado real desde allocations, no
+  `note` — §40), **`history_through(period)`** — historial **ACUMULATIVO**:
+  sólo cuotas ≤ período dado, nunca meses futuros (§2/§38/§60),
+  `contract_summary` (valor, programado a fecha, pagado acumulado, saldo
+  contractual, vencido, próximo vencimiento — §23), `allocate_payment`
+  (aplica a cuota(s), bloquea sobrepago por cuota — §10).
+- Migración `2640b82e65b8` (single head; roundtrip probado); índices en
+  contract/schedule/installment/payment/allocation.
+- Tests: `test_contract_payment_control.py` (5) — generación mensual +
+  totales, plan > valor contractual rechazado, plan duplicado rechazado,
+  historial acumulativo Ago/Sep/Oct sin meses futuros (§60), pago parcial
+  → PARCIAL → PAGADO + sobrepago bloqueado (§61). Regresión: AP 23,
+  migrations verdes.

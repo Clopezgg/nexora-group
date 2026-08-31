@@ -94,4 +94,24 @@ describe('financial service idempotency', () => {
       expect(options.body).toBe(JSON.stringify(payload))
     }
   })
+
+  it('sends the supplier-invoice payment plan as a PUT with installments', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] } as Response)
+    vi.stubGlobal('fetch', fetchMock)
+
+    await apService.setPaymentPlan('inv-1', [
+      { dueDate: '2026-02-10', amount: '400.00' },
+      { dueDate: '2026-03-10', amount: '750.00' },
+    ])
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain('/ap/supplier-invoices/inv-1/payment-plan')
+    expect(options.method).toBe('PUT')
+    expect(JSON.parse(String(options.body))).toEqual({
+      installments: [
+        { dueDate: '2026-02-10', amount: '400.00' },
+        { dueDate: '2026-03-10', amount: '750.00' },
+      ],
+    })
+  })
 })

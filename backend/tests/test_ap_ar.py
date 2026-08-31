@@ -813,3 +813,88 @@ def test_submit_for_approval_never_crosses_company(client, db_session):
     )
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def _approved_invoice(client):
+    company, bank, expense, payable, supplier = _setup_ap(client)
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "F-PLAN-001",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "1000.00",
+            "taxAmount": "150.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    ).json()
+    client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+    return company, bank, invoice
+
+
+def test_supplier_invoice_payment_plan_installments_and_history(client):
+    """Orden maestra Phase 2: planes/cuotas de pago + historial."""
+    login_admin(client)
+    _company, bank, invoice = _approved_invoice(client)
+    invoice_id = invoice["id"]
+
+    # Cuotas que no suman el total -> 422.
+    bad = client.put(
+        f"/api/ap/supplier-invoices/{invoice_id}/payment-plan",
+        json={"installments": [
+            {"dueDate": "2026-02-10", "amount": "500.00"},
+            {"dueDate": "2026-03-10", "amount": "500.00"},
+        ]},
+    )
+    assert bad.status_code == 422, bad.text
+
+    # Fechas no crecientes -> 422.
+    bad_dates = client.put(
+        f"/api/ap/supplier-invoices/{invoice_id}/payment-plan",
+        json={"installments": [
+            {"dueDate": "2026-03-10", "amount": "575.00"},
+            {"dueDate": "2026-02-10", "amount": "575.00"},
+        ]},
+    )
+    assert bad_dates.status_code == 422, bad_dates.text
+
+    # Plan válido: 3 cuotas que suman 1150.00.
+    ok = client.put(
+        f"/api/ap/supplier-invoices/{invoice_id}/payment-plan",
+        json={"installments": [
+            {"dueDate": "2026-02-10", "amount": "400.00", "note": "Anticipo"},
+            {"dueDate": "2026-03-10", "amount": "400.00"},
+            {"dueDate": "2026-04-10", "amount": "350.00"},
+        ]},
+    )
+    assert ok.status_code == 200, ok.text
+    plan = ok.json()
+    assert [p["sequence"] for p in plan] == [1, 2, 3]
+    assert sum(float(p["amount"]) for p in plan) == 1150.0
+
+    assert client.get(f"/api/ap/supplier-invoices/{invoice_id}").json()["status"] == "SCHEDULED"
+    assert client.get(f"/api/ap/supplier-invoices/{invoice_id}/payment-plan").json() == plan
+
+    # Pago parcial -> el historial lo refleja y el plan queda congelado.
+    pay = client.post(
+        f"/api/ap/supplier-invoices/{invoice_id}/payments",
+        json={"treasuryAccountId": bank["id"], "amount": "400.00", "paymentDate": "2026-02-11"},
+    )
+    assert pay.status_code == 201, pay.text
+
+    history = client.get(f"/api/ap/supplier-invoices/{invoice_id}/payments")
+    assert history.status_code == 200, history.text
+    assert len(history.json()) == 1
+    assert float(history.json()[0]["amount"]) == 400.0
+
+    # Con pagos aplicados el plan ya no se puede reescribir (estado -> 409).
+    locked = client.put(
+        f"/api/ap/supplier-invoices/{invoice_id}/payment-plan",
+        json={"installments": [{"dueDate": "2026-05-10", "amount": "1150.00"}]},
+    )
+    assert locked.status_code == 409, locked.text

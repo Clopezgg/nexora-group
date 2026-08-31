@@ -63,3 +63,22 @@ class SupplierPaymentResponse(CamelModel):
     reversed_at: datetime | None = None
     reversed_by_user_id: uuid.UUID | None = None
     reversal_reason: str | None = None
+
+
+class PaymentPlanItemInput(CamelModel):
+    due_date: date
+    amount: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
+    note: str | None = Field(default=None, max_length=255)
+
+
+class PaymentPlanRequest(CamelModel):
+    installments: list[PaymentPlanItemInput] = Field(min_length=1)
+
+
+class PaymentPlanItemResponse(CamelModel):
+    id: uuid.UUID
+    supplier_invoice_id: uuid.UUID
+    sequence: int
+    due_date: date
+    amount: Decimal
+    note: str | None = None

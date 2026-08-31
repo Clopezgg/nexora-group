@@ -1,12 +1,14 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
 from app.domain.errors import InvalidFinancialReferenceError, NotFoundError, SegregationOfDutiesError
 from app.schemas.ap import (
+    PaymentPlanItemResponse,
+    PaymentPlanRequest,
     SupplierInvoiceCreateRequest,
     SupplierInvoiceResponse,
     SupplierInvoiceSubmitRequest,
@@ -314,6 +316,79 @@ def pay_supplier_invoice(
             )
         db.commit()
         return response
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.get(
+    "/supplier-invoices/{invoice_id}/payment-plan",
+    response_model=list[PaymentPlanItemResponse],
+)
+def get_payment_plan(
+    invoice_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("ap.supplier_invoice", "read")),
+) -> list[PaymentPlanItemResponse]:
+    invoice = _resolve_invoice(db, invoice_id)
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="ap.supplier_invoice",
+        action="read",
+        company_id=invoice.company_id,
+    )
+    return [
+        PaymentPlanItemResponse.model_validate(row, from_attributes=True)
+        for row in ap_service.list_payment_plan(db, invoice_id=invoice_id)
+    ]
+
+
+@router.put(
+    "/supplier-invoices/{invoice_id}/payment-plan",
+    response_model=list[PaymentPlanItemResponse],
+)
+def set_payment_plan(
+    invoice_id: uuid.UUID,
+    payload: PaymentPlanRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("ap.supplier_invoice", "update")),
+    correlation_id: str = Depends(get_correlation_id),
+) -> list[PaymentPlanItemResponse]:
+    invoice = _resolve_invoice(db, invoice_id)
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="ap.supplier_invoice",
+        action="update",
+        company_id=invoice.company_id,
+    )
+    try:
+        rows = ap_service.set_payment_plan(
+            db,
+            invoice_id=invoice_id,
+            installments=[item.model_dump() for item in payload.installments],
+            commit=False,
+        )
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="ap.supplier_invoice.payment_plan.set",
+            entity_type="ap.supplier_invoice",
+            entity_id=invoice.id,
+            company_id=invoice.company_id,
+            project_id=invoice.project_id,
+            before=None,
+            after={"installments": len(rows), "total": str(invoice.amount + invoice.tax_amount)},
+            correlation_id=correlation_id,
+        )
+        db.commit()
+        return [PaymentPlanItemResponse.model_validate(row, from_attributes=True) for row in rows]
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
+        ) from error
     except Exception:
         db.rollback()
         raise

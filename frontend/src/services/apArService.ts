@@ -27,6 +27,21 @@ export interface SupplierPayment {
   reversalReason: string | null
 }
 
+export interface PaymentPlanItem {
+  id: string
+  supplierInvoiceId: string
+  sequence: number
+  dueDate: string
+  amount: number
+  note: string | null
+}
+
+export interface PaymentPlanItemInput {
+  dueDate: string
+  amount: string
+  note?: string
+}
+
 export interface CustomerInvoice {
   id: string
   customerId: string
@@ -114,6 +129,13 @@ export const apService = {
     }),
   listPayments: (invoiceId: string) =>
     apiFetch<SupplierPayment[]>(`/ap/supplier-invoices/${invoiceId}/payments`),
+  getPaymentPlan: (invoiceId: string) =>
+    apiFetch<PaymentPlanItem[]>(`/ap/supplier-invoices/${invoiceId}/payment-plan`),
+  setPaymentPlan: (invoiceId: string, installments: PaymentPlanItemInput[]) =>
+    apiFetch<PaymentPlanItem[]>(`/ap/supplier-invoices/${invoiceId}/payment-plan`, {
+      method: 'PUT',
+      body: JSON.stringify({ installments }),
+    }),
   reversePayment: (paymentId: string, reason: string) =>
     apiFetch<BusinessReversalResponse>(`/ap/supplier-payments/${paymentId}/reverse`, {
       method: 'POST',

@@ -6,6 +6,7 @@ import { apService, type SupplierInvoice } from '../../services/apArService'
 import { treasuryService } from '../../services/treasuryService'
 import { formatMoney } from '../../utils/currency'
 import { AccountsPayablePage } from './AccountsPayablePage'
+import { PaymentPlanModal } from './PaymentPlanModal'
 import { SupplierPaymentHistoryModal } from './SupplierPaymentHistoryModal'
 
 export function AccountsPayableWorkspace() {
@@ -13,6 +14,7 @@ export function AccountsPayableWorkspace() {
   const [companyId, setCompanyId] = useState('')
   const [invoiceId, setInvoiceId] = useState('')
   const [historyInvoice, setHistoryInvoice] = useState<SupplierInvoice | null>(null)
+  const [planInvoice, setPlanInvoice] = useState<SupplierInvoice | null>(null)
 
   const companiesQuery = useQuery({
     queryKey: ['master-data', 'companies'],
@@ -77,16 +79,36 @@ export function AccountsPayableWorkspace() {
                 </option>
               ))}
             </Select>
-            <Button
-              variant="secondary"
-              disabled={!selectedInvoice}
-              onClick={() => selectedInvoice && setHistoryInvoice(selectedInvoice)}
-            >
-              Ver pagos y reversals
-            </Button>
+            <div className="nx-treasury__actions">
+              <Button
+                variant="secondary"
+                disabled={!selectedInvoice}
+                onClick={() => selectedInvoice && setHistoryInvoice(selectedInvoice)}
+              >
+                Ver pagos y reversals
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!selectedInvoice}
+                onClick={() => selectedInvoice && setPlanInvoice(selectedInvoice)}
+              >
+                Plan de pago / cuotas
+              </Button>
+            </div>
           </div>
         )}
       </Card>
+
+      {planInvoice ? (
+        <PaymentPlanModal
+          invoice={planInvoice}
+          onClose={() => setPlanInvoice(null)}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ['ap', 'supplier-invoices', activeCompanyId] })
+            queryClient.invalidateQueries({ queryKey: ['ap', 'payment-plan', planInvoice.id] })
+          }}
+        />
+      ) : null}
 
       {historyInvoice ? (
         <SupplierPaymentHistoryModal

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.models.accounting import AccountingDocument
 from app.models.change_order import ChangeOrder
 from app.models.evidence import Evidence
 from app.models.procurement import GoodsReceipt, PurchaseOrder, ServiceEntry
@@ -109,6 +110,16 @@ def _resolve_evidence_context(
         if non_conformance is None:
             raise HTTPException(status_code=404, detail="No conformidad de la acción correctiva no encontrada")
         return _project_context(db, non_conformance.project_id, label="Proyecto de evidencia")
+
+    if normalized in {"ACCOUNTING_DOCUMENT", "PAYMENT_DOCUMENT", "VOUCHER"}:
+        # Soporte de comprobante (orden maestra Phase 2): evidencia obligatoria
+        # de transferencia / depósito / cheque adjunta al documento contable.
+        acc_doc = db.get(AccountingDocument, entity_id)
+        if acc_doc is None:
+            raise HTTPException(
+                status_code=404, detail="Documento contable de evidencia no encontrado"
+            )
+        return acc_doc.company_id, acc_doc.project_id
 
     if normalized in {"PURCHASE_ORDER", "PO"}:
         order = db.get(PurchaseOrder, entity_id)

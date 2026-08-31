@@ -3333,3 +3333,28 @@ Rama: `feat/phase2-beneficiary-selector`.
   incluye el proveedor; PDF resuelve el nombre; beneficiario de otra
   compañía → 404). Frontend `VouchersPage.test.tsx` actualizado (combobox +
   aserción de que la URL lleva `beneficiaryType`/`beneficiaryId`, no `payer=`).
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 2 — incremento 5 (evidencia obligatoria)
+
+Rama: `feat/phase2-voucher-evidence`.
+
+- **Evidence context** (`evidence.py`): nuevo tipo polimórfico
+  `ACCOUNTING_DOCUMENT` / `PAYMENT_DOCUMENT` / `VOUCHER` → resuelve
+  `company_id` / `project_id` desde `AccountingDocument`. Ya se puede
+  adjuntar/listar evidencia contra un documento contable con el flujo de
+  evidencia existente (blob real en Azure Blob, sin filesystem local).
+- **Gate del comprobante** (`GET /treasury/vouchers/{id}`): si el método de
+  pago normaliza a **transferencia / depósito / cheque**, debe existir al
+  menos una `Evidence` adjunta al documento; si no → **422** con mensaje
+  claro. Efectivo / remesa / otro no lo exigen.
+- **Frontend** `VouchersPage`: al elegir un documento con método bancario se
+  muestra el input de archivo "Evidencia del pago · obligatoria", se lista lo
+  ya adjunto y **se bloquea "Generar PDF"** hasta que haya evidencia.
+  Se añadió "Depósito" al selector de método.
+- Tests: `test_voucher_requires_evidence_for_bank_payment_methods` (422 sin
+  evidencia → 200 tras adjuntarla; efectivo nunca bloquea); frontend
+  `VouchersPage.test.tsx` +1 (botón deshabilitado sin evidencia, habilitado
+  al cambiar a efectivo). e2e `critical-journey`: ahora verifica 422 sin
+  evidencia, sube evidencia `ACCOUNTING_DOCUMENT` y luego emite el PDF.
+  Tests de comprobante existentes migrados a `paymentMethod=Efectivo` donde
+  solo validan contenido del PDF.

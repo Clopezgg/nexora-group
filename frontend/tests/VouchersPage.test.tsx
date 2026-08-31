@@ -74,6 +74,14 @@ describe('VouchersPage', () => {
             ],
           } as Response)
         }
+        if (url.includes('/evidence') && (!init || init.method === undefined || init.method === 'GET')) {
+          // Con evidencia adjunta el método bancario queda habilitado.
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [{ id: 'ev-1', originalFilename: 'transferencia.pdf' }],
+          } as Response)
+        }
         if (url.includes('/treasury/vouchers/document-runtime')) {
           expect(init?.credentials).toBe('include')
           return Promise.resolve({
@@ -131,5 +139,49 @@ describe('VouchersPage', () => {
     expect(voucherUrl).not.toContain('payer=')
     expect(voucherUrl).toContain('beneficiaryType=SUPPLIER')
     expect(voucherUrl).toContain('beneficiaryId=sup-1')
+  })
+
+  it('blocks bank payment methods until payment evidence is attached', async () => {
+    // Sin evidencia adjunta para el documento.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ id: 'u1', email: 'a@nexora.group', fullName: 'Admin', roles: ['Administrator'], permissions: ['treasury.voucher:read'] }),
+          } as Response)
+        }
+        if (url.includes('/master-data/companies')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 'company-runtime', name: 'Constructora Nexora', functionalCurrencyCode: 'HNL', voucherPayerName: 'KAREN', voucherApproverName: 'CARLOS' }] } as Response)
+        }
+        if (url.includes('/treasury/beneficiaries')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [{ beneficiaryType: 'SUPPLIER', id: 'sup-1', name: 'Ferretería El Clavo', reference: null }] } as Response)
+        }
+        if (url.includes('/accounting/journal-entries')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 'document-runtime', documentNumber: 'REM-2026-0001', companyId: 'company-runtime', scope: 'CENTRAL', projectId: null, currencyCode: 'HNL', status: 'POSTED', description: 'Remesa' }] } as Response)
+        }
+        if (url.includes('/evidence')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
+      }),
+    )
+    const user = userEvent.setup()
+    render(renderApp('/finanzas/comprobantes'))
+
+    await user.selectOptions(await screen.findByLabelText('Asiento / documento'), 'document-runtime')
+    await user.type(screen.getByRole('combobox', { name: 'Beneficiario' }), 'Ferre')
+    await user.click(await screen.findByText(/Ferretería El Clavo/))
+
+    // Método por defecto = Transferencia (bancario) -> evidencia obligatoria.
+    expect(await screen.findByText(/exigen adjuntar el comprobante del pago/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Generar PDF' })).toBeDisabled()
+
+    // Cambiar a Efectivo libera el botón.
+    await user.selectOptions(screen.getByLabelText('Método de pago'), 'CASH')
+    expect(screen.getByRole('button', { name: 'Generar PDF' })).toBeEnabled()
   })
 })

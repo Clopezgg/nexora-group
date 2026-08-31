@@ -203,7 +203,7 @@ def test_voucher_pdf_is_generated_for_a_remittance(client):
 
     response = client.get(
         f"/api/treasury/vouchers/{funding_doc}"
-        "?beneficiary=Constructora%20Nexora&payer=Aportante&paymentMethod=Transferencia"
+        "?beneficiary=Constructora%20Nexora&payer=Aportante&paymentMethod=Efectivo"
     )
     assert response.status_code == 200, response.text
     assert response.headers["content-type"] == "application/pdf"
@@ -245,13 +245,70 @@ def test_voucher_pdf_uses_company_fixed_payer_and_configured_approver(client):
 
     response = client.get(
         f"/api/treasury/vouchers/{funding_doc}"
-        "?beneficiary=Proveedor%20X&payer=IGNORAME&paymentMethod=Cheque"
+        "?beneficiary=Proveedor%20X&payer=IGNORAME&paymentMethod=Efectivo"
     )
     assert response.status_code == 200, response.text
     text = response.content.decode("latin-1")
     assert "KAREN VANNESSA LOPEZ GONZALEZ" in text
     assert "CARLOS HUMBERTO LOPEZ" in text
     assert "IGNORAME" not in text
+
+
+class _FakeBlobContainer:
+    def __init__(self):
+        self.uploaded: list[dict] = []
+
+    def upload_blob(self, **kwargs):
+        self.uploaded.append(kwargs)
+
+    def delete_blob(self, blob_key: str):  # pragma: no cover - not exercised here
+        pass
+
+
+def test_voucher_requires_evidence_for_bank_payment_methods(client, monkeypatch):
+    """Orden maestra Phase 2: transferencia / depósito / cheque exigen
+    evidencia adjunta al documento antes de emitir el comprobante."""
+    login_admin(client)
+    company, _cash, _diff, _contrib, funding_doc = _setup(client)
+
+    # Sin evidencia -> 422 para un método bancario.
+    blocked = client.get(
+        f"/api/treasury/vouchers/{funding_doc}"
+        "?beneficiary=Proveedor&paymentMethod=Transferencia"
+    )
+    assert blocked.status_code == 422, blocked.text
+
+    # Efectivo no requiere evidencia.
+    cash_ok = client.get(
+        f"/api/treasury/vouchers/{funding_doc}"
+        "?beneficiary=Proveedor&paymentMethod=Efectivo"
+    )
+    assert cash_ok.status_code == 200, cash_ok.text
+
+    # Adjuntamos evidencia real al documento contable...
+    container = _FakeBlobContainer()
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: container,
+    )
+    upload = client.post(
+        "/api/evidence",
+        data={
+            "companyId": company["id"],
+            "entityType": "ACCOUNTING_DOCUMENT",
+            "entityId": funding_doc,
+        },
+        files={"file": ("transferencia.pdf", b"%PDF-1.7\ncomprobante real", "application/pdf")},
+    )
+    assert upload.status_code == 201, upload.text
+
+    # ...y ahora el método bancario sí emite el comprobante.
+    allowed = client.get(
+        f"/api/treasury/vouchers/{funding_doc}"
+        "?beneficiary=Proveedor&paymentMethod=Transferencia"
+    )
+    assert allowed.status_code == 200, allowed.text
+    assert allowed.content.startswith(b"%PDF")
 
 
 def test_voucher_beneficiary_resolves_from_registered_entity(client):
@@ -272,7 +329,7 @@ def test_voucher_beneficiary_resolves_from_registered_entity(client):
 
     response = client.get(
         f"/api/treasury/vouchers/{funding_doc}"
-        f"?beneficiaryType=SUPPLIER&beneficiaryId={supplier['id']}&paymentMethod=Cheque"
+        f"?beneficiaryType=SUPPLIER&beneficiaryId={supplier['id']}&paymentMethod=Efectivo"
     )
     assert response.status_code == 200, response.text
     assert "Ferrer" in response.content.decode("latin-1") or "Ferret" in response.content.decode(
@@ -284,7 +341,7 @@ def test_voucher_beneficiary_resolves_from_registered_entity(client):
     other_supplier = create_supplier(client, company_id=other["id"], legal_name="Ajeno S.A.")
     bad = client.get(
         f"/api/treasury/vouchers/{funding_doc}"
-        f"?beneficiaryType=SUPPLIER&beneficiaryId={other_supplier['id']}&paymentMethod=Cheque"
+        f"?beneficiaryType=SUPPLIER&beneficiaryId={other_supplier['id']}&paymentMethod=Efectivo"
     )
     assert bad.status_code == 404, bad.text
 

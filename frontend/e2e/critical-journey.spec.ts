@@ -444,8 +444,22 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     expect(unmatched.status).toBe('UNMATCHED')
 
     const documents = await api<any[]>(page.request, 'get', `/accounting/journal-entries?companyId=${companyId}&limit=250`)
+    // Un método bancario exige evidencia adjunta al documento (orden maestra Phase 2).
+    const voucherBlocked = await page.request.get(
+      `/api/treasury/vouchers/${documents[0].id}?beneficiary=Nexora%20Group&paymentMethod=TRANSFER`,
+    )
+    expect(voucherBlocked.status()).toBe(422)
+    const evidenceUpload = await page.request.post('/api/evidence', {
+      multipart: {
+        companyId,
+        entityType: 'ACCOUNTING_DOCUMENT',
+        entityId: documents[0].id,
+        file: { name: 'transferencia.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7\ncomprobante') },
+      },
+    })
+    expect(evidenceUpload.ok()).toBeTruthy()
     const voucherResponse = await page.request.get(
-      `/api/treasury/vouchers/${documents[0].id}?beneficiary=Nexora%20Group&payer=Administracion&paymentMethod=TRANSFER`,
+      `/api/treasury/vouchers/${documents[0].id}?beneficiary=Nexora%20Group&paymentMethod=TRANSFER`,
     )
     expect(voucherResponse.ok()).toBeTruthy()
     expect(voucherResponse.headers()['content-type']).toContain('application/pdf')

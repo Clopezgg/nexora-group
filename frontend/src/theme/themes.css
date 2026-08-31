@@ -1,18 +1,21 @@
-/* Enterprise Theme Engine — capa de aplicación (orden maestra Phase 8).
-   §68: solo presentación.
+/* Enterprise Theme Engine — capa de aplicación.
+   §68: solo presentación (color / tipografía / radio / densidad).
 
-   IMPORTANTE: el preset por defecto `nexora-classic` NO activa esta capa
-   (ThemeProvider pone data-nx-themed="off"). Así la apariencia hand-tuned
-   actual queda 100% intacta y la auditoría axe/WCAG del recorrido base no
-   cambia. Solo al elegir OTRO preset se aplica el re-pintado por variables. */
+   El Theme Engine gobierna SIEMPRE: NEXORA Horizon Light (default) también
+   re-pinta por variables. Todas las superficies globales del shell
+   (canvas, topbar, sidebar, cards, tablas, formularios, botones) leen los
+   tokens `--nx-theme-*`. No quedan capas CSS compitiendo con valores
+   hardcoded para estos elementos. */
 
 :root {
   --nx-theme-page-bg: #eef3f9;
   --nx-theme-surface: #ffffff;
+  --nx-theme-surface-2: #f4f7fb;
   --nx-theme-text: #102844;
   --nx-theme-text-muted: #4f6176;
   --nx-theme-border: #dce5ef;
   --nx-theme-accent: #1769d2;
+  --nx-theme-accent-contrast: #ffffff;
   --nx-theme-sidebar-bg: #0b274a;
   --nx-theme-sidebar-text: #c7d7ea;
   --nx-theme-radius: 9px;
@@ -24,7 +27,9 @@
   --nx-density-scale: 0.72;
 }
 
-/* ---- Capa activa: solo para presets != nexora-classic ---- */
+/* ---------------------------------------------------------------------------
+ * Capa activa (siempre). data-nx-themed="on" lo pone ThemeProvider.
+ * ------------------------------------------------------------------------- */
 
 :root[data-nx-themed='on'] body {
   background: var(--nx-theme-page-bg);
@@ -32,7 +37,9 @@
   font-family: var(--nx-theme-font);
 }
 
-:root[data-nx-themed='on'] a {
+/* Solo enlaces del área de contenido: NO recolorear enlaces del sidebar
+   navy ni de la navegación inferior (perderían contraste sobre navy). */
+:root[data-nx-themed='on'] body .nx-app-shell__content a {
   color: var(--nx-theme-accent);
 }
 
@@ -40,47 +47,154 @@
   background: var(--nx-theme-page-bg);
 }
 
+/* Sidebar — superficie navy controlada (o la que defina el preset). */
 :root[data-nx-themed='on'] body .nx-sidebar {
   background: var(--nx-theme-sidebar-bg);
   color: var(--nx-theme-sidebar-text);
 }
-
-:root[data-nx-themed='on'] body .nx-topbar {
-  background: var(--nx-theme-surface);
-  border-bottom: 1px solid var(--nx-theme-border);
+/* Etiquetas de grupo del sidebar: contraste AA sobre la superficie navy. */
+:root[data-nx-themed='on'] body .nx-sidebar__group-label {
+  color: #a9c0dc;
 }
 
+/* Topbar — LIGHT CLEAN: superficie del tema, texto e iconos oscuros. */
+:root[data-nx-themed='on'] body .nx-topbar {
+  background: var(--nx-theme-surface);
+  color: var(--nx-theme-text);
+  border-bottom: 1px solid var(--nx-theme-border);
+  box-shadow: 0 1px 2px rgba(7, 26, 51, 0.05);
+}
+:root[data-nx-themed='on'] body .nx-topbar__company,
+:root[data-nx-themed='on'] body .nx-topbar__user {
+  border-color: var(--nx-theme-border);
+}
+:root[data-nx-themed='on'] body .nx-topbar__company-name,
+:root[data-nx-themed='on'] body .nx-topbar__user-name {
+  color: var(--nx-theme-text);
+}
+:root[data-nx-themed='on'] body .nx-topbar__context-label,
+:root[data-nx-themed='on'] body .nx-topbar__user-role {
+  color: var(--nx-theme-text-muted);
+}
+:root[data-nx-themed='on'] body .nx-topbar .nx-select {
+  background: var(--nx-theme-surface-2);
+  border-color: var(--nx-theme-border);
+  color: var(--nx-theme-text);
+}
+:root[data-nx-themed='on'] body .nx-topbar .nx-select option {
+  color: var(--nx-theme-text);
+  background: var(--nx-theme-surface);
+}
+:root[data-nx-themed='on'] body .nx-topbar .nx-icon-button {
+  color: var(--nx-theme-text-muted);
+}
+:root[data-nx-themed='on'] body .nx-topbar .nx-icon-button:hover {
+  background: var(--nx-theme-surface-2);
+  color: var(--nx-theme-text);
+}
+:root[data-nx-themed='on'] body .nx-topbar .nx-badge {
+  background: var(--nx-theme-surface-2);
+  color: var(--nx-theme-text-muted);
+  border: 1px solid var(--nx-theme-border);
+}
+:root[data-nx-themed='on'] body .nx-topbar__logout {
+  background: var(--nx-theme-surface-2);
+  border-color: var(--nx-theme-border);
+  color: var(--nx-theme-text-muted);
+}
+:root[data-nx-themed='on'] body .nx-topbar__logout:hover {
+  color: var(--nx-theme-text);
+  border-color: var(--nx-theme-accent);
+}
+/* Edit-access pill fue diseñado para topbar oscura; en topbar clara usa
+   tokens del tema para no perder contraste. */
+:root[data-nx-themed='on'] body .nx-topbar .nx-edit-access {
+  border-color: var(--nx-theme-border);
+  background: var(--nx-theme-surface-2);
+  color: var(--nx-theme-text-muted);
+}
+:root[data-nx-themed='on'] body .nx-topbar .nx-edit-access:hover {
+  color: var(--nx-theme-text);
+  background: var(--nx-theme-surface-2);
+}
+:root[data-nx-themed='on'] body .nx-topbar .nx-edit-access--unlocked {
+  color: var(--nx-success, #157347);
+  border-color: rgba(21, 115, 71, 0.35);
+  background: rgba(21, 115, 71, 0.1);
+}
+
+/* Surfaces */
 :root[data-nx-themed='on'] body .nx-card,
+:root[data-nx-themed='on'] body .nx-stat-card,
 :root[data-nx-themed='on'] body .nx-chart-card,
 :root[data-nx-themed='on'] body .nx-fcc-kpi,
-:root[data-nx-themed='on'] body .nx-modal {
+:root[data-nx-themed='on'] body .nx-modal,
+:root[data-nx-themed='on'] body .nx-filter-bar,
+:root[data-nx-themed='on'] body .nx-bottom-nav {
   background: var(--nx-theme-surface);
   border-color: var(--nx-theme-border);
+  color: var(--nx-theme-text);
+}
+:root[data-nx-themed='on'] body .nx-card,
+:root[data-nx-themed='on'] body .nx-chart-card {
   border-radius: var(--nx-theme-radius);
+}
+:root[data-nx-themed='on'] body .nx-card__title,
+:root[data-nx-themed='on'] body .nx-stat-card__label,
+:root[data-nx-themed='on'] body .nx-page__eyebrow,
+:root[data-nx-themed='on'] body .nx-field__hint {
+  color: var(--nx-theme-text-muted);
+}
+:root[data-nx-themed='on'] body .nx-stat-card__value,
+:root[data-nx-themed='on'] body .nx-card__value,
+:root[data-nx-themed='on'] body .nx-app-shell__content h1,
+:root[data-nx-themed='on'] body .nx-app-shell__content h2,
+:root[data-nx-themed='on'] body .nx-app-shell__content h3,
+:root[data-nx-themed='on'] body .nx-dashboard__title {
+  color: var(--nx-theme-text);
+}
+:root[data-nx-themed='on'] body .nx-stat-card::before {
+  background: var(--nx-theme-accent);
+}
+
+/* Forms */
+:root[data-nx-themed='on'] body .nx-input,
+:root[data-nx-themed='on'] body .nx-select,
+:root[data-nx-themed='on'] body .nx-textarea {
+  background: var(--nx-theme-surface);
+  border-color: var(--nx-theme-border);
+  color: var(--nx-theme-text);
+}
+:root[data-nx-themed='on'] body .nx-field__label {
   color: var(--nx-theme-text);
 }
 
-:root[data-nx-themed='on'] body .nx-card__title,
-:root[data-nx-themed='on'] body .nx-page__eyebrow {
-  color: var(--nx-theme-text-muted);
+/* Tables */
+:root[data-nx-themed='on'] body .nx-table {
+  background: var(--nx-theme-surface);
+  border-color: var(--nx-theme-border);
 }
-
 :root[data-nx-themed='on'] body .nx-table th {
+  background: var(--nx-theme-surface-2);
   color: var(--nx-theme-text-muted);
   border-bottom-color: var(--nx-theme-border);
 }
-
 :root[data-nx-themed='on'] body .nx-table td {
   border-bottom-color: var(--nx-theme-border);
   color: var(--nx-theme-text);
 }
 
+/* Primary action */
 :root[data-nx-themed='on'] body .nx-button--primary {
   background: var(--nx-theme-accent);
   border-color: var(--nx-theme-accent);
+  color: var(--nx-theme-accent-contrast);
+}
+:root[data-nx-themed='on'] body .nx-button--primary:hover {
+  filter: brightness(0.96);
 }
 
-/* ---- Densidad: aplica siempre (comfortable / compact), independiente del preset ---- */
+/* ---- Densidad: aplica siempre (comfortable / compact) ---- */
 
 :root[data-nx-density='compact'] body .nx-card {
   padding: calc(20px * var(--nx-density-scale) + 4px);

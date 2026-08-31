@@ -20,6 +20,7 @@ function stubFetch() {
             permissions: [
               'treasury.account:read',
               'accounting.journal_entry:read',
+              'treasury.voucher:read',
               'project:read',
               'workflow.approval:read',
             ],
@@ -52,5 +53,18 @@ describe('Mobile bottom navigation', () => {
     await user.click(within(nav).getByRole('button', { name: /más/i }))
     expect(await screen.findByRole('dialog', { name: /navegación/i })).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/buscar módulo/i)).toBeInTheDocument()
+  })
+
+  it('exposes a central FAB that opens Quick Create with permission-gated actions', async () => {
+    stubFetch()
+    const user = userEvent.setup()
+    render(renderApp('/inicio'))
+
+    const nav = await screen.findByRole('navigation', { name: /navegación principal \(móvil\)/i })
+    await user.click(within(nav).getByRole('button', { name: 'Crear' }))
+
+    const sheet = await screen.findByRole('dialog', { name: 'Crear' })
+    expect(within(sheet).getByRole('button', { name: /nuevo comprobante/i })).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: /nuevo proyecto/i })).toBeInTheDocument()
   })
 })

@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { NavList } from './NavList'
 import { BottomNav } from './BottomNav'
+import { QuickCreate } from './QuickCreate'
 import { filterNavGroups } from '../app/navigation'
 import { Button, CommandPalette, Drawer, type CommandItem } from '../design-system'
 import { useAuth } from '../features/auth/auth-context'
@@ -13,6 +14,7 @@ import './AppLayout.css'
 
 export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   const { activeCompanyId } = useActiveCompany()
   const { user, logout } = useAuth()
   const visibleGroups = useMemo(() => filterNavGroups(user?.permissions), [user?.permissions])
@@ -53,7 +55,11 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
-      <BottomNav onOpenMore={() => setMobileNavOpen(true)} />
+      <BottomNav
+        onOpenMore={() => setMobileNavOpen(true)}
+        onQuickCreate={() => setQuickCreateOpen(true)}
+      />
+      <QuickCreate open={quickCreateOpen} onClose={() => setQuickCreateOpen(false)} />
       <Drawer
         open={mobileNavOpen}
         title="Navegación"

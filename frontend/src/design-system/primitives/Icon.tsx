@@ -40,6 +40,7 @@ export type IconName =
   | 'bell'
   | 'warning'
   | 'clipboard'
+  | 'plus'
 
 const paths: Record<IconName, string> = {
   home: 'M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
@@ -81,6 +82,7 @@ const paths: Record<IconName, string> = {
   bell: 'M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z M10 20h4',
   warning: 'M12 3 22 21H2z M12 9v5m0 3h.01',
   clipboard: 'M7 5h10v16H5V5h2 M9 3h6v4H9z M9 12h6m-6 4h6',
+  plus: 'M12 5v14 M5 12h14',
 }
 
 interface IconProps extends Omit<SVGAttributes<SVGSVGElement>, 'name'> {

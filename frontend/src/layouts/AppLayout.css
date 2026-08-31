@@ -385,7 +385,55 @@
     text-decoration: none;
   }
   .nx-bottom-nav__item .nx-icon { width: 20px; height: 20px; }
-  .nx-bottom-nav__item--active { color: var(--nx-color-accent); }
+  .nx-bottom-nav__item--active { color: var(--nx-theme-accent, var(--nx-color-accent)); }
+
+  /* FAB central azul, ligeramente elevado (Opción 2). */
+  .nx-bottom-nav__fab {
+    appearance: none;
+    justify-self: center;
+    align-self: center;
+    margin-top: -18px;
+    width: 52px;
+    height: 52px;
+    border: none;
+    border-radius: 50%;
+    background: var(--nx-theme-accent, #1769d2);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(23, 105, 210, 0.4);
+  }
+  .nx-bottom-nav__fab .nx-icon { width: 24px; height: 24px; }
+  .nx-bottom-nav__fab:active { transform: translateY(1px); }
+
+  .nx-quick-create { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .nx-quick-create__action {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--nx-touch-target);
+    padding: 10px 8px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: var(--nx-text-body);
+    color: var(--nx-theme-text, var(--nx-color-text));
+    text-align: left;
+  }
+  .nx-quick-create__action:hover { background: var(--nx-theme-surface-2, #f4f7fb); border-radius: var(--nx-radius-sm); }
+  .nx-quick-create__icon {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--nx-radius-sm);
+    background: var(--nx-color-accent-soft, #e4edff);
+    color: var(--nx-theme-accent, var(--nx-color-accent));
+  }
 
   /* Deja espacio para que el bottom-nav no tape contenido. */
   .nx-app-shell__content {

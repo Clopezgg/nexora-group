@@ -2,6 +2,7 @@ import re
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id, get_db
@@ -10,6 +11,7 @@ from app.domain.errors import InvalidFinancialReferenceError
 from app.models.accounting import AccountingDocument
 from app.models.company import Company
 from app.models.crm import Customer
+from app.models.evidence import Evidence
 from app.models.supplier import Supplier
 from app.models.workforce import Worker
 from app.models.treasury import (
@@ -821,6 +823,15 @@ def list_beneficiaries(
     return options
 
 
+# Métodos de pago que exigen comprobante de respaldo (orden maestra Phase 2).
+_METHODS_REQUIRING_EVIDENCE = {
+    "TRANSFER", "TRANSFERENCIA", "WIRE",
+    "DEPOSIT", "DEPOSITO", "DEPÓSITO",
+    "CHECK", "CHEQUE",
+}
+_ACCOUNTING_DOCUMENT_EVIDENCE_TYPES = {"ACCOUNTING_DOCUMENT", "PAYMENT_DOCUMENT", "VOUCHER"}
+
+
 @router.get("/vouchers/{accounting_document_id}")
 def download_voucher(
     accounting_document_id: uuid.UUID,
@@ -873,6 +884,29 @@ def download_voucher(
         or (company.name if company else "")
     )
     resolved_approver = approved_by or (company.voucher_approver_name if company else None)
+
+    # Evidencia obligatoria para transferencia / depósito / cheque
+    # (orden maestra Phase 2). Debe existir al menos una Evidence adjunta al
+    # documento contable de este comprobante.
+    if payment_method.strip().upper() in _METHODS_REQUIRING_EVIDENCE:
+        has_evidence = (
+            db.query(Evidence.id)
+            .filter(
+                Evidence.entity_id == document.id,
+                func.upper(Evidence.entity_type).in_(_ACCOUNTING_DOCUMENT_EVIDENCE_TYPES),
+            )
+            .first()
+            is not None
+        )
+        if not has_evidence:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Este método de pago exige adjuntar evidencia (comprobante de "
+                    "transferencia, depósito o cheque) al documento antes de emitir "
+                    "el comprobante."
+                ),
+            )
     try:
         pdf_bytes = voucher_service.generate_voucher_pdf(
             db,

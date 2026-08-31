@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Badge,
   Button,
@@ -13,9 +13,12 @@ import {
 } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { useMutationError } from '../../hooks/useMutationError'
+import { documentService } from '../../services/documentService'
 import { voucherService } from '../../services/voucherService'
 import { statusLabel } from '../../utils/statusLabels'
 import './TreasuryPage.css'
+
+const METHODS_REQUIRING_EVIDENCE = new Set(['TRANSFER', 'DEPOSIT', 'CHECK'])
 
 export function VouchersPage() {
   const handleMutationError = useMutationError()
@@ -41,6 +44,32 @@ export function VouchersPage() {
   const selectedBeneficiary = (beneficiariesQuery.data ?? []).find(
     (row) => `${row.beneficiaryType}:${row.id}` === beneficiaryKey,
   )
+
+  const queryClient = useQueryClient()
+  const evidenceQuery = useQuery({
+    queryKey: ['evidence', 'ACCOUNTING_DOCUMENT', documentId],
+    queryFn: () =>
+      documentService.listEvidence(activeCompanyId as string, 'ACCOUNTING_DOCUMENT', documentId),
+    enabled: Boolean(activeCompanyId && documentId),
+  })
+  const evidenceCount = evidenceQuery.data?.length ?? 0
+  const needsEvidence = METHODS_REQUIRING_EVIDENCE.has(paymentMethod)
+  const evidenceMissing = needsEvidence && evidenceCount === 0
+
+  const uploadEvidence = useMutation({
+    mutationFn: (file: File) =>
+      documentService.uploadEvidence(
+        activeCompanyId as string,
+        file,
+        'PAYMENT_PROOF',
+        'ACCOUNTING_DOCUMENT',
+        documentId,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['evidence', 'ACCOUNTING_DOCUMENT', documentId] })
+    },
+    onError: (error) => handleMutationError(error, 'Adjuntar evidencia'),
+  })
 
   const download = useMutation({
     mutationFn: () => voucherService.download(documentId, {
@@ -136,11 +165,33 @@ export function VouchersPage() {
           </div>
           <Select label="Método de pago" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
             <option value="TRANSFER">Transferencia</option>
+            <option value="DEPOSIT">Depósito</option>
             <option value="CHECK">Cheque</option>
             <option value="CASH">Efectivo</option>
             <option value="REMITTANCE">Remesa</option>
             <option value="OTHER">Otro</option>
           </Select>
+          {documentId && needsEvidence ? (
+            <div>
+              <label className="nx-field__label" htmlFor="voucher-evidence">
+                Evidencia del pago {evidenceMissing ? '· obligatoria' : `· ${evidenceCount} adjunta(s)`}
+              </label>
+              <input
+                id="voucher-evidence"
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                disabled={uploadEvidence.isPending}
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) uploadEvidence.mutate(file)
+                  event.target.value = ''
+                }}
+              />
+              <p className={evidenceMissing ? 'nx-field__error' : 'nx-field__hint'} role={evidenceMissing ? 'alert' : undefined}>
+                Transferencia, depósito y cheque exigen adjuntar el comprobante del pago antes de emitir el PDF.
+              </p>
+            </div>
+          ) : null}
           <div>
             <Input
               label="Aprobado por"
@@ -154,7 +205,7 @@ export function VouchersPage() {
           </div>
           <Button
             loading={download.isPending}
-            disabled={!documentId || !selectedBeneficiary || !paymentMethod}
+            disabled={!documentId || !selectedBeneficiary || !paymentMethod || evidenceMissing}
             onClick={() => download.mutate()}
           >
             Generar PDF

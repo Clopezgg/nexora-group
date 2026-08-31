@@ -3884,3 +3884,22 @@ pero `applyToDom` desactivaba la capa de theming para el default.
 - Icono `plus` añadido al design system.
 - Tests: `BottomNav.test.tsx` (+1 FAB/QuickCreate). Frontend 164 passed;
   typecheck/lint/build verdes.
+
+### 2026-08-31 — ORDEN MAESTRA CORRECTIVA · PR B (dashboard: composición Opción 2)
+
+Rama: `feat/oc-b-dashboard-composition`.
+
+- **KPI icon tiles (§12)**: cada StatCard del Home lleva un cuadrado tonal
+  con icono (Tesorería azul · Ingresos verde · Gastos ámbar · Proyectos
+  púrpura). Sin emojis, sin porcentajes inventados.
+- **Flujo de caja proyectado · 13 semanas (§15)**: `HomeForecastCard` —
+  ComposedChart compacto (Entradas/Salidas barras + Saldo línea) que
+  reutiliza `cashForecastService` real; alerta de liquidez si aplica;
+  estado vacío compacto (§18) enlazando a `/finanzas/flujo-13-semanas`.
+- **Cuentas bancarias · saldos en libros (§16)**: `HomeBankAccountsCard` —
+  lista de `TreasuryAccount` reales (banco, número enmascarado `••••1234`,
+  moneda, saldo), enlace a Tesorería.
+- **Reordenado (§11)**: header → KPIs → Mi trabajo hoy → forecast 13s →
+  cuentas bancarias → analítica histórica (secundaria).
+- Tests: `HomePage.test.tsx` verifica forecast + cuentas bancarias.
+  Frontend 164 passed; typecheck/lint/build verdes.

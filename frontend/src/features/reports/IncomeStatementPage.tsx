@@ -4,17 +4,12 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { reportingService } from '../../services/reportingService'
 import type { StatementRow } from '../../types/reporting'
 import { downloadCsv, toCsv } from '../../utils/csv'
+import { useReportCurrency } from './reportMoney'
 
 const CSV_COLUMNS = [
   { key: 'accountCode' as const, label: 'Código' },
   { key: 'accountName' as const, label: 'Cuenta' },
   { key: 'balance' as const, label: 'Saldo' },
-]
-
-const COLUMNS: TableColumn<StatementRow>[] = [
-  { key: 'accountCode', header: 'Código', render: (row) => row.accountCode },
-  { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
-  { key: 'balance', header: 'Saldo', render: (row) => row.balance },
 ]
 
 /** NXR-REQ-0093 (financial statements subproject): Estado de Resultados
@@ -23,6 +18,12 @@ const COLUMNS: TableColumn<StatementRow>[] = [
  * docs/superpowers/specs/2026-08-25-financial-statements-design.md. */
 export function IncomeStatementPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const { fmt } = useReportCurrency()
+  const COLUMNS: TableColumn<StatementRow>[] = [
+    { key: 'accountCode', header: 'Código', render: (row) => row.accountCode },
+    { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
+    { key: 'balance', header: 'Saldo', numeric: true, render: (row) => fmt(row.balance) },
+  ]
 
   const reportQuery = useQuery({
     queryKey: ['reports', 'income-statement', activeCompanyId],
@@ -71,7 +72,7 @@ export function IncomeStatementPage() {
               getRowKey={(row) => row.accountId}
               emptyMessage="Sin cuentas de ingreso con saldo."
             />
-            <p className="nx-field__label">Total ingresos: {report.totalRevenue}</p>
+            <p className="nx-field__label">Total ingresos: {fmt(report.totalRevenue)}</p>
           </Card>
           <Card>
             <h2 className="nx-field__label">Gastos</h2>
@@ -81,10 +82,10 @@ export function IncomeStatementPage() {
               getRowKey={(row) => row.accountId}
               emptyMessage="Sin cuentas de gasto con saldo."
             />
-            <p className="nx-field__label">Total gastos: {report.totalExpenses}</p>
+            <p className="nx-field__label">Total gastos: {fmt(report.totalExpenses)}</p>
           </Card>
           <Card>
-            <p className="nx-field__label">Utilidad neta: {report.netIncome}</p>
+            <p className="nx-field__label">Utilidad neta: {fmt(report.netIncome)}</p>
           </Card>
         </>
       ) : null}

@@ -4,17 +4,12 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { reportingService } from '../../services/reportingService'
 import type { StatementRow } from '../../types/reporting'
 import { downloadCsv, toCsv } from '../../utils/csv'
+import { useReportCurrency } from './reportMoney'
 
 const CSV_COLUMNS = [
   { key: 'accountCode' as const, label: 'Código' },
   { key: 'accountName' as const, label: 'Cuenta' },
   { key: 'balance' as const, label: 'Monto' },
-]
-
-const COLUMNS: TableColumn<StatementRow>[] = [
-  { key: 'accountCode', header: 'Código', render: (row) => row.accountCode },
-  { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
-  { key: 'balance', header: 'Monto', render: (row) => row.balance },
 ]
 
 /** NXR-REQ-0016/0093 (Cash Flow, método directo): entradas/salidas de
@@ -25,6 +20,12 @@ const COLUMNS: TableColumn<StatementRow>[] = [
  * explícito, nunca oculto -- ver reporting_service.cash_flow_statement. */
 export function CashFlowPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const { fmt } = useReportCurrency()
+  const COLUMNS: TableColumn<StatementRow>[] = [
+    { key: 'accountCode', header: 'Código', render: (row) => row.accountCode },
+    { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
+    { key: 'balance', header: 'Monto', numeric: true, render: (row) => fmt(row.balance) },
+  ]
 
   const reportQuery = useQuery({
     queryKey: ['reports', 'cash-flow', activeCompanyId],
@@ -75,7 +76,7 @@ export function CashFlowPage() {
               getRowKey={(row) => row.accountId}
               emptyMessage="Sin movimiento operativo clasificado en el período."
             />
-            <p className="nx-field__label">Total operativo: {report.totalOperating}</p>
+            <p className="nx-field__label">Total operativo: {fmt(report.totalOperating)}</p>
           </Card>
           <Card>
             <h2 className="nx-field__label">Actividades de inversión</h2>
@@ -85,7 +86,7 @@ export function CashFlowPage() {
               getRowKey={(row) => row.accountId}
               emptyMessage="Sin movimiento de inversión clasificado en el período."
             />
-            <p className="nx-field__label">Total inversión: {report.totalInvesting}</p>
+            <p className="nx-field__label">Total inversión: {fmt(report.totalInvesting)}</p>
           </Card>
           <Card>
             <h2 className="nx-field__label">Actividades de financiamiento</h2>
@@ -95,7 +96,7 @@ export function CashFlowPage() {
               getRowKey={(row) => row.accountId}
               emptyMessage="Sin movimiento de financiamiento clasificado en el período."
             />
-            <p className="nx-field__label">Total financiamiento: {report.totalFinancing}</p>
+            <p className="nx-field__label">Total financiamiento: {fmt(report.totalFinancing)}</p>
           </Card>
           {report.unclassified.length > 0 ? (
             <Card>
@@ -111,11 +112,11 @@ export function CashFlowPage() {
                 getRowKey={(row) => row.accountId}
                 emptyMessage="Sin cuentas por clasificar."
               />
-              <p className="nx-field__label">Total sin clasificar: {report.totalUnclassified}</p>
+              <p className="nx-field__label">Total sin clasificar: {fmt(report.totalUnclassified)}</p>
             </Card>
           ) : null}
           <Card>
-            <p className="nx-field__label">Cambio neto en efectivo: {report.netChangeInCash}</p>
+            <p className="nx-field__label">Cambio neto en efectivo: {fmt(report.netChangeInCash)}</p>
           </Card>
         </>
       ) : null}

@@ -76,8 +76,8 @@ describe('BalanceSheetPage', () => {
 
     expect(await screen.findByText('Caja')).toBeInTheDocument()
     expect(screen.getByText('Capital')).toBeInTheDocument()
-    expect(screen.getByText(/activos: 150.00/i)).toBeInTheDocument()
-    expect(screen.getByText(/pasivo \+ patrimonio: 150.00/i)).toBeInTheDocument()
+    expect(screen.getByText(/activos: L 150\.00/i)).toBeInTheDocument()
+    expect(screen.getByText(/pasivo \+ patrimonio: L 150\.00/i)).toBeInTheDocument()
   })
 
   it('shows an honest empty state when there are no companies yet', async () => {
@@ -107,7 +107,7 @@ describe('IncomeStatementPage', () => {
 
     expect(await screen.findByText('Ventas de Servicios')).toBeInTheDocument()
     expect(screen.getByText('Gastos Operativos')).toBeInTheDocument()
-    expect(screen.getByText(/utilidad neta: 75.00/i)).toBeInTheDocument()
+    expect(screen.getByText(/utilidad neta: L 75\.00/i)).toBeInTheDocument()
   })
 
   it('disables the CSV export button when there are no rows', async () => {
@@ -150,7 +150,7 @@ describe('CashFlowPage', () => {
     expect(await screen.findByText('Aportes de socios')).toBeInTheDocument()
     expect(screen.getByText('Gastos administrativos')).toBeInTheDocument()
     expect(screen.getByText('CxP sin clasificar')).toBeInTheDocument()
-    expect(screen.getByText(/cambio neto en efectivo: 4600.00/i)).toBeInTheDocument()
+    expect(screen.getByText(/cambio neto en efectivo: L 4,600\.00/i)).toBeInTheDocument()
   })
 
   it('hides the unclassified card when every account is classified', async () => {

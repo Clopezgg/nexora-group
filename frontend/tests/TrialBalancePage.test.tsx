@@ -58,6 +58,6 @@ describe('TrialBalancePage', () => {
 
     expect(await screen.findByText('Gastos')).toBeInTheDocument()
     expect(screen.getByText('Caja')).toBeInTheDocument()
-    expect(screen.getByText(/Total débito: 100.00 — Total crédito: 100.00/)).toBeInTheDocument()
+    expect(screen.getByText(/Total débito: L 100.00 — Total crédito: L 100.00/)).toBeInTheDocument()
   })
 })

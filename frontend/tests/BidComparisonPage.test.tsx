@@ -89,7 +89,7 @@ describe('BidComparisonPage', () => {
     expect(await screen.findByText('RFQ-2026-000001')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /comparar/i }))
 
-    expect(await screen.findByText(/1000\.00/)).toBeInTheDocument()
+    expect(await screen.findByText(/L 1,000\.00/)).toBeInTheDocument()
     expect(screen.getByText('15')).toBeInTheDocument()
     expect(screen.getByText('50% anticipo')).toBeInTheDocument()
   })
@@ -100,7 +100,7 @@ describe('BidComparisonPage', () => {
 
     render(renderApp('/abastecimiento/comparativos'))
     await userEvent.click(await screen.findByRole('button', { name: /comparar/i }))
-    await screen.findByText(/1000\.00/)
+    await screen.findByText(/L 1,000\.00/)
     await userEvent.click(screen.getByRole('button', { name: /seleccionar ganadora/i }))
 
     expect(onCreatePO).toHaveBeenCalled()

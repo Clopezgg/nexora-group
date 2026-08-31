@@ -6,6 +6,7 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { crmService } from '../../services/crmService'
 import { masterDataService } from '../../services/masterDataService'
 import type { SalesContract } from '../../types/crm'
+import { formatMoney } from '../../utils/currency'
 
 export function SalesContractsPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
@@ -33,7 +34,7 @@ export function SalesContractsPage() {
 
   const columns: TableColumn<SalesContract>[] = [
     { key: 'contractNumber', header: 'Contrato', render: (row) => row.contractNumber },
-    { key: 'amount', header: 'Monto', render: (row) => `${row.currencyCode} ${row.amount}` },
+    { key: 'amount', header: 'Monto', render: (row) => formatMoney(row.amount, row.currencyCode), numeric: true },
     { key: 'status', header: 'Estado', render: (row) => <Badge>{row.status}</Badge> },
     {
       key: 'actions',

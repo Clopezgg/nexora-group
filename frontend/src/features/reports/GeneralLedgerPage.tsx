@@ -6,6 +6,7 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { reportingService } from '../../services/reportingService'
 import type { GeneralLedgerRow } from '../../types/reporting'
 import { downloadCsv, toCsv } from '../../utils/csv'
+import { useReportCurrency } from './reportMoney'
 
 const PAGE_SIZE = 25
 
@@ -16,23 +17,6 @@ const CSV_COLUMNS = [
   { key: 'description' as const, label: 'Descripción' },
   { key: 'debitAmount' as const, label: 'Débito' },
   { key: 'creditAmount' as const, label: 'Crédito' },
-]
-
-const COLUMNS: TableColumn<GeneralLedgerRow>[] = [
-  {
-    key: 'documentNumber',
-    header: 'Documento',
-    render: (row) => (
-      <Link to={`/finanzas/inspector?documentId=${encodeURIComponent(row.documentId)}`}>
-        {row.documentNumber}
-      </Link>
-    ),
-  },
-  { key: 'postedAt', header: 'Fecha', render: (row) => row.postedAt ?? '—' },
-  { key: 'accountCode', header: 'Cuenta', render: (row) => `${row.accountCode} — ${row.accountName}` },
-  { key: 'description', header: 'Descripción', render: (row) => row.description ?? '—' },
-  { key: 'debitAmount', header: 'Débito', render: (row) => row.debitAmount },
-  { key: 'creditAmount', header: 'Crédito', render: (row) => row.creditAmount },
 ]
 
 /** NXR-REQ-0093 + Phase 9: Libro Mayor paginado real. Cuando se llega por
@@ -48,7 +32,24 @@ export function GeneralLedgerPage({
   onClearAccountFilter?: () => void
 } = {}) {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const { fmt } = useReportCurrency()
   const [offset, setOffset] = useState(0)
+  const COLUMNS: TableColumn<GeneralLedgerRow>[] = [
+    {
+      key: 'documentNumber',
+      header: 'Documento',
+      render: (row) => (
+        <Link to={`/finanzas/inspector?documentId=${encodeURIComponent(row.documentId)}`}>
+          {row.documentNumber}
+        </Link>
+      ),
+    },
+    { key: 'postedAt', header: 'Fecha', render: (row) => row.postedAt ?? '—' },
+    { key: 'accountCode', header: 'Cuenta', render: (row) => `${row.accountCode} — ${row.accountName}` },
+    { key: 'description', header: 'Descripción', render: (row) => row.description ?? '—' },
+    { key: 'debitAmount', header: 'Débito', numeric: true, render: (row) => fmt(row.debitAmount) },
+    { key: 'creditAmount', header: 'Crédito', numeric: true, render: (row) => fmt(row.creditAmount) },
+  ]
 
   const reportQuery = useQuery({
     queryKey: ['reports', 'general-ledger', activeCompanyId, offset, accountId],
@@ -118,7 +119,7 @@ export function GeneralLedgerPage({
             />
             {report ? (
               <p className="nx-field__label">
-                Total débito: {report.totalDebit} — Total crédito: {report.totalCredit} — {report.total} movimientos
+                Total débito: {fmt(report.totalDebit)} — Total crédito: {fmt(report.totalCredit)} — {report.total} movimientos
               </p>
             ) : null}
             <div className="nx-page__header">

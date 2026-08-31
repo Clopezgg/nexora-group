@@ -6,6 +6,7 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { useMutationError } from '../../hooks/useMutationError'
 import { procurementService } from '../../services/procurementService'
 import type { PurchaseOrder, Quotation, Rfq } from '../../types/procurement'
+import { formatMoney } from '../../utils/currency'
 
 /** NXR-REQ-0044. `/abastecimiento/comparativos` ya existía como entrada
  * reservada ("Comparativos") en navigation.ts. RFQ (NXR-REQ-0042) y
@@ -79,7 +80,7 @@ export function BidComparisonPage() {
       header: 'Proveedor',
       render: (row) => supplierNameById.get(row.supplierId) ?? row.supplierId,
     },
-    { key: 'total', header: 'Total', render: (row) => `${row.currencyCode} ${row.total}` },
+    { key: 'total', header: 'Total', render: (row) => formatMoney(row.total, row.currencyCode), numeric: true },
     { key: 'deliveryDays', header: 'Días de entrega', render: (row) => row.deliveryDays ?? '—' },
     { key: 'paymentTerms', header: 'Condiciones de pago', render: (row) => row.paymentTerms ?? '—' },
     { key: 'validUntil', header: 'Vigente hasta', render: (row) => row.validUntil ?? '—' },

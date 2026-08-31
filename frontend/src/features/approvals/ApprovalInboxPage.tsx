@@ -14,6 +14,7 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { formatMoney } from '../../utils/currency'
 import { useMutationError } from '../../hooks/useMutationError'
 import { approvalService } from '../../services/approvalService'
 import type { ApprovalPriority, ApprovalRequestEntry } from '../../types/approval'
@@ -60,7 +61,8 @@ function DecideControl({
 }
 
 export function ApprovalInboxPage() {
-  const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const { activeCompany, activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const currency = activeCompany?.functionalCurrencyCode ?? 'HNL'
   const queryClient = useQueryClient()
   const handleMutationError = useMutationError()
   const [moduleFilter, setModuleFilter] = useState('')
@@ -108,7 +110,7 @@ export function ApprovalInboxPage() {
       header: 'Prioridad',
       render: (row) => <Badge tone={PRIORITY_TONE[row.priority]}>{PRIORITY_LABEL[row.priority]}</Badge>,
     },
-    { key: 'amount', header: 'Monto', render: (row) => row.amount ?? '—' },
+    { key: 'amount', header: 'Monto', numeric: true, render: (row) => (row.amount == null ? '—' : formatMoney(row.amount, currency)) },
     { key: 'requestedBy', header: 'Solicitado por', render: (row) => row.requestedBy },
     { key: 'createdAt', header: 'Fecha', render: (row) => new Date(row.createdAt).toLocaleString('es-HN') },
     {

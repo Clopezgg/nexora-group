@@ -3828,3 +3828,36 @@ la Orden Maestra FINAL (PRs #43–#48). Esta fase cierra los huecos de UI:
   el número completo.
 - Tests: `VouchersPage.test.tsx` actualizado (vista previa presente,
   selector `span` para moneda). Frontend 158 passed; typecheck/lint verdes.
+
+### 2026-08-31 — ORDEN MAESTRA DEFINITIVA · FASE 10 (Deploy Azure REAL + certificación)
+
+`main` @ `19f1df6`. Fases 1–9 de la Orden Maestra Definitiva + hotfix de
+evidencia/comprobantes (#63) fusionadas por PR, todas con CI verde
+(backend, frontend, e2e incluido el barrido responsive amplio §93, Docker
+Compose smoke, Bicep).
+
+**Deploy Azure REAL** — run `33424158485` (`workflow_dispatch`, `deploy=true`,
+`main` @ 19f1df6): `Bicep what-if` ✅ · `Deploy infra + apps` ✅. Aplica el
+fix de infra del hotfix: `AZURE_CLIENT_ID` = `backendIdentity.properties.clientId`
+en el Container App + `storageRoleAssignment` en `backendApp.dependsOn`.
+
+**Smoke de producción** (`https://jolly-plant-0d6bf700f.7.azurestaticapps.net`):
+- frontend `/` → 200
+- `/api/healthz` → 200 `{"status":"ok"}`
+- `/api/readyz` → 200 `{"status":"ok"}` — con `EVIDENCE_BACKEND=azure_blob`,
+  `readyz` ahora falla si la Managed Identity no alcanza el Blob privado;
+  200 confirma que el path identity→Blob funciona (causa raíz del 500 de
+  evidencia resuelta).
+- `/api/auth/login` credenciales inválidas → 401 (first-party, sin 405)
+- sin cabecera `Access-Control-Allow-Origin` (first-party, correcto)
+- pasos de verificación del propio workflow: "Verify newest backend
+  revision is healthy" ✅, "Verify direct Container Apps API is locked
+  down" ✅, "Verify production" ✅.
+
+**Pendiente de verificación humana** (§30, requiere sesión autenticada en
+navegador real, no automatizable desde CLI sin credenciales): recorrido
+Comprobantes en Safari/iPhone + desktop — seleccionar documento →
+Transferencia → adjuntar fotografía → confirmar que el nombre permanece →
+upload OK → Evidence persistida → botón habilitado → Generar PDF → 200 →
+PDF abre. Repetir con PNG (screenshot) y JPEG; HEIC/HEIF ahora aceptado
+(transcode server-side diferido en `DEFERRED-FINAL-019`).

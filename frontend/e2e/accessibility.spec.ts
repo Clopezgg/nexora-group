@@ -115,6 +115,31 @@ test.describe('Accessibility and responsive acceptance', () => {
       }
     }
 
+    // Barrido responsive amplio (§93): cada ruta de dominio, a los tres anchos
+    // representativos. La tabla vive dentro de su contenedor con scroll propio,
+    // así que la página nunca debe desbordar horizontalmente (§105).
+    const domainRoutes = [
+      '/finanzas/control',
+      '/finanzas/cuentas-por-cobrar',
+      '/finanzas/conciliacion-subledger',
+      '/finanzas/cierre',
+      '/finanzas/excepciones',
+      '/finanzas/inspector',
+      '/finanzas/flujo-13-semanas',
+      '/finanzas/comprobantes',
+      '/proyectos/cockpit',
+      '/control/auditoria',
+      '/control/configuracion',
+    ]
+    for (const width of [390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      for (const route of domainRoutes) {
+        await page.goto(route)
+        await expect(page.locator('.nx-app-shell')).toBeVisible()
+        await expectNoDocumentOverflow(page, `${route} @ ${width}px`)
+      }
+    }
+
     // El cierre de sesión sigue alcanzable en móvil: dentro del drawer.
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/inicio')

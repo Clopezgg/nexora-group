@@ -17,6 +17,9 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
   '/finanzas/conciliacion-subledger': async () => ({
     Component: (await import('../features/finance/SubledgerReconciliationPage')).SubledgerReconciliationPage,
   }),
+  '/finanzas/cierre': async () => ({
+    Component: (await import('../features/finance/ClosingCenterPage')).ClosingCenterPage,
+  }),
   '/finanzas/tesoreria': async () => ({
     Component: (await import('../features/treasury/TreasuryPage')).TreasuryPage,
   }),

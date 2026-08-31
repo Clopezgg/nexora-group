@@ -23,6 +23,11 @@ from app.models.document import Document, DocumentVersion
 from app.models.document_type import DocumentType
 from app.models.edit_access import EditAccessCapability, EditAccessEvent
 from app.models.equipment import Equipment, FuelLog, MaintenanceOrder, MaintenancePlan
+from app.models.contract_payment import (
+    ContractPaymentAllocation,
+    ContractPaymentInstallment,
+    ContractPaymentSchedule,
+)
 from app.models.evidence import Evidence
 from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.models.idempotency import IdempotencyRecord
@@ -113,6 +118,9 @@ __all__ = [
     "EditAccessCapability",
     "EditAccessEvent",
     "Equipment",
+    "ContractPaymentAllocation",
+    "ContractPaymentInstallment",
+    "ContractPaymentSchedule",
     "Evidence",
     "ExchangeRate",
     "FiscalPeriod",

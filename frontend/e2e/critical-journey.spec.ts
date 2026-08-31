@@ -487,6 +487,15 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
 
     await page.goto('/finanzas/excepciones')
     await expect(page.getByRole('heading', { name: 'Exception Center' })).toBeVisible({ timeout: 10_000 })
+
+    await page.goto('/finanzas/inspector')
+    await expect(page.getByRole('heading', { name: 'Transaction Inspector' })).toBeVisible({ timeout: 10_000 })
+    const inspectDocs = await api<any[]>(page.request, 'get', `/accounting/journal-entries?companyId=${companyId}&limit=5`)
+    if (inspectDocs.length > 0) {
+      const inspected = await api<any>(page.request, 'get', `/accounting/journal-entries/${inspectDocs[0].id}/inspect`)
+      expect(inspected.balanced).toBe(true)
+      expect(inspected.sourceEvent).toBeTruthy()
+    }
   })
 
   await test.step('Documents + multipart Evidence with real selectors', async () => {

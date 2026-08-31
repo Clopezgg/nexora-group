@@ -33,6 +33,7 @@ export const navGroups: NavGroup[] = [
       { path: '/finanzas/conciliacion-subledger', label: 'Conciliación Subledger ↔ GL', icon: 'shuffle', requiredAny: read('accounting.reconciliation:read') },
       { path: '/finanzas/cierre', label: 'Centro de Cierre', icon: 'shield', requiredAny: read('accounting.closing:read') },
       { path: '/finanzas/excepciones', label: 'Exception Center', icon: 'warning', requiredAny: read('treasury.account:read', 'accounting.journal_entry:read') },
+      { path: '/finanzas/inspector', label: 'Transaction Inspector', icon: 'search', requiredAny: read('accounting.journal_entry:read') },
       { path: '/finanzas/tesoreria', label: 'Tesorería', icon: 'bank', requiredAny: read('treasury.account:read') },
       { path: '/finanzas/conciliacion', label: 'Conciliación bancaria', icon: 'shuffle', requiredAny: read('treasury.bank_reconciliation:read') },
       { path: '/finanzas/cierres-caja', label: 'Cierres de caja', icon: 'receipt', requiredAny: read('treasury.cash_closing:read') },

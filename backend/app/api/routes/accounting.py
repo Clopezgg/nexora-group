@@ -308,3 +308,78 @@ def subledger_gl_reconciliation(
             for line in lines
         ],
     )
+
+
+@router.get(
+    "/journal-entries/{document_id}/inspect",
+    response_model=None,
+)
+def inspect_journal_entry(
+    document_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("accounting.journal_entry", "read")),
+):
+    from app.schemas.transaction_inspector import (
+        InspectedLineResponse,
+        InspectionResponse,
+        SourceEventResponse,
+    )
+    from app.services import transaction_inspector_service
+
+    document = db.get(AccountingDocument, document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asiento no encontrado")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="accounting.journal_entry",
+        action="read",
+        company_id=document.company_id,
+    )
+    _assert_document_project_access(
+        db,
+        user_id=user.id,
+        resource="accounting.journal_entry",
+        action="read",
+        document=document,
+    )
+    result = transaction_inspector_service.inspect(db, document_id=document_id)
+    assert result is not None
+    return InspectionResponse(
+        document_id=uuid.UUID(result.document_id),
+        document_number=result.document_number,
+        document_type_code=result.document_type_code,
+        scope=result.scope,
+        status=result.status,
+        currency_code=result.currency_code,
+        description=result.description,
+        project_name=result.project_name,
+        posted_at=result.posted_at,
+        total_debit=result.total_debit,
+        total_credit=result.total_credit,
+        balanced=result.balanced,
+        source_event=SourceEventResponse(
+            kind=result.source_event.kind,
+            label=result.source_event.label,
+            reference=result.source_event.reference,
+            entity_id=result.source_event.entity_id,
+        ),
+        lines=[
+            InspectedLineResponse(
+                account_code=line.account_code,
+                account_name=line.account_name,
+                debit=line.debit,
+                credit=line.credit,
+                description=line.description,
+                project_name=line.project_name,
+                cost_center_name=line.cost_center_name,
+            )
+            for line in result.lines
+        ],
+        reverses_document_id=(
+            uuid.UUID(result.reverses_document_id) if result.reverses_document_id else None
+        ),
+        reversal_reason=result.reversal_reason,
+        reversed_by_document_ids=[uuid.UUID(x) for x in result.reversed_by_document_ids],
+        evidence=result.evidence,
+    )

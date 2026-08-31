@@ -1,6 +1,12 @@
+import hashlib
 import uuid
 
 import pytest
+from azure.core.exceptions import (
+    ClientAuthenticationError,
+    HttpResponseError,
+    ServiceRequestError,
+)
 from sqlalchemy import select
 
 from app.domain.errors import EvidenceTooLargeError
@@ -258,3 +264,152 @@ def test_evidence_list_is_bounded_and_paginated(client, db_session):
     for query in ("limit=0", "limit=101", "offset=-1"):
         response = client.get(f"/api/evidence?companyId={company['id']}&{query}")
         assert response.status_code == 422, response.text
+
+
+# --- HEIC / HEIF (iOS Safari/iPhone) -----------------------------------------
+
+HEIC_BYTES = b"\x00\x00\x00\x20ftypheic\x00\x00\x00\x00mif1heic" + b"\x00" * 24
+HEIF_BYTES = b"\x00\x00\x00\x20ftypmif1\x00\x00\x00\x00mif1heic" + b"\x00" * 24
+
+
+def test_evidence_accepts_heic_with_real_signature(client, db_session, monkeypatch):
+    login_admin(client)
+    company = create_company(client, name="Evidence HEIC Co")
+    container = FakeContainerClient()
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: container,
+    )
+
+    response = _upload(
+        client,
+        company_id=company["id"],
+        filename="IMG_0001.HEIC",
+        content=HEIC_BYTES,
+        mime="image/heic",
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["mimeType"] == "image/heic"
+    assert body["contentHash"] == hashlib.sha256(HEIC_BYTES).hexdigest()
+    assert len(container.uploaded) == 1
+
+
+def test_evidence_accepts_heif_when_ios_sends_empty_content_type(client, monkeypatch):
+    login_admin(client)
+    company = create_company(client, name="Evidence HEIF Co")
+    container = FakeContainerClient()
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: container,
+    )
+
+    # iOS a veces manda application/octet-stream para estas fotos.
+    response = _upload(
+        client,
+        company_id=company["id"],
+        filename="IMG_0002.heif",
+        content=HEIF_BYTES,
+        mime="application/octet-stream",
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["mimeType"] == "image/heif"
+
+
+def test_evidence_rejects_octet_stream_without_a_valid_signature(client, monkeypatch):
+    login_admin(client)
+    company = create_company(client, name="Evidence Octet Co")
+    container = FakeContainerClient()
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: container,
+    )
+
+    response = _upload(
+        client,
+        company_id=company["id"],
+        filename="misterio.bin",
+        content=b"\x00\x01\x02\x03not-a-real-image",
+        mime="application/octet-stream",
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "NXR-EVIDENCE-002"
+    assert container.uploaded == []
+
+
+# --- Storage error classification ------------------------------------------
+
+
+class _RaisingContainer:
+    def __init__(self, exc: Exception):
+        self.exc = exc
+
+    def upload_blob(self, **kwargs):
+        raise self.exc
+
+    def delete_blob(self, blob_key: str):  # pragma: no cover
+        pass
+
+
+@pytest.mark.parametrize(
+    ("exc", "expected_code"),
+    [
+        (ClientAuthenticationError("managed identity token failed"), "NXR-EVIDENCE-STORAGE-AUTH"),
+        (ServiceRequestError("connection reset"), "NXR-EVIDENCE-STORAGE-TEMPORARY"),
+    ],
+)
+def test_evidence_upload_classifies_storage_failures(client, monkeypatch, exc, expected_code):
+    login_admin(client)
+    company = create_company(client, name=f"Evidence Storage {expected_code}")
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: _RaisingContainer(exc),
+    )
+
+    response = _upload(client, company_id=company["id"])
+    assert response.status_code == 503, response.text
+    body = response.json()["error"]
+    assert body["code"] == expected_code
+    # Nunca se filtra la causa raíz ni credenciales al cliente.
+    assert "token" not in body["message"].lower()
+    assert body["message"] == "No fue posible almacenar la evidencia. Intenta nuevamente."
+
+
+def test_evidence_upload_maps_403_to_access_error(client, monkeypatch):
+    login_admin(client)
+    company = create_company(client, name="Evidence Storage 403 Co")
+    forbidden = HttpResponseError("AuthorizationPermissionMismatch")
+    forbidden.status_code = 403
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: _RaisingContainer(forbidden),
+    )
+
+    response = _upload(client, company_id=company["id"])
+    assert response.status_code == 503, response.text
+    assert response.json()["error"]["code"] == "NXR-EVIDENCE-STORAGE-ACCESS"
+
+
+def test_evidence_upload_persists_content_hash(client, db_session, monkeypatch):
+    login_admin(client)
+    company = create_company(client, name="Evidence Hash Co")
+    container = FakeContainerClient()
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: container,
+    )
+
+    content = b"%PDF-1.7\nintegridad"
+    response = _upload(
+        client,
+        company_id=company["id"],
+        filename="recibo.pdf",
+        content=content,
+        mime="application/pdf",
+    )
+    assert response.status_code == 201, response.text
+    db_session.expire_all()
+    row = db_session.execute(
+        select(Evidence).where(Evidence.id == uuid.UUID(response.json()["id"]))
+    ).scalar_one()
+    assert row.content_hash == hashlib.sha256(content).hexdigest()

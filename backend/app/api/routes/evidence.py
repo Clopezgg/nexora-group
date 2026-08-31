@@ -1,3 +1,5 @@
+import logging
+import time
 import uuid
 from urllib.parse import quote
 
@@ -29,6 +31,8 @@ from app.services.permission_service import (
 )
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
+
+logger = logging.getLogger("nexora.evidence")
 
 """Evidence upload/download API (CONSTRUCTION CONTROL).
 
@@ -248,6 +252,17 @@ async def upload_evidence(
                 project_id=project_id,
             )
     content = await evidence_service.read_bounded_upload(file)
+    declared_mime = file.content_type or "application/octet-stream"
+    started = time.monotonic()
+    logger.info(
+        "evidence.upload.started correlationId=%s companyId=%s entityType=%s entityId=%s mime=%s size=%s",
+        correlation_id,
+        company_id,
+        entity_type,
+        entity_id,
+        declared_mime,
+        len(content),
+    )
     evidence = None
     try:
         evidence = evidence_service.upload_evidence(
@@ -255,12 +270,13 @@ async def upload_evidence(
             company_id=company_id,
             uploaded_by=user.id,
             filename=file.filename or "archivo",
-            mime_type=file.content_type or "application/octet-stream",
+            mime_type=declared_mime,
             content=content,
             category=category,
             entity_type=entity_type,
             entity_id=entity_id,
             commit=False,
+            correlation_id=correlation_id,
         )
         audit_service.record(
             db,
@@ -275,11 +291,34 @@ async def upload_evidence(
             correlation_id=correlation_id,
         )
         db.commit()
+        logger.info(
+            "evidence.upload.completed correlationId=%s companyId=%s entityType=%s entityId=%s "
+            "mime=%s size=%s duration_ms=%d",
+            correlation_id,
+            company_id,
+            entity_type,
+            entity_id,
+            evidence.mime_type,
+            evidence.size_bytes,
+            int((time.monotonic() - started) * 1000),
+        )
         return EvidenceResponse.model_validate(evidence, from_attributes=True)
-    except Exception:
+    except Exception as exc:
         db.rollback()
         if evidence is not None:
             evidence_service.compensate_evidence_blob(evidence.blob_key)
+        logger.warning(
+            "evidence.upload.failed correlationId=%s companyId=%s entityType=%s entityId=%s "
+            "mime=%s size=%s duration_ms=%d error=%s",
+            correlation_id,
+            company_id,
+            entity_type,
+            entity_id,
+            declared_mime,
+            len(content),
+            int((time.monotonic() - started) * 1000),
+            type(exc).__name__,
+        )
         raise
 
 

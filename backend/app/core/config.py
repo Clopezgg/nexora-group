@@ -40,6 +40,12 @@ class Settings(BaseSettings):
 
     azure_key_vault_uri: str | None = None
     azure_storage_account_name: str | None = None
+    # clientId de la User Assigned Managed Identity del Container App. Se pasa
+    # explicitamente a DefaultAzureCredential para que, cuando el contenedor
+    # tenga mas de una identidad asignada (o el IMDS no infiera cual usar),
+    # la autenticacion contra Blob Storage sea determinista. Lo inyecta el
+    # Bicep (infra/modules/containerapps.bicep) como AZURE_CLIENT_ID.
+    azure_client_id: str | None = None
     # Solo para desarrollo/E2E con un emulador compatible (Azurite). Producción
     # sigue usando Managed Identity + `azure_storage_account_name`; nunca se
     # necesita ni se commitea una connection string productiva.

@@ -311,6 +311,84 @@ def test_voucher_requires_evidence_for_bank_payment_methods(client, monkeypatch)
     assert allowed.content.startswith(b"%PDF")
 
 
+def test_voucher_evidence_gate_is_scoped_to_the_exact_document_and_company(client, monkeypatch):
+    """La evidencia solo satisface la barrera del comprobante si esta adjunta
+    a ESTE documento contable y pertenece a ESTA compania. Evidencia de otro
+    documento u otra compania no habilita el PDF (orden maestra Phase 2)."""
+    login_admin(client)
+    company, cash, _diff, contributions, funding_doc = _setup(client)
+    other_doc = client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": cash["id"],
+            "counterAccountId": contributions["id"],
+            "sender": "Segundo fondeo",
+            "currencyCode": "HNL",
+            "originalAmount": "500.00",
+            "remittanceDate": "2026-02-01",
+        },
+    ).json()["accountingDocumentId"]
+
+    container = _FakeBlobContainer()
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: container,
+    )
+
+    # Evidencia adjunta a OTRO documento de la MISMA compania.
+    other_doc_upload = client.post(
+        "/api/evidence",
+        data={"companyId": company["id"], "entityType": "ACCOUNTING_DOCUMENT", "entityId": other_doc},
+        files={"file": ("otro.pdf", b"%PDF-1.7\notro documento", "application/pdf")},
+    )
+    assert other_doc_upload.status_code == 201, other_doc_upload.text
+
+    blocked = client.get(
+        f"/api/treasury/vouchers/{funding_doc}?beneficiary=Proveedor&paymentMethod=Transferencia"
+    )
+    assert blocked.status_code == 422, blocked.text
+
+    # Ahora sí: evidencia adjunta al documento correcto.
+    good = client.post(
+        "/api/evidence",
+        data={"companyId": company["id"], "entityType": "ACCOUNTING_DOCUMENT", "entityId": funding_doc},
+        files={"file": ("bueno.pdf", b"%PDF-1.7\ncomprobante", "application/pdf")},
+    )
+    assert good.status_code == 201, good.text
+    allowed = client.get(
+        f"/api/treasury/vouchers/{funding_doc}?beneficiary=Proveedor&paymentMethod=Transferencia"
+    )
+    assert allowed.status_code == 200, allowed.text
+
+
+def test_voucher_pdf_renders_accented_and_long_names_without_dropping_text(client):
+    """Regresion: nombres con tildes/ene y descripciones largas deben salir
+    integros en el PDF (Helvetica/WinAnsi cubre Latin-1)."""
+    login_admin(client)
+    company, _cash, _diff, _contrib, funding_doc = _setup(client)
+    client.patch(
+        f"/api/master-data/companies/{company['id']}",
+        json={
+            "voucherPayerName": "KAREN VANNESSA LÓPEZ GONZÁLEZ",
+            "voucherApproverName": "CARLOS HUMBERTO LÓPEZ NÚÑEZ",
+        },
+    )
+    response = client.get(
+        f"/api/treasury/vouchers/{funding_doc}"
+        "?beneficiary=CONSTRUCCIONES%20Y%20REMODELACIONES%20SE%C3%91OR%20DE%20LOS%20MILAGROS"
+        "&paymentMethod=Efectivo"
+    )
+    assert response.status_code == 200, response.text
+    assert response.content.startswith(b"%PDF")
+    # El PDF se genero completo (encabezado + cuerpo + asiento + firmas): un
+    # fallo de fuente/encoding produciria un documento truncado o una 500.
+    assert len(response.content) > 1800
+    text = response.content.decode("latin-1")
+    for fragment in ("VANNESSA", "GONZ", "HUMBERTO", "MILAGROS", "Asiento contable", "conforme"):
+        assert fragment in text, fragment
+
+
 def test_voucher_pdf_shows_masked_bank_account_and_approval_code(client):
     """Orden maestra Phase 2: identidad bancaria segura (cuenta enmascarada)
     + firma de aprobación (aprobador + fecha + código de verificación

@@ -258,6 +258,16 @@ certificar el 100%.
   rechazan doble reversal y registran auditoría. Las páginas separadas de
   AP y Collections muestran historial, estado reversado y modal de motivo;
   el Critical Journey ejecuta ambos reversals y comprueba la restauración.
+- `DEFERRED-FINAL-019` — **Normalización server-side de evidencia HEIC/HEIF a
+  JPEG.** El backend ya ACEPTA fotos HEIC/HEIF (iOS Safari/iPhone): valida la
+  firma real ISO-BMFF `ftyp` (`evidence_service._detect_heif_mime`), sanea el
+  nombre, aplica límite de tamaño y las guarda PRIVADAS en Blob igual que el
+  resto. Lo que queda diferido es transcodificarlas a JPEG en el servidor
+  para que cualquier visor las abra sin depender del soporte HEIC del sistema
+  operativo. Requiere una dependencia de decodificación (p. ej. `pillow-heif`
+  o `pyvips`) que hoy no se quiere añadir al contenedor; no es bloqueante
+  porque el archivo original queda íntegro y descargable. Volver a evaluarlo
+  al 90% junto con miniaturas de evidencia.
 
 ## Bloqueos externos
 

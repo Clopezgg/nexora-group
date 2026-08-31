@@ -18,6 +18,7 @@ def create_evidence(
     category: str | None = None,
     entity_type: str | None = None,
     entity_id: uuid.UUID | None = None,
+    content_hash: str | None = None,
 ) -> Evidence:
     evidence = Evidence(
         company_id=company_id,
@@ -29,6 +30,7 @@ def create_evidence(
         category=category,
         entity_type=entity_type,
         entity_id=entity_id,
+        content_hash=content_hash,
     )
     db.add(evidence)
     db.flush()

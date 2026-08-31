@@ -1,4 +1,5 @@
 export interface TrialBalanceRow {
+  accountId: string
   accountCode: string
   accountName: string
   debitBalance: string

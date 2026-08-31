@@ -52,6 +52,7 @@ def get_trial_balance(
     return TrialBalanceReportResponse(
         rows=[
             TrialBalanceRowResponse(
+                account_id=row.account_id,
                 account_code=row.account_code,
                 account_name=row.account_name,
                 debit_balance=row.debit_balance,

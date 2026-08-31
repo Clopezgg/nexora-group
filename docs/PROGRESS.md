@@ -3654,3 +3654,30 @@ Rama: `feat/phase8-theme-engine`.
     predeterminado de la compañía".
 - Tests: `test_theme_preferences.py` (2); `themeEngine.test.ts` (4);
   `ThemeSettingsCard.test.tsx` (2). `testUtils` envuelve con `ThemeProvider`.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 9 (Financial Reporting Center + drill-down)
+
+Rama: `feat/phase9-reporting-drilldown`.
+
+- **Backend**: `TrialBalanceRow` (+ schema + ruta) ahora incluye `accountId`
+  para habilitar el drill-down. (Sin migración: es data ya en el modelo.)
+- **`Tabs`** (design system): modo controlado opcional (`activeKey`/`onChange`)
+  además del no controlado.
+- **`ReportsPage`** → Financial Reporting Center: mantiene el tab activo y el
+  filtro de cuenta en estado; `drillToLedger(accountId, label)` cambia al tab
+  "Libro Mayor" filtrando por esa cuenta.
+- **`TrialBalancePage`**: el código de cuenta es ahora un botón que hace
+  drill-down al Libro Mayor de esa cuenta.
+- **`GeneralLedgerPage`**: acepta `accountId` (filtro real vía
+  `?accountId=` de la API), muestra un badge "Filtrado por cuenta: …" +
+  "Quitar filtro"; cada nº de documento enlaza a
+  `/finanzas/inspector?documentId=<id>`.
+- **`TransactionInspectorPage`**: preselecciona el asiento cuando llega con
+  `?documentId=`.
+- Cadena completa: Balance de Comprobación → Libro Mayor por cuenta →
+  Transaction Inspector del documento (evento de negocio + reversos +
+  evidencia).
+- Tests: `test_reporting.py` reforzado (fila lleva `accountId`; el Libro
+  Mayor filtrado por esa cuenta solo trae sus líneas); frontend
+  `ReportsDrilldown.test.tsx`; `TrialBalancePage.test.tsx` actualizado; e2e
+  `critical-journey` ejerce el drill-down.

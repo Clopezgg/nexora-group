@@ -38,6 +38,7 @@ _LEDGER_STATUSES = ("POSTED", "REVERSED")
 
 @dataclass
 class TrialBalanceRow:
+    account_id: uuid.UUID
     account_code: str
     account_name: str
     debit_balance: Decimal
@@ -61,6 +62,7 @@ def trial_balance(db: Session, *, company_id: uuid.UUID) -> TrialBalanceReport:
     # Single aggregated query instead of N+1 per-account balance calls.
     rows = db.execute(
         select(
+            Account.id,
             Account.code,
             Account.name,
             func.coalesce(func.sum(JournalLine.debit_amount), Decimal("0")).label("total_debit"),
@@ -73,7 +75,7 @@ def trial_balance(db: Session, *, company_id: uuid.UUID) -> TrialBalanceReport:
     ).all()
 
     report = TrialBalanceReport()
-    for code, name, total_debit, total_credit in rows:
+    for account_id, code, name, total_debit, total_credit in rows:
         balance = total_debit - total_credit
         if balance == Decimal("0"):
             continue
@@ -81,6 +83,7 @@ def trial_balance(db: Session, *, company_id: uuid.UUID) -> TrialBalanceReport:
         credit = -balance if balance < 0 else Decimal("0")
         report.rows.append(
             TrialBalanceRow(
+                account_id=account_id,
                 account_code=code,
                 account_name=name,
                 debit_balance=debit,

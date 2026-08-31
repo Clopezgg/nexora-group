@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Button, Card, EmptyState, ErrorState, LoadingState, Table, type TableColumn } from '../../design-system'
+import { Link } from 'react-router-dom'
+import { Badge, Button, Card, EmptyState, ErrorState, LoadingState, Table, type TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { reportingService } from '../../services/reportingService'
 import type { GeneralLedgerRow } from '../../types/reporting'
@@ -18,7 +19,15 @@ const CSV_COLUMNS = [
 ]
 
 const COLUMNS: TableColumn<GeneralLedgerRow>[] = [
-  { key: 'documentNumber', header: 'Documento', render: (row) => row.documentNumber },
+  {
+    key: 'documentNumber',
+    header: 'Documento',
+    render: (row) => (
+      <Link to={`/finanzas/inspector?documentId=${encodeURIComponent(row.documentId)}`}>
+        {row.documentNumber}
+      </Link>
+    ),
+  },
   { key: 'postedAt', header: 'Fecha', render: (row) => row.postedAt ?? '—' },
   { key: 'accountCode', header: 'Cuenta', render: (row) => `${row.accountCode} — ${row.accountName}` },
   { key: 'description', header: 'Descripción', render: (row) => row.description ?? '—' },
@@ -26,18 +35,25 @@ const COLUMNS: TableColumn<GeneralLedgerRow>[] = [
   { key: 'creditAmount', header: 'Crédito', render: (row) => row.creditAmount },
 ]
 
-/** NXR-REQ-0093 (financial statements subproject): Libro Mayor paginado
- * real desde reporting_service.general_ledger -- los totales cubren todo
- * el filtro, no solo la página cargada. Filtros de fecha quedan fuera de
- * esta primera UI (el contrato de la API ya los soporta) -- ver
- * docs/superpowers/specs/2026-08-25-financial-statements-design.md. */
-export function GeneralLedgerPage() {
+/** NXR-REQ-0093 + Phase 9: Libro Mayor paginado real. Cuando se llega por
+ * drill-down desde el Balance de Comprobación se filtra por cuenta; cada
+ * documento enlaza al Transaction Inspector. */
+export function GeneralLedgerPage({
+  accountId = null,
+  accountLabel = null,
+  onClearAccountFilter,
+}: {
+  accountId?: string | null
+  accountLabel?: string | null
+  onClearAccountFilter?: () => void
+} = {}) {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
   const [offset, setOffset] = useState(0)
 
   const reportQuery = useQuery({
-    queryKey: ['reports', 'general-ledger', activeCompanyId, offset],
-    queryFn: () => reportingService.getGeneralLedger(activeCompanyId as string, offset, PAGE_SIZE),
+    queryKey: ['reports', 'general-ledger', activeCompanyId, offset, accountId],
+    queryFn: () =>
+      reportingService.getGeneralLedger(activeCompanyId as string, offset, PAGE_SIZE, accountId ?? undefined),
     enabled: Boolean(activeCompanyId),
   })
 
@@ -69,6 +85,23 @@ export function GeneralLedgerPage() {
           Exportar CSV
         </Button>
       </header>
+
+      {accountId ? (
+        <div className="nx-treasury__actions" style={{ marginBottom: '0.5rem' }}>
+          <Badge tone="info">Filtrado por cuenta: {accountLabel ?? accountId}</Badge>
+          {onClearAccountFilter ? (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setOffset(0)
+                onClearAccountFilter()
+              }}
+            >
+              Quitar filtro
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <Card>
         {reportQuery.isLoading ? (

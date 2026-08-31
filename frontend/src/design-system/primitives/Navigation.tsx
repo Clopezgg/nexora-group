@@ -89,8 +89,24 @@ export interface TabItem {
   content: ReactNode
 }
 
-export function Tabs({ items, defaultKey }: { items: TabItem[]; defaultKey?: string }) {
-  const [active, setActive] = useState(defaultKey ?? items[0]?.key)
+export function Tabs({
+  items,
+  defaultKey,
+  activeKey,
+  onChange,
+}: {
+  items: TabItem[]
+  defaultKey?: string
+  /** Modo controlado: si se pasa, `Tabs` no guarda estado propio. */
+  activeKey?: string
+  onChange?: (key: string) => void
+}) {
+  const [internalActive, setInternalActive] = useState(defaultKey ?? items[0]?.key)
+  const active = activeKey ?? internalActive
+  const setActive = (key: string) => {
+    if (activeKey === undefined) setInternalActive(key)
+    onChange?.(key)
+  }
   const activeItem = items.find((item) => item.key === active)
   return (
     <div className="nx-tabs" style={{ minWidth: 0, maxWidth: '100%' }}>

@@ -1,0 +1,47 @@
+.nx-detail-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.nx-detail-list > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.nx-detail-list dt {
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--nx-text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.nx-detail-list dd {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--nx-text, #0f172a);
+  word-break: break-word;
+}
+
+.nx-detail-list dd code {
+  font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+}
+
+.nx-code-block {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  background: var(--nx-surface-sunken, #f1f5f9);
+  border: 1px solid var(--nx-border, #e2e8f0);
+  border-radius: var(--nx-radius-sm, 6px);
+  font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 260px;
+  overflow: auto;
+}

@@ -3522,3 +3522,30 @@ Rama: `feat/phase5-exception-center`.
 - Tests: `test_exception_center.py` (Exception Zero para compañía limpia;
   detecta duplicado + período faltante + pagador sin fijar, `criticalCount`);
   frontend `ExceptionCenterPage.test.tsx` (2); e2e `critical-journey`.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 5 — incremento 2 (Transaction Inspector)
+
+Rama: `feat/phase5-transaction-inspector`.
+
+- **`transaction_inspector_service.inspect`** + `GET
+  /accounting/journal-entries/{id}/inspect` — dado un `AccountingDocument`,
+  reconstruye la foto completa (solo lectura):
+  - líneas con **código + nombre de cuenta**, proyecto y centro de costo por
+    nombre;
+  - **drill-down inverso** al evento de negocio que lo originó
+    (`REMITTANCE`, `SUPPLIER_INVOICE_ACCRUAL`, `SUPPLIER_PAYMENT`,
+    `CUSTOMER_INVOICE`, `CUSTOMER_RECEIPT`, `GENERAL_EXPENSE`,
+    `TREASURY_TRANSFER` o `MANUAL_JOURNAL`) con su referencia (nº de factura,
+    remitente, categoría…);
+  - **cadena de reversos**: `reversesDocumentId` (original que este asiento
+    anula) + `reversedByDocumentIds` (anulación de este) + `reversalReason`;
+  - evidencia adjunta al documento (`ACCOUNTING_DOCUMENT`);
+  - `balanced` (TOTAL DÉBITO == TOTAL CRÉDITO).
+- **Frontend**: `/finanzas/inspector` → `TransactionInspectorPage` (selector
+  de asiento, panel de evento de negocio + cadena de reversos + evidencia,
+  tabla de líneas con totales), nueva entrada de navegación.
+- Tests: `test_transaction_inspector.py` (3): remesa → `REMITTANCE` +
+  cuentas con nombre; pago a proveedor → `SUPPLIER_PAYMENT` + nº de factura;
+  cadena de reversos (`reversedByDocumentIds` / `reversesDocumentId` /
+  `reversalReason`). Frontend `TransactionInspectorPage.test.tsx`; e2e
+  `critical-journey` inspecciona un asiento real.

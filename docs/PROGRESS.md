@@ -3787,3 +3787,21 @@ fase cierra §66/§67/§72:
   Alto contraste Negro/Blanco, Executive, Compact Finance).
 - Tests: `themeEngine.test.ts` (default = horizon-light, primer preset,
   classic presente). Frontend 160 passed; typecheck/lint verdes.
+
+### 2026-08-31 — ORDEN MAESTRA DEFINITIVA · FASES 5–7 + 10 (responsive hardening de tablas)
+
+Rama: `feat/od-fase10-responsive-hardening`.
+
+Las pantallas de FASE 5 (Exception Center, Transaction Inspector), FASE 6
+(Project Cockpit + EAC/ETC) y FASE 7 (13-week Cash Forecast, AP/AR
+Workbench) se entregaron funcionalmente en la Orden Maestra FINAL
+(PRs #49–#56). Esta fase las endurece para móvil (§4/§23/§93/§105):
+
+- **`Table` y `DataGrid`** (design system) envuelven la `<table>` en un
+  contenedor `.nx-table-scroll` con `overflow-x: auto` y `tabIndex=0`
+  (scroll con teclado). En móvil la tabla se desplaza dentro de su caja
+  y la página nunca desborda horizontalmente.
+- **e2e `accessibility.spec.ts`**: barrido responsive amplio (§93) — cada
+  ruta de dominio financiero/proyectos/control a 390/768/1440px con
+  `expectNoDocumentOverflow`.
+- Frontend 159 passed; typecheck/lint verdes.

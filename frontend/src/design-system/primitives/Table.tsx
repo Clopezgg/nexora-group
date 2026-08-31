@@ -31,27 +31,31 @@ export function Table<T>({ columns, rows, getRowKey, emptyMessage }: TableProps<
     return <p className="nx-field__label">{emptyMessage ?? 'Sin datos disponibles.'}</p>
   }
   return (
-    <table className="nx-table">
-      <thead>
-        <tr>
-          {columns.map((column) => (
-            <th key={column.key} className={cellClass(column)}>
-              {column.header}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={getRowKey(row)}>
+    // Contenedor con scroll horizontal propio: en móvil la tabla se desplaza
+    // dentro de su caja y la página nunca desborda (§4/§105).
+    <div className="nx-table-scroll" tabIndex={0}>
+      <table className="nx-table">
+        <thead>
+          <tr>
             {columns.map((column) => (
-              <td key={column.key} className={cellClass(column)}>
-                {column.render(row)}
-              </td>
+              <th key={column.key} className={cellClass(column)}>
+                {column.header}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={getRowKey(row)}>
+              {columns.map((column) => (
+                <td key={column.key} className={cellClass(column)}>
+                  {column.render(row)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }

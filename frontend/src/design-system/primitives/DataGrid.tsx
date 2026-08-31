@@ -51,6 +51,7 @@ export function DataGrid<T>({
   }
 
   return (
+    <div className="nx-table-scroll" tabIndex={0}>
     <table className="nx-table nx-data-grid">
       <thead>
         <tr>
@@ -85,6 +86,7 @@ export function DataGrid<T>({
         ))}
       </tbody>
     </table>
+    </div>
   )
 }
 

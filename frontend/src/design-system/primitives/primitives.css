@@ -126,6 +126,15 @@
 }
 
 /* Table */
+.nx-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+.nx-table-scroll:focus-visible {
+  outline: 2px solid var(--nx-color-accent, #1d5fd6);
+  outline-offset: 2px;
+}
 .nx-table {
   width: 100%;
   border-collapse: collapse;

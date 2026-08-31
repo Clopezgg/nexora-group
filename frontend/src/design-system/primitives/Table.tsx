@@ -31,10 +31,12 @@ export function Table<T>({ columns, rows, getRowKey, emptyMessage }: TableProps<
     return <p className="nx-field__label">{emptyMessage ?? 'Sin datos disponibles.'}</p>
   }
   return (
-    // Contenedor con scroll horizontal propio: en móvil la tabla se desplaza
-    // dentro de su caja y la página nunca desborda (§4/§105).
+    // En escritorio: tabla densa dentro de su propio contenedor con scroll
+    // horizontal (§4/§105). En móvil (`@media`): cada fila se apila como
+    // "record card" con etiqueta/valor por columna (§22/§23) — se evita
+    // comprimir 8 columnas. El `data-label` alimenta el `::before` en CSS.
     <div className="nx-table-scroll" tabIndex={0}>
-      <table className="nx-table">
+      <table className="nx-table nx-table--responsive">
         <thead>
           <tr>
             {columns.map((column) => (
@@ -48,7 +50,7 @@ export function Table<T>({ columns, rows, getRowKey, emptyMessage }: TableProps<
           {rows.map((row) => (
             <tr key={getRowKey(row)}>
               {columns.map((column) => (
-                <td key={column.key} className={cellClass(column)}>
+                <td key={column.key} className={cellClass(column)} data-label={column.header}>
                   {column.render(row)}
                 </td>
               ))}

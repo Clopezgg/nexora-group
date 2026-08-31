@@ -165,6 +165,54 @@
   white-space: nowrap;
 }
 
+/* Móvil: la tabla responsive se apila en tarjetas (§22/§23).
+ * No se comprimen columnas ni se fuerza scroll interminable. */
+@media (max-width: 640px) {
+  .nx-table--responsive {
+    border: 0;
+  }
+  .nx-table--responsive thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .nx-table--responsive tbody tr {
+    display: block;
+    border: 1px solid var(--nx-theme-border, var(--nx-color-border, #dde4ee));
+    border-radius: var(--nx-radius-md, 10px);
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    background: var(--nx-theme-surface, var(--nx-color-surface, #fff));
+  }
+  .nx-table--responsive tbody td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border: 0;
+    text-align: right;
+  }
+  .nx-table--responsive tbody td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--nx-theme-text-muted, var(--nx-color-text-muted, #5b6779));
+    text-align: left;
+    flex: 0 0 auto;
+  }
+  .nx-table--responsive tbody td.nx-table__cell--right {
+    text-align: right;
+  }
+  .nx-table--responsive tbody td:empty {
+    display: none;
+  }
+}
+
 /* EmptyState / LoadingState / ErrorState */
 .nx-state {
   display: flex;

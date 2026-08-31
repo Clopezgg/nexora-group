@@ -267,18 +267,25 @@ jobs:
           RG=nexora-rg-dev
           REGION=eastus2
           az staticwebapp backends unlink --name "$SWA" --resource-group "$RG" --only-show-errors >/dev/null 2>&1 || true
-          az staticwebapp backends link \
+          LINK_JSON="$(az staticwebapp backends link \
             --name "$SWA" \
             --resource-group "$RG" \
             --backend-resource-id "$BACKEND_RESOURCE_ID" \
             --backend-region "$REGION" \
-            --only-show-errors
-          LINKED="$(az staticwebapp backends show --name "$SWA" --resource-group "$RG" --query "backendResourceId" -o tsv 2>/dev/null || true)"
-          if [ "$LINKED" != "$BACKEND_RESOURCE_ID" ]; then
-            echo "::error::Static Web Apps linked backend did not attach (got: ${LINKED:-<none>})"
+            --only-show-errors -o json)"
+          echo "$LINK_JSON" | jq '{name, backendResourceId, provisioningState}'
+          STATE="$(echo "$LINK_JSON" | jq -r '.provisioningState')"
+          LINKED_ID="$(echo "$LINK_JSON" | jq -r '.backendResourceId')"
+          if [ "$STATE" != "Succeeded" ] || [ "$LINKED_ID" != "$BACKEND_RESOURCE_ID" ]; then
+            echo "::error::Static Web Apps linked backend did not attach (state=$STATE id=${LINKED_ID:-<none>})"
             exit 1
           fi
-          echo "Static Web Apps linked backend attached: $LINKED"
+          # Confirm it is listed on the build (the list command returns an array).
+          az staticwebapp backends show --name "$SWA" --resource-group "$RG" -o json \
+            | jq -e --arg id "$BACKEND_RESOURCE_ID" 'if type=="array" then any(.[]; .backendResourceId==$id) else (.backendResourceId==$id) end' \
+            >/dev/null \
+            || { echo "::error::Linked backend not present in 'backends show'"; exit 1; }
+          echo "Static Web Apps linked backend attached: $LINKED_ID"
 
       - name: Verify newest backend revision is healthy
         run: |

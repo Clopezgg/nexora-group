@@ -37,7 +37,9 @@
   font-family: var(--nx-theme-font);
 }
 
-:root[data-nx-themed='on'] a {
+/* Solo enlaces del área de contenido: NO recolorear enlaces del sidebar
+   navy ni de la navegación inferior (perderían contraste sobre navy). */
+:root[data-nx-themed='on'] body .nx-app-shell__content a {
   color: var(--nx-theme-accent);
 }
 
@@ -49,6 +51,10 @@
 :root[data-nx-themed='on'] body .nx-sidebar {
   background: var(--nx-theme-sidebar-bg);
   color: var(--nx-theme-sidebar-text);
+}
+/* Etiquetas de grupo del sidebar: contraste AA sobre la superficie navy. */
+:root[data-nx-themed='on'] body .nx-sidebar__group-label {
+  color: #a9c0dc;
 }
 
 /* Topbar — LIGHT CLEAN: superficie del tema, texto e iconos oscuros. */

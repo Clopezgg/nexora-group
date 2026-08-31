@@ -48,6 +48,7 @@ from app.api.routes import (
     search,
     site_reports,
     submittals,
+    voucher_verification,
     suppliers,
     treasury,
     treasury_advanced,
@@ -179,6 +180,7 @@ def create_app() -> FastAPI:
     app.include_router(preferences.router, prefix="/api")
     app.include_router(reports.router, prefix="/api")
     app.include_router(search.router, prefix="/api")
+    app.include_router(voucher_verification.router, prefix="/api")
 
     return app
 

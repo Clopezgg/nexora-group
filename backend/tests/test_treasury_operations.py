@@ -413,7 +413,7 @@ def test_voucher_pdf_shows_masked_bank_account_and_approval_code(client):
     )
     assert response.status_code == 200, response.text
     text = response.content.decode("latin-1")
-    assert "Cuenta / banco" in text
+    assert "Banco / cuenta" in text
     assert "verificaci" in text  # "código de verificación"
     assert "Aprobaci" in text  # "Aprobación: ..."
 
@@ -1174,3 +1174,62 @@ def test_fund_restriction_rolls_back_when_audit_write_fails(
 
     db_session.expire_all()
     assert db_session.query(FundRestriction).count() == 0
+
+
+def test_voucher_pdf_embeds_qr_verification_url_and_the_token_resolves(client):
+    """Orden maestra correctiva §39-§43: el comprobante lleva un QR que
+    codifica /verificar/comprobante/<token>; ese token resuelve en el
+    endpoint público a un conjunto mínimo de datos (sin cuenta completa,
+    evidencia, UUID ni secretos)."""
+    from app.models.voucher_verification import VoucherVerification
+
+    login_admin(client)
+    company, _cash, _diff, _contrib, funding_doc = _setup(client)
+    client.patch(
+        f"/api/master-data/companies/{company['id']}",
+        json={"voucherApproverName": "CARLOS HUMBERTO LOPEZ"},
+    )
+
+    response = client.get(
+        f"/api/treasury/vouchers/{funding_doc}"
+        "?beneficiary=Constructora%20Nexora&paymentMethod=Efectivo"
+    )
+    assert response.status_code == 200, response.text
+    text = response.content.decode("latin-1")
+    assert "/verificar/comprobante/" in text  # URL impresa junto al QR
+
+    from tests.conftest import TestingSessionLocal  # type: ignore
+
+    with TestingSessionLocal() as session:
+        row = session.execute(
+            select(VoucherVerification).where(
+                VoucherVerification.accounting_document_id == uuid.UUID(funding_doc)
+            )
+        ).scalar_one()
+        token = row.token
+
+    # Endpoint público, sin auth.
+    verify = client.get(f"/api/verificar/comprobante/{token}")
+    assert verify.status_code == 200, verify.text
+    body = verify.json()
+    assert body["verified"] is True
+    assert body["documentNumber"] == row.document_number
+    assert body["company"] == company["name"]
+    assert set(body) == {
+        "verified",
+        "documentNumber",
+        "company",
+        "beneficiary",
+        "issuedOn",
+        "amount",
+        "currency",
+        "status",
+        "verificationCode",
+    }
+    # Nunca expone datos sensibles.
+    assert "blob" not in verify.text.lower()
+    assert funding_doc not in verify.text
+
+    # Token inválido -> 404 humano.
+    bad = client.get("/api/verificar/comprobante/no-existe-este-token")
+    assert bad.status_code == 404

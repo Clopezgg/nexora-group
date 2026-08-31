@@ -935,6 +935,8 @@ def download_voucher(
         )
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    # Persistir el token de verificación creado/actualizado para el QR.
+    db.commit()
     safe_number = re.sub(r"[^A-Za-z0-9_-]+", "-", document.document_number).strip("-")
     filename = f"NEXORA-Comprobante-{safe_number or document.id}.pdf"
     return Response(

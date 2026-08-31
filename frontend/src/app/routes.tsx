@@ -188,6 +188,14 @@ export const routes: RouteObject[] = [
     lazy: async () => ({ Component: (await import('../pages/LoginPage')).LoginPage }),
   },
   {
+    // Verificación pública de comprobantes: sin autenticación (§42).
+    path: '/verificar/comprobante/:token',
+    lazy: async () => ({
+      Component: (await import('../features/verification/VoucherVerificationPage'))
+        .VoucherVerificationPage,
+    }),
+  },
+  {
     element: <ProtectedRoute />,
     children: [
       {

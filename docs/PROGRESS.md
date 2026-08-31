@@ -3903,3 +3903,43 @@ Rama: `feat/oc-b-dashboard-composition`.
   cuentas bancarias → analítica histórica (secundaria).
 - Tests: `HomePage.test.tsx` verifica forecast + cuentas bancarias.
   Frontend 164 passed; typecheck/lint/build verdes.
+
+### 2026-08-31 — ORDEN MAESTRA CORRECTIVA · PR D (comprobante PDF empresarial + QR + verificación)
+
+Rama: `feat/oc-d-voucher-pdf-enterprise`.
+
+- **`voucher_service` reescrito con reportlab Platypus** (§48): Table /
+  Paragraph / Image / KeepTogether / PageBreak en vez de coordenadas
+  absolutas — soporta nombres largos, acentos/ñ, conceptos largos, planes
+  de pago, evidencia y multipágina sin desbordar la hoja. Fuente Helvetica
+  estándar de reportlab (WinAnsi cubre el español; no propietaria).
+- **QR real** (§39): `reportlab.graphics.barcode.qr` (sin dependencia
+  nueva), esquina superior derecha, codifica
+  `<FRONTEND_URL>/verificar/comprobante/<token>`. La URL también se imprime
+  como texto.
+- **Token opaco de verificación** (§40): `VoucherVerification` — tabla nueva
+  (`secrets.token_urlsafe`), uno por AccountingDocument. Migración
+  `7163bfe08fdb` (single head, roundtrip probado). NO es firma PKI y así se
+  documenta.
+- **Endpoint público** (§41): `GET /api/verificar/comprobante/{token}` —
+  sin auth, rate-limited por IP (respaldo PostgreSQL), exposición mínima
+  (verified, número, empresa, beneficiario, fecha, monto, moneda, estado,
+  código). Nunca cuenta bancaria completa, evidencia, UUID, blob key ni
+  secretos.
+- **Página pública** (§42): `/verificar/comprobante/:token` (fuera de
+  `ProtectedRoute`), NEXORA Horizon Light.
+- **Evidencia en el PDF** (§33-§36): consulta `Evidence` del documento
+  (company + entity + PAYMENT_PROOF), descarga bytes del Blob privado (nunca
+  URL/SAS/blob_key), muestra nombre + tamaño + SHA-256 abreviado en la
+  página 1 y la imagen a tamaño completo en la página 2. HEIC/HEIF: el
+  original se conserva; el render de imagen sólo soporta JPEG/PNG/WEBP (el
+  transcode queda en `DEFERRED-FINAL-019`). Pillow añadido a requirements.
+- **Plan de pagos** (§44): si el comprobante corresponde a una factura de
+  proveedor con plan de cuotas, se imprime la tabla real (período / importe
+  / estado) + total acordado / pagado acumulado / saldo pendiente.
+- **Asiento contable** (§46): tabla código/cuenta/débito/crédito alineada
+  con totales; nunca UUID.
+- **Ámbito CENTRAL/GENERAL** (§45): "Operación general", se omite Proyecto.
+- Tests: `test_treasury_operations.py` (7 de comprobante existentes + 1
+  nuevo: QR/URL impresa + el token resuelve en el endpoint con exposición
+  mínima + token inválido 404); `VoucherVerificationPage.test.tsx` (2).

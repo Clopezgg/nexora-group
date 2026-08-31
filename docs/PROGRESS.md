@@ -3175,3 +3175,72 @@ Azure` ejecutan steps reales.
 **No bloqueante (documentado, no oculto):**
 - CSP en Static Web Apps (el backend ya envía `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` + HSTS; el frontend cubre clickjacking con `X-Frame-Options: DENY`).
 - Paginación explícita en ~56 consultas de listado (todas ya acotadas por tenant; sin problema de performance demostrado).
+
+---
+
+## 2026-08-31 — Fallo troncal de producción en Safari: API cross-site → first-party
+
+**Reportado por el usuario:** en producción (Safari), `/proyectos`,
+`/finanzas/contabilidad` y `/control/configuracion` mostraban "Ocurrió un
+error" / "No se pudo cargar la compañía", con el topbar en "Vista empresa ·
+sin proyecto" / "Período no configurado". GitHub Actions estaba verde.
+
+**Causa raíz.** El SPA en `*.azurestaticapps.net` llamaba a la API en
+`*.azurecontainerapps.io` **directamente**. La cookie de sesión
+`SameSite=None` es entonces una cookie de terceros; Safari/WebKit la descarta
+por ITP. Login parecía exitoso en memoria pero `/auth/me`,
+`/master-data/companies`, `/projects`, `/master-data/accounts`, etc. devolvían
+401 y cada página renderizaba su `ErrorState`. El smoke de CI usaba `curl`
+(sin ITP) y solo comprobaba `/dashboard/summary`. El `Administrator` de
+producción sí tiene `core.company:read` con `SCOPE_ANY` (reconciliado en cada
+arranque) — el fallo era de transporte de sesión en el navegador, no de RBAC.
+
+**Corrección (arquitectura, no parche de Safari).** PRs #37–#40:
+
+- `az staticwebapp backends link` — el Container App queda ligado como backend
+  de Static Web Apps. El navegador llama a `/api/*` en su **propio origen**;
+  Static Web Apps hace de reverse proxy y la cookie es first-party. Ligar
+  también habilita autenticación en el Container App: el FQDN directo
+  `*.azurecontainerapps.io` deja de responder anónimo (401) — la API solo es
+  alcanzable vía el proxy first-party.
+- Frontend se compila con `VITE_API_BASE_URL=/api`; `httpClient` acepta un
+  path same-origin en build de producción.
+- `staticwebapp.config.json`: `/api/*` y assets excluidos del navigation
+  fallback; `/api/*` `no-store`.
+- Manejo de errores: un 401 en cualquier llamada no-auth emite
+  `nexora:session-expired`; `AuthProvider` descarta el usuario cacheado y el
+  router muestra el login en vez de errores dispersos. `friendlyApiMessage()`
+  mapea status → mensaje humano y expone el `correlationId` del backend en 5xx.
+- `Verify production` ahora hace login real y ejercita `auth/me`,
+  `master-data/companies` (≥1), `projects`, `master-data/accounts`,
+  `dashboard`, `fiscal/periods/current` y `logout`+`relogin` **a través del
+  origen first-party** — no `curl` al FQDN.
+- `actions/checkout@v5`, `setup-node@v5`, `setup-python@v6` (Node 20 EOL).
+- Tests: 6 nuevos en `frontend/src/services/httpClient.test.ts` (evento
+  `session-expired`, correlation id, `friendlyApiMessage`, `/api` aceptado en
+  build PROD, texto-claro rechazado). Frontend 127/127, backend sin cambios.
+
+**Certificación de producción (2026-08-31, Deploy Azure run `33348100953`,
+`main@50fde56`):**
+
+- Container App `nexora-backend-dev--0000043`: `Running`, `Healthy`,
+  `latestRevision == latestReadyRevision`, imagen =
+  `ghcr.io/clopezgg/nexora-backend:50fde5622a698d5c33cf31199b00fc520deabe20`
+  (SHA exacto de `main`).
+- Frontend HTTP 200. Bundle productivo llama a `/api` (path same-origin), no
+  al FQDN de Container Apps. HTML `no-store`.
+- A través de `https://jolly-plant-0d6bf700f.7.azurestaticapps.net/api`:
+  `healthz` 200, `readyz` 200, `edit-access/verify` (GET) 405,
+  login → cookie `Secure`+`HttpOnly`+`Path=/`, `auth/me` 200,
+  **`master-data/companies` 200 (1 compañía visible al Administrator)**,
+  **`projects` 200**, **`master-data/accounts` 200**, `dashboard/summary` 200
+  (`currency=="HNL"`), `fiscal/periods/current` 200,
+  `logout` 204 → `auth/me` 401 → `relogin` → `auth/me` 200.
+- FQDN directo `*.azurecontainerapps.io/api/healthz` → 401 (locked down).
+
+**Browser matrix.** El gate de CI es HTTP (curl) contra el origen first-party
+real; no ejecuta un navegador. La corrección es de arquitectura: con la cookie
+first-party, Safari/WebKit ITP ya no aplica (ITP bloquea cookies de
+*terceros*, no de primera parte). Chromium ya funcionaba con la cookie
+cross-site y sigue funcionando con la first-party. Pendiente de añadir: un
+recorrido Playwright WebKit contra producción en `Verify production`.

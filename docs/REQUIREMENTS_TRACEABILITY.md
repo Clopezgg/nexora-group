@@ -287,7 +287,7 @@ todavía).
 | NXR-REQ-0121 | Monitor / Application Insights | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep + wiring opcional en `main.py`, sin desplegar |
 | NXR-REQ-0122 | OIDC deployment (federated credentials) | ➖➖⬜➖➖➖➖⬜⬜ | NOT_STARTED | workflow escrito, falta configurar credenciales federadas en GitHub |
 | NXR-REQ-0123 | Production smoke | ⬜ | BLOCKED_EXTERNAL | requiere confirmación puntual de despliegue real (`CLAUDE.md` §11.1) |
-| NXR-REQ-0124 | Production E2E | ➖➖✅✅✅✅✅✅✅ | IMPLEMENTED | 2026-08-30: despliegue real confirmado puntualmente y ejecutado (Deploy Azure run `33341601256`, `main@2b1cbe4`). Producción verificada: Container App `nexora-backend-dev--0000039` `Running`/`Healthy`/`latestRevision==latestReadyRevision`, imagen = SHA exacto de `main`, `healthz`/`readyz` 200, CORS exact-origin + credentials, login real → cookie `Secure`+`HttpOnly`+`SameSite=None`+`Path=/`, dashboard autenticado 200 con `currency=="HNL"`. Ver `docs/PROGRESS.md` (entrada 2026-08-30). |
+| NXR-REQ-0124 | Production E2E | ➖➖✅✅✅✅✅✅✅ | IMPLEMENTED | 2026-08-31: tras corregir el fallo troncal de Safari (API cross-site → first-party via Static Web Apps linked backend, PRs #37–#40), Deploy Azure run `33348100953` (`main@50fde56`) certifica producción a través del origen first-party `$FRONTEND_URL/api`: Container App `nexora-backend-dev--0000043` `Running`/`Healthy`/`latest==ready`, imagen = SHA exacto de `main`, `healthz`/`readyz` 200, login real → cookie `Secure`+`HttpOnly`+`Path=/`, `auth/me` 200, `master-data/companies` 200 (1 visible), `projects` 200, `master-data/accounts` 200, `dashboard` 200 (`HNL`), `fiscal/periods/current` 200, `logout`→401→`relogin`→200; FQDN directo locked (401). Ver `docs/PROGRESS.md` (entrada 2026-08-31). |
 
 ## Resumen
 

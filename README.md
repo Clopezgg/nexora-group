@@ -109,10 +109,19 @@ login parece exitoso pero toda llamada autenticada posterior devuelve 401 y
 media aplicación muestra "Ocurrió un error". Con el linked backend la cookie es
 first-party y funciona en todos los navegadores.
 
-El backend además sigue aceptando exactamente el origen de Static Web Apps por
-CORS con credenciales y el guard CSRF valida el mismo `Origin` (defensa en
-profundidad para el FQDN directo). El HTML de Static Web Apps se entrega
-`no-store` y el service worker no precachea HTML/JS/CSS del shell transaccional.
+Ligar el backend también **habilita autenticación en el Container App**: el
+FQDN público `*.azurecontainerapps.io` deja de responder tráfico anónimo
+(devuelve 401) y solo es alcanzable a través del proxy first-party de Static
+Web Apps. El gate de despliegue lo verifica (`Verify direct Container Apps API
+is locked down`). El HTML de Static Web Apps se entrega `no-store` y el service
+worker no precachea HTML/JS/CSS del shell transaccional.
+
+**Verificación de producción (gate `Verify production`):** hace login real y
+ejercita `auth/me`, `master-data/companies` (exige ≥1 visible al
+Administrator), `projects`, `master-data/accounts`, `dashboard` (contrato
+`currency == "HNL"`), `fiscal/periods/current` y `logout`+`relogin` — todo a
+través del origen first-party `$FRONTEND_URL/api`, no con `curl` al FQDN del
+Container App.
 
 ### Autorización del despliegue
 

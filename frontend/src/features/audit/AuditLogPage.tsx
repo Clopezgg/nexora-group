@@ -54,11 +54,11 @@ export function AuditLogPage() {
     { key: 'actor', header: 'Ejecutado por', render: (row) => auditActorLabel(row) },
     {
       key: 'details',
-      header: '',
+      header: 'Detalle',
       render: (row) => (
         <button
           type="button"
-          className="nx-button nx-button--ghost"
+          className="nx-button nx-button--secondary"
           onClick={() => setSelected(row)}
         >
           <span className="nx-button__label">Ver detalles</span>

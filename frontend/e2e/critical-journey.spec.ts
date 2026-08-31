@@ -160,6 +160,12 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     expect(approved.status).toBe('APPROVED')
     await page.goto('/proyectos/presupuestos')
     await expect(page.getByText('Comprometido')).toBeVisible({ timeout: 10_000 })
+
+    await page.goto('/proyectos/cockpit')
+    await expect(page.getByRole('heading', { name: 'Project Financial Cockpit' })).toBeVisible({ timeout: 10_000 })
+    const cockpit = await api<any>(page.request, 'get', `/projects/${projectId}/financial-cockpit`)
+    expect(cockpit).toHaveProperty('budgetAtCompletion')
+    expect(cockpit).toHaveProperty('estimateAtCompletion')
   })
 
   let supplierId = '', poId = ''

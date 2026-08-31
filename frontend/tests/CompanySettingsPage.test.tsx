@@ -12,6 +12,8 @@ function makeCompany() {
     functionalCurrencyCode: 'HNL',
     country: null,
     fiscalId: null as string | null,
+    voucherPayerName: null as string | null,
+    voucherApproverName: null as string | null,
   }
 }
 
@@ -32,9 +34,18 @@ function stubFetch(company: ReturnType<typeof makeCompany>) {
         // muestra este valor después de guardar, es porque de verdad
         // recargó desde la API real, no porque conservó lo que el usuario
         // tecleó localmente.
-        const body = JSON.parse(String(init.body)) as { legalName?: string; fiscalId?: string }
+        const body = JSON.parse(String(init.body)) as {
+          legalName?: string
+          fiscalId?: string
+          voucherPayerName?: string
+          voucherApproverName?: string
+        }
         if (body.legalName !== undefined) company.legalName = body.legalName.toUpperCase()
         if (body.fiscalId !== undefined) company.fiscalId = body.fiscalId
+        if (body.voucherPayerName !== undefined && !company.voucherPayerName) {
+          company.voucherPayerName = body.voucherPayerName
+        }
+        if (body.voucherApproverName !== undefined) company.voucherApproverName = body.voucherApproverName
         return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...company }) } as Response)
       }
       if (url.includes('/master-data/companies')) {
@@ -99,5 +110,23 @@ describe('CompanySettingsPage', () => {
     // El código y la moneda funcional nunca se enviaron ni cambiaron.
     expect(screen.getByDisplayValue('NX-001')).toBeInTheDocument()
     expect(screen.getByLabelText(/moneda funcional/i)).toHaveValue('HNL')
+  })
+
+  it('fixes the voucher payer once set and keeps the approver editable', async () => {
+    const company = makeCompany()
+    stubFetch(company)
+    const user = userEvent.setup()
+
+    render(renderApp('/control/configuracion'))
+
+    const payerInput = await screen.findByLabelText(/pagador de comprobantes/i)
+    expect(payerInput).not.toBeDisabled()
+    await user.type(payerInput, 'KAREN VANNESSA LOPEZ GONZALEZ')
+    await user.type(screen.getByLabelText(/aprobador de comprobantes/i), 'CARLOS HUMBERTO LOPEZ')
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+
+    // Tras guardar, el pagador queda fijado (read-only) y refleja el valor del servidor.
+    expect(await screen.findByDisplayValue('KAREN VANNESSA LOPEZ GONZALEZ')).toBeDisabled()
+    expect(screen.getByDisplayValue('CARLOS HUMBERTO LOPEZ')).not.toBeDisabled()
   })
 })

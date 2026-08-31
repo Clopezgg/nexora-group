@@ -3278,3 +3278,37 @@ Rama: `feat/phase2-comprobantes-enterprise`.
   `test_voucher_pdf_is_generated_for_a_remittance` (cuenta con código+nombre,
   importe formateado, sin UUID, sin `1.000000`), `frontend/tests/currency.test.ts`
   (4), `TimeEntriesPage.test.tsx` actualizado a la salida formateada.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 2 — incremento 3 (identidad del comprobante)
+
+Rama: `feat/phase2-voucher-identity`.
+
+- **Migración `251d08ffc0df`**: `companies.voucher_payer_name`,
+  `companies.voucher_approver_name` (ambas nullable). Roundtrip
+  `downgrade`/`upgrade` verificado.
+- **Pagador fijo / aprobador configurable** (orden maestra Phase 2):
+  - El pagador (`voucher_payer_name`) se asigna **una sola vez**; después es
+    inmutable (mismo patrón que `companies.code`) — `company_repository.update_company`
+    lanza `ValueError` → HTTP 409 si se intenta cambiar.
+  - El aprobador (`voucher_approver_name`) es siempre editable.
+  - `CompanyResponse` expone ambos; `CompanyUpdateRequest` los acepta.
+  - Audit `core.company.update` / `core.company.profile.update` registran
+    ambos en `before`/`after`.
+- **Ruta del comprobante** (`GET /treasury/vouchers/{id}`):
+  - `payer` pasa a ser query param opcional; el pagador **real** se resuelve
+    desde `company.voucher_payer_name` (el cliente ya no puede fijarlo).
+  - `approvedBy` por defecto = `company.voucher_approver_name`.
+  - `prepared_by` = **nombre del usuario** autenticado, ya no su UUID.
+- **Frontend**:
+  - `CompanySettingsPage` → Perfil de la compañía: campos "Pagador de
+    comprobantes (se asigna una sola vez / inmutable)" y "Aprobador de
+    comprobantes (configurable)".
+  - `VouchersPage`: el pagador se muestra **read-only** desde Company
+    Settings (se quitó el input de texto libre); el aprobador se precarga del
+    valor configurado.
+  - `voucherService.download` ya no envía `payer`.
+- Tests: `test_master_data.py::test_company_voucher_payer_is_set_once_then_immutable`,
+  `test_treasury_operations.py::test_voucher_pdf_uses_company_fixed_payer_and_configured_approver`
+  + aserción "prepared_by es nombre, no UUID"; frontend
+  `CompanySettingsPage.test.tsx` (+1), `VouchersPage.test.tsx` (payer
+  read-only, sin `payer=` en la URL).

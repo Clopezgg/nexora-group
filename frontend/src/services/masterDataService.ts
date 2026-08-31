@@ -15,6 +15,8 @@ export interface CompanyProfileInput {
   functionalCurrencyCode?: string
   country?: string
   fiscalId?: string
+  voucherPayerName?: string
+  voucherApproverName?: string
 }
 
 export const masterDataService = {

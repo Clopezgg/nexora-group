@@ -27,5 +27,10 @@ class Company(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     country: Mapped[str | None] = mapped_column(String(2), nullable=True)
     fiscal_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Identidad de comprobantes (orden maestra Phase 2). El pagador se asigna
+    # una sola vez y luego es read-only (mismo patrón que `code`); el
+    # aprobador es configurable. Se imprimen en el PDF -- nunca hardcodeados.
+    voucher_payer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    voucher_approver_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     projects: Mapped[list["Project"]] = relationship(back_populates="company")

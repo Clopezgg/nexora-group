@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -94,14 +94,25 @@ def update_company(
         assert_company_access(
             db, user_id=user.id, resource="core.company", action="update", company_id=company_id
         )
-        before_legal_name = existing.legal_name
-        before_fiscal_id = existing.fiscal_id
-        company = company_repository.update_company(
-            db,
-            company=existing,
-            legal_name=payload.legal_name,
-            fiscal_id=payload.fiscal_id,
-        )
+        before = {
+            "legalName": existing.legal_name,
+            "fiscalId": existing.fiscal_id,
+            "voucherPayerName": existing.voucher_payer_name,
+            "voucherApproverName": existing.voucher_approver_name,
+        }
+        try:
+            company = company_repository.update_company(
+                db,
+                company=existing,
+                legal_name=payload.legal_name,
+                fiscal_id=payload.fiscal_id,
+                voucher_payer_name=payload.voucher_payer_name,
+                voucher_approver_name=payload.voucher_approver_name,
+            )
+        except ValueError as error:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail=str(error)
+            ) from error
         audit_service.record(
             db,
             actor_user_id=user.id,
@@ -110,8 +121,13 @@ def update_company(
             entity_id=company_id,
             company_id=company_id,
             project_id=None,
-            before={"legalName": before_legal_name, "fiscalId": before_fiscal_id},
-            after={"legalName": company.legal_name, "fiscalId": company.fiscal_id},
+            before=before,
+            after={
+                "legalName": company.legal_name,
+                "fiscalId": company.fiscal_id,
+                "voucherPayerName": company.voucher_payer_name,
+                "voucherApproverName": company.voucher_approver_name,
+            },
             correlation_id=correlation_id,
         )
         db.commit()

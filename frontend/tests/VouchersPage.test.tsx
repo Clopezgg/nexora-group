@@ -41,6 +41,8 @@ describe('VouchersPage', () => {
                 name: 'Constructora Nexora',
                 code: 'NX',
                 functionalCurrencyCode: 'HNL',
+                voucherPayerName: 'KAREN VANNESSA LOPEZ GONZALEZ',
+                voucherApproverName: 'CARLOS HUMBERTO LOPEZ',
               },
             ],
           } as Response)
@@ -97,12 +99,21 @@ describe('VouchersPage', () => {
     expect(screen.getByRole('option', { name: 'Otro' })).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Beneficiario'), 'Proveedor real')
-    await user.type(screen.getByLabelText('Pagador / emisor'), 'Nexora Group')
+    // El pagador es fijo desde Company Settings: se muestra read-only, no se captura.
+    const payerField = screen.getByLabelText('Pagador') as HTMLInputElement
+    expect(payerField).toBeDisabled()
+    expect(payerField.value).toBe('KAREN VANNESSA LOPEZ GONZALEZ')
     await user.click(screen.getByRole('button', { name: 'Generar PDF' }))
 
     await waitFor(() => {
       expect(URL.createObjectURL).toHaveBeenCalled()
     })
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled()
+
+    const voucherCall = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.find(([u]) =>
+      String(u).includes('/treasury/vouchers/document-runtime'),
+    )
+    expect(voucherCall).toBeDefined()
+    expect(String(voucherCall?.[0])).not.toContain('payer=')
   })
 })

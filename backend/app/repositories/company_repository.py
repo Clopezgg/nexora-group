@@ -53,6 +53,8 @@ def update_company(
     functional_currency_code: str | None = None,
     country: str | None = None,
     fiscal_id: str | None = None,
+    voucher_payer_name: str | None = None,
+    voucher_approver_name: str | None = None,
 ) -> Company:
     if name is not None:
         company.name = name.strip()
@@ -75,5 +77,14 @@ def update_company(
         company.country = country.upper().strip() or None
     if fiscal_id is not None:
         company.fiscal_id = fiscal_id.strip() or None
+    if voucher_payer_name is not None:
+        normalized_payer = voucher_payer_name.strip()
+        if company.voucher_payer_name and normalized_payer != company.voucher_payer_name:
+            raise ValueError(
+                "El pagador de comprobantes ya fue asignado y es inmutable"
+            )
+        company.voucher_payer_name = normalized_payer or None
+    if voucher_approver_name is not None:
+        company.voucher_approver_name = voucher_approver_name.strip() or None
     db.flush()
     return company

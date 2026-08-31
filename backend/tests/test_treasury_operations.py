@@ -198,7 +198,7 @@ def test_fund_restriction_never_transfers_money_ownership_to_project(client):
 def test_voucher_pdf_is_generated_for_a_remittance(client):
     """Orden maestra §71: comprobante PDF vectorial real, no captura."""
     login_admin(client)
-    _company, _cash, _diff_account, _contributions, funding_doc = _setup(client)
+    company, _cash, _diff_account, _contributions, funding_doc = _setup(client)
 
     response = client.get(
         f"/api/treasury/vouchers/{funding_doc}"
@@ -223,6 +223,34 @@ def test_voucher_pdf_is_generated_for_a_remittance(client):
     assert str(funding_doc) not in text
     assert "Asiento contable" in text
     assert "conforme" in text  # bloque de firmas "Recib\xed conforme"
+    # prepared_by es el nombre del usuario, nunca su UUID.
+    assert "Administrador Nexora" in text
+
+
+def test_voucher_pdf_uses_company_fixed_payer_and_configured_approver(client):
+    """Orden maestra Phase 2: el pagador sale de Company Settings (read-only),
+    el aprobador es el configurado; el cliente no puede sobrescribir el
+    pagador fijado."""
+    login_admin(client)
+    company, _cash, _diff, _contrib, funding_doc = _setup(client)
+    patched = client.patch(
+        f"/api/master-data/companies/{company['id']}",
+        json={
+            "voucherPayerName": "KAREN VANNESSA LOPEZ GONZALEZ",
+            "voucherApproverName": "CARLOS HUMBERTO LOPEZ",
+        },
+    )
+    assert patched.status_code == 200, patched.text
+
+    response = client.get(
+        f"/api/treasury/vouchers/{funding_doc}"
+        "?beneficiary=Proveedor%20X&payer=IGNORAME&paymentMethod=Cheque"
+    )
+    assert response.status_code == 200, response.text
+    text = response.content.decode("latin-1")
+    assert "KAREN VANNESSA LOPEZ GONZALEZ" in text
+    assert "CARLOS HUMBERTO LOPEZ" in text
+    assert "IGNORAME" not in text
 
 
 def test_reconciliation_uses_cumulative_matches_and_blocks_overmatch(client, db_session):

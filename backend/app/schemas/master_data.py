@@ -28,6 +28,11 @@ class CompanyUpdateRequest(CamelModel):
     functional_currency_code: str | None = Field(default=None, min_length=3, max_length=3)
     country: str | None = Field(default=None, min_length=2, max_length=2)
     fiscal_id: str | None = Field(default=None, max_length=64)
+    # Identidad de comprobantes (orden maestra Phase 2). El pagador se asigna
+    # una sola vez (immutable una vez que la fila deja de tener NULL, mismo
+    # patrón que `code`); el aprobador es siempre editable.
+    voucher_payer_name: str | None = Field(default=None, min_length=1, max_length=255)
+    voucher_approver_name: str | None = Field(default=None, max_length=255)
 
 
 class CompanyResponse(CamelModel):
@@ -38,6 +43,8 @@ class CompanyResponse(CamelModel):
     functional_currency_code: str | None
     country: str | None
     fiscal_id: str | None
+    voucher_payer_name: str | None = None
+    voucher_approver_name: str | None = None
 
 
 class AccountCreateRequest(CamelModel):

@@ -26,6 +26,7 @@ from app.api.routes import (
     edit_access,
     equipment,
     evidence,
+    financial_control,
     financial_reversals,
     fiscal,
     health,
@@ -138,6 +139,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api")
     app.include_router(edit_access.router, prefix="/api")
     app.include_router(dashboard.router, prefix="/api")
+    app.include_router(financial_control.router, prefix="/api")
     app.include_router(context.router, prefix="/api")
     app.include_router(master_data.router, prefix="/api")
     app.include_router(access_management.router, prefix="/api")

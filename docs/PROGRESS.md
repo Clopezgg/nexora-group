@@ -3412,3 +3412,26 @@ Rama: `feat/phase2-payment-schedule`.
   (suma ≠ total → 422, fechas no crecientes → 422, plan válido de 3 cuotas,
   estado SCHEDULED, historial tras pago parcial, plan congelado tras pago →
   409); frontend `financialServices.test.ts` +1 (PUT con installments).
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 3 (Financial Control Center)
+
+Rama: `feat/phase3-financial-control-center`.
+
+- **`financial_control_service.daily_status`** + `GET
+  /financial-control/daily-status?companyId=` — "Estado financiero del día":
+  KPIs accionables derivados de las fuentes de verdad existentes (Treasury
+  Ledger, AP, AR, fiscal periods, approval inbox). Ninguna cifra hardcodeada.
+  KPIs: posición de caja/bancos, asientos posteados hoy, AP que vence hoy,
+  AP vencida, AR que vence hoy, AR vencida, aprobaciones pendientes, período
+  fiscal actual + estado. Cada KPI lleva `severity` (ok/info/warning/critical),
+  `hint` y `route` de drill-down.
+- Autorización: `core.company:read` sobre la compañía (mismo patrón que
+  `/dashboard/summary`).
+- **Frontend**: `/finanzas/control` → `FinancialControlCenterPage` (tarjetas
+  KPI con color por severidad, drill-down por `<Link>`), nueva entrada de
+  navegación "Centro de Control Financiero" al inicio del grupo Finanzas.
+- Tests: `test_financial_control.py` (KPIs presentes, `cash_position`
+  numérico correcto, período no configurado → severity critical / valor
+  honesto; compañía sin acceso → 403/404); frontend
+  `FinancialControlCenterPage.test.tsx`; e2e `critical-journey` visita
+  `/finanzas/control`.

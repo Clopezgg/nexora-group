@@ -8,6 +8,9 @@ import { navItems } from './navigation'
 type LazyRoute = NonNullable<RouteObject['lazy']>
 
 const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
+  '/finanzas/control': async () => ({
+    Component: (await import('../features/finance/FinancialControlCenterPage')).FinancialControlCenterPage,
+  }),
   '/finanzas/contabilidad': async () => ({
     Component: (await import('../features/accounting/AccountingPage')).AccountingPage,
   }),

@@ -13,7 +13,11 @@ from app.schemas.accounting import (
     JournalEntryResponse,
     JournalLineResponse,
 )
-from app.services import audit_service, posting_service
+from app.schemas.reconciliation import (
+    ReconciliationLineResponse,
+    SubledgerGlReconciliationResponse,
+)
+from app.services import audit_service, posting_service, subledger_reconciliation_service
 from app.services.permission_service import (
     accessible_project_ids,
     assert_company_access,
@@ -271,3 +275,36 @@ def reverse_journal_entry(
     )
     db.commit()
     return _to_response(reversal, _get_lines(db, reversal.id))
+
+
+@router.get(
+    "/reconciliation/subledger-gl",
+    response_model=SubledgerGlReconciliationResponse,
+)
+def subledger_gl_reconciliation(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("accounting.reconciliation", "read")),
+) -> SubledgerGlReconciliationResponse:
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="accounting.reconciliation",
+        action="read",
+        company_id=company_id,
+    )
+    lines = subledger_reconciliation_service.reconcile(db, company_id=company_id)
+    return SubledgerGlReconciliationResponse(
+        all_reconciled=all(line.reconciled for line in lines),
+        lines=[
+            ReconciliationLineResponse(
+                subledger=line.subledger,
+                subledger_total=line.subledger_total,
+                gl_total=line.gl_total,
+                difference=line.difference,
+                reconciled=line.reconciled,
+                detail=line.detail,
+            )
+            for line in lines
+        ],
+    )

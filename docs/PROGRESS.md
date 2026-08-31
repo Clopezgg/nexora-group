@@ -3435,3 +3435,32 @@ Rama: `feat/phase3-financial-control-center`.
   honesto; compañía sin acceso → 403/404); frontend
   `FinancialControlCenterPage.test.tsx`; e2e `critical-journey` visita
   `/finanzas/control`.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 4 — incremento 1 (Subledger ↔ GL Reconciliation)
+
+Rama: `feat/phase4-subledger-gl-reconciliation`.
+
+- **`subledger_reconciliation_service.reconcile`** + `GET
+  /accounting/reconciliation/subledger-gl?companyId=`: compara cada subledger
+  contra su cuenta de control en el GL — "el GL es la verdad contable; un
+  trial balance que cuadra no basta":
+  - **TREASURY**: saldo consolidado de cuentas de Tesorería vs. saldo de sus
+    cuentas GL asociadas.
+  - **ACCOUNTS_PAYABLE**: saldo pendiente de facturas de proveedor abiertas
+    (APPROVED/SCHEDULED/PARTIALLY_PAID) vs. saldo acreedor de la(s) cuenta(s)
+    `payable_account_id` de control.
+  - **ACCOUNTS_RECEIVABLE**: saldo por cobrar de facturas de cliente abiertas
+    vs. saldo deudor de la(s) cuenta(s) `receivable_account_id`.
+  Cada línea: `subledgerTotal`, `glTotal`, `difference`, `reconciled`.
+  `allReconciled` global.
+- Permisos nuevos (self-heal): `accounting.reconciliation:read`,
+  `accounting.closing:read`, `accounting.closing:execute` — otorgados en el
+  mismo scope por rol donde ya está `reports.trial_balance:read`
+  (Administrator los hereda).
+- **Frontend**: `/finanzas/conciliacion-subledger` →
+  `SubledgerReconciliationPage` (tabla con badge Cuadra/DESCUADRE por
+  subledger + banner global), nueva entrada de navegación.
+- Tests: `test_subledger_gl_reconciliation_matches_after_ap_accrual` (AP
+  cuadra tras accrual; sigue cuadrando tras pago parcial — subledger y GL
+  bajan juntos); frontend `SubledgerReconciliationPage.test.tsx` (2); e2e
+  `critical-journey` visita la página.

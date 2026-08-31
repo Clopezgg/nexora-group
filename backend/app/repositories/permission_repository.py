@@ -211,6 +211,11 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     # Cash Flow (NXR-REQ-0016/0093, 2026-08-25). Mismo scope por rol que
     # reports.balance_sheet/read -- ver reporting_service.cash_flow_statement.
     ("reports.cash_flow", "read", "Ver el Estado de Flujo de Efectivo"),
+    # Closing Center / Subledger<->GL reconciliation (orden maestra FINAL,
+    # Phase 4). Mismo scope por rol que reports.trial_balance/read.
+    ("accounting.reconciliation", "read", "Ver la conciliación Subledger <-> GL"),
+    ("accounting.closing", "read", "Ver el Centro de Cierre contable"),
+    ("accounting.closing", "execute", "Ejecutar el cierre duro de un período fiscal"),
     # Track H -- Reports/Search/Analytics (orden maestra §92-96, NXR-REQ-0092
     # Global Search). Se otorga ampliamente (mismo patrón que
     # document.document/read) porque casi todo rol operativo necesita poder
@@ -283,6 +288,9 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("workflow.approval", "read", SCOPE_OWN),
         ("workflow.approval", "decide", SCOPE_OWN),
         ("reports.trial_balance", "read", SCOPE_OWN),
+        ("accounting.reconciliation", "read", SCOPE_OWN),
+        ("accounting.closing", "read", SCOPE_OWN),
+        ("accounting.closing", "execute", SCOPE_OWN),
         ("reports.budget_vs_actual", "read", SCOPE_OWN),
         ("reports.general_ledger", "read", SCOPE_OWN),
         ("reports.balance_sheet", "read", SCOPE_OWN),
@@ -340,6 +348,9 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("asset.fixed_asset", "read", SCOPE_OWN),
         ("asset.depreciation", "read", SCOPE_OWN),
         ("reports.trial_balance", "read", SCOPE_OWN),
+        ("accounting.reconciliation", "read", SCOPE_OWN),
+        ("accounting.closing", "read", SCOPE_OWN),
+        ("accounting.closing", "execute", SCOPE_OWN),
         ("reports.general_ledger", "read", SCOPE_OWN),
         ("reports.balance_sheet", "read", SCOPE_OWN),
         ("reports.cash_flow", "read", SCOPE_OWN),
@@ -410,6 +421,9 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("audit.log", "read", SCOPE_ANY),
         ("workflow.approval", "read", SCOPE_ANY),
         ("reports.trial_balance", "read", SCOPE_ANY),
+        ("accounting.reconciliation", "read", SCOPE_ANY),
+        ("accounting.closing", "read", SCOPE_ANY),
+        ("accounting.closing", "execute", SCOPE_ANY),
         ("reports.budget_vs_actual", "read", SCOPE_ANY),
         ("reports.general_ledger", "read", SCOPE_ANY),
         ("reports.balance_sheet", "read", SCOPE_ANY),

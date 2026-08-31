@@ -55,6 +55,8 @@ def update_company(
     fiscal_id: str | None = None,
     voucher_payer_name: str | None = None,
     voucher_approver_name: str | None = None,
+    default_theme_id: str | None = None,
+    default_density: str | None = None,
 ) -> Company:
     if name is not None:
         company.name = name.strip()
@@ -86,5 +88,9 @@ def update_company(
         company.voucher_payer_name = normalized_payer or None
     if voucher_approver_name is not None:
         company.voucher_approver_name = voucher_approver_name.strip() or None
+    if default_theme_id is not None:
+        company.default_theme_id = default_theme_id.strip() or None
+    if default_density is not None:
+        company.default_density = default_density.strip() or None
     db.flush()
     return company

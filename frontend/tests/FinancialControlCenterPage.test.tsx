@@ -70,7 +70,7 @@ describe('FinancialControlCenterPage', () => {
     stubFetch()
     render(renderApp('/finanzas/control'))
 
-    expect(await screen.findByText('Centro de Control Financiero')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Centro de Control Financiero' })).toBeInTheDocument()
     expect(await screen.findByText('L 5,000.00')).toBeInTheDocument()
     expect(screen.getByText('Cuentas por pagar vencidas')).toBeInTheDocument()
     expect(screen.getByText(/Estado financiero del día · 2026-08-31/)).toBeInTheDocument()

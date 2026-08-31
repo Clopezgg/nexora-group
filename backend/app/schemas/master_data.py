@@ -33,6 +33,8 @@ class CompanyUpdateRequest(CamelModel):
     # patrón que `code`); el aprobador es siempre editable.
     voucher_payer_name: str | None = Field(default=None, min_length=1, max_length=255)
     voucher_approver_name: str | None = Field(default=None, max_length=255)
+    default_theme_id: str | None = Field(default=None, max_length=64)
+    default_density: str | None = Field(default=None, max_length=16)
 
 
 class CompanyResponse(CamelModel):
@@ -45,6 +47,8 @@ class CompanyResponse(CamelModel):
     fiscal_id: str | None
     voucher_payer_name: str | None = None
     voucher_approver_name: str | None = None
+    default_theme_id: str | None = None
+    default_density: str | None = None
 
 
 class AccountCreateRequest(CamelModel):

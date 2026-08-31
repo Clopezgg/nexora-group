@@ -24,6 +24,7 @@ import type {
   ResourcePostingSource,
 } from '../../types/masterData'
 import { statusLabel } from '../../utils/statusLabels'
+import { ThemeSettingsCard } from './ThemeSettingsCard'
 
 function CompanyProfileForm({ company }: { company: Company }) {
   const queryClient = useQueryClient()
@@ -309,6 +310,12 @@ export function CompanySettingsPage() {
           <CompanyProfileForm key={selectedCompany.id} company={selectedCompany} />
         </Card>
       ) : null}
+
+      <ThemeSettingsCard
+        companyId={activeCompanyId}
+        companyDefaultThemeId={selectedCompany?.defaultThemeId ?? null}
+        companyDefaultDensity={selectedCompany?.defaultDensity ?? null}
+      />
 
       {activeCompanyId ? <ResourcePostingSettings key={activeCompanyId} companyId={activeCompanyId} /> : null}
 

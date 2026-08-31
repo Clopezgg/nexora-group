@@ -64,7 +64,7 @@ describe('SubledgerReconciliationPage', () => {
     stubFetch(true)
     render(renderApp('/finanzas/conciliacion-subledger'))
 
-    expect(await screen.findByText('Conciliación Subledger ↔ GL')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Conciliación Subledger ↔ GL' })).toBeInTheDocument()
     expect(await screen.findByText('Todos los subledgers cuadran contra el GL')).toBeInTheDocument()
     expect(screen.getAllByText('Cuadra').length).toBeGreaterThan(0)
   })

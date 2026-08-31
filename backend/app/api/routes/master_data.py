@@ -108,6 +108,8 @@ def update_company(
                 fiscal_id=payload.fiscal_id,
                 voucher_payer_name=payload.voucher_payer_name,
                 voucher_approver_name=payload.voucher_approver_name,
+                default_theme_id=payload.default_theme_id,
+                default_density=payload.default_density,
             )
         except ValueError as error:
             raise HTTPException(

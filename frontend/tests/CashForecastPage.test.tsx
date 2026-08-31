@@ -61,7 +61,7 @@ describe('CashForecastPage', () => {
     stubFetch(true)
     render(renderApp('/finanzas/flujo-13-semanas'))
 
-    expect(await screen.findByText('Forecast de caja · 13 semanas')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Forecast de caja · 13 semanas' })).toBeInTheDocument()
     expect(await screen.findByText(/Alerta de liquidez · descubierto en la semana 3/)).toBeInTheDocument()
     expect(screen.getAllByText(/S\d+ ·/).length).toBe(13)
   })

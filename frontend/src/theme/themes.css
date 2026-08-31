@@ -1,0 +1,95 @@
+/* Enterprise Theme Engine — capa de aplicación (orden maestra Phase 8).
+   §68: solo presentación.
+
+   IMPORTANTE: el preset por defecto `nexora-classic` NO activa esta capa
+   (ThemeProvider pone data-nx-themed="off"). Así la apariencia hand-tuned
+   actual queda 100% intacta y la auditoría axe/WCAG del recorrido base no
+   cambia. Solo al elegir OTRO preset se aplica el re-pintado por variables. */
+
+:root {
+  --nx-theme-page-bg: #eef3f9;
+  --nx-theme-surface: #ffffff;
+  --nx-theme-text: #102844;
+  --nx-theme-text-muted: #4f6176;
+  --nx-theme-border: #dce5ef;
+  --nx-theme-accent: #1769d2;
+  --nx-theme-sidebar-bg: #0b274a;
+  --nx-theme-sidebar-text: #c7d7ea;
+  --nx-theme-radius: 9px;
+  --nx-theme-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --nx-density-scale: 1;
+}
+
+:root[data-nx-density='compact'] {
+  --nx-density-scale: 0.72;
+}
+
+/* ---- Capa activa: solo para presets != nexora-classic ---- */
+
+:root[data-nx-themed='on'] body {
+  background: var(--nx-theme-page-bg);
+  color: var(--nx-theme-text);
+  font-family: var(--nx-theme-font);
+}
+
+:root[data-nx-themed='on'] a {
+  color: var(--nx-theme-accent);
+}
+
+:root[data-nx-themed='on'] body .nx-app-shell {
+  background: var(--nx-theme-page-bg);
+}
+
+:root[data-nx-themed='on'] body .nx-sidebar {
+  background: var(--nx-theme-sidebar-bg);
+  color: var(--nx-theme-sidebar-text);
+}
+
+:root[data-nx-themed='on'] body .nx-topbar {
+  background: var(--nx-theme-surface);
+  border-bottom: 1px solid var(--nx-theme-border);
+}
+
+:root[data-nx-themed='on'] body .nx-card,
+:root[data-nx-themed='on'] body .nx-chart-card,
+:root[data-nx-themed='on'] body .nx-fcc-kpi,
+:root[data-nx-themed='on'] body .nx-modal {
+  background: var(--nx-theme-surface);
+  border-color: var(--nx-theme-border);
+  border-radius: var(--nx-theme-radius);
+  color: var(--nx-theme-text);
+}
+
+:root[data-nx-themed='on'] body .nx-card__title,
+:root[data-nx-themed='on'] body .nx-page__eyebrow {
+  color: var(--nx-theme-text-muted);
+}
+
+:root[data-nx-themed='on'] body .nx-table th {
+  color: var(--nx-theme-text-muted);
+  border-bottom-color: var(--nx-theme-border);
+}
+
+:root[data-nx-themed='on'] body .nx-table td {
+  border-bottom-color: var(--nx-theme-border);
+  color: var(--nx-theme-text);
+}
+
+:root[data-nx-themed='on'] body .nx-button--primary {
+  background: var(--nx-theme-accent);
+  border-color: var(--nx-theme-accent);
+}
+
+/* ---- Densidad: aplica siempre (comfortable / compact), independiente del preset ---- */
+
+:root[data-nx-density='compact'] body .nx-card {
+  padding: calc(20px * var(--nx-density-scale) + 4px);
+}
+:root[data-nx-density='compact'] body .nx-table td,
+:root[data-nx-density='compact'] body .nx-table th {
+  padding-top: calc(10px * var(--nx-density-scale) + 2px);
+  padding-bottom: calc(10px * var(--nx-density-scale) + 2px);
+}
+:root[data-nx-density='compact'] body .nx-fcc-grid {
+  gap: 0.55rem;
+}

@@ -26,3 +26,22 @@ def test_format_money_never_returns_bare_number():
     out = format_money("150000", "HNL")
     assert out != "150000"
     assert "," in out and "." in out
+
+
+def test_approval_verification_code_is_deterministic():
+    from datetime import date
+
+    from app.services.voucher_service import approval_verification_code
+
+    a = approval_verification_code(
+        document_number="REM-2026-0001", approved_by="carlos lopez", issued_on=date(2026, 8, 31)
+    )
+    b = approval_verification_code(
+        document_number="REM-2026-0001", approved_by="CARLOS LOPEZ", issued_on=date(2026, 8, 31)
+    )
+    c = approval_verification_code(
+        document_number="REM-2026-0001", approved_by="CARLOS LOPEZ", issued_on=date(2026, 9, 1)
+    )
+    assert a == b  # case-insensitive
+    assert a != c  # la fecha cambia el código
+    assert len(a) == 12 and a.isalnum()

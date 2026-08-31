@@ -3358,3 +3358,26 @@ Rama: `feat/phase2-voucher-evidence`.
   evidencia, sube evidencia `ACCOUNTING_DOCUMENT` y luego emite el PDF.
   Tests de comprobante existentes migrados a `paymentMethod=Efectivo` donde
   solo validan contenido del PDF.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 2 — incremento 6 (banco + firma de aprobación)
+
+Rama: `feat/phase2-voucher-bank-approval`.
+
+- **Cuenta / banco en el comprobante**: `GET /treasury/vouchers/{id}` acepta
+  `treasuryAccountId`. El PDF muestra "Cuenta / banco: <institución|nombre> ·
+  ****1234" — la referencia bancaria **siempre enmascarada** (identidad
+  bancaria segura). Cuenta de otra compañía → 404.
+- **Firma de aprobación** (`voucher_service.approval_verification_code`):
+  el PDF imprime "Aprobación: <aprobador> · emitido DD/MM/YYYY · código de
+  verificación <XXXXXXXXXXXX>". El código es
+  `sha256(document_number | approver_upper | issued_date)[:12]` —
+  determinista y re-derivable para contrastar que no se alteró el trío
+  (documento, aprobador, fecha). No es firma con clave; es control
+  tamper-evident + trazable.
+- **Frontend** `VouchersPage`: selector "Cuenta de tesorería (banco)" que
+  carga `treasuryService.listAccounts`.
+- Tests: `test_voucher_pdf_shows_masked_bank_account_and_approval_code`
+  (cuenta enmascarada, bloque de aprobación, 404 cross-company);
+  `test_approval_verification_code_is_deterministic` (case-insensitive, la
+  fecha cambia el código); frontend `VouchersPage.test.tsx` (+ selector de
+  cuenta, URL lleva `treasuryAccountId`).

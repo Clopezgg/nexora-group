@@ -56,6 +56,15 @@ describe('VouchersPage', () => {
             ],
           } as Response)
         }
+        if (url.includes('/treasury/accounts')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              { id: 'acc-1', name: 'Cuenta operativa', kind: 'BANK', institution: 'BAC', accountReference: '1234567890', currencyCode: 'HNL', balance: '0.00', glAccountId: 'gl-1', companyId: 'company-runtime', status: 'ACTIVE' },
+            ],
+          } as Response)
+        }
         if (url.includes('/accounting/journal-entries')) {
           return Promise.resolve({
             ok: true,
@@ -124,6 +133,9 @@ describe('VouchersPage', () => {
     const payerField = screen.getByLabelText('Pagador') as HTMLInputElement
     expect(payerField).toBeDisabled()
     expect(payerField.value).toBe('KAREN VANNESSA LOPEZ GONZALEZ')
+
+    // Selector de cuenta de tesorería (banco).
+    await user.selectOptions(screen.getByLabelText('Cuenta de tesorería (banco)'), 'acc-1')
     await user.click(screen.getByRole('button', { name: 'Generar PDF' }))
 
     await waitFor(() => {
@@ -139,6 +151,7 @@ describe('VouchersPage', () => {
     expect(voucherUrl).not.toContain('payer=')
     expect(voucherUrl).toContain('beneficiaryType=SUPPLIER')
     expect(voucherUrl).toContain('beneficiaryId=sup-1')
+    expect(voucherUrl).toContain('treasuryAccountId=acc-1')
   })
 
   it('blocks bank payment methods until payment evidence is attached', async () => {

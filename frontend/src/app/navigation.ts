@@ -28,6 +28,7 @@ export const navGroups: NavGroup[] = [
     key: 'finanzas',
     label: 'Finanzas',
     items: [
+      { path: '/finanzas/control', label: 'Centro de Control Financiero', icon: 'chart', requiredAny: read('treasury.account:read', 'accounting.journal_entry:read') },
       { path: '/finanzas/contabilidad', label: 'Contabilidad', icon: 'book', requiredAny: read('accounting.journal_entry:read') },
       { path: '/finanzas/tesoreria', label: 'Tesorería', icon: 'bank', requiredAny: read('treasury.account:read') },
       { path: '/finanzas/conciliacion', label: 'Conciliación bancaria', icon: 'shuffle', requiredAny: read('treasury.bank_reconciliation:read') },

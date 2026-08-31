@@ -1,0 +1,76 @@
+.nx-fcc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+
+.nx-fcc-kpi__link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.nx-fcc-kpi {
+  border: 1px solid var(--nx-border, #e2e8f0);
+  border-left-width: 4px;
+  border-radius: var(--nx-radius-sm, 8px);
+  padding: 0.9rem 1rem;
+  background: var(--nx-surface, #ffffff);
+  height: 100%;
+  transition: box-shadow 0.15s ease;
+}
+
+.nx-fcc-kpi__link:hover .nx-fcc-kpi {
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
+}
+
+.nx-fcc-kpi--ok {
+  border-left-color: #16a34a;
+}
+.nx-fcc-kpi--info {
+  border-left-color: #2563eb;
+}
+.nx-fcc-kpi--warning {
+  border-left-color: #d97706;
+}
+.nx-fcc-kpi--critical {
+  border-left-color: #dc2626;
+}
+
+.nx-fcc-kpi__label {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--nx-text-muted, #64748b);
+}
+
+.nx-fcc-kpi__value {
+  margin: 0.25rem 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--nx-text, #0f172a);
+}
+
+.nx-fcc-kpi__severity {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--nx-text-muted, #64748b);
+}
+
+.nx-fcc-kpi__hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  color: var(--nx-text-muted, #64748b);
+  line-height: 1.4;
+}
+
+.nx-fcc-kpi__drill {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2563eb;
+}

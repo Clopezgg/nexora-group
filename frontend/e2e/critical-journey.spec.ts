@@ -473,6 +473,10 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await expect(page.getByRole('heading', { name: 'Restricciones de fondos' })).toBeVisible({ timeout: 10_000 })
     await page.goto('/finanzas/comprobantes')
     await expect(page.getByRole('heading', { name: 'Comprobantes / Vouchers' })).toBeVisible({ timeout: 10_000 })
+
+    await page.goto('/finanzas/control')
+    await expect(page.getByRole('heading', { name: 'Centro de Control Financiero' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('Posición de caja y bancos')).toBeVisible({ timeout: 10_000 })
   })
 
   await test.step('Documents + multipart Evidence with real selectors', async () => {

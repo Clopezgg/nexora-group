@@ -477,8 +477,43 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await expect(page.getByRole('heading', { name: 'Cierres de caja' })).toBeVisible({ timeout: 10_000 })
     await page.goto('/finanzas/restricciones-fondos')
     await expect(page.getByRole('heading', { name: 'Restricciones de fondos' })).toBeVisible({ timeout: 10_000 })
+    // Mobile-viewport (iPhone-sized) critical journey for the repaired
+    // evidence upload + PDF flow: select document -> beneficiary ->
+    // Transferencia -> attach an image through the enterprise uploader ->
+    // evidence shows as loaded -> Generar PDF downloads a real application/pdf.
+    await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/finanzas/comprobantes')
     await expect(page.getByRole('heading', { name: 'Comprobantes / Vouchers' })).toBeVisible({ timeout: 10_000 })
+
+    await page.getByLabel('Asiento / documento').selectOption(documents[0].id)
+    await page.getByRole('combobox', { name: 'Beneficiario' }).fill('Proveedor')
+    await page.getByText(/Proveedor E2E/).first().click()
+    await page.getByLabel('Método de pago').selectOption('TRANSFER')
+
+    await page.locator('#voucher-evidence-file').setInputFiles({
+      name: 'comprobante-transferencia.png',
+      mimeType: 'image/png',
+      buffer: Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        Buffer.from('e2e-mobile-screenshot'),
+      ]),
+    })
+    await expect(page.getByText('Evidencia cargada correctamente')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('comprobante-transferencia.png')).toBeVisible()
+
+    const generar = page.getByRole('button', { name: 'Generar PDF' })
+    await expect(generar).toBeEnabled()
+    const [pdfResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes(`/treasury/vouchers/${documents[0].id}`) &&
+          response.request().method() === 'GET',
+      ),
+      generar.click(),
+    ])
+    expect(pdfResponse.status()).toBe(200)
+    expect(pdfResponse.headers()['content-type']).toContain('application/pdf')
+    await page.setViewportSize({ width: 1280, height: 720 })
 
     await page.goto('/finanzas/control')
     await expect(page.getByRole('heading', { name: 'Centro de Control Financiero' })).toBeVisible({ timeout: 10_000 })

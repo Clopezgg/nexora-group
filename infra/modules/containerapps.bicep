@@ -85,6 +85,11 @@ var baseEnvironment = [
   { name: 'FRONTEND_URL', value: frontendUrl }
   { name: 'EVIDENCE_BACKEND', value: 'azure_blob' }
   { name: 'AZURE_STORAGE_ACCOUNT_NAME', value: storageAccountName }
+  // clientId de la User Assigned Managed Identity: sin esto
+  // DefaultAzureCredential() no puede resolver de forma determinista cual
+  // identidad usar contra Blob Storage y el upload de evidencias falla con
+  // ClientAuthenticationError (HTTP 503 NXR-EVIDENCE-STORAGE-AUTH).
+  { name: 'AZURE_CLIENT_ID', value: backendIdentity.properties.clientId }
   { name: 'AZURE_KEY_VAULT_URI', value: keyVaultUri }
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
 ]
@@ -152,6 +157,9 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
   }
   dependsOn: [
     keyVaultRoleAssignment
+    // El backend valida el acceso a Blob Storage en /readyz; la app no debe
+    // arrancar antes de que exista el rol Storage Blob Data Contributor.
+    storageRoleAssignment
   ]
   properties: {
     managedEnvironmentId: containerAppsEnvironment.id

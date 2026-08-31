@@ -18,6 +18,7 @@ class EvidenceResponse(CamelModel):
     category: str | None
     entity_type: str | None
     entity_id: uuid.UUID | None
+    content_hash: str | None = None
     uploaded_by: uuid.UUID
     created_at: datetime
 

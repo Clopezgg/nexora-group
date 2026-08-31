@@ -905,6 +905,7 @@ def download_voucher(
         has_evidence = (
             db.query(Evidence.id)
             .filter(
+                Evidence.company_id == document.company_id,
                 Evidence.entity_id == document.id,
                 func.upper(Evidence.entity_type).in_(_ACCOUNTING_DOCUMENT_EVIDENCE_TYPES),
             )

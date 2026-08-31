@@ -29,6 +29,12 @@ EVIDENCE_ALLOWED_MIME_TYPES = (
     "image/jpeg",
     "image/png",
     "image/webp",
+    # iOS (Safari/iPhone) sube fotos de comprobante como HEIC/HEIF. Se acepta
+    # el formato validando la firma real ISO-BMFF `ftyp` (ver
+    # evidence_service._detect_mime); la normalizacion server-side a JPEG queda
+    # documentada como DEFERRED en docs/DEFERRED.md.
+    "image/heic",
+    "image/heif",
 )
 
 
@@ -46,6 +52,11 @@ class Evidence(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # SHA-256 hex del contenido subido. No es una firma digital: es un control
+    # de integridad/auditoria para poder contrastar que el blob almacenado no
+    # cambio respecto a lo que se recibio. Nullable por compatibilidad con
+    # filas historicas anteriores a la migracion.
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     uploaded_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )

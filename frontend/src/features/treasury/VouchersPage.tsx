@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Badge,
@@ -7,6 +7,7 @@ import {
   Combobox,
   EmptyState,
   ErrorState,
+  Icon,
   Input,
   LoadingState,
   Select,
@@ -14,12 +15,209 @@ import {
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { useMutationError } from '../../hooks/useMutationError'
 import { documentService } from '../../services/documentService'
+import { friendlyApiMessage } from '../../services/httpClient'
 import { treasuryService } from '../../services/treasuryService'
 import { voucherService } from '../../services/voucherService'
+import type { Evidence } from '../../types/document'
 import { statusLabel } from '../../utils/statusLabels'
 import './TreasuryPage.css'
 
 const METHODS_REQUIRING_EVIDENCE = new Set(['TRANSFER', 'DEPOSIT', 'CHECK'])
+
+const EVIDENCE_ACCEPT =
+  'application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif'
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const value = bytes / 1024 ** exponent
+  return `${value >= 10 || exponent === 0 ? Math.round(value) : value.toFixed(1)} ${units[exponent]}`
+}
+
+type EvidenceUiState = 'idle' | 'selected' | 'uploading' | 'uploaded' | 'failed'
+
+interface PaymentEvidenceFieldProps {
+  companyId: string
+  documentId: string
+  evidenceCount: number
+  isBlocking: boolean
+  onUploadingChange: (uploading: boolean) => void
+}
+
+/**
+ * Enterprise mobile-friendly evidence uploader.
+ *
+ * The field is remounted (via a `key` on the parent) whenever the active
+ * company or the selected accounting document changes, so a file picked for
+ * document A can never leak into document B. The native input is never
+ * cleared before the mutation resolves — the visible selection persists
+ * through `selected -> uploading -> uploaded | failed`.
+ */
+function PaymentEvidenceField({
+  companyId,
+  documentId,
+  evidenceCount,
+  isBlocking,
+  onUploadingChange,
+}: PaymentEvidenceFieldProps) {
+  const queryClient = useQueryClient()
+  const evidenceKey = ['evidence', 'ACCOUNTING_DOCUMENT', documentId] as const
+  const [file, setFile] = useState<File | null>(null)
+  const [uiState, setUiState] = useState<EvidenceUiState>('idle')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  // On unmount (document or company changed — the parent remounts this field
+  // via `key`) release any "uploading" lock held on the parent's PDF button.
+  useEffect(() => () => onUploadingChange(false), [onUploadingChange])
+
+  const upload = useMutation({
+    mutationFn: (candidate: File) =>
+      documentService.uploadEvidence(
+        companyId,
+        candidate,
+        'PAYMENT_PROOF',
+        'ACCOUNTING_DOCUMENT',
+        documentId,
+      ),
+    onMutate: () => {
+      setUiState('uploading')
+      setErrorMessage(null)
+      onUploadingChange(true)
+    },
+    onSuccess: (evidence: Evidence) => {
+      // Optimistic cache write BEFORE invalidate: evidenceCount becomes > 0
+      // immediately so "Generar PDF" enables without waiting for the refetch,
+      // closing the race where the upload finished but the list still read 0.
+      queryClient.setQueryData<Evidence[]>(evidenceKey, (previous) => {
+        const list = Array.isArray(previous) ? previous : []
+        return list.some((row) => row.id === evidence.id) ? list : [evidence, ...list]
+      })
+      queryClient.invalidateQueries({ queryKey: evidenceKey })
+      setUiState('uploaded')
+    },
+    onError: (error: unknown) => {
+      setErrorMessage(friendlyApiMessage(error))
+      setUiState('failed')
+    },
+    onSettled: () => {
+      onUploadingChange(false)
+      // Safe to reset the native inputs now that the mutation resolved: the
+      // filename/status stay visible from component state, and re-selecting
+      // the same file will still fire onChange.
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
+    },
+  })
+
+  function handlePicked(next: File | undefined | null) {
+    if (!next) return
+    setFile(next)
+    setUiState('selected')
+    setErrorMessage(null)
+    upload.mutate(next)
+  }
+
+  const hasConfirmedEvidence = evidenceCount > 0
+  const labelSuffix = hasConfirmedEvidence
+    ? `· ${evidenceCount} adjunta(s)`
+    : isBlocking
+      ? '· obligatoria'
+      : ''
+
+  return (
+    <div className="nx-evidence">
+      <span className="nx-field__label">Evidencia del pago {labelSuffix}</span>
+
+      <input
+        ref={cameraInputRef}
+        id="voucher-evidence-camera"
+        type="file"
+        accept={EVIDENCE_ACCEPT}
+        capture="environment"
+        hidden
+        onChange={(event) => handlePicked(event.target.files?.[0])}
+      />
+      <input
+        ref={fileInputRef}
+        id="voucher-evidence-file"
+        type="file"
+        accept={EVIDENCE_ACCEPT}
+        hidden
+        onChange={(event) => handlePicked(event.target.files?.[0])}
+      />
+
+      <div className="nx-evidence__actions">
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={uiState === 'uploading'}
+          onClick={() => cameraInputRef.current?.click()}
+        >
+          <Icon name="camera" size={16} /> Tomar fotografía
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={uiState === 'uploading'}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Icon name="file" size={16} /> Seleccionar archivo
+        </Button>
+      </div>
+
+      {file ? (
+        <div className="nx-evidence__file">
+          <Icon name="file" size={16} />
+          <span className="nx-evidence__filename">{file.name}</span>
+          <span className="nx-evidence__meta">
+            {file.type || 'tipo desconocido'} · {formatBytes(file.size)}
+          </span>
+        </div>
+      ) : null}
+
+      {uiState === 'uploading' ? (
+        <p className="nx-field__hint" role="status">
+          <Icon name="refresh" size={14} /> Subiendo evidencia…
+        </p>
+      ) : null}
+
+      {uiState === 'uploaded' ? (
+        <p className="nx-evidence__ok" role="status">
+          <Icon name="check" size={14} /> Evidencia cargada correctamente
+        </p>
+      ) : null}
+
+      {uiState === 'failed' ? (
+        <div className="nx-field__error" role="alert">
+          <p>
+            <Icon name="warning" size={14} /> {errorMessage ?? 'No se pudo cargar la evidencia.'}
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!file || upload.isPending}
+            onClick={() => file && upload.mutate(file)}
+          >
+            <Icon name="refresh" size={16} /> Reintentar
+          </Button>
+        </div>
+      ) : null}
+
+      {isBlocking && !hasConfirmedEvidence && uiState !== 'uploading' ? (
+        <p className="nx-field__error" role="alert">
+          Adjunta el comprobante de transferencia para continuar.
+        </p>
+      ) : (
+        <p className="nx-field__hint">
+          Transferencia, depósito y cheque exigen adjuntar el comprobante del pago antes de emitir el PDF.
+        </p>
+      )}
+    </div>
+  )
+}
 
 export function VouchersPage() {
   const handleMutationError = useMutationError()
@@ -30,6 +228,7 @@ export function VouchersPage() {
   const [paymentMethod, setPaymentMethod] = useState('TRANSFER')
   const [approvedBy, setApprovedBy] = useState('')
   const [treasuryAccountId, setTreasuryAccountId] = useState('')
+  const [evidenceUploading, setEvidenceUploading] = useState(false)
 
   const documentsQuery = useQuery({
     queryKey: ['accounting', 'journal-documents', activeCompanyId],
@@ -53,7 +252,6 @@ export function VouchersPage() {
     (row) => `${row.beneficiaryType}:${row.id}` === beneficiaryKey,
   )
 
-  const queryClient = useQueryClient()
   const evidenceQuery = useQuery({
     queryKey: ['evidence', 'ACCOUNTING_DOCUMENT', documentId],
     queryFn: () =>
@@ -63,21 +261,6 @@ export function VouchersPage() {
   const evidenceCount = evidenceQuery.data?.length ?? 0
   const needsEvidence = METHODS_REQUIRING_EVIDENCE.has(paymentMethod)
   const evidenceMissing = needsEvidence && evidenceCount === 0
-
-  const uploadEvidence = useMutation({
-    mutationFn: (file: File) =>
-      documentService.uploadEvidence(
-        activeCompanyId as string,
-        file,
-        'PAYMENT_PROOF',
-        'ACCOUNTING_DOCUMENT',
-        documentId,
-      ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['evidence', 'ACCOUNTING_DOCUMENT', documentId] })
-    },
-    onError: (error) => handleMutationError(error, 'Adjuntar evidencia'),
-  })
 
   const download = useMutation({
     mutationFn: () => voucherService.download(documentId, {
@@ -93,10 +276,16 @@ export function VouchersPage() {
       const anchor = window.document.createElement('a')
       anchor.href = url
       anchor.download = `NEXORA-${document?.documentNumber ?? 'comprobante'}.pdf`
+      anchor.rel = 'noopener'
       window.document.body.appendChild(anchor)
       anchor.click()
-      anchor.remove()
-      URL.revokeObjectURL(url)
+      // Safari/iOS: the download is still resolving when click() returns.
+      // Revoking the object URL or yanking the anchor synchronously aborts it,
+      // so defer both well past the navigation.
+      window.setTimeout(() => {
+        anchor.remove()
+        URL.revokeObjectURL(url)
+      }, 60_000)
     },
     onError: (error) => handleMutationError(error, 'Generar comprobante'),
   })
@@ -192,26 +381,15 @@ export function VouchersPage() {
               </option>
             ))}
           </Select>
-          {documentId && needsEvidence ? (
-            <div>
-              <label className="nx-field__label" htmlFor="voucher-evidence">
-                Evidencia del pago {evidenceMissing ? '· obligatoria' : `· ${evidenceCount} adjunta(s)`}
-              </label>
-              <input
-                id="voucher-evidence"
-                type="file"
-                accept="application/pdf,image/jpeg,image/png,image/webp"
-                disabled={uploadEvidence.isPending}
-                onChange={(event) => {
-                  const file = event.target.files?.[0]
-                  if (file) uploadEvidence.mutate(file)
-                  event.target.value = ''
-                }}
-              />
-              <p className={evidenceMissing ? 'nx-field__error' : 'nx-field__hint'} role={evidenceMissing ? 'alert' : undefined}>
-                Transferencia, depósito y cheque exigen adjuntar el comprobante del pago antes de emitir el PDF.
-              </p>
-            </div>
+          {documentId && needsEvidence && activeCompanyId ? (
+            <PaymentEvidenceField
+              key={`${activeCompanyId}:${documentId}`}
+              companyId={activeCompanyId}
+              documentId={documentId}
+              evidenceCount={evidenceCount}
+              isBlocking={evidenceMissing}
+              onUploadingChange={setEvidenceUploading}
+            />
           ) : null}
           <div>
             <Input
@@ -226,7 +404,7 @@ export function VouchersPage() {
           </div>
           <Button
             loading={download.isPending}
-            disabled={!documentId || !selectedBeneficiary || !paymentMethod || evidenceMissing}
+            disabled={!documentId || !selectedBeneficiary || !paymentMethod || evidenceMissing || evidenceUploading}
             onClick={() => download.mutate()}
           >
             Generar PDF

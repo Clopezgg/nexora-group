@@ -139,6 +139,38 @@ class EvidenceTooLargeError(Exception):
     llamar a get_evidence_container_client()."""
 
 
+_EVIDENCE_STORAGE_USER_MESSAGE = (
+    "No fue posible almacenar la evidencia. Intenta nuevamente."
+)
+
+
+class EvidenceStorageAuthError(Exception):
+    """NXR-EVIDENCE-STORAGE-AUTH: la Managed Identity no pudo autenticarse
+    contra Azure Blob Storage (`ClientAuthenticationError`). La causa raíz se
+    loguea con el correlationId; al cliente solo le llega un mensaje genérico
+    y HTTP 503."""
+
+    def __init__(self, message: str | None = None) -> None:
+        super().__init__(message or _EVIDENCE_STORAGE_USER_MESSAGE)
+
+
+class EvidenceStorageTemporaryError(Exception):
+    """NXR-EVIDENCE-STORAGE-TEMPORARY: fallo transitorio de Blob Storage
+    (`ServiceRequestError` / `ServiceResponseError` / `HttpResponseError` 5xx).
+    HTTP 503, reintentar."""
+
+    def __init__(self, message: str | None = None) -> None:
+        super().__init__(message or _EVIDENCE_STORAGE_USER_MESSAGE)
+
+
+class EvidenceStorageAccessError(Exception):
+    """NXR-EVIDENCE-STORAGE-ACCESS: la identidad se autenticó pero no tiene
+    permiso sobre el contenedor privado (`HttpResponseError` 403). HTTP 503."""
+
+    def __init__(self, message: str | None = None) -> None:
+        super().__init__(message or _EVIDENCE_STORAGE_USER_MESSAGE)
+
+
 class InvalidDocumentStateError(Exception):
     """Transición de estado inválida sobre Document/DocumentVersion (p.ej.
     subir una nueva versión sobre un Document ARCHIVED)."""

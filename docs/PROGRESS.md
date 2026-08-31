@@ -3464,3 +3464,37 @@ Rama: `feat/phase4-subledger-gl-reconciliation`.
   cuadra tras accrual; sigue cuadrando tras pago parcial — subledger y GL
   bajan juntos); frontend `SubledgerReconciliationPage.test.tsx` (2); e2e
   `critical-journey` visita la página.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 4 — incremento 2 (Closing Center)
+
+Rama: `feat/phase4-closing-center`.
+
+- **`closing_service`** + rutas `GET /accounting/closing/checklist` y
+  `POST /accounting/closing/{periodId}/hard-close`:
+  - **Checklist de pre-cierre** — 5 verificaciones:
+    1. `period_state` (bloqueante) — período OPEN o SOFT_CLOSED.
+    2. `subledger_gl` (bloqueante) — todos los subledgers cuadran contra el GL
+       (reutiliza `subledger_reconciliation_service`).
+    3. `no_draft_documents` (bloqueante) — sin `AccountingDocument` DRAFT en el
+       período.
+    4. `double_entry` (bloqueante) — todo asiento del período con
+       TOTAL DÉBITO = TOTAL CRÉDITO (tripwire de invariante).
+    5. `bank_reconciliation` (advertencia) — líneas bancarias UNMATCHED en el
+       período.
+    `canHardClose` = todas las bloqueantes pasan.
+  - **Cierre duro** — transición irreversible a `CLOSED`
+    (`_ALLOWED_PERIOD_TRANSITIONS["CLOSED"] == set()`). Rechazado con **409**
+    si hay bloqueantes sin pasar y no se fuerza; **422** si el período ya está
+    cerrado o si se fuerza sin motivo. Devuelve un **manifiesto** con el
+    snapshot de checks + `closedAt` + `forced`/`forceReason`. Audita
+    `accounting.closing.hard_close`.
+  - Permiso `accounting.closing:read` / `:execute`.
+- **Frontend**: `/finanzas/cierre` → `ClosingCenterPage` — selector de período,
+  tabla del checklist (Bloqueante/Advertencia · OK/BLOQUEA), botón "Ejecutar
+  cierre duro" (deshabilitado si `canHardClose` es falso) + "Forzar cierre
+  (con motivo)". Nueva entrada de navegación.
+- Tests: `test_closing_center.py` (checklist con 5 keys, cierre feliz →
+  manifiesto, período queda CLOSED, segundo cierre → 422, checklist post-cierre
+  reporta `period_state` fallido; forzar sin motivo → 422); frontend
+  `ClosingCenterPage.test.tsx` (2); e2e `critical-journey` visita
+  `/finanzas/cierre`.

@@ -3805,3 +3805,26 @@ Workbench) se entregaron funcionalmente en la Orden Maestra FINAL
   ruta de dominio financiero/proyectos/control a 390/768/1440px con
   `expectNoDocumentOverflow`.
 - Frontend 159 passed; typecheck/lint verdes.
+
+### 2026-08-31 — ORDEN MAESTRA DEFINITIVA · FASE 4 (Comprobantes: vista previa + identidad bancaria)
+
+Rama: `feat/od-fase4-voucher-preview`.
+
+El backend de comprobantes (beneficiarios registrados, pagador/aprobador
+fijos desde Company Settings, evidencia obligatoria para
+transferencia/depósito/cheque, PDF profesional sin UUID, cuotas, historial,
+pagos parciales, bloqueo de sobrepago, auditoría humana) ya se entregó en
+la Orden Maestra FINAL (PRs #43–#48). Esta fase cierra los huecos de UI:
+
+- **Vista previa del comprobante (§44)**: nueva tarjeta que muestra
+  documento, estado, moneda, ámbito, beneficiario, pagador, aprobador,
+  método (etiqueta humana), banco/cuenta enmascarada y estado de evidencia
+  ANTES de generar el PDF. Botón "Generar PDF" deshabilitado hasta que el
+  comprobante esté completo; en móvil el CTA queda sticky sobre la
+  navegación inferior (§24).
+- **Identidad visual bancaria (§52/§53)**: al elegir una cuenta de
+  tesorería se muestra `institution` (o nombre), número enmascarado
+  (`••••1234`) y moneda, con ícono de banco de fallback. Nunca se imprime
+  el número completo.
+- Tests: `VouchersPage.test.tsx` actualizado (vista previa presente,
+  selector `span` para moneda). Frontend 158 passed; typecheck/lint verdes.

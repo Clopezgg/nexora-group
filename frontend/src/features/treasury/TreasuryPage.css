@@ -96,3 +96,63 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* OD FASE 4 — identidad bancaria + vista previa del comprobante */
+.nx-bank-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--nx-color-border);
+  border-radius: var(--nx-radius-md);
+  background: var(--nx-color-surface-secondary);
+}
+.nx-bank-identity__icon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nx-radius-sm);
+  background: var(--nx-color-accent-soft);
+  color: var(--nx-color-accent);
+  flex-shrink: 0;
+}
+.nx-bank-identity__body { display: flex; flex-direction: column; min-width: 0; }
+.nx-bank-identity__name { font-weight: 700; font-size: var(--nx-text-label); color: var(--nx-color-text); }
+.nx-bank-identity__meta {
+  font-size: var(--nx-text-caption);
+  color: var(--nx-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.nx-voucher-preview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 20px;
+  margin: 0 0 12px;
+}
+.nx-voucher-preview > div { display: flex; flex-direction: column; gap: 2px; }
+.nx-voucher-preview dt {
+  font-size: var(--nx-text-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--nx-color-text-muted);
+}
+.nx-voucher-preview dd {
+  margin: 0;
+  font-size: var(--nx-text-body);
+  color: var(--nx-color-text);
+}
+.nx-voucher-preview__actions { display: flex; justify-content: flex-end; }
+
+@media (max-width: 620px) {
+  .nx-voucher-preview { grid-template-columns: 1fr; }
+  .nx-voucher-preview__actions {
+    position: sticky;
+    bottom: calc(var(--nx-bottom-nav-height) + var(--nx-safe-bottom) + 8px);
+    background: var(--nx-color-surface);
+    padding-top: 8px;
+  }
+  .nx-voucher-preview__actions .nx-button { width: 100%; }
+}

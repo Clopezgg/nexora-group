@@ -127,6 +127,8 @@ describe('VouchersPage', () => {
 
     await selectDocumentAndBeneficiary(user)
     expect(screen.getByText('REM-2026-0001', { selector: 'span' })).toBeInTheDocument()
+    // Vista previa del comprobante (OD FASE 4) — antes de generar el PDF.
+    expect(screen.getByText('Vista previa del comprobante')).toBeInTheDocument()
     await user.selectOptions(screen.getByLabelText('Cuenta de tesorería (banco)'), 'acc-1')
     await user.click(screen.getByRole('button', { name: 'Generar PDF' }))
 

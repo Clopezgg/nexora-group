@@ -484,6 +484,9 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
 
     await page.goto('/finanzas/cierre')
     await expect(page.getByRole('heading', { name: 'Centro de Cierre contable' })).toBeVisible({ timeout: 10_000 })
+
+    await page.goto('/finanzas/excepciones')
+    await expect(page.getByRole('heading', { name: 'Exception Center' })).toBeVisible({ timeout: 10_000 })
   })
 
   await test.step('Documents + multipart Evidence with real selectors', async () => {

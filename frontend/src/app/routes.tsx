@@ -20,6 +20,9 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
   '/finanzas/cierre': async () => ({
     Component: (await import('../features/finance/ClosingCenterPage')).ClosingCenterPage,
   }),
+  '/finanzas/excepciones': async () => ({
+    Component: (await import('../features/finance/ExceptionCenterPage')).ExceptionCenterPage,
+  }),
   '/finanzas/tesoreria': async () => ({
     Component: (await import('../features/treasury/TreasuryPage')).TreasuryPage,
   }),

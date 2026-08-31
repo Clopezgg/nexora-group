@@ -3498,3 +3498,27 @@ Rama: `feat/phase4-closing-center`.
   reporta `period_state` fallido; forzar sin motivo → 422); frontend
   `ClosingCenterPage.test.tsx` (2); e2e `critical-journey` visita
   `/finanzas/cierre`.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 5 — incremento 1 (Exception Center)
+
+Rama: `feat/phase5-exception-center`.
+
+- **`exception_service.list_exceptions`** + `GET
+  /financial-control/exceptions?companyId=` — "Exception Zero": lista única y
+  accionable de todo lo que está mal a nivel financiero/dato, derivado de la
+  base:
+  1. `SUBLEDGER_GL_MISMATCH` (crítica) — subledger descuadrado.
+  2. `UNMATCHED_BANK_LINES` (advertencia) — líneas bancarias sin conciliar.
+  3. `AP_OVERDUE` / 4. `AR_OVERDUE` (advertencia) — facturas vencidas con saldo.
+  5. `STALE_APPROVALS` (advertencia) — aprobaciones PENDING > 7 días.
+  6. `FISCAL_PERIOD_MISSING` (crítica) — sin período fiscal para hoy.
+  7. `DUPLICATE_SUPPLIER_INVOICE` (crítica) — (proveedor, número) repetido.
+  8. `VOUCHER_PAYER_UNSET` (info) — pagador de comprobantes sin fijar.
+  Cada excepción: `severity`, `count`, `detail`, `suggestedAction`, `route`.
+  Respuesta: `exceptionZero`, `total`, `criticalCount`.
+- **Frontend**: `/finanzas/excepciones` → `ExceptionCenterPage` (EmptyState
+  "Exception Zero" cuando no hay nada; tabla con severidad + acción sugerida
+  + link "Resolver →"), nueva entrada de navegación.
+- Tests: `test_exception_center.py` (Exception Zero para compañía limpia;
+  detecta duplicado + período faltante + pagador sin fijar, `criticalCount`);
+  frontend `ExceptionCenterPage.test.tsx` (2); e2e `critical-journey`.

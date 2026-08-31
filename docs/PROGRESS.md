@@ -3312,3 +3312,24 @@ Rama: `feat/phase2-voucher-identity`.
   + aserción "prepared_by es nombre, no UUID"; frontend
   `CompanySettingsPage.test.tsx` (+1), `VouchersPage.test.tsx` (payer
   read-only, sin `payer=` en la URL).
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 2 — incremento 4 (beneficiario buscable)
+
+Rama: `feat/phase2-beneficiary-selector`.
+
+- **`GET /treasury/beneficiaries?companyId=`**: lista unificada y buscable de
+  beneficiarios elegibles, reuniendo `Supplier` + `Worker` + `Customer` sin
+  duplicar entidades (el `id` es el de la tabla de origen). Permiso
+  `treasury.voucher:read` + `assert_company_access`.
+- **Comprobante** (`GET /treasury/vouchers/{id}`): acepta
+  `beneficiaryType` + `beneficiaryId`; el backend traduce a nombre validando
+  pertenencia a la compañía (404 si es de otra compañía). El texto libre
+  `beneficiary` queda como fallback. Sin `(tipo,id)` ni texto → 422.
+- **Frontend** `VouchersPage`: el beneficiario ahora es un `Combobox` sobre
+  `/treasury/beneficiaries` (proveedor / trabajador / cliente), ya no un
+  input de texto libre. `voucherService.download` envía `(beneficiaryType,
+  beneficiaryId)`.
+- Tests: `test_voucher_beneficiary_resolves_from_registered_entity` (listado
+  incluye el proveedor; PDF resuelve el nombre; beneficiario de otra
+  compañía → 404). Frontend `VouchersPage.test.tsx` actualizado (combobox +
+  aserción de que la URL lleva `beneficiaryType`/`beneficiaryId`, no `payer=`).

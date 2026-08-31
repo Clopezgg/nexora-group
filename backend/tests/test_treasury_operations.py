@@ -16,6 +16,7 @@ from app.models.permission import UserCompanyAccess
 from tests.helpers import (
     create_account,
     create_company,
+    create_supplier,
     create_treasury_account,
     create_user_with_role,
     login_admin,
@@ -251,6 +252,41 @@ def test_voucher_pdf_uses_company_fixed_payer_and_configured_approver(client):
     assert "KAREN VANNESSA LOPEZ GONZALEZ" in text
     assert "CARLOS HUMBERTO LOPEZ" in text
     assert "IGNORAME" not in text
+
+
+def test_voucher_beneficiary_resolves_from_registered_entity(client):
+    """Orden maestra Phase 2: beneficiario buscable sobre entidades reales
+    (Supplier/Worker/Customer), sin duplicar entidades ni capturar texto."""
+    login_admin(client)
+    company, _cash, _diff, _contrib, funding_doc = _setup(client)
+    supplier = create_supplier(
+        client, company_id=company["id"], legal_name="Ferretería El Clavo S.A."
+    )
+
+    listing = client.get(f"/api/treasury/beneficiaries?companyId={company['id']}")
+    assert listing.status_code == 200, listing.text
+    entries = listing.json()
+    assert any(
+        e["beneficiaryType"] == "SUPPLIER" and e["id"] == supplier["id"] for e in entries
+    )
+
+    response = client.get(
+        f"/api/treasury/vouchers/{funding_doc}"
+        f"?beneficiaryType=SUPPLIER&beneficiaryId={supplier['id']}&paymentMethod=Cheque"
+    )
+    assert response.status_code == 200, response.text
+    assert "Ferrer" in response.content.decode("latin-1") or "Ferret" in response.content.decode(
+        "latin-1"
+    )
+
+    # Un beneficiario de otra compañía es rechazado.
+    other = create_company(client, name="Otra Compañía")
+    other_supplier = create_supplier(client, company_id=other["id"], legal_name="Ajeno S.A.")
+    bad = client.get(
+        f"/api/treasury/vouchers/{funding_doc}"
+        f"?beneficiaryType=SUPPLIER&beneficiaryId={other_supplier['id']}&paymentMethod=Cheque"
+    )
+    assert bad.status_code == 404, bad.text
 
 
 def test_reconciliation_uses_cumulative_matches_and_blocks_overmatch(client, db_session):

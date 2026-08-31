@@ -19,11 +19,12 @@ export const voucherService = {
 
   download: async (
     accountingDocumentId: string,
-    input: { beneficiary: string; payer: string; paymentMethod: string; approvedBy?: string },
+    input: { beneficiary: string; paymentMethod: string; approvedBy?: string },
   ): Promise<Blob> => {
+    // El pagador ya no se envía desde el cliente: es un dato fijo de la
+    // compañía (Company Settings) que el backend resuelve.
     const params = new URLSearchParams({
       beneficiary: input.beneficiary,
-      payer: input.payer,
       paymentMethod: input.paymentMethod,
     })
     if (input.approvedBy?.trim()) params.set('approvedBy', input.approvedBy.trim())

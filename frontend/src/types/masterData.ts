@@ -6,6 +6,8 @@ export interface Company {
   functionalCurrencyCode: string | null
   country: string | null
   fiscalId: string | null
+  voucherPayerName: string | null
+  voucherApproverName: string | null
 }
 
 export interface Account {

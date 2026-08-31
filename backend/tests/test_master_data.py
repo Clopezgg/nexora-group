@@ -217,3 +217,44 @@ def test_account_create_rejects_invalid_domain_values_without_inserting(client, 
 
     assert response.status_code == 422, response.text
     assert client.get(f"/api/master-data/accounts?companyId={company['id']}").json() == []
+
+
+def test_company_voucher_payer_is_set_once_then_immutable(client, db_session):
+    """Orden maestra Phase 2: el pagador de comprobantes se asigna una sola
+    vez (mismo patrón que `code`); el aprobador es siempre editable."""
+    login_admin(client)
+    company = create_company(client)
+
+    first = client.patch(
+        f"/api/master-data/companies/{company['id']}",
+        json={
+            "voucherPayerName": "KAREN VANNESSA LOPEZ GONZALEZ",
+            "voucherApproverName": "CARLOS HUMBERTO LOPEZ",
+        },
+    )
+    assert first.status_code == 200, first.text
+    assert first.json()["voucherPayerName"] == "KAREN VANNESSA LOPEZ GONZALEZ"
+    assert first.json()["voucherApproverName"] == "CARLOS HUMBERTO LOPEZ"
+
+    # Aprobador editable.
+    edit_approver = client.patch(
+        f"/api/master-data/companies/{company['id']}",
+        json={"voucherApproverName": "OTRO APROBADOR"},
+    )
+    assert edit_approver.status_code == 200, edit_approver.text
+    assert edit_approver.json()["voucherApproverName"] == "OTRO APROBADOR"
+    assert edit_approver.json()["voucherPayerName"] == "KAREN VANNESSA LOPEZ GONZALEZ"
+
+    # Pagador inmutable una vez fijado.
+    change_payer = client.patch(
+        f"/api/master-data/companies/{company['id']}",
+        json={"voucherPayerName": "ALGUIEN MAS"},
+    )
+    assert change_payer.status_code == 409, change_payer.text
+
+    # Reenviar el mismo valor no es un cambio -> permitido.
+    same_payer = client.patch(
+        f"/api/master-data/companies/{company['id']}",
+        json={"voucherPayerName": "KAREN VANNESSA LOPEZ GONZALEZ"},
+    )
+    assert same_payer.status_code == 200, same_payer.text

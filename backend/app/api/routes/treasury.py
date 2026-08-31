@@ -8,6 +8,7 @@ from app.api.deps import get_current_user_id, get_db
 from app.api.deps_correlation import get_correlation_id
 from app.domain.errors import InvalidFinancialReferenceError
 from app.models.accounting import AccountingDocument
+from app.models.company import Company
 from app.models.treasury import (
     BankStatementLine,
     FundRestriction,
@@ -747,7 +748,7 @@ def list_fund_restrictions(
 def download_voucher(
     accounting_document_id: uuid.UUID,
     beneficiary: str,
-    payer: str,
+    payer: str | None = Query(default=None),
     payment_method: str = Query(alias="paymentMethod"),
     approved_by: str | None = Query(default=None, alias="approvedBy"),
     db: Session = Depends(get_db),
@@ -766,14 +767,23 @@ def download_voucher(
         action="read",
         company_id=document.company_id,
     )
+    company = db.get(Company, document.company_id)
+    # Pagador: dato fijo de la compañía (orden maestra Phase 2). Solo se usa el
+    # `payer` del cliente como fallback cuando la compañía todavía no lo fijó.
+    resolved_payer = (
+        (company.voucher_payer_name if company else None)
+        or (payer.strip() if payer else None)
+        or (company.name if company else "")
+    )
+    resolved_approver = approved_by or (company.voucher_approver_name if company else None)
     try:
         pdf_bytes = voucher_service.generate_voucher_pdf(
             db,
             accounting_document_id=accounting_document_id,
-            prepared_by=str(user_id),
-            approved_by=approved_by,
+            prepared_by=user.full_name,
+            approved_by=resolved_approver,
             beneficiary=beneficiary,
-            payer=payer,
+            payer=resolved_payer,
             payment_method=payment_method,
         )
     except ValueError as error:

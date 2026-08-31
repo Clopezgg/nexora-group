@@ -34,6 +34,8 @@ function CompanyProfileForm({ company }: { company: Company }) {
     fiscalId: company.fiscalId ?? '',
     country: company.country ?? 'HN',
     functionalCurrencyCode: company.functionalCurrencyCode ?? 'HNL',
+    voucherPayerName: company.voucherPayerName ?? '',
+    voucherApproverName: company.voucherApproverName ?? '',
   })
 
   const updateMutation = useMutation({
@@ -44,6 +46,8 @@ function CompanyProfileForm({ company }: { company: Company }) {
       fiscalId: form.fiscalId,
       country: form.country,
       functionalCurrencyCode: company.functionalCurrencyCode ? undefined : form.functionalCurrencyCode,
+      voucherPayerName: company.voucherPayerName ? undefined : form.voucherPayerName || undefined,
+      voucherApproverName: form.voucherApproverName || undefined,
     }),
     onSuccess: (updatedCompany: Company) => {
       queryClient.invalidateQueries({ queryKey: ['master-data', 'companies'] })
@@ -54,6 +58,8 @@ function CompanyProfileForm({ company }: { company: Company }) {
         fiscalId: updatedCompany.fiscalId ?? '',
         country: updatedCompany.country ?? 'HN',
         functionalCurrencyCode: updatedCompany.functionalCurrencyCode ?? 'HNL',
+        voucherPayerName: updatedCompany.voucherPayerName ?? '',
+        voucherApproverName: updatedCompany.voucherApproverName ?? '',
       })
     },
   })
@@ -70,6 +76,17 @@ function CompanyProfileForm({ company }: { company: Company }) {
       />
       <Input label="Razón social" value={form.legalName} onChange={(event) => setForm({ ...form, legalName: event.target.value })} />
       <Input label="Identificación fiscal / RTN" value={form.fiscalId} onChange={(event) => setForm({ ...form, fiscalId: event.target.value })} />
+      <Input
+        label={company.voucherPayerName ? 'Pagador de comprobantes · inmutable' : 'Pagador de comprobantes · se asigna una sola vez'}
+        value={form.voucherPayerName}
+        onChange={(event) => setForm({ ...form, voucherPayerName: event.target.value })}
+        disabled={Boolean(company.voucherPayerName)}
+      />
+      <Input
+        label="Aprobador de comprobantes · configurable"
+        value={form.voucherApproverName}
+        onChange={(event) => setForm({ ...form, voucherApproverName: event.target.value })}
+      />
       <Select label="País" value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })}>
         <option value="HN">HN — Honduras</option>
       </Select>

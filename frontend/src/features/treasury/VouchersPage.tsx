@@ -19,9 +19,9 @@ import './TreasuryPage.css'
 export function VouchersPage() {
   const handleMutationError = useMutationError()
   const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
+  const activeCompany = companies.find((company) => company.id === activeCompanyId) ?? null
   const [documentId, setDocumentId] = useState('')
   const [beneficiary, setBeneficiary] = useState('')
-  const [payer, setPayer] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('TRANSFER')
   const [approvedBy, setApprovedBy] = useState('')
 
@@ -34,9 +34,8 @@ export function VouchersPage() {
   const download = useMutation({
     mutationFn: () => voucherService.download(documentId, {
       beneficiary: beneficiary.trim(),
-      payer: payer.trim(),
       paymentMethod,
-      approvedBy: approvedBy.trim() || undefined,
+      approvedBy: approvedBy.trim() || activeCompany?.voucherApproverName || undefined,
     }),
     onSuccess: (blob) => {
       const document = (documentsQuery.data ?? []).find((row) => row.id === documentId)
@@ -101,7 +100,15 @@ export function VouchersPage() {
       <Card title="Datos impresos en el comprobante">
         <div className="nx-treasury__form">
           <Input label="Beneficiario" value={beneficiary} onChange={(event) => setBeneficiary(event.target.value)} required />
-          <Input label="Pagador / emisor" value={payer} onChange={(event) => setPayer(event.target.value)} required />
+          <div>
+            <Input
+              label="Pagador"
+              value={activeCompany?.voucherPayerName ?? 'No configurado — se usará el nombre de la compañía'}
+              readOnly
+              disabled
+            />
+            <p className="nx-field__hint">El pagador es un dato fijo de la compañía. Se define en Configuración → Perfil de la compañía.</p>
+          </div>
           <Select label="Método de pago" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
             <option value="TRANSFER">Transferencia</option>
             <option value="CHECK">Cheque</option>
@@ -109,10 +116,20 @@ export function VouchersPage() {
             <option value="REMITTANCE">Remesa</option>
             <option value="OTHER">Otro</option>
           </Select>
-          <Input label="Aprobado por (opcional)" value={approvedBy} onChange={(event) => setApprovedBy(event.target.value)} />
+          <div>
+            <Input
+              label="Aprobado por"
+              value={approvedBy}
+              onChange={(event) => setApprovedBy(event.target.value)}
+              placeholder={activeCompany?.voucherApproverName ?? 'Sin aprobador configurado'}
+            />
+            {activeCompany?.voucherApproverName ? (
+              <p className="nx-field__hint">Si lo dejas vacío se usa el aprobador configurado: {activeCompany.voucherApproverName}</p>
+            ) : null}
+          </div>
           <Button
             loading={download.isPending}
-            disabled={!documentId || !beneficiary.trim() || !payer.trim() || !paymentMethod}
+            disabled={!documentId || !beneficiary.trim() || !paymentMethod}
             onClick={() => download.mutate()}
           >
             Generar PDF

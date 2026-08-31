@@ -1,7 +1,7 @@
 import uuid
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.audit import AuditLog
 
@@ -23,7 +23,11 @@ def list_for_company(
     offset: int = 0,
     limit: int = 50,
 ) -> list[AuditLog]:
-    stmt = select(AuditLog).where(AuditLog.company_id == company_id)
+    stmt = (
+        select(AuditLog)
+        .options(selectinload(AuditLog.actor))
+        .where(AuditLog.company_id == company_id)
+    )
     if entity_type is not None:
         stmt = stmt.where(AuditLog.entity_type == entity_type)
     if entity_id is not None:

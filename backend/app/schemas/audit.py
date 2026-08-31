@@ -7,6 +7,8 @@ from app.schemas.base import CamelModel
 class AuditLogResponse(CamelModel):
     id: uuid.UUID
     actor_user_id: uuid.UUID | None
+    actor_full_name: str | None = None
+    actor_email: str | None = None
     action: str
     entity_type: str
     entity_id: uuid.UUID

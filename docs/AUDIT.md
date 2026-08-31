@@ -446,3 +446,24 @@ Plataforma nueva). Filtros: tipo de entidad (texto libre, ya que
 `entity_type` es un string dinámico por dominio) y rango de fechas
 (client-side sobre `createdAt`). `frontend/src/services/auditService.ts`,
 `frontend/src/types/audit.ts`.
+
+### Vista humana (2026-08-31)
+
+La tabla primaria **no** muestra códigos técnicos ni UUIDs. Columnas:
+`Fecha` · `Evento` · `Módulo` · `Ejecutado por` · acción *Ver detalles*.
+
+- `humanizeAudit.ts` descompone el `action` almacenado
+  (`<módulo>.<entidad>.<verbo>`) en español (`ap.supplier_invoice.approve`
+  → "Factura de proveedor · Aprobación", módulo "Cuentas por pagar"). El
+  código almacenado **nunca** cambia (orden maestra §45); solo la
+  presentación. Fallback determinístico (`titleize`) para acciones nuevas,
+  más un mapa `SPECIAL_ACTIONS` para las que decomponen mal.
+- La API de auditoría añade `actorFullName` / `actorEmail` (left join a
+  `users`, sin migración: el FK ya existía) para mostrar un nombre en vez
+  de un UUID. `null` para eventos de sistema.
+- El cajón *Ver detalles* (`Drawer`) expone los campos técnicos bajo
+  demanda: código del evento, ID de entidad, ID de correlación, proyecto,
+  y `before`/`after` como JSON formateado. `redactSensitive()` oculta
+  cualquier clave con pinta de secreto (`password`, `token`, `secret`,
+  `api_key`, `database_url`, …) a cualquier profundidad — defensa en
+  profundidad sobre el criterio de no incluir secretos en el `record`.

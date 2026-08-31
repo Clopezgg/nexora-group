@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderApp } from './testUtils'
 
@@ -34,19 +35,21 @@ describe('AuditLogPage', () => {
     expect(await screen.findByText(/configura una compañía primero/i)).toBeInTheDocument()
   })
 
-  it('loads and displays real audit log entries from the API', async () => {
+  it('shows humanized events in the table and technical fields only in the detail drawer', async () => {
     stubFetch(
       [{ id: 'c1', name: 'Constructora Nexora', code: null, legalName: null, functionalCurrencyCode: 'HNL' }],
       [
         {
           id: 'a1',
           actorUserId: 'u1',
+          actorFullName: 'Carlos Humberto López',
+          actorEmail: 'carlos@nexora.group',
           action: 'ap.supplier_invoice.approve',
           entityType: 'ap.supplier_invoice',
-          entityId: 'inv1',
+          entityId: 'inv-uuid-1',
           companyId: 'c1',
           projectId: null,
-          before: { status: 'DRAFT' },
+          before: { status: 'DRAFT', secret: 'should-not-render' },
           after: { status: 'APPROVED' },
           correlationId: 'corr-1',
           createdAt: '2026-08-25T10:00:00Z',
@@ -56,6 +59,20 @@ describe('AuditLogPage', () => {
 
     render(renderApp('/control/auditoria'))
 
-    expect(await screen.findByText(/ap\.supplier_invoice\.approve/i)).toBeInTheDocument()
+    // Primary view: human language, no raw code, actor name not UUID.
+    expect(await screen.findByText('Factura de proveedor · Aprobación')).toBeInTheDocument()
+    expect(screen.getByText('Cuentas por pagar')).toBeInTheDocument()
+    expect(screen.getByText('Carlos Humberto López')).toBeInTheDocument()
+    expect(screen.queryByText('ap.supplier_invoice.approve')).not.toBeInTheDocument()
+    expect(screen.queryByText('inv-uuid-1')).not.toBeInTheDocument()
+
+    // Detail drawer: technical fields available on demand, secrets redacted.
+    await userEvent.click(screen.getByRole('button', { name: /ver detalles/i }))
+    expect(await screen.findByText('ap.supplier_invoice.approve')).toBeInTheDocument()
+    expect(screen.getByText('inv-uuid-1')).toBeInTheDocument()
+    expect(screen.getByText('corr-1')).toBeInTheDocument()
+    expect(screen.getByText(/"status": "APPROVED"/)).toBeInTheDocument()
+    expect(screen.getByText(/\[oculto\]/)).toBeInTheDocument()
+    expect(screen.queryByText(/should-not-render/)).not.toBeInTheDocument()
   })
 })

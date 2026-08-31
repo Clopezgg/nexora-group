@@ -4,6 +4,7 @@ import { Button, Card, EmptyState, LoadingState, Select } from '../../design-sys
 import { masterDataService } from '../../services/masterDataService'
 import { apService, type SupplierInvoice } from '../../services/apArService'
 import { treasuryService } from '../../services/treasuryService'
+import { formatMoney } from '../../utils/currency'
 import { AccountsPayablePage } from './AccountsPayablePage'
 import { SupplierPaymentHistoryModal } from './SupplierPaymentHistoryModal'
 
@@ -72,7 +73,7 @@ export function AccountsPayableWorkspace() {
               <option value="">Selecciona una factura…</option>
               {invoices.map((invoice) => (
                 <option key={invoice.id} value={invoice.id}>
-                  {invoice.invoiceNumber} — {invoice.currencyCode} {invoice.amount.toFixed(2)} — {invoice.status}
+                  {invoice.invoiceNumber} — {formatMoney(invoice.amount, invoice.currencyCode)} — {invoice.status}
                 </option>
               ))}
             </Select>

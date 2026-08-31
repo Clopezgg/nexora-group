@@ -462,7 +462,7 @@ function PaySupplierInvoiceButton({
         onClick={() => setOpen(true)}
         disabled={eligibleTreasuryAccounts.length === 0}
       >
-        Pagar saldo ({remaining.toFixed(2)})
+        Pagar saldo ({formatMoney(remaining, currencyCode)})
       </Button>
       {open ? (
         <Modal open title="Pagar factura de proveedor" onClose={() => setOpen(false)}>

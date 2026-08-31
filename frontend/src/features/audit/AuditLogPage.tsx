@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import {
   Card,
+  Drawer,
   EmptyState,
   ErrorState,
   FilterBar,
@@ -13,16 +14,11 @@ import {
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { auditService } from '../../services/auditService'
 import type { AuditLogEntry } from '../../types/audit'
+import './AuditLogPage.css'
+import { auditActorLabel, humanizeAuditAction, redactSensitive } from './humanizeAudit'
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString('es-HN')
-}
-
-function formatDiff(entry: AuditLogEntry): string {
-  const parts: string[] = []
-  if (entry.before) parts.push(`antes: ${JSON.stringify(entry.before)}`)
-  if (entry.after) parts.push(`después: ${JSON.stringify(entry.after)}`)
-  return parts.join(' — ') || '—'
 }
 
 export function AuditLogPage() {
@@ -30,6 +26,7 @@ export function AuditLogPage() {
   const [entityTypeFilter, setEntityTypeFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [selected, setSelected] = useState<AuditLogEntry | null>(null)
 
   const auditQuery = useQuery({
     queryKey: ['audit', activeCompanyId, entityTypeFilter],
@@ -52,12 +49,22 @@ export function AuditLogPage() {
 
   const columns: TableColumn<AuditLogEntry>[] = [
     { key: 'createdAt', header: 'Fecha', render: (row) => formatDateTime(row.createdAt) },
-    { key: 'action', header: 'Acción', render: (row) => row.action },
-    { key: 'entityType', header: 'Entidad', render: (row) => row.entityType },
-    { key: 'entityId', header: 'ID de entidad', render: (row) => row.entityId },
-    { key: 'actorUserId', header: 'Usuario', render: (row) => row.actorUserId ?? 'sistema' },
-    { key: 'diff', header: 'Cambio', render: (row) => formatDiff(row) },
-    { key: 'correlationId', header: 'Correlación', render: (row) => row.correlationId },
+    { key: 'event', header: 'Evento', render: (row) => humanizeAuditAction(row.action).event },
+    { key: 'module', header: 'Módulo', render: (row) => humanizeAuditAction(row.action).module },
+    { key: 'actor', header: 'Ejecutado por', render: (row) => auditActorLabel(row) },
+    {
+      key: 'details',
+      header: '',
+      render: (row) => (
+        <button
+          type="button"
+          className="nx-button nx-button--ghost"
+          onClick={() => setSelected(row)}
+        >
+          <span className="nx-button__label">Ver detalles</span>
+        </button>
+      ),
+    },
   ]
 
   if (loadingCompanies) return <LoadingState label="Cargando compañías…" />
@@ -70,6 +77,8 @@ export function AuditLogPage() {
       />
     )
   }
+
+  const human = selected ? humanizeAuditAction(selected.action) : null
 
   return (
     <div>
@@ -108,6 +117,74 @@ export function AuditLogPage() {
           />
         )}
       </Card>
+
+      <Drawer open={Boolean(selected)} title="Detalle de auditoría" onClose={() => setSelected(null)}>
+        {selected && human ? (
+          <dl className="nx-detail-list">
+            <div>
+              <dt>Evento</dt>
+              <dd>{human.event}</dd>
+            </div>
+            <div>
+              <dt>Módulo</dt>
+              <dd>{human.module}</dd>
+            </div>
+            <div>
+              <dt>Fecha y hora</dt>
+              <dd>{formatDateTime(selected.createdAt)}</dd>
+            </div>
+            <div>
+              <dt>Ejecutado por</dt>
+              <dd>
+                {auditActorLabel(selected)}
+                {selected.actorEmail ? ` · ${selected.actorEmail}` : ''}
+              </dd>
+            </div>
+            <div>
+              <dt>Código técnico del evento</dt>
+              <dd><code>{selected.action}</code></dd>
+            </div>
+            <div>
+              <dt>Registro</dt>
+              <dd>{human.record}</dd>
+            </div>
+            <div>
+              <dt>ID de entidad</dt>
+              <dd><code>{selected.entityId}</code></dd>
+            </div>
+            <div>
+              <dt>ID de correlación</dt>
+              <dd><code>{selected.correlationId}</code></dd>
+            </div>
+            {selected.projectId ? (
+              <div>
+                <dt>Proyecto</dt>
+                <dd><code>{selected.projectId}</code></dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>Antes</dt>
+              <dd>
+                <pre className="nx-code-block">
+                  {selected.before
+                    ? JSON.stringify(redactSensitive(selected.before), null, 2)
+                    : '—'}
+                </pre>
+              </dd>
+            </div>
+            <div>
+              <dt>Después</dt>
+              <dd>
+                <pre className="nx-code-block">
+                  {selected.after
+                    ? JSON.stringify(redactSensitive(selected.after), null, 2)
+                    : '—'}
+                </pre>
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+      </Drawer>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { RequiresActiveProject } from '../projects/RequiresActiveProject'
 import { reportingService } from '../../services/reportingService'
 import type { BudgetVsActualReport } from '../../types/reporting'
 import { downloadCsv, toCsv } from '../../utils/csv'
+import { useReportCurrency } from './reportMoney'
 
 interface BudgetVsActualRow {
   concept: string
@@ -14,11 +15,6 @@ interface BudgetVsActualRow {
 const CSV_COLUMNS = [
   { key: 'concept' as const, label: 'Concepto' },
   { key: 'amount' as const, label: 'Monto' },
-]
-
-const COLUMNS: TableColumn<BudgetVsActualRow>[] = [
-  { key: 'concept', header: 'Concepto', render: (row) => row.concept },
-  { key: 'amount', header: 'Monto', render: (row) => row.amount },
 ]
 
 function toRows(report: BudgetVsActualReport): BudgetVsActualRow[] {
@@ -37,6 +33,11 @@ function toRows(report: BudgetVsActualReport): BudgetVsActualRow[] {
  * campos ya confiables de GET /api/reports/budget-vs-actual. Earned
  * Value (CPI/SPI/EAC/VAC) queda fuera de alcance de este reporte. */
 function BudgetVsActualReportView({ projectId }: { projectId: string }) {
+  const { fmt } = useReportCurrency()
+  const COLUMNS: TableColumn<BudgetVsActualRow>[] = [
+    { key: 'concept', header: 'Concepto', render: (row) => row.concept },
+    { key: 'amount', header: 'Monto', numeric: true, render: (row) => fmt(row.amount) },
+  ]
   const reportQuery = useQuery({
     queryKey: ['reports', 'budget-vs-actual', projectId],
     queryFn: () => reportingService.getBudgetVsActual(projectId),

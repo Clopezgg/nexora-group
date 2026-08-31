@@ -58,8 +58,8 @@ describe('BudgetVsActualPage', () => {
 
     await user.click(await screen.findByRole('tab', { name: 'Presupuesto vs. Real' }))
 
-    expect(await screen.findByText('1000.00')).toBeInTheDocument()
-    expect(screen.getByText('125.50')).toBeInTheDocument()
-    expect(screen.getByText('874.50')).toBeInTheDocument()
+    expect(await screen.findByText('L 1,000.00')).toBeInTheDocument()
+    expect(screen.getByText('L 125.50')).toBeInTheDocument()
+    expect(screen.getByText('L 874.50')).toBeInTheDocument()
   })
 })

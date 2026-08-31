@@ -3741,3 +3741,28 @@ Rama: `feat/od-fase2-dashboard-mobile`.
   (banda "Mi trabajo hoy" clicable), e2e `critical-journey` verifica la
   banda en `/inicio`. Frontend 158 passed; typecheck/lint/build verdes.
 - Pendiente menor arrastrado a una fase posterior: FAB "Quick create" (§25).
+
+### 2026-08-31 — ORDEN MAESTRA DEFINITIVA · FASE 3 (Money formatting global)
+
+Rama: `feat/od-fase3-money-global`.
+
+Auditoría §26–§29 sobre toda la UI. El formateo ya estaba centralizado
+(`formatMoney` / `MoneyInput`), pero varias pantallas renderizaban el
+número crudo del backend:
+
+- **Reportes**: Balance de Comprobación, Libro Mayor, Balance General,
+  Estado de Resultados, Flujo de Efectivo, Presupuesto vs. Real — todos los
+  importes (celdas y totales) pasan por `formatMoney` en la moneda funcional
+  de la compañía activa (`useReportCurrency`). Antes mostraban `"1234.50"`.
+- **Comercial**: `SalesContractsPage`, `QuotationsPage` — `"HNL 5000"` →
+  `L 5,000.00`.
+- **Abastecimiento**: `BidComparisonPage` — total de cotización formateado.
+- **Recursos**: `EquipmentPage` (combustible) — costo unitario y total.
+- **Aprobaciones**: `ApprovalInboxPage` — columna Monto.
+- **Design System**: `Table` acepta `numeric` / `align` por columna →
+  `font-variant-numeric: tabular-nums` + alineación a la derecha en todas
+  las columnas de débito/crédito/monto/saldo (§29).
+- Tests: `currency` (compacto), y actualizados los asserts de
+  `TrialBalancePage`, `BudgetVsActualPage`, `FinancialStatementsPage`,
+  `BidComparisonPage`, e2e `critical-journey` para esperar dinero
+  formateado. Frontend 158 passed; typecheck/lint/build verdes.

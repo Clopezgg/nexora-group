@@ -4,6 +4,7 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { reportingService } from '../../services/reportingService'
 import type { TrialBalanceRow } from '../../types/reporting'
 import { downloadCsv, toCsv } from '../../utils/csv'
+import { useReportCurrency } from './reportMoney'
 
 const CSV_COLUMNS = [
   { key: 'accountCode' as const, label: 'Código' },
@@ -13,6 +14,7 @@ const CSV_COLUMNS = [
 ]
 
 function buildColumns(
+  fmt: (value: string | number | null | undefined) => string,
   onDrillToLedger?: (accountId: string, label: string) => void,
 ): TableColumn<TrialBalanceRow>[] {
   return [
@@ -33,8 +35,8 @@ function buildColumns(
         ),
     },
     { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
-    { key: 'debitBalance', header: 'Débito', render: (row) => row.debitBalance },
-    { key: 'creditBalance', header: 'Crédito', render: (row) => row.creditBalance },
+    { key: 'debitBalance', header: 'Débito', numeric: true, render: (row) => fmt(row.debitBalance) },
+    { key: 'creditBalance', header: 'Crédito', numeric: true, render: (row) => fmt(row.creditBalance) },
   ]
 }
 
@@ -49,7 +51,8 @@ export function TrialBalancePage({
   onDrillToLedger?: (accountId: string, label: string) => void
 } = {}) {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
-  const columns = buildColumns(onDrillToLedger)
+  const { fmt } = useReportCurrency()
+  const columns = buildColumns(fmt, onDrillToLedger)
 
   const reportQuery = useQuery({
     queryKey: ['reports', 'trial-balance', activeCompanyId],
@@ -98,7 +101,7 @@ export function TrialBalancePage({
             />
             {reportQuery.data ? (
               <p className="nx-field__label">
-                Total débito: {reportQuery.data.totalDebit} — Total crédito: {reportQuery.data.totalCredit}
+                Total débito: {fmt(reportQuery.data.totalDebit)} — Total crédito: {fmt(reportQuery.data.totalCredit)}
               </p>
             ) : null}
           </>

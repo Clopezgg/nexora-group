@@ -13,6 +13,7 @@ import {
   Table,
 } from '../../design-system'
 import type { TableColumn } from '../../design-system'
+import { formatMoney } from '../../utils/currency'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { crmService } from '../../services/crmService'
 import { projectService } from '../../services/projectService'
@@ -57,7 +58,7 @@ export function QuotationsPage() {
 
   const columns: TableColumn<Quotation>[] = [
     { key: 'quotationNumber', header: 'Cotización', render: (row) => row.quotationNumber },
-    { key: 'amount', header: 'Monto', render: (row) => `${row.currencyCode} ${row.amount}` },
+    { key: 'amount', header: 'Monto', render: (row) => formatMoney(row.amount, row.currencyCode), numeric: true },
     { key: 'status', header: 'Estado', render: (row) => <Badge>{row.status}</Badge> },
     {
       key: 'actions',

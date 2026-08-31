@@ -180,7 +180,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await page.goto('/abastecimiento/comparativos')
     await expect(page.getByText(/RFQ-/)).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: 'Comparar' }).first().click()
-    await expect(page.getByText(/1000\.00/)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/L\s*1,000\.00/)).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: 'Seleccionar ganadora' }).click()
     await expect(page.getByText(/PO-/i)).toBeVisible({ timeout: 10_000 })
 
@@ -641,7 +641,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await page.getByRole('tab', { name: /libro mayor/i }).click()
     await expect(page.getByText(/Total débito/)).toBeVisible({ timeout: 10_000 })
     await page.getByRole('tab', { name: /balance general/i }).click()
-    await expect(page.getByText(/Diferencia: 0\.00/)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/Diferencia:\s*L\s*0\.00/)).toBeVisible({ timeout: 10_000 })
     await page.getByRole('tab', { name: /estado de resultados/i }).click()
     await expect(page.getByText(/Utilidad neta/)).toBeVisible({ timeout: 10_000 })
   })

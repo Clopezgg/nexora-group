@@ -15,6 +15,7 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { formatMoney } from '../../utils/currency'
 import { equipmentService } from '../../services/equipmentService'
 import { projectService } from '../../services/projectService'
 import type { Equipment, FuelLog, MaintenanceOrder } from '../../types/equipment'
@@ -140,6 +141,8 @@ function EquipmentTab({ companyId }: { companyId: string }) {
 
 function FuelTab({ companyId }: { companyId: string }) {
   const queryClient = useQueryClient()
+  const { activeCompany } = useActiveCompany()
+  const currency = activeCompany?.functionalCurrencyCode ?? 'HNL'
   const equipmentQuery = useEquipmentList(companyId)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -178,8 +181,8 @@ function FuelTab({ companyId }: { companyId: string }) {
   const columns: TableColumn<FuelLog>[] = [
     { key: 'logDate', header: 'Fecha', render: (row) => row.logDate },
     { key: 'quantity', header: 'Cantidad', render: (row) => row.quantity },
-    { key: 'unitCost', header: 'Costo unitario', render: (row) => row.unitCost },
-    { key: 'totalCost', header: 'Total', render: (row) => row.totalCost },
+    { key: 'unitCost', header: 'Costo unitario', numeric: true, render: (row) => formatMoney(row.unitCost, currency) },
+    { key: 'totalCost', header: 'Total', numeric: true, render: (row) => formatMoney(row.totalCost, currency) },
   ]
 
   return (

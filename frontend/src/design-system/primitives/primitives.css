@@ -148,6 +148,13 @@
 .nx-table tr:last-child td {
   border-bottom: none;
 }
+.nx-table__cell--right {
+  text-align: right;
+}
+.nx-table__cell--numeric {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 /* EmptyState / LoadingState / ErrorState */
 .nx-state {

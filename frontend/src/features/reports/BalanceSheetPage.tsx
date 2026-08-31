@@ -4,17 +4,12 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { reportingService } from '../../services/reportingService'
 import type { StatementRow } from '../../types/reporting'
 import { downloadCsv, toCsv } from '../../utils/csv'
+import { useReportCurrency } from './reportMoney'
 
 const CSV_COLUMNS = [
   { key: 'accountCode' as const, label: 'Código' },
   { key: 'accountName' as const, label: 'Cuenta' },
   { key: 'balance' as const, label: 'Saldo' },
-]
-
-const COLUMNS: TableColumn<StatementRow>[] = [
-  { key: 'accountCode', header: 'Código', render: (row) => row.accountCode },
-  { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
-  { key: 'balance', header: 'Saldo', render: (row) => row.balance },
 ]
 
 /** NXR-REQ-0093 (financial statements subproject): Balance General armado
@@ -23,6 +18,12 @@ const COLUMNS: TableColumn<StatementRow>[] = [
  * docs/superpowers/specs/2026-08-25-financial-statements-design.md. */
 export function BalanceSheetPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const { fmt } = useReportCurrency()
+  const COLUMNS: TableColumn<StatementRow>[] = [
+    { key: 'accountCode', header: 'Código', render: (row) => row.accountCode },
+    { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
+    { key: 'balance', header: 'Saldo', numeric: true, render: (row) => fmt(row.balance) },
+  ]
 
   const reportQuery = useQuery({
     queryKey: ['reports', 'balance-sheet', activeCompanyId],
@@ -71,7 +72,7 @@ export function BalanceSheetPage() {
               getRowKey={(row) => row.accountId}
               emptyMessage="Sin cuentas de activo con saldo."
             />
-            <p className="nx-field__label">Subtotal: {report.totalAssets}</p>
+            <p className="nx-field__label">Subtotal: {fmt(report.totalAssets)}</p>
           </Card>
           <Card>
             <h2 className="nx-field__label">Pasivos</h2>
@@ -81,7 +82,7 @@ export function BalanceSheetPage() {
               getRowKey={(row) => row.accountId}
               emptyMessage="Sin cuentas de pasivo con saldo."
             />
-            <p className="nx-field__label">Subtotal: {report.totalLiabilities}</p>
+            <p className="nx-field__label">Subtotal: {fmt(report.totalLiabilities)}</p>
           </Card>
           <Card>
             <h2 className="nx-field__label">Patrimonio</h2>
@@ -92,14 +93,14 @@ export function BalanceSheetPage() {
               emptyMessage="Sin cuentas de patrimonio con saldo."
             />
             <p className="nx-field__label">
-              Subtotal: {report.totalEquity} — Resultado del ejercicio: {report.currentEarnings} —
-              Subtotal + resultado: {report.totalEquityIncludingEarnings}
+              Subtotal: {fmt(report.totalEquity)} — Resultado del ejercicio: {fmt(report.currentEarnings)} —
+              Subtotal + resultado: {fmt(report.totalEquityIncludingEarnings)}
             </p>
           </Card>
           <Card>
-            <p className="nx-field__label">Activos: {report.totalAssets}</p>
-            <p className="nx-field__label">Pasivo + Patrimonio: {report.totalLiabilitiesAndEquity}</p>
-            <p className="nx-field__label">Diferencia: {report.equationDelta}</p>
+            <p className="nx-field__label">Activos: {fmt(report.totalAssets)}</p>
+            <p className="nx-field__label">Pasivo + Patrimonio: {fmt(report.totalLiabilitiesAndEquity)}</p>
+            <p className="nx-field__label">Diferencia: {fmt(report.equationDelta)}</p>
           </Card>
         </>
       ) : null}

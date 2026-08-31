@@ -201,3 +201,161 @@ def test_partial_then_full_installment_via_allocations(client, db_session):
     summary = cps.contract_summary(db_session, schedule_id=schedule.id, as_of=date(2026, 9, 15))
     assert summary.paid_accumulated == Decimal("50000.00")
     assert summary.contract_balance == Decimal("450000.00")
+
+
+# --------------------------------------------------------------------------- #
+# PR 2 — allocation vía el endpoint de pago AP + reversal                      #
+# --------------------------------------------------------------------------- #
+
+def _ap_setup(client, company, *, tag):
+    bank_gl = create_account(client, company_id=company["id"], code=f"11{tag}", name="Bancos", account_type="ASSET")
+    expense = create_account(client, company_id=company["id"], code=f"52{tag}", name="Obra", account_type="EXPENSE")
+    payable = create_account(client, company_id=company["id"], code=f"21{tag}", name="CxP", account_type="LIABILITY")
+    contrib = create_account(client, company_id=company["id"], code=f"31{tag}", name="Aportes", account_type="EQUITY")
+    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+    client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"], "treasuryAccountId": bank["id"],
+            "counterAccountId": contrib["id"], "sender": "Fondeo", "currencyCode": "HNL",
+            "originalAmount": "600000.00", "remittanceDate": "2026-01-01",
+        },
+    )
+    return bank, expense, payable
+
+
+def _contract_invoice(client, *, company, supplier, contract_id, expense, payable, amount, number):
+    r = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"], "supplierId": supplier["id"],
+            "invoiceNumber": number, "scope": "GENERAL",
+            "expenseAccountId": expense["id"], "payableAccountId": payable["id"],
+            "currencyCode": "HNL", "amount": str(amount), "invoiceDate": "2026-09-01",
+            "dueDate": "2026-09-30", "supplierContractId": contract_id,
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["supplierContractId"] == contract_id
+    client.post(f"/api/ap/supplier-invoices/{r.json()['id']}/approve")
+    return r.json()
+
+
+def test_contract_payment_allocation_via_ap_endpoint_and_reversal(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    contract = _contract(client, company_id=company["id"], supplier_id=supplier["id"])
+    schedule = _monthly_plan(db_session, contract["id"])
+    bank, expense, payable = _ap_setup(client, company, tag="70")
+
+    invoice = _contract_invoice(
+        client, company=company, supplier=supplier, contract_id=contract["id"],
+        expense=expense, payable=payable, amount="50000.00", number="F-CTR-AUG",
+    )
+    aug = [
+        s for s in cps.installment_summaries(db_session, schedule_id=schedule.id)
+        if s.period_label == "Agosto 2026"
+    ][0]
+
+    pay = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/payments",
+        json={
+            "treasuryAccountId": bank["id"], "amount": "50000.00", "paymentDate": "2026-09-03",
+            "contractAllocations": [
+                {"installmentId": str(aug.installment_id), "amountApplied": "50000.00"}
+            ],
+        },
+    )
+    assert pay.status_code == 201, pay.text
+    payment_id = pay.json()["id"]
+
+    db_session.expire_all()
+    after = [
+        s for s in cps.installment_summaries(db_session, schedule_id=schedule.id)
+        if s.installment_id == aug.installment_id
+    ][0]
+    assert after.paid == Decimal("50000.00")
+    assert after.status == "PAID"
+
+    # Reversal del pago -> reabre la cuota y baja amount_paid.
+    rev = client.post(
+        f"/api/ap/supplier-payments/{payment_id}/reverse",
+        json={"reason": "Pago duplicado"},
+    )
+    assert rev.status_code in (200, 201), rev.text
+
+    db_session.expire_all()
+    reopened = [
+        s for s in cps.installment_summaries(db_session, schedule_id=schedule.id)
+        if s.installment_id == aug.installment_id
+    ][0]
+    assert reopened.paid == Decimal("0.00")
+    assert reopened.remaining == Decimal("50000.00")
+    assert reopened.status != "PAID"
+
+    invoice_after = client.get(f"/api/ap/supplier-invoices/{invoice['id']}").json()
+    assert float(invoice_after["amountPaid"]) == 0.0
+
+
+def test_contract_allocation_sum_must_equal_payment_amount(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    contract = _contract(client, company_id=company["id"], supplier_id=supplier["id"])
+    schedule = _monthly_plan(db_session, contract["id"])
+    bank, expense, payable = _ap_setup(client, company, tag="71")
+    invoice = _contract_invoice(
+        client, company=company, supplier=supplier, contract_id=contract["id"],
+        expense=expense, payable=payable, amount="50000.00", number="F-CTR-X",
+    )
+    aug = cps.installment_summaries(db_session, schedule_id=schedule.id)[0]
+
+    bad = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/payments",
+        json={
+            "treasuryAccountId": bank["id"], "amount": "50000.00", "paymentDate": "2026-09-03",
+            "contractAllocations": [
+                {"installmentId": str(aug.installment_id), "amountApplied": "40000.00"}
+            ],
+        },
+    )
+    assert bad.status_code == 422, bad.text
+
+
+def test_fifo_proposal_spreads_over_oldest_unpaid_first(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    contract = _contract(client, company_id=company["id"], supplier_id=supplier["id"])
+    schedule = _monthly_plan(db_session, contract["id"])
+
+    proposal = cps.propose_fifo(
+        db_session, schedule_id=schedule.id, amount=Decimal("60000.00"), as_of=date(2026, 10, 1)
+    )
+    assert [p["period_label"] for p in proposal] == ["Agosto 2026", "Septiembre 2026"]
+    assert proposal[0]["amount_applied"] == Decimal("50000.00")
+    assert proposal[1]["amount_applied"] == Decimal("10000.00")
+
+
+def test_invoice_rejects_contract_of_another_supplier(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    supplier_a = create_supplier(client, company_id=company["id"], legal_name="Proveedor A")
+    supplier_b = create_supplier(client, company_id=company["id"], legal_name="Proveedor B")
+    contract = _contract(
+        client, company_id=company["id"], supplier_id=supplier_a["id"], number="CTR-A"
+    )
+    _bank, expense, payable = _ap_setup(client, company, tag="72")
+
+    r = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"], "supplierId": supplier_b["id"],
+            "invoiceNumber": "F-WRONG", "scope": "GENERAL",
+            "expenseAccountId": expense["id"], "payableAccountId": payable["id"],
+            "currencyCode": "HNL", "amount": "1000.00", "invoiceDate": "2026-09-01",
+            "dueDate": "2026-09-30", "supplierContractId": contract["id"],
+        },
+    )
+    assert r.status_code == 422, r.text

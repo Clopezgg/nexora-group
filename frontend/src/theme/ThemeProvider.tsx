@@ -12,7 +12,11 @@ function applyToDom(themeId: string, density: Density) {
   const root = document.documentElement
   root.dataset.nxTheme = preset.id
   root.dataset.nxDensity = density
-  root.style.colorScheme = preset.isDark ? 'dark' : 'light'
+  // El preset por defecto NO activa la capa de re-pintado por variables: deja
+  // la apariencia hand-tuned actual 100% intacta (y la auditoría WCAG del
+  // recorrido base sin cambios). Solo otros presets activan la capa.
+  root.dataset.nxThemed = preset.id === 'nexora-classic' ? 'off' : 'on'
+  root.style.colorScheme = preset.id === 'nexora-classic' ? '' : preset.isDark ? 'dark' : 'light'
   for (const [key, value] of Object.entries(preset.vars)) {
     root.style.setProperty(key, value)
   }

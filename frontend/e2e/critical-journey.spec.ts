@@ -614,7 +614,11 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
 
   await test.step('global search', async () => {
     await page.goto('/inicio')
-    // Dashboard (OD FASE 2): banda "Mi trabajo hoy" con tarjetas clicables.
+    // Dashboard (OD FASE 2): en vista empresa aparece la banda "Mi trabajo hoy"
+    // con tarjetas clicables.
+    await page
+      .getByRole('combobox', { name: 'Proyecto seleccionado' })
+      .selectOption('')
     await expect(page.getByRole('heading', { name: 'Mi trabajo hoy' })).toBeVisible({
       timeout: 10_000,
     })

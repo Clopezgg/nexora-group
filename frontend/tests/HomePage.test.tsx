@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { readSelectedCompanyId, writeSelectedCompanyId } from '../src/hooks/useActiveCompany'
 import { renderApp } from './testUtils'
@@ -67,14 +67,25 @@ describe('HomePage', () => {
       periodIncome: 5000,
       periodExpense: 2000,
       activeProjects: 3,
+      pendingApprovals: 2,
+      overduePayables: 1,
+      overduePayablesAmount: 4500,
+      receivablesOutstanding: 9000,
       currency: 'HNL',
     })
 
     render(renderApp('/inicio'))
 
     expect(await screen.findByRole('heading', { name: /inicio — finanzas/i })).toBeInTheDocument()
-    expect(await screen.findByText('Saldo disponible de Tesorería')).toBeInTheDocument()
+    expect(await screen.findByText('Tesorería · disponible')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
+    // "Mi trabajo hoy" band, clicable, con el conteo real de aprobaciones.
+    const workToday = screen.getByRole('region', { name: /mi trabajo hoy/i })
+    expect(workToday).toBeInTheDocument()
+    expect(within(workToday).getByRole('link', { name: /aprobaciones/i })).toHaveAttribute(
+      'href',
+      '/inicio/aprobaciones',
+    )
   })
 
   it('shows the project home with real module shortcuts for Project Manager', async () => {

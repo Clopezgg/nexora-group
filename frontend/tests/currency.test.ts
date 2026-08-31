@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatMoney } from '../src/utils/currency'
+import { formatMoney, formatMoneyCompact } from '../src/utils/currency'
 
 describe('formatMoney', () => {
   it('formats HNL with symbol, thousands separator and two decimals', () => {
@@ -18,5 +18,17 @@ describe('formatMoney', () => {
 
   it('formats negatives without dropping the sign', () => {
     expect(formatMoney(-2500, 'HNL')).toMatch(/-|\(/)
+  })
+})
+
+describe('formatMoneyCompact', () => {
+  it('abbreviates millions and thousands with a currency symbol', () => {
+    expect(formatMoneyCompact(1_200_000, 'HNL')).toMatch(/^L\s1\.2M$/)
+    expect(formatMoneyCompact(250_000, 'HNL')).toMatch(/^L\s250K$/)
+    expect(formatMoneyCompact(980, 'HNL')).toMatch(/^L\s980$/)
+  })
+
+  it('keeps the negative sign', () => {
+    expect(formatMoneyCompact(-1_500_000, 'HNL')).toMatch(/^-L\s1\.5M$/)
   })
 })

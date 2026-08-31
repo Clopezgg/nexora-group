@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Badge,
   Button,
   Card,
   CustomerSelector,
@@ -18,6 +19,7 @@ import { projectService } from '../../services/projectService'
 import { treasuryService } from '../../services/treasuryService'
 import { useMutationError } from '../../hooks/useMutationError'
 import { arService, type CustomerInvoice } from '../../services/apArService'
+import { arMetricsService } from '../../services/financialControlService'
 import { formatMoney } from '../../utils/currency'
 import type { TreasuryAccount } from '../../types/treasury'
 import './TreasuryPage.css'
@@ -140,6 +142,8 @@ export function AccountsReceivablePage() {
           ))}
         </Select>
       </header>
+
+      <ArMetricsCard companyId={activeCompanyId} />
 
       <Card title="Acciones">
         <Button
@@ -434,5 +438,32 @@ function CollectButton({
         </Modal>
       ) : null}
     </>
+  )
+}
+
+function ArMetricsCard({ companyId }: { companyId: string | null }) {
+  const query = useQuery({
+    queryKey: ['ar-metrics', companyId],
+    queryFn: () => arMetricsService.get(companyId as string),
+    enabled: Boolean(companyId),
+  })
+  if (!companyId) return null
+  const m = query.data
+  return (
+    <Card title="DSO y aging de cartera">
+      {query.isLoading ? (
+        <LoadingState label="Calculando DSO…" />
+      ) : m?.aging ? (
+        <div className="nx-treasury__actions" style={{ flexWrap: 'wrap' }}>
+          <Badge>{m.dso == null ? 'DSO — (sin ventas recientes)' : `DSO ${m.dso} días`}</Badge>
+          <Badge>Cartera abierta {formatMoney(Number(m.arOutstanding ?? 0))}</Badge>
+          <Badge tone="neutral">Al día {formatMoney(Number(m.aging.current ?? 0))}</Badge>
+          <Badge tone="warning">1–30 {formatMoney(Number(m.aging['1_30'] ?? 0))}</Badge>
+          <Badge tone="warning">31–60 {formatMoney(Number(m.aging['31_60'] ?? 0))}</Badge>
+          <Badge tone="danger">61–90 {formatMoney(Number(m.aging['61_90'] ?? 0))}</Badge>
+          <Badge tone="danger">+90 {formatMoney(Number(m.aging.over_90 ?? 0))}</Badge>
+        </div>
+      ) : null}
+    </Card>
   )
 }

@@ -3600,3 +3600,24 @@ Rama: `feat/phase7-cash-forecast`.
   semana 2, `minProjectedBalance == -4000`, `hasLiquidityAlert`; sin AP →
   sin alerta, saldo estable. Frontend `CashForecastPage.test.tsx` (2); e2e
   `critical-journey`.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 7 — incremento 2 (AP Payment Proposal + AR DSO)
+
+Rama: `feat/phase7-ap-proposal-ar-dso`.
+
+- **AP Payment Proposal** — `ap_service.build_payment_proposal` +
+  `GET /ap/payment-proposal?companyId=&horizonDays=14`: facturas de proveedor
+  abiertas con saldo pendiente cuyo vencimiento (o próxima cuota impaga) cae
+  dentro del horizonte o ya está vencido; ordenadas por urgencia (vencidas
+  primero). Devuelve `items[]` (invoice, proveedor, fecha, saldo, `overdue`)
+  + `total`. Permiso `ap.supplier_payment:read`.
+- **AR DSO + aging** — `financial_control_service.ar_metrics` +
+  `GET /financial-control/ar-metrics?companyId=`: DSO simple =
+  (cartera abierta / ventas a crédito de los últimos 90 días) · 90; buckets
+  de aging (al día / 1-30 / 31-60 / 61-90 / +90) por días de mora.
+- **Frontend**: tarjeta "Propuesta de pago · próximos 14 días" en
+  `AccountsPayableWorkspace`; tarjeta "DSO y aging de cartera" en
+  `AccountsReceivablePage`.
+- Tests: `test_ap_proposal_ar_dso.py` (2): propuesta ordena vencidas primero
+  y excluye lo fuera de horizonte, total correcto; DSO = 90 días para
+  cartera == ventas 90d, factura vencida hace 3 días cae en bucket 1-30.

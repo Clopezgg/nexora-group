@@ -392,3 +392,24 @@ def set_payment_plan(
     except Exception:
         db.rollback()
         raise
+
+
+@router.get("/payment-proposal", response_model=None)
+def payment_proposal(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    horizon_days: int = Query(default=14, ge=1, le=90, alias="horizonDays"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("ap.supplier_payment", "read")),
+):
+    from app.core.business_time import business_today
+
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="ap.supplier_payment",
+        action="read",
+        company_id=company_id,
+    )
+    return ap_service.build_payment_proposal(
+        db, company_id=company_id, as_of=business_today(), horizon_days=horizon_days
+    )

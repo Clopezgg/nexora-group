@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Card, EmptyState, LoadingState, Select } from '../../design-system'
+import { Badge, Button, Card, EmptyState, LoadingState, Select, Table, type TableColumn } from '../../design-system'
 import { masterDataService } from '../../services/masterDataService'
-import { apService, type SupplierInvoice } from '../../services/apArService'
+import { apService, type PaymentProposalItem, type SupplierInvoice } from '../../services/apArService'
 import { treasuryService } from '../../services/treasuryService'
 import { formatMoney } from '../../utils/currency'
 import { AccountsPayablePage } from './AccountsPayablePage'
@@ -36,11 +36,51 @@ export function AccountsPayableWorkspace() {
   const invoices = invoicesQuery.data ?? []
   const selectedInvoice = invoices.find((invoice) => invoice.id === invoiceId) ?? null
 
+  const proposalQuery = useQuery({
+    queryKey: ['ap', 'payment-proposal', activeCompanyId],
+    queryFn: () => apService.paymentProposal(activeCompanyId, 14),
+    enabled: Boolean(activeCompanyId),
+  })
+  const proposalColumns: TableColumn<PaymentProposalItem>[] = [
+    { key: 'invoice', header: 'Factura', render: (row) => row.invoiceNumber },
+    { key: 'supplier', header: 'Proveedor', render: (row) => row.supplierName ?? '—' },
+    { key: 'due', header: 'Vence', render: (row) => row.dueDate },
+    { key: 'remaining', header: 'A pagar', render: (row) => formatMoney(Number(row.remaining)) },
+    {
+      key: 'flag',
+      header: '',
+      render: (row) => (row.overdue ? <Badge tone="danger">Vencida</Badge> : null),
+    },
+  ]
+
   if (companiesQuery.isLoading) return <LoadingState label="Cargando cuentas por pagar…" />
 
   return (
     <div className="nx-treasury">
       <AccountsPayablePage />
+
+      <Card title="Propuesta de pago · próximos 14 días">
+        {companies.length === 0 ? (
+          <EmptyState icon="card" title="No hay compañía configurada" description="Configura una compañía." />
+        ) : proposalQuery.isLoading ? (
+          <LoadingState label="Calculando propuesta de pago…" />
+        ) : proposalQuery.data?.items ? (
+          <>
+            <div className="nx-treasury__actions">
+              <Badge>
+                {proposalQuery.data.items.length} factura(s) · total{' '}
+                {formatMoney(Number(proposalQuery.data.total ?? 0))}
+              </Badge>
+            </div>
+            <Table
+              columns={proposalColumns}
+              rows={proposalQuery.data.items}
+              getRowKey={(row) => row.invoiceId}
+              emptyMessage="Nada por pagar en el horizonte."
+            />
+          </>
+        ) : null}
+      </Card>
 
       <Card title="Historial formal de pagos y reversals">
         {companies.length === 0 ? (

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -485,3 +485,43 @@ def apply_accrual_reversal(db: Session, *, invoice_id: uuid.UUID, document_type_
             f"No se puede revertir el accrual de una factura en estado {invoice.status}"
         )
     invoice.status = "CANCELLED"
+
+
+def build_payment_proposal(db: Session, *, company_id, as_of: date, horizon_days: int = 14) -> dict:
+    """Propuesta de pago: facturas de proveedor abiertas con saldo pendiente
+    cuyo vencimiento (o próxima cuota impaga) cae dentro del horizonte o ya
+    está vencido. Ordenada por urgencia. Orden maestra Phase 7."""
+    from app.models.supplier import Supplier
+
+    horizon_end = as_of + timedelta(days=horizon_days)
+    invoices = db.execute(
+        select(SupplierInvoice)
+        .where(SupplierInvoice.company_id == company_id)
+        .where(SupplierInvoice.status.in_(_PLAN_EDITABLE_STATUSES | {"PARTIALLY_PAID"}))
+    ).scalars().all()
+
+    items: list[dict] = []
+    total = Decimal("0")
+    for invoice in invoices:
+        remaining = (invoice.amount + invoice.tax_amount) - invoice.amount_paid
+        if remaining <= 0:
+            continue
+        plan = list_payment_plan(db, invoice_id=invoice.id)
+        next_due = min((p.due_date for p in plan), default=invoice.due_date) if plan else invoice.due_date
+        if next_due > horizon_end:
+            continue
+        supplier = db.get(Supplier, invoice.supplier_id)
+        items.append(
+            {
+                "invoiceId": str(invoice.id),
+                "invoiceNumber": invoice.invoice_number,
+                "supplierName": (supplier.trade_name or supplier.legal_name) if supplier else None,
+                "dueDate": next_due.isoformat(),
+                "remaining": str(remaining),
+                "overdue": next_due < as_of,
+            }
+        )
+        total += remaining
+
+    items.sort(key=lambda x: (not x["overdue"], x["dueDate"]))
+    return {"horizonDays": horizon_days, "asOf": as_of.isoformat(), "total": str(total), "items": items}

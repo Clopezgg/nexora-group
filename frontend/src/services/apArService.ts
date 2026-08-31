@@ -42,6 +42,22 @@ export interface PaymentPlanItemInput {
   note?: string
 }
 
+export interface PaymentProposalItem {
+  invoiceId: string
+  invoiceNumber: string
+  supplierName: string | null
+  dueDate: string
+  remaining: string
+  overdue: boolean
+}
+
+export interface PaymentProposal {
+  horizonDays: number
+  asOf: string
+  total: string
+  items: PaymentProposalItem[]
+}
+
 export interface CustomerInvoice {
   id: string
   customerId: string
@@ -131,6 +147,10 @@ export const apService = {
     apiFetch<SupplierPayment[]>(`/ap/supplier-invoices/${invoiceId}/payments`),
   getPaymentPlan: (invoiceId: string) =>
     apiFetch<PaymentPlanItem[]>(`/ap/supplier-invoices/${invoiceId}/payment-plan`),
+  paymentProposal: (companyId: string, horizonDays = 14) =>
+    apiFetch<PaymentProposal>(
+      `/ap/payment-proposal?companyId=${encodeURIComponent(companyId)}&horizonDays=${horizonDays}`,
+    ),
   setPaymentPlan: (invoiceId: string, installments: PaymentPlanItemInput[]) =>
     apiFetch<PaymentPlanItem[]>(`/ap/supplier-invoices/${invoiceId}/payment-plan`, {
       method: 'PUT',

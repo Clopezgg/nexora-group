@@ -9,6 +9,7 @@ import { useAuth } from '../auth/auth-context'
 import { useActiveContext } from '../context/useActiveContext'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { resolveHomeConfig } from './roleHomes'
+import { MiTrabajoHoy } from './MiTrabajoHoy'
 import { Card, EmptyState, ErrorState, LoadingState, StatCard } from '../../design-system'
 import './HomePage.css'
 
@@ -114,8 +115,8 @@ export function HomePage() {
           />
         ) : (
           <>
-            <section className="nx-home__grid" aria-label="Indicadores financieros">
-              <StatCard label="Saldo disponible de Tesorería" value={formatMoney(companySummaryQuery.data.treasuryBalance, companySummaryQuery.data.currency)} />
+            <section className="nx-home__grid nx-home__grid--kpi" aria-label="Indicadores financieros">
+              <StatCard label="Tesorería · disponible" value={formatMoney(companySummaryQuery.data.treasuryBalance, companySummaryQuery.data.currency)} />
               <StatCard
                 label={companySummaryQuery.data.fiscalPeriodLabel ? `Ingresos · ${companySummaryQuery.data.fiscalPeriodLabel}` : 'Ingresos del mes calendario'}
                 value={formatMoney(companySummaryQuery.data.periodIncome, companySummaryQuery.data.currency)}
@@ -142,15 +143,7 @@ export function HomePage() {
               />
             </Suspense>
 
-            <section className="nx-home__operations" aria-label="Información operativa">
-              <StatCard label="Aprobaciones pendientes" value={companySummaryQuery.data.pendingApprovals} />
-              <StatCard
-                label="Cuentas por pagar vencidas"
-                value={formatMoney(companySummaryQuery.data.overduePayablesAmount, companySummaryQuery.data.currency)}
-                delta={{ value: `${companySummaryQuery.data.overduePayables} documento(s)`, tone: companySummaryQuery.data.overduePayables > 0 ? 'negative' : 'neutral' }}
-              />
-              <StatCard label="Cuentas por cobrar" value={formatMoney(companySummaryQuery.data.receivablesOutstanding, companySummaryQuery.data.currency)} />
-            </section>
+            <MiTrabajoHoy summary={companySummaryQuery.data} />
           </>
         )
       ) : null}

@@ -3717,3 +3717,27 @@ Rama: `feat/od-fase1-designsystem-login-shell`.
 - Deploy Azure de Phases 2–9 (SHA c938168) ejecutado y verificado en
   producción: frontend 200, `/api/healthz` 200, `/api/readyz` ok,
   `/api/auth/login` 401 con credenciales inválidas (first-party, sin 405).
+
+### 2026-08-31 — ORDEN MAESTRA DEFINITIVA · FASE 2 (Dashboard + experiencia móvil financiera)
+
+Rama: `feat/od-fase2-dashboard-mobile`.
+
+- **KPIs compactos** (§17): grid `--kpi` que colapsa a 2×2 en móvil,
+  tarjetas más bajas, `tabular-nums` en los valores. Etiquetas cortas
+  ("Tesorería · disponible").
+- **"Mi trabajo hoy"** (§18): `MiTrabajoHoy` — banda de tarjetas pequeñas
+  todas clicables (Aprobaciones, Por pagar vencidas, Por cobrar,
+  Excepciones, Conciliaciones, Evidencias) con conteo real y tono
+  (warning/danger) cuando aplica. Sustituye la vieja fila
+  `nx-home__operations` de StatCards.
+- **Gráficas rediseñadas para móvil** (§19/§20): `FinancialCharts` con
+  ejes abreviados (`formatMoneyCompact` → "L 250K" / "L 1.2M"), tooltip
+  con el monto exacto, **barras horizontales** para "Gastos por alcance"
+  (ya no donut), altura reducida (220px), `CartesianGrid` sutil,
+  estados vacíos compactos ("Sin movimientos en este período.").
+- **`formatMoneyCompact`** en `utils/currency.ts` — abreviatura de dinero
+  para ejes/sparklines; el monto exacto sigue en tooltips y tarjetas.
+- Tests: `currency.test.ts` (+2 — abreviatura y signo), `HomePage.test.tsx`
+  (banda "Mi trabajo hoy" clicable), e2e `critical-journey` verifica la
+  banda en `/inicio`. Frontend 158 passed; typecheck/lint/build verdes.
+- Pendiente menor arrastrado a una fase posterior: FAB "Quick create" (§25).

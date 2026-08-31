@@ -7,6 +7,12 @@
       }
     },
     {
+      "route": "/api/*",
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
       "route": "/",
       "headers": {
         "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -34,6 +40,7 @@
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()"
   },
   "navigationFallback": {
-    "rewrite": "/index.html"
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/assets/*", "/*.{png,svg,webmanifest,ico,json,txt,js,css}"]
   }
 }

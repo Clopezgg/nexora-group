@@ -71,9 +71,9 @@ npm run typecheck && npm run lint && npm run test
 VITE_API_BASE_URL=https://ci.invalid/api npm run build
 ```
 
-El build de producción **falla cerrado** si `VITE_API_BASE_URL` no es una URL
-HTTPS absoluta. El fallback relativo `/api` existe únicamente en modo de
-desarrollo/test para el proxy local de Vite.
+El build de producción **falla cerrado** si `VITE_API_BASE_URL` no es
+first-party: acepta un path same-origin (`/api`, el valor real de producción)
+o una URL HTTPS absoluta; rechaza cualquier URL en texto claro.
 
 ## Deploy
 
@@ -91,21 +91,28 @@ de despliegue (ver `CLAUDE.md`).
 
 ### Contrato de red de producción
 
-El frontend **no** usa un proxy same-origin `/api` en Azure. Durante el deploy
-se compila con:
+El frontend llama a la API en su **mismo origen**: `/api/*` sobre el dominio de
+Azure Static Web Apps. El workflow liga el Container App como *linked backend*
+de Static Web Apps (`az staticwebapp backends link`), que actúa de reverse
+proxy hacia el HTTPS del Container App y reescribe `Set-Cookie` al dominio
+first-party. Durante el deploy el frontend se compila con:
 
 ```text
-VITE_API_BASE_URL=https://<container-app-fqdn>/api
+VITE_API_BASE_URL=/api
 ```
 
-El navegador llama directamente al HTTPS público de Container Apps. El backend
-acepta exactamente el origen de Azure Static Web Apps mediante CORS con
-credenciales y el guard CSRF valida el mismo `Origin`. La sesión se transporta
-en una cookie `Secure`, `HttpOnly`, `SameSite=None`, `Path=/`.
+**Por qué first-party y no el FQDN directo de Container Apps:** el frontend
+(`*.azurestaticapps.net`) y el Container App (`*.azurecontainerapps.io`) están
+en dominios registrables distintos. Una cookie de sesión cross-site
+(`SameSite=None`) es descartada silenciosamente por Safari/WebKit (ITP): el
+login parece exitoso pero toda llamada autenticada posterior devuelve 401 y
+media aplicación muestra "Ocurrió un error". Con el linked backend la cookie es
+first-party y funciona en todos los navegadores.
 
-Para evitar que una versión antigua vuelva a llamar al proxy `/api`, el HTML de
-Static Web Apps se entrega `no-store` y el service worker no precachea HTML,
-JavaScript ni CSS del shell transaccional.
+El backend además sigue aceptando exactamente el origen de Static Web Apps por
+CORS con credenciales y el guard CSRF valida el mismo `Origin` (defensa en
+profundidad para el FQDN directo). El HTML de Static Web Apps se entrega
+`no-store` y el service worker no precachea HTML/JS/CSS del shell transaccional.
 
 ### Autorización del despliegue
 

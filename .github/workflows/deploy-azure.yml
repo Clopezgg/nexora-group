@@ -48,7 +48,7 @@ jobs:
       EDIT_ACCESS_TOKEN_SALT: ${{ secrets.EDIT_ACCESS_TOKEN_SALT }}
       EDIT_ACCESS_TOKEN_DIGEST: ${{ secrets.EDIT_ACCESS_TOKEN_DIGEST }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check required deployment secrets
         env:
@@ -119,7 +119,7 @@ jobs:
       EDIT_ACCESS_TOKEN_DIGEST: ${{ secrets.EDIT_ACCESS_TOKEN_DIGEST }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Record deployment authorization
         env:
@@ -235,32 +235,50 @@ jobs:
           echo "::error::Container App did not reach Running after deployment"
           exit 1
 
-      - name: Remove failing Static Web Apps linked backend
-        run: |
-          set -euo pipefail
-          az staticwebapp backends unlink \
-            --name nexora-frontend-dev \
-            --resource-group nexora-rg-dev \
-            --remove-backend-auth \
-            --only-show-errors \
-            >/dev/null 2>&1 || true
-          echo "Static Web Apps linked-backend proxy removed; frontend will use the Container Apps HTTPS API directly"
-
       - name: Capture deployed endpoints
         run: |
           set -euo pipefail
           DEPLOYMENT_NAME="nexora-deploy-${{ github.run_number }}"
           FRONTEND_HOSTNAME="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.frontendHostname.value -o tsv)"
           BACKEND_FQDN="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.backendFqdn.value -o tsv)"
+          BACKEND_RESOURCE_ID="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.backendResourceId.value -o tsv)"
           EDIT_ACCESS_CONFIGURED="$(az deployment sub show --name "$DEPLOYMENT_NAME" --query properties.outputs.editAccessConfigured.value -o tsv)"
           DEPLOYED_IMAGE="$(az containerapp show -g nexora-rg-dev -n nexora-backend-dev --query 'properties.template.containers[0].image' -o tsv)"
           MIN_REPLICAS="$(az containerapp show -g nexora-rg-dev -n nexora-backend-dev --query 'properties.template.scale.minReplicas' -o tsv)"
-          [ -n "$FRONTEND_HOSTNAME" ] && [ -n "$BACKEND_FQDN" ]
+          [ -n "$FRONTEND_HOSTNAME" ] && [ -n "$BACKEND_FQDN" ] && [ -n "$BACKEND_RESOURCE_ID" ]
           [[ "$DEPLOYED_IMAGE" == *"${{ github.sha }}"* ]]
           [ "$MIN_REPLICAS" = "1" ]
           [ "${EDIT_ACCESS_CONFIGURED,,}" = "true" ]
           echo "FRONTEND_URL=https://$FRONTEND_HOSTNAME" >> "$GITHUB_ENV"
           echo "BACKEND_URL=https://$BACKEND_FQDN" >> "$GITHUB_ENV"
+          echo "BACKEND_RESOURCE_ID=$BACKEND_RESOURCE_ID" >> "$GITHUB_ENV"
+
+      - name: Link Static Web Apps backend for first-party /api
+        run: |
+          set -euo pipefail
+          # The frontend (Static Web Apps) and the API (Container Apps) live on
+          # different registrable domains. A cross-site session cookie
+          # (SameSite=None) is silently dropped by Safari/WebKit ITP, so the
+          # browser looks logged in but every authenticated call fails.
+          # Linking the Container App as the Static Web Apps backend makes the
+          # SPA call `/api/*` on its OWN origin; Static Web Apps proxies to the
+          # Container App and rewrites Set-Cookie to the first-party domain.
+          SWA=nexora-frontend-dev
+          RG=nexora-rg-dev
+          REGION=eastus2
+          az staticwebapp backends unlink --name "$SWA" --resource-group "$RG" --only-show-errors >/dev/null 2>&1 || true
+          az staticwebapp backends link \
+            --name "$SWA" \
+            --resource-group "$RG" \
+            --backend-resource-id "$BACKEND_RESOURCE_ID" \
+            --backend-region "$REGION" \
+            --only-show-errors
+          LINKED="$(az staticwebapp backends show --name "$SWA" --resource-group "$RG" --query "backendResourceId" -o tsv 2>/dev/null || true)"
+          if [ "$LINKED" != "$BACKEND_RESOURCE_ID" ]; then
+            echo "::error::Static Web Apps linked backend did not attach (got: ${LINKED:-<none>})"
+            exit 1
+          fi
+          echo "Static Web Apps linked backend attached: $LINKED"
 
       - name: Verify newest backend revision is healthy
         run: |
@@ -303,7 +321,9 @@ jobs:
           set -euo pipefail
           cd frontend
           npm ci
-          VITE_API_BASE_URL="${BACKEND_URL}/api" npm run build
+          # First-party same-origin API: Static Web Apps proxies /api/* to the
+          # linked Container App, keeping the session cookie first-party.
+          VITE_API_BASE_URL="/api" npm run build
 
       - name: Get Static Web Apps deployment token
         id: swa-token
@@ -357,9 +377,19 @@ jobs:
           }
 
           wait_for_status "$FRONTEND_URL/" "200" "Frontend"
-          wait_for_status "$BACKEND_URL/api/healthz" "200" "API health"
-          wait_for_status "$BACKEND_URL/api/readyz" "200" "Database readiness"
-          wait_for_status "$BACKEND_URL/api/edit-access/verify" "405" "Protected Edit route"
+          wait_for_status "$BACKEND_URL/api/healthz" "200" "API health (direct)"
+          wait_for_status "$BACKEND_URL/api/readyz" "200" "Database readiness (direct)"
+          wait_for_status "$BACKEND_URL/api/edit-access/verify" "405" "Protected Edit route (direct)"
+
+          # First-party path: the browser only ever talks to $FRONTEND_URL/api,
+          # which Static Web Apps proxies to the linked Container App. Static
+          # Web Apps forwards the linked-backend path verbatim, so /api/healthz
+          # must reach the backend's /api/healthz. Diagnose both shapes so a
+          # first failed run tells us exactly how the proxy rewrites paths.
+          echo "SWA /api/healthz  -> $(curl -s -o /dev/null -w '%{http_code}' "$FRONTEND_URL/api/healthz")"
+          echo "SWA /healthz      -> $(curl -s -o /dev/null -w '%{http_code}' "$FRONTEND_URL/healthz")"
+          wait_for_status "$FRONTEND_URL/api/healthz" "200" "First-party API via Static Web Apps"
+          API="$FRONTEND_URL/api"
 
           RUNTIME_FRONTEND_URL="$(az containerapp show \
             -g nexora-rg-dev \
@@ -398,6 +428,7 @@ jobs:
           fi
           echo "Production CORS preflight: HTTP 200 with exact origin and credentials"
 
+          # Everything below hits the SAME origin the browser uses: $API == $FRONTEND_URL/api.
           LOGIN_PAYLOAD="$(jq -n --arg email "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" '{email:$email,password:$password}')"
           LOGIN_CODE="$(curl --silent --show-error \
             --dump-header "$LOGIN_HEADERS" \
@@ -407,9 +438,9 @@ jobs:
             --data "$LOGIN_PAYLOAD" \
             --output "$RUNNER_TEMP/login.json" \
             --write-out '%{http_code}' \
-            "$BACKEND_URL/api/auth/login")"
+            "$API/auth/login")"
           if [ "$LOGIN_CODE" != "200" ]; then
-            echo "::error::Production login returned HTTP $LOGIN_CODE"
+            echo "::error::First-party login returned HTTP $LOGIN_CODE"
             if ! jq -c '{detail: .detail?, error: .error?}' "$RUNNER_TEMP/login.json"; then
               echo 'Unable to parse production login error body.'
             fi
@@ -419,46 +450,63 @@ jobs:
           tr -d '\r' < "$LOGIN_HEADERS" > "$LOGIN_HEADERS_NORMALIZED"
           SESSION_COOKIE_HEADER="$(grep -Ei '^set-cookie:[[:space:]]*nexora_session=' "$LOGIN_HEADERS_NORMALIZED" | head -n 1 || true)"
           if [ -z "$SESSION_COOKIE_HEADER" ]; then
-            echo "::error::Production login did not issue the nexora_session cookie"
+            echo "::error::First-party login did not issue the nexora_session cookie"
             exit 1
           fi
           SESSION_COOKIE_ATTRIBUTES="${SESSION_COOKIE_HEADER#*:}"
-          if ! grep -Eiq '(^|;[[:space:]]*)Secure([;[:space:]]|$)' <<< "$SESSION_COOKIE_ATTRIBUTES"; then
-            echo "::error::Production session cookie is missing Secure"
-            echo 'set-cookie: [redacted]'
-            exit 1
-          fi
-          if ! grep -Eiq '(^|;[[:space:]]*)HttpOnly([;[:space:]]|$)' <<< "$SESSION_COOKIE_ATTRIBUTES"; then
-            echo "::error::Production session cookie is missing HttpOnly"
-            echo 'set-cookie: [redacted]'
-            exit 1
-          fi
-          if ! grep -Eiq '(^|;[[:space:]]*)SameSite=None([;[:space:]]|$)' <<< "$SESSION_COOKIE_ATTRIBUTES"; then
-            echo "::error::Production session cookie is missing SameSite=None"
-            echo 'set-cookie: [redacted]'
-            exit 1
-          fi
-          if ! grep -Eiq '(^|;[[:space:]]*)Path=/([;[:space:]]|$)' <<< "$SESSION_COOKIE_ATTRIBUTES"; then
-            echo "::error::Production session cookie is missing Path=/"
-            echo 'set-cookie: [redacted]'
-            exit 1
-          fi
-          echo "Production session cookie: Secure + HttpOnly + SameSite=None + Path=/ verified"
-
-          DASHBOARD_CODE="$(curl --silent --show-error \
-            --cookie "$COOKIE_JAR" \
-            --header "Origin: $FRONTEND_URL" \
-            --output "$RUNNER_TEMP/dashboard-summary.json" \
-            --write-out '%{http_code}' \
-            "$BACKEND_URL/api/dashboard/summary")"
-          if [ "$DASHBOARD_CODE" != "200" ]; then
-            echo "::error::Authenticated dashboard returned HTTP $DASHBOARD_CODE"
-            if ! jq -c '{detail: .detail?, error: .error?}' "$RUNNER_TEMP/dashboard-summary.json"; then
-              echo 'Unable to parse authenticated dashboard error body.'
+          for attr in Secure HttpOnly 'Path=/'; do
+            if ! grep -Eiq "(^|;[[:space:]]*)${attr}([;[:space:]]|\$)" <<< "$SESSION_COOKIE_ATTRIBUTES"; then
+              echo "::error::Production session cookie is missing $attr"
+              echo 'set-cookie: [redacted]'
+              exit 1
             fi
+          done
+          # First-party proxy: SameSite None or Lax are both acceptable; a
+          # missing SameSite (defaults to Lax) is fine too.
+          echo "Production session cookie: Secure + HttpOnly + Path=/ verified (first-party)"
+
+          call_authed() {
+            local label="$1" expected="$2" path="$3"
+            local out="$RUNNER_TEMP/authed-$(echo "$label" | tr -cs 'A-Za-z0-9' '-').json"
+            local code
+            code="$(curl --silent --show-error \
+              --cookie "$COOKIE_JAR" \
+              --header "Origin: $FRONTEND_URL" \
+              --output "$out" \
+              --write-out '%{http_code}' \
+              "$API$path")"
+            if [ "$code" != "$expected" ]; then
+              echo "::error::$label returned HTTP $code (expected $expected) for $path"
+              head -c 600 "$out" || true
+              echo
+              exit 1
+            fi
+            echo "$label: HTTP $code" >&2
+            echo "$out"
+          }
+
+          ME_JSON="$(call_authed 'auth/me' 200 '/auth/me')"
+          jq -e '.email and .roles' "$ME_JSON" >/dev/null
+
+          COMPANIES_JSON="$(call_authed 'master-data/companies' 200 '/master-data/companies')"
+          jq -e 'type == "array"' "$COMPANIES_JSON" >/dev/null
+          COMPANY_COUNT="$(jq 'length' "$COMPANIES_JSON")"
+          echo "Companies visible to Administrator: $COMPANY_COUNT"
+          if [ "$COMPANY_COUNT" -lt 1 ]; then
+            echo "::error::Administrator sees zero companies in production; /proyectos, /finanzas/contabilidad and /control/configuracion will all fail"
             exit 1
           fi
-          jq -e '.currency == "HNL"' "$RUNNER_TEMP/dashboard-summary.json" >/dev/null
+          COMPANY_ID="$(jq -r '.[0].id' "$COMPANIES_JSON")"
+
+          call_authed 'projects' 200 "/projects?company_id=$COMPANY_ID" >/dev/null
+          ACCOUNTS_JSON="$(call_authed 'master-data/accounts' 200 "/master-data/accounts?companyId=$COMPANY_ID")"
+          jq -e 'type == "array"' "$ACCOUNTS_JSON" >/dev/null
+
+          DASHBOARD_JSON="$(call_authed 'dashboard/summary' 200 '/dashboard/summary')"
+          jq -e '.currency == "HNL"' "$DASHBOARD_JSON" >/dev/null
+
+          # Fiscal period read (returns 200 with nulls when not configured).
+          call_authed 'fiscal/periods/current' 200 "/fiscal/periods/current?companyId=$COMPANY_ID" >/dev/null
 
           if [ "${EDIT_ACCESS_FALLBACK:-false}" = "true" ]; then
             EDIT_PAYLOAD="$(jq -n --arg token "$ADMIN_PASSWORD" '{token:$token}')"
@@ -467,18 +515,37 @@ jobs:
               --header "Origin: $FRONTEND_URL" \
               --header 'Content-Type: application/json' \
               --data "$EDIT_PAYLOAD" \
-              "$BACKEND_URL/api/edit-access/verify" > "$RUNNER_TEMP/edit-access.json"
+              "$API/edit-access/verify" > "$RUNNER_TEMP/edit-access.json"
             jq -e '.capability and .expiresAt and .usesRemaining' "$RUNNER_TEMP/edit-access.json" >/dev/null
           fi
 
+          # Session survives logout + relogin.
+          LOGOUT_CODE="$(curl --silent --cookie "$COOKIE_JAR" --cookie-jar "$COOKIE_JAR" \
+            --header "Origin: $FRONTEND_URL" --request POST \
+            --output /dev/null --write-out '%{http_code}' "$API/auth/logout")"
+          echo "auth/logout: HTTP $LOGOUT_CODE"
+          POST_LOGOUT_ME="$(curl --silent --cookie "$COOKIE_JAR" --header "Origin: $FRONTEND_URL" \
+            --output /dev/null --write-out '%{http_code}' "$API/auth/me")"
+          if [ "$POST_LOGOUT_ME" != "401" ]; then
+            echo "::error::auth/me after logout returned HTTP $POST_LOGOUT_ME (expected 401)"
+            exit 1
+          fi
+          RELOGIN_CODE="$(curl --silent --cookie-jar "$COOKIE_JAR" \
+            --header "Origin: $FRONTEND_URL" --header 'Content-Type: application/json' \
+            --data "$LOGIN_PAYLOAD" --output /dev/null --write-out '%{http_code}' "$API/auth/login")"
+          if [ "$RELOGIN_CODE" != "200" ]; then
+            echo "::error::Relogin returned HTTP $RELOGIN_CODE"
+            exit 1
+          fi
+          call_authed 'auth/me (relogin)' 200 '/auth/me' >/dev/null
+          echo "logout + relogin: verified"
+
           {
-            echo "### Production verification"
+            echo "### Production verification (first-party /api via Static Web Apps)"
             echo "- Frontend: $FRONTEND_URL"
-            echo "- Backend revision: healthy"
-            echo "- Direct HTTPS API: healthy"
-            echo "- CORS + credentialed browser session: verified"
-            echo "- Database readiness: healthy"
-            echo "- Authenticated dashboard: healthy"
-            echo "- HNL contract: verified"
-            echo "- Protected Edit: verified"
+            echo "- Backend revision: healthy, image = \`${{ github.sha }}\`"
+            echo "- Direct HTTPS API + first-party \`$FRONTEND_URL/api\`: healthy"
+            echo "- CORS + credentialed session cookie (Secure + HttpOnly + Path=/): verified"
+            echo "- auth/me, master-data/companies ($COMPANY_COUNT visible), projects, master-data/accounts, dashboard (HNL), fiscal/periods/current: HTTP 200"
+            echo "- logout invalidates session; relogin succeeds"
           } >> "$GITHUB_STEP_SUMMARY"

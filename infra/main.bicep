@@ -138,10 +138,12 @@ module containerApps 'modules/containerapps.bicep' = {
   }
 }
 
-// No se declara ni se conserva una asociación Static Web Apps -> Container Apps.
-// El navegador usa el FQDN HTTPS directo del backend, compilado en el frontend.
-// El workflow de despliegue elimina cualquier linked backend residual antes de
-// publicar Static Web Apps para que /api nunca vuelva a ser una ruta ambigua.
+// El workflow de despliegue liga el Container App como "linked backend" de
+// Static Web Apps (`az staticwebapp backends link`) para que el navegador
+// llame a `/api/*` en su MISMO origen (Static Web Apps) y la cookie de sesión
+// sea first-party -- imprescindible para Safari/WebKit (ITP bloquea la cookie
+// cross-site `SameSite=None`). El link se gestiona por CLI, no en Bicep, para
+// no requerir un PAT de GitHub dentro de la plantilla.
 
 output resourceGroupName string = rg.name
 output backendFqdn string = containerApps.outputs.backendFqdn

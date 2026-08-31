@@ -28,8 +28,8 @@ jobs:
       BOOTSTRAP_ADMIN_PASSWORD: NexoraAdmin123!
       FRONTEND_URL: http://localhost:5173
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install backend dependencies
@@ -58,8 +58,8 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
       - name: Install frontend dependencies
@@ -87,7 +87,7 @@ jobs:
     name: Compile Azure Bicep
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Compile subscription template without deploying
         run: az bicep build --file infra/main.bicep --stdout > /dev/null
 
@@ -95,7 +95,7 @@ jobs:
     name: Docker Compose smoke
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Prepare isolated development environment
         run: |
           cat > backend/.env <<'EOF'
@@ -156,11 +156,11 @@ jobs:
       PGPASSWORD: nexora
       E2E_AZURE_STORAGE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=nexorae2e;AccountKey=bmV4b3JhLWUyZS1henVyaXRlLXNoYXJlZC1rZXktMDAwMQ==;BlobEndpoint=http://127.0.0.1:10000/nexorae2e;
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
       - name: Install backend dependencies in E2E virtualenv

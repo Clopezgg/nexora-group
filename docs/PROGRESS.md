@@ -3576,3 +3576,27 @@ Rama: `feat/phase6-project-cockpit`.
   (BAC 600, AC 200, 50% → EV 300, CPI 1.5, ETC 200, EAC 400, VAC 200,
   ingreso 1000, margen 600 / 60%); proyecto sin datos → derivados `None`.
   Frontend `ProjectCockpitPage.test.tsx`; e2e `critical-journey`.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 7 — incremento 1 (13-Week Cash Forecast)
+
+Rama: `feat/phase7-cash-forecast`.
+
+- **`cash_forecast_service.forecast`** + `GET
+  /financial-control/cash-forecast?companyId=` — forecast rodante de 13
+  semanas:
+  - saldo inicial = posición de caja actual (Treasury Ledger);
+  - por semana: entradas = AR abierto que vence esa semana; salidas = AP
+    abierto que vence esa semana — **si la factura tiene plan de pago se usan
+    las fechas de las cuotas** (prorrateando el saldo pendiente), no la fecha
+    única de la factura;
+  - la semana 0 absorbe todo el backlog vencido (`due < hoy`);
+  - saldo proyectado acumulado; `minProjectedBalance`;
+    `firstNegativeWeekIndex`; `hasLiquidityAlert`.
+  - Sin proyección de ventas futuras — solo compromisos ya registrados.
+- **Frontend**: `/finanzas/flujo-13-semanas` → `CashForecastPage` — banner de
+  alerta de liquidez, gráfico de barras del saldo proyectado (Recharts,
+  línea de referencia en 0) + tabla por semana. Nueva entrada de navegación.
+- Tests: `test_cash_forecast.py` (2): pago grande a 14 días → descubierto en
+  semana 2, `minProjectedBalance == -4000`, `hasLiquidityAlert`; sin AP →
+  sin alerta, saldo estable. Frontend `CashForecastPage.test.tsx` (2); e2e
+  `critical-journey`.

@@ -502,6 +502,11 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
       expect(inspected.balanced).toBe(true)
       expect(inspected.sourceEvent).toBeTruthy()
     }
+
+    await page.goto('/finanzas/flujo-13-semanas')
+    await expect(page.getByRole('heading', { name: 'Forecast de caja · 13 semanas' })).toBeVisible({ timeout: 10_000 })
+    const forecast = await api<any>(page.request, 'get', `/financial-control/cash-forecast?companyId=${companyId}`)
+    expect(forecast.weeks.length).toBe(13)
   })
 
   await test.step('Documents + multipart Evidence with real selectors', async () => {

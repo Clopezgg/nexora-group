@@ -5,8 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.schemas.exceptions import ExceptionCenterResponse, ExceptionResponse
-from app.schemas.financial_control import DailyStatusResponse, KpiResponse
-from app.services import exception_service, financial_control_service
+from app.schemas.financial_control import (
+    CashForecastResponse,
+    DailyStatusResponse,
+    ForecastWeekResponse,
+    KpiResponse,
+)
+from app.services import cash_forecast_service, exception_service, financial_control_service
 from app.services.permission_service import assert_company_access
 
 router = APIRouter(prefix="/financial-control", tags=["financial-control"])
@@ -71,4 +76,37 @@ def exception_center(
             )
             for i in items
         ],
+    )
+
+
+@router.get("/cash-forecast", response_model=CashForecastResponse)
+def cash_forecast(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    db: Session = Depends(get_db),
+    current: tuple = Depends(get_current_user),
+) -> CashForecastResponse:
+    user, _roles = current
+    assert_company_access(
+        db, user_id=user.id, resource="core.company", action="read", company_id=company_id
+    )
+    fc = cash_forecast_service.forecast(db, company_id=company_id)
+    return CashForecastResponse(
+        as_of=fc.as_of,
+        currency_code=fc.currency_code,
+        opening_balance=fc.opening_balance,
+        weeks=[
+            ForecastWeekResponse(
+                week_index=w.week_index,
+                week_start=w.week_start,
+                week_end=w.week_end,
+                inflows=w.inflows,
+                outflows=w.outflows,
+                net=w.net,
+                projected_balance=w.projected_balance,
+            )
+            for w in fc.weeks
+        ],
+        min_projected_balance=fc.min_projected_balance,
+        first_negative_week_index=fc.first_negative_week_index,
+        has_liquidity_alert=fc.has_liquidity_alert,
     )

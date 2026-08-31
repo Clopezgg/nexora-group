@@ -487,7 +487,10 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
 
     await page.getByLabel('Asiento / documento').selectOption(documents[0].id)
     await page.getByRole('combobox', { name: 'Beneficiario' }).fill('Proveedor')
-    await page.getByText(/Proveedor E2E/).first().click()
+    await page
+      .locator('.nx-combobox__listbox .nx-combobox__option', { hasText: 'Proveedor E2E' })
+      .first()
+      .click()
     await page.getByLabel('Método de pago').selectOption('TRANSFER')
 
     await page.locator('#voucher-evidence-file').setInputFiles({

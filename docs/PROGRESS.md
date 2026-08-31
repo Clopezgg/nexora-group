@@ -3381,3 +3381,34 @@ Rama: `feat/phase2-voucher-bank-approval`.
   `test_approval_verification_code_is_deterministic` (case-insensitive, la
   fecha cambia el código); frontend `VouchersPage.test.tsx` (+ selector de
   cuenta, URL lleva `treasuryAccountId`).
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 2 — incremento 7 (plan de pago / cuotas / historial)
+
+Rama: `feat/phase2-payment-schedule`.
+
+- **Migración `33941de1b1ae`**: tabla `supplier_invoice_payment_plan_items`
+  (supplier_invoice_id, sequence, due_date, amount, note) con
+  `UNIQUE(supplier_invoice_id, sequence)` + índice por factura. Roundtrip
+  verificado.
+- **Plan de pago** (`ap_service.set_payment_plan` / `list_payment_plan`):
+  reemplaza atómicamente el plan de una factura. Invariantes:
+  - factura APPROVED o SCHEDULED (si no → 409);
+  - sin pagos aplicados (`amount_paid == 0`, si no → 409);
+  - suma de cuotas == total exacto de la factura (si no → 422, `OverpaymentError`);
+  - fechas de vencimiento crecientes; montos > 0; ≥ 1 cuota.
+  Al fijar el plan la factura pasa a `SCHEDULED` y `due_date` = último
+  vencimiento. Permiso nuevo `ap.supplier_invoice:update` (Administrator lo
+  hereda; Finance Manager / AP Clerk añadidos).
+- **Rutas**: `GET/PUT /ap/supplier-invoices/{id}/payment-plan`. El
+  **historial de pagos** ya existía (`GET .../payments` en
+  `financial_reversals.py` + `SupplierPaymentHistoryModal`); se reutiliza.
+- **Frontend**: `PaymentPlanModal` (editor de cuotas con previsualización de
+  suma vs total) accesible desde `AccountsPayableWorkspace`.
+- **Pagos parciales / bloqueo de sobrepago / saldo pendiente**: ya
+  implementados en `ap_service.pay_supplier_invoice` (`amount_paid`,
+  `PARTIALLY_PAID`, `OverpaymentError` cuando `amount > remaining`) — se
+  confirmó con `test_supplier_invoice_payment_plan_installments_and_history`.
+- Tests: `test_supplier_invoice_payment_plan_installments_and_history`
+  (suma ≠ total → 422, fechas no crecientes → 422, plan válido de 3 cuotas,
+  estado SCHEDULED, historial tras pago parcial, plan congelado tras pago →
+  409); frontend `financialServices.test.ts` +1 (PUT con installments).

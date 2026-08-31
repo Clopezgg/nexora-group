@@ -102,3 +102,24 @@ class SupplierPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
     )
     reversal_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+class SupplierInvoicePaymentPlanItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Cuota de un plan de pago de una factura de proveedor (orden maestra
+    Phase 2 -- planes/cuotas de pago). La suma de `amount` de todas las
+    cuotas de una factura debe igualar su total (amount + tax_amount); esto
+    se valida en `ap_service.set_payment_plan`, no en la base, porque el plan
+    se reemplaza atómicamente."""
+
+    __tablename__ = "supplier_invoice_payment_plan_items"
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_supplier_invoice_plan_amount_positive"),
+        CheckConstraint("sequence >= 1", name="ck_supplier_invoice_plan_sequence_positive"),
+    )
+
+    supplier_invoice_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("supplier_invoices.id", ondelete="CASCADE"), nullable=False
+    )
+    sequence: Mapped[int] = mapped_column(nullable=False)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True)

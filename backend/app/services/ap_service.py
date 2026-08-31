@@ -10,7 +10,11 @@ from app.domain.errors import (
     InvalidInvoiceStateError,
     OverpaymentError,
 )
-from app.models.ap import SupplierInvoice, SupplierPayment
+from app.models.ap import (
+    SupplierInvoice,
+    SupplierInvoicePaymentPlanItem,
+    SupplierPayment,
+)
 from app.models.accounting import AccountingDocument
 from app.models.asset import FixedAsset
 from app.models.supplier import Supplier
@@ -317,6 +321,111 @@ def apply_approval_decision(db: Session, *, invoice_id: uuid.UUID, decision: str
 
 def get_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierInvoice | None:
     return db.get(SupplierInvoice, invoice_id)
+
+
+# -- Plan de pago / cuotas (orden maestra Phase 2) ----------------------
+
+_PLAN_EDITABLE_STATUSES = {"APPROVED", "SCHEDULED"}
+
+
+def list_payment_plan(
+    db: Session, *, invoice_id: uuid.UUID
+) -> list[SupplierInvoicePaymentPlanItem]:
+    return list(
+        db.execute(
+            select(SupplierInvoicePaymentPlanItem)
+            .where(SupplierInvoicePaymentPlanItem.supplier_invoice_id == invoice_id)
+            .order_by(SupplierInvoicePaymentPlanItem.sequence)
+        ).scalars()
+    )
+
+
+def set_payment_plan(
+    db: Session,
+    *,
+    invoice_id: uuid.UUID,
+    installments: list[dict],
+    commit: bool = True,
+) -> list[SupplierInvoicePaymentPlanItem]:
+    """Reemplaza el plan de pago de una factura. `installments` es una lista
+    de `{"due_date": date, "amount": Decimal, "note": str | None}`.
+
+    Invariantes:
+    - la factura debe estar APPROVED o SCHEDULED (no DRAFT/REVIEW/PAID/CANCELLED);
+    - no puede tener pagos aplicados todavía (`amount_paid == 0`);
+    - la suma de las cuotas debe igualar exactamente el total de la factura;
+    - fechas de vencimiento estrictamente crecientes;
+    - al menos una cuota.
+    """
+    invoice = db.execute(
+        select(SupplierInvoice).where(SupplierInvoice.id == invoice_id).with_for_update()
+    ).scalar_one_or_none()
+    if invoice is None:
+        raise ValueError(f"SupplierInvoice {invoice_id} no existe")
+    if invoice.status not in _PLAN_EDITABLE_STATUSES:
+        raise InvalidInvoiceStateError(
+            f"No se puede planificar el pago de una factura en estado {invoice.status}"
+        )
+    if invoice.amount_paid > 0:
+        raise InvalidInvoiceStateError(
+            "La factura ya tiene pagos aplicados; el plan de pago no puede modificarse"
+        )
+    if not installments:
+        raise ValueError("El plan de pago requiere al menos una cuota")
+
+    total = invoice.amount + invoice.tax_amount
+    plan_total = sum((Decimal(str(item["amount"])) for item in installments), Decimal("0"))
+    if plan_total != total:
+        raise OverpaymentError(
+            f"La suma de las cuotas ({plan_total}) debe igualar el total de la factura ({total})"
+        )
+
+    previous_due: date | None = None
+    for item in installments:
+        if Decimal(str(item["amount"])) <= 0:
+            raise ValueError("Cada cuota debe tener un monto mayor que cero")
+        due = item["due_date"]
+        if previous_due is not None and due <= previous_due:
+            raise ValueError("Las fechas de vencimiento de las cuotas deben ser crecientes")
+        previous_due = due
+
+    for existing in list_payment_plan(db, invoice_id=invoice_id):
+        db.delete(existing)
+    db.flush()
+
+    rows: list[SupplierInvoicePaymentPlanItem] = []
+    for index, item in enumerate(installments, start=1):
+        row = SupplierInvoicePaymentPlanItem(
+            supplier_invoice_id=invoice_id,
+            sequence=index,
+            due_date=item["due_date"],
+            amount=Decimal(str(item["amount"])),
+            note=item.get("note"),
+        )
+        db.add(row)
+        rows.append(row)
+
+    invoice.status = "SCHEDULED"
+    invoice.due_date = installments[-1]["due_date"]
+    db.flush()
+    if commit:
+        db.commit()
+        for row in rows:
+            db.refresh(row)
+    return rows
+
+
+def list_supplier_payments(
+    db: Session, *, invoice_id: uuid.UUID
+) -> list[SupplierPayment]:
+    """Historial de pagos de una factura (orden maestra Phase 2)."""
+    return list(
+        db.execute(
+            select(SupplierPayment)
+            .where(SupplierPayment.supplier_invoice_id == invoice_id)
+            .order_by(SupplierPayment.payment_date, SupplierPayment.created_at)
+        ).scalars()
+    )
 
 
 def list_supplier_invoices(db: Session, *, company_id: uuid.UUID) -> list[SupplierInvoice]:

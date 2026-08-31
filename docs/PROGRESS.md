@@ -3766,3 +3766,24 @@ número crudo del backend:
   `TrialBalancePage`, `BudgetVsActualPage`, `FinancialStatementsPage`,
   `BidComparisonPage`, e2e `critical-journey` para esperar dinero
   formateado. Frontend 158 passed; typecheck/lint/build verdes.
+
+### 2026-08-31 — ORDEN MAESTRA DEFINITIVA · FASE 8 (Theme Engine: HORIZON LIGHT default)
+
+Rama: `feat/od-fase8-horizon-default`.
+
+El motor de temas ya se entregó en la Orden Maestra FINAL (PR #57). Esta
+fase cierra §66/§67/§72:
+
+- **`NEXORA Horizon Light` es ahora el tema por defecto** y el primer preset.
+  Sus variables son idénticas a la apariencia hand-tuned auditada (WCAG),
+  así que el default no cambia visualmente — solo pasa a ser un tema con
+  nombre canónico. `applyToDom` mantiene `data-nx-themed='off'` para el
+  default (no repinta por variables); cualquier otro preset sí repinta.
+- `NEXORA Classic` se conserva como preset seleccionable (repinta por
+  variables, colores casi idénticos).
+- Añadido **`Alto contraste — Blanco`** (fondo blanco, texto negro, bordes
+  definidos) además del negro existente (§72 "Black / White").
+- Presets totales: 11 (Horizon Light/Dark, Classic, Dark, Quartz Light/Dark,
+  Alto contraste Negro/Blanco, Executive, Compact Finance).
+- Tests: `themeEngine.test.ts` (default = horizon-light, primer preset,
+  classic presente). Frontend 160 passed; typecheck/lint verdes.

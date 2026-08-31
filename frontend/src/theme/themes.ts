@@ -26,9 +26,28 @@ const SYSTEM = "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-s
 
 export const THEME_PRESETS: ThemePreset[] = [
   {
+    id: 'nexora-horizon-light',
+    name: 'NEXORA Horizon Light',
+    description:
+      'El tema por defecto de NEXORA: superficies blancas, fondo gris azulado, azul eléctrico como accent. Limpio y denso, dirección enterprise light clean.',
+    isDark: false,
+    vars: {
+      '--nx-theme-page-bg': '#eef3f9',
+      '--nx-theme-surface': '#ffffff',
+      '--nx-theme-text': '#102844',
+      '--nx-theme-text-muted': '#4f6176',
+      '--nx-theme-border': '#dce5ef',
+      '--nx-theme-accent': '#1769d2',
+      '--nx-theme-sidebar-bg': '#0b274a',
+      '--nx-theme-sidebar-text': '#c7d7ea',
+      '--nx-theme-radius': '9px',
+      '--nx-theme-font': INTER,
+    },
+  },
+  {
     id: 'nexora-classic',
     name: 'NEXORA Classic',
-    description: 'El azul ejecutivo por defecto de NEXORA.',
+    description: 'El azul ejecutivo clásico de NEXORA (repinta por variables).',
     isDark: false,
     vars: {
       '--nx-theme-page-bg': '#eef3f9',
@@ -135,8 +154,8 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
   {
     id: 'high-contrast',
-    name: 'Alto contraste (negro / blanco)',
-    description: 'Máxima legibilidad para accesibilidad.',
+    name: 'Alto contraste — Negro',
+    description: 'Fondo negro, texto blanco. Máxima legibilidad para accesibilidad.',
     isDark: true,
     vars: {
       '--nx-theme-page-bg': '#000000',
@@ -147,6 +166,24 @@ export const THEME_PRESETS: ThemePreset[] = [
       '--nx-theme-accent': '#ffd500',
       '--nx-theme-sidebar-bg': '#000000',
       '--nx-theme-sidebar-text': '#ffffff',
+      '--nx-theme-radius': '0px',
+      '--nx-theme-font': SYSTEM,
+    },
+  },
+  {
+    id: 'high-contrast-white',
+    name: 'Alto contraste — Blanco',
+    description: 'Fondo blanco, texto negro y bordes definidos. Accesibilidad, no depende solo del color.',
+    isDark: false,
+    vars: {
+      '--nx-theme-page-bg': '#ffffff',
+      '--nx-theme-surface': '#ffffff',
+      '--nx-theme-text': '#000000',
+      '--nx-theme-text-muted': '#1a1a1a',
+      '--nx-theme-border': '#000000',
+      '--nx-theme-accent': '#0000cc',
+      '--nx-theme-sidebar-bg': '#ffffff',
+      '--nx-theme-sidebar-text': '#000000',
       '--nx-theme-radius': '0px',
       '--nx-theme-font': SYSTEM,
     },
@@ -189,7 +226,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
 ]
 
-export const DEFAULT_THEME_ID = 'nexora-classic'
+export const DEFAULT_THEME_ID = 'nexora-horizon-light'
 export const DEFAULT_DENSITY: Density = 'comfortable'
 
 export function getThemePreset(id: string | null | undefined): ThemePreset {

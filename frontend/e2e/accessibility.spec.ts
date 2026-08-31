@@ -76,7 +76,7 @@ test.describe('Accessibility and responsive acceptance', () => {
     for (const width of acceptanceWidths) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/login')
-      await expect(page.getByRole('heading', { name: 'Iniciar sesión' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Bienvenido a NEXORA' })).toBeVisible()
       await expect(page.getByLabel('Correo electrónico')).toBeVisible()
       await expect(page.getByLabel('Contraseña')).toBeVisible()
       await expect(page.getByRole('button', { name: 'Iniciar sesión' })).toBeVisible()
@@ -104,12 +104,22 @@ test.describe('Accessibility and responsive acceptance', () => {
       for (const route of criticalRoutes) {
         await page.goto(route)
         await expect(page.locator('.nx-app-shell')).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible()
         if (width <= 1024) {
+          // Móvil: el "Salir" ya no vive permanente en la cabecera (§12); la
+          // sesión se cierra desde el drawer.
           await expect(page.getByRole('button', { name: 'Abrir navegación' })).toBeVisible()
+        } else {
+          await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible()
         }
         await expectNoDocumentOverflow(page, `${route} @ ${width}px`)
       }
     }
+
+    // El cierre de sesión sigue alcanzable en móvil: dentro del drawer.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/inicio')
+    await page.getByRole('button', { name: 'Abrir navegación' }).click()
+    const drawer = page.getByRole('dialog', { name: 'Navegación' })
+    await expect(drawer.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible()
   })
 })

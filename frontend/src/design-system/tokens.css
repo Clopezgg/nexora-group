@@ -72,6 +72,57 @@
   --nx-bp-desktop-lg: 1440px;
 
   --nx-touch-target: 44px;
+
+  /* ---------------------------------------------------------------------------
+   * NEXORA Design System 2.0 — semantic layer (default: NEXORA HORIZON LIGHT).
+   * Pantallas y componentes deben consumir estos tokens semánticos, no los
+   * primitivos de color ni valores arbitrarios. El Theme Engine sobrescribe
+   * únicamente esta capa (ver src/theme/).
+   * ------------------------------------------------------------------------- */
+  --nx-color-brand-900: var(--nx-navy-900);
+  --nx-color-brand-800: var(--nx-navy-800);
+  --nx-color-brand-700: var(--nx-navy-700);
+  --nx-color-accent: var(--nx-blue-600);
+  --nx-color-accent-hover: var(--nx-blue-500);
+  --nx-color-accent-soft: var(--nx-blue-100);
+  --nx-color-background: #eef3f9;
+  --nx-color-surface: var(--nx-white);
+  --nx-color-surface-secondary: var(--nx-gray-50);
+  --nx-color-border: var(--nx-gray-200);
+  --nx-color-border-strong: #cdd7e5;
+  --nx-color-text: var(--nx-navy-900);
+  --nx-color-text-muted: var(--nx-gray-600);
+  --nx-color-text-inverse: var(--nx-white);
+  --nx-color-success: var(--nx-success);
+  --nx-color-warning: var(--nx-warning);
+  --nx-color-error: var(--nx-danger);
+  --nx-color-info: var(--nx-info);
+
+  /* Escala tipográfica (§69). No títulos gigantes en móvil, no labels micro. */
+  --nx-text-display: 28px;
+  --nx-text-h1: 22px;
+  --nx-text-h2: 18px;
+  --nx-text-h3: 15px;
+  --nx-text-body: 13px;
+  --nx-text-label: 12px;
+  --nx-text-caption: 11px;
+  --nx-text-financial: 14px;
+  --nx-font-financial: var(--nx-font-family-mono);
+
+  /* Safe-area (iPhone). Componentes fijos usan estos helpers. */
+  --nx-safe-top: env(safe-area-inset-top, 0px);
+  --nx-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nx-safe-left: env(safe-area-inset-left, 0px);
+  --nx-safe-right: env(safe-area-inset-right, 0px);
+  --nx-bottom-nav-height: 58px;
+}
+
+@media (min-width: 720px) {
+  :root {
+    --nx-text-display: 34px;
+    --nx-text-h1: 26px;
+    --nx-text-h2: 20px;
+  }
 }
 
 * {

@@ -3,8 +3,9 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { NavList } from './NavList'
+import { BottomNav } from './BottomNav'
 import { filterNavGroups } from '../app/navigation'
-import { CommandPalette, Drawer, type CommandItem } from '../design-system'
+import { Button, CommandPalette, Drawer, type CommandItem } from '../design-system'
 import { useAuth } from '../features/auth/auth-context'
 import { useActiveCompany } from '../hooks/useActiveCompany'
 import { globalSearch } from '../services/searchService'
@@ -13,7 +14,7 @@ import './AppLayout.css'
 export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const { activeCompanyId } = useActiveCompany()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const visibleGroups = useMemo(() => filterNavGroups(user?.permissions), [user?.permissions])
 
   const commandItems = useMemo<CommandItem[]>(
@@ -52,13 +53,31 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <BottomNav onOpenMore={() => setMobileNavOpen(true)} />
       <Drawer
         open={mobileNavOpen}
         title="Navegación"
         side="left"
         onClose={() => setMobileNavOpen(false)}
       >
-        <NavList onNavigate={() => setMobileNavOpen(false)} />
+        <NavList variant="drawer" onNavigate={() => setMobileNavOpen(false)} />
+        <div className="nx-drawer__footer">
+          <div className="nx-drawer__user">
+            <span className="nx-drawer__user-name">{user?.fullName ?? user?.email}</span>
+            {user?.roles?.[0] ? (
+              <span className="nx-drawer__user-role">{user.roles[0]}</span>
+            ) : null}
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setMobileNavOpen(false)
+              logout()
+            }}
+          >
+            Cerrar sesión
+          </Button>
+        </div>
       </Drawer>
       <CommandPalette items={commandItems} searchRemote={searchRemote} />
     </div>

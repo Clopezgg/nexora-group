@@ -59,6 +59,9 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
   '/proyectos/presupuestos': async () => ({
     Component: (await import('../features/projects/BudgetPage')).BudgetPage,
   }),
+  '/proyectos/cockpit': async () => ({
+    Component: (await import('../features/projects/ProjectCockpitPage')).ProjectCockpitPage,
+  }),
   '/proyectos/ordenes-de-cambio': async () => ({
     Component: (await import('../features/projects/ChangeOrdersPage')).ChangeOrdersPage,
   }),

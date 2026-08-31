@@ -175,3 +175,44 @@ def create_detailed_change_order(
     db.commit()
     db.refresh(change_order)
     return ChangeOrderResponse.model_validate(change_order, from_attributes=True)
+
+
+@router.get(
+    "/{project_id}/financial-cockpit",
+    response_model=None,
+)
+def project_financial_cockpit(
+    project_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("project.budget", "read")),
+):
+    from app.schemas.project_cockpit import ProjectCockpitResponse
+    from app.services import project_cockpit_service
+    from app.services.permission_service import assert_project_access
+
+    project = _project_or_404(db, project_id)
+    assert_company_access(
+        db, user_id=user.id, resource="project.budget", action="read", company_id=project.company_id
+    )
+    assert_project_access(
+        db, user_id=user.id, resource="project.budget", action="read", project_id=project_id
+    )
+    cockpit = project_cockpit_service.build(db, project_id=project_id)
+    assert cockpit is not None
+    return ProjectCockpitResponse(
+        project_id=uuid.UUID(cockpit.project_id),
+        project_name=cockpit.project_name,
+        currency_code=cockpit.currency_code,
+        budget_at_completion=cockpit.budget_at_completion,
+        committed=cockpit.committed,
+        actual_cost=cockpit.actual_cost,
+        percent_complete=cockpit.percent_complete,
+        earned_value=cockpit.earned_value,
+        cost_performance_index=cockpit.cost_performance_index,
+        estimate_to_complete=cockpit.estimate_to_complete,
+        estimate_at_completion=cockpit.estimate_at_completion,
+        variance_at_completion=cockpit.variance_at_completion,
+        contract_revenue=cockpit.contract_revenue,
+        projected_margin=cockpit.projected_margin,
+        projected_margin_pct=cockpit.projected_margin_pct,
+    )

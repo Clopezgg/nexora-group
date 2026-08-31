@@ -3549,3 +3549,30 @@ Rama: `feat/phase5-transaction-inspector`.
   cadena de reversos (`reversedByDocumentIds` / `reversesDocumentId` /
   `reversalReason`). Frontend `TransactionInspectorPage.test.tsx`; e2e
   `critical-journey` inspecciona un asiento real.
+
+### 2026-08-31 — ORDEN MAESTRA FINAL · Phase 6 (Project Financial Cockpit)
+
+Rama: `feat/phase6-project-cockpit`.
+
+- **`project_cockpit_service.build`** + `GET
+  /projects/{id}/financial-cockpit` — EAC/ETC/CPI/margen:
+  - **BAC** = presupuesto autorizado (baseline + change orders).
+  - **AC** = costo real leído del **General Ledger** (neto deudor de líneas
+    de cuentas EXPENSE imputadas al proyecto) — captura TODO el costo
+    (AP, mano de obra, combustible, depreciación…), no solo el subledger de AP.
+  - **% avance** = último `ProgressRecord` a nivel proyecto (o máx. WBS).
+  - **EV** = BAC · % · **CPI** = EV / AC.
+  - **ETC** = (BAC − EV)/CPI si CPI usable, si no resto simple.
+  - **EAC** = AC + ETC · **VAC** = BAC − EAC.
+  - **Ingreso** = Σ `SalesContract.amount` del proyecto (no CANCELLED).
+  - **Margen proyectado** = ingreso − EAC (+ %).
+  - Fail-closed: sin presupuesto o sin avance → los derivados quedan `None`,
+    no una cifra inventada.
+  - Permiso `project.budget:read` + `assert_project_access`.
+- **Frontend**: `/proyectos/cockpit` → `ProjectCockpitPage` (badges CPI /
+  dentro-de-presupuesto / sin-avance + rejilla de métricas con color por
+  salud), nueva entrada de navegación.
+- Tests: `test_project_cockpit.py` (2): cálculo completo
+  (BAC 600, AC 200, 50% → EV 300, CPI 1.5, ETC 200, EAC 400, VAC 200,
+  ingreso 1000, margen 600 / 60%); proyecto sin datos → derivados `None`.
+  Frontend `ProjectCockpitPage.test.tsx`; e2e `critical-journey`.

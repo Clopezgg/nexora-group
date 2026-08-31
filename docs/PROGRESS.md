@@ -3943,3 +3943,18 @@ Rama: `feat/oc-d-voucher-pdf-enterprise`.
 - Tests: `test_treasury_operations.py` (7 de comprobante existentes + 1
   nuevo: QR/URL impresa + el token resuelve en el endpoint con exposición
   mínima + token inválido 404); `VoucherVerificationPage.test.tsx` (2).
+
+### 2026-08-31 — ORDEN MAESTRA CORRECTIVA · PR C (normalización por pantalla + móvil)
+
+Rama: `feat/oc-c-screen-normalization`.
+
+- **Tablas → record cards en móvil (§22/§23)**: `Table` y `DataGrid` marcan
+  cada `<td>` con `data-label` y la clase `nx-table--responsive`. En
+  `@media (max-width: 640px)` la tabla se apila: `thead` oculto, cada `<tr>`
+  es una tarjeta con etiqueta/valor por columna (el `::before` toma
+  `attr(data-label)`). Ya no se comprimen 8 columnas ni se fuerza scroll
+  interminable; el escritorio conserva la tabla densa.
+- El resto del lenguaje visual por pantalla lo gobierna la capa temática
+  siempre-activa de PR A (topbar light, superficies, tablas, formularios).
+- Tests: `TableResponsive.test.tsx`. Frontend 165 passed; typecheck/lint
+  verdes. El barrido axe/overflow e2e valida el apilado en cada ruta.

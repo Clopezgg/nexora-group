@@ -52,7 +52,7 @@ export function DataGrid<T>({
 
   return (
     <div className="nx-table-scroll" tabIndex={0}>
-    <table className="nx-table nx-data-grid">
+    <table className="nx-table nx-data-grid nx-table--responsive">
       <thead>
         <tr>
           {columns.map((column) => (
@@ -80,7 +80,7 @@ export function DataGrid<T>({
         {sortedRows.map((row) => (
           <tr key={getRowKey(row)}>
             {columns.map((column) => (
-              <td key={column.key}>{column.render(row)}</td>
+              <td key={column.key} data-label={column.header}>{column.render(row)}</td>
             ))}
           </tr>
         ))}

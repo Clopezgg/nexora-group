@@ -3958,3 +3958,36 @@ Rama: `feat/oc-c-screen-normalization`.
   siempre-activa de PR A (topbar light, superficies, tablas, formularios).
 - Tests: `TableResponsive.test.tsx`. Frontend 165 passed; typecheck/lint
   verdes. El barrido axe/overflow e2e valida el apilado en cada ruta.
+
+### 2026-08-31 — ORDEN MAESTRA CORRECTIVA · PR E (Deploy Azure + verificación de producción)
+
+`main` @ `790cc83`. PRs A/B/C/D fusionados por PR, todos CI verde (backend,
+frontend, e2e incl. barrido responsive amplio, Docker smoke, Bicep).
+
+**Deploy Azure REAL** — run `33446468541` (`workflow_dispatch`, `deploy=true`,
+`main` @ 790cc83): `Bicep what-if` ✅ · `Deploy infra + apps` ✅. Aplica la
+migración `7163bfe08fdb` (`voucher_verifications`) y el backend con Pillow +
+el nuevo `voucher_service` Platypus.
+
+**Smoke de producción** (`https://jolly-plant-0d6bf700f.7.azurestaticapps.net`):
+- frontend `/` → 200 · `/api/healthz` → 200 · `/api/readyz` → 200 (valida
+  Managed Identity → Blob privado; el 200 confirma que evidencia funciona).
+- `/api/auth/login` credenciales inválidas → 401 (first-party, sin 405).
+- **`/api/verificar/comprobante/<token-inexistente>` → 404** con mensaje
+  humano — el endpoint público nuevo está vivo y la migración aplicó (si la
+  tabla faltara sería 500).
+- **`/verificar/comprobante/abc` (SPA) → 200** — la ruta pública nueva del
+  frontend se sirve.
+- Pasos de verificación del propio workflow: "newest backend revision
+  healthy" ✅, "direct Container Apps API locked down" ✅, "Verify
+  production" ✅.
+
+**Pendiente de verificación humana** (§65/§66, requiere sesión autenticada
+en navegador real):
+- Visual en 390 / 430 / iPad / 1440: topbar light, marca NEXORA GROUP, FAB
+  central, KPI tiles, forecast 13 semanas, cuentas bancarias, bottom nav,
+  sin overflow ni botón "Salir" permanente.
+- Recorrido comprobante en Safari/iPhone: documento → Transferencia →
+  evidencia → Generar PDF → 200 → el PDF abre con QR escaneable, página 2
+  con la fotografía, sin UUID; escanear el QR abre `/verificar/comprobante/…`
+  con "✓ Comprobante válido".

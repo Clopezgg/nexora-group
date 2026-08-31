@@ -46,8 +46,8 @@ describe('TrialBalancePage', () => {
       [{ id: 'c1', name: 'Constructora Nexora', code: null, legalName: null, functionalCurrencyCode: 'HNL' }],
       {
         rows: [
-          { accountCode: '6000', accountName: 'Gastos', debitBalance: '100.00', creditBalance: '0' },
-          { accountCode: '1000', accountName: 'Caja', debitBalance: '0', creditBalance: '100.00' },
+          { accountId: 'acc-6000', accountCode: '6000', accountName: 'Gastos', debitBalance: '100.00', creditBalance: '0' },
+          { accountId: 'acc-1000', accountCode: '1000', accountName: 'Caja', debitBalance: '0', creditBalance: '100.00' },
         ],
         totalDebit: '100.00',
         totalCredit: '100.00',

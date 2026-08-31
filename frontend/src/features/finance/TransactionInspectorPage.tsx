@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   Badge,
   Card,
@@ -26,7 +26,8 @@ export function TransactionInspectorPage() {
   const { companies, activeCompanyId, setActiveCompanyId, activeCompany, isLoading, isError, refetch } =
     useActiveCompany()
   const currency = activeCompany?.functionalCurrencyCode ?? undefined
-  const [documentId, setDocumentId] = useState('')
+  const [searchParams] = useSearchParams()
+  const [documentId, setDocumentId] = useState(searchParams.get('documentId') ?? '')
 
   const documentsQuery = useQuery({
     queryKey: ['accounting', 'journal-documents', activeCompanyId],

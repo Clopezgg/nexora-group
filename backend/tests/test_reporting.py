@@ -74,6 +74,14 @@ def test_trial_balance_debits_equal_credits_after_a_real_posting(client, db_sess
 
     expense_row = next(row for row in body["rows"] if row["accountCode"] == "6000")
     cash_row = next(row for row in body["rows"] if row["accountCode"] == "1000")
+    # Phase 9: cada fila lleva accountId para el drill-down al Libro Mayor.
+    assert expense_row["accountId"] and cash_row["accountId"]
+    # Drill-down real: el Libro Mayor filtrado por esa cuenta solo trae sus líneas.
+    gl = client.get(
+        f"/api/reports/general-ledger?companyId={company['id']}&accountId={expense_row['accountId']}"
+    ).json()
+    assert gl["rows"]
+    assert all(r["accountCode"] == "6000" for r in gl["rows"])
     assert Decimal(expense_row["debitBalance"]) == Decimal("100.00")
     assert Decimal(expense_row["creditBalance"]) == Decimal("0")
     assert Decimal(cash_row["debitBalance"]) == Decimal("0")

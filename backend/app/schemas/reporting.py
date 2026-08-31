@@ -6,6 +6,7 @@ from app.schemas.base import CamelModel
 
 
 class TrialBalanceRowResponse(CamelModel):
+    account_id: uuid.UUID
     account_code: str
     account_name: str
     debit_balance: Decimal

@@ -623,6 +623,10 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
   await test.step('reports: TB, GL, Balance Sheet, Income Statement', async () => {
     await page.goto('/control/reportes')
     await expect(page.getByText(/Total débito/)).toBeVisible({ timeout: 10_000 })
+    // Drill-down (Phase 9): del Balance de Comprobación al Libro Mayor por cuenta.
+    await page.locator('.nx-link-button').first().click()
+    await expect(page.getByText(/Filtrado por cuenta:/)).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Quitar filtro' }).click()
     await page.getByRole('tab', { name: /libro mayor/i }).click()
     await expect(page.getByText(/Total débito/)).toBeVisible({ timeout: 10_000 })
     await page.getByRole('tab', { name: /balance general/i }).click()

@@ -22,12 +22,13 @@ export const reportingService = {
     apiFetch<CashFlowReport>(`/reports/cash-flow?companyId=${companyId}`),
   getSupplierPerformance: (companyId: string) =>
     apiFetch<SupplierPerformanceRow[]>(`/reports/supplier-performance?companyId=${companyId}`),
-  getGeneralLedger: (companyId: string, offset = 0, limit = 25) => {
+  getGeneralLedger: (companyId: string, offset = 0, limit = 25, accountId?: string) => {
     const params = new URLSearchParams({
       companyId,
       offset: String(offset),
       limit: String(limit),
     })
+    if (accountId) params.set('accountId', accountId)
     return apiFetch<GeneralLedgerReport>(`/reports/general-ledger?${params.toString()}`)
   },
 }

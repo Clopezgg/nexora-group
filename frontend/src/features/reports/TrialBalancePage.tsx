@@ -12,20 +12,44 @@ const CSV_COLUMNS = [
   { key: 'creditBalance' as const, label: 'Crédito' },
 ]
 
-const COLUMNS: TableColumn<TrialBalanceRow>[] = [
-  { key: 'accountCode', header: 'Código', render: (row) => row.accountCode },
-  { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
-  { key: 'debitBalance', header: 'Débito', render: (row) => row.debitBalance },
-  { key: 'creditBalance', header: 'Crédito', render: (row) => row.creditBalance },
-]
+function buildColumns(
+  onDrillToLedger?: (accountId: string, label: string) => void,
+): TableColumn<TrialBalanceRow>[] {
+  return [
+    {
+      key: 'accountCode',
+      header: 'Código',
+      render: (row) =>
+        onDrillToLedger ? (
+          <button
+            type="button"
+            className="nx-link-button"
+            onClick={() => onDrillToLedger(row.accountId, `${row.accountCode} — ${row.accountName}`)}
+          >
+            {row.accountCode}
+          </button>
+        ) : (
+          row.accountCode
+        ),
+    },
+    { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
+    { key: 'debitBalance', header: 'Débito', render: (row) => row.debitBalance },
+    { key: 'creditBalance', header: 'Crédito', render: (row) => row.creditBalance },
+  ]
+}
 
 /** NXR-REQ-0093 (alcance de esta fase): Balance de Comprobación real,
  * armado a partir de treasury_service.account_balance por cada cuenta del
  * chart of accounts de la company activa -- ver
  * backend/app/services/reporting_service.py. Balance Sheet / P&L / Cash
  * Flow quedan fuera de alcance deliberadamente. */
-export function TrialBalancePage() {
+export function TrialBalancePage({
+  onDrillToLedger,
+}: {
+  onDrillToLedger?: (accountId: string, label: string) => void
+} = {}) {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const columns = buildColumns(onDrillToLedger)
 
   const reportQuery = useQuery({
     queryKey: ['reports', 'trial-balance', activeCompanyId],
@@ -67,9 +91,9 @@ export function TrialBalancePage() {
         ) : (
           <>
             <Table
-              columns={COLUMNS}
+              columns={columns}
               rows={rows}
-              getRowKey={(row) => row.accountCode}
+              getRowKey={(row) => row.accountId}
               emptyMessage="No hay movimientos contabilizados todavía."
             />
             {reportQuery.data ? (

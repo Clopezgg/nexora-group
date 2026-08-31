@@ -12,12 +12,10 @@ function applyToDom(themeId: string, density: Density) {
   const root = document.documentElement
   root.dataset.nxTheme = preset.id
   root.dataset.nxDensity = density
-  // NEXORA Horizon Light es el default y equivale exactamente a la apariencia
-  // hand-tuned auditada (WCAG del recorrido base sin cambios): NO activa la
-  // capa de re-pintado por variables. Cualquier otro preset sí la activa.
-  const isDefault = preset.id === DEFAULT_THEME_ID
-  root.dataset.nxThemed = isDefault ? 'off' : 'on'
-  root.style.colorScheme = isDefault ? '' : preset.isDark ? 'dark' : 'light'
+  // El Theme Engine gobierna SIEMPRE la presentación: NEXORA Horizon Light
+  // (default) también re-pinta por variables. No hay un modo "sin tema".
+  root.dataset.nxThemed = 'on'
+  root.style.colorScheme = preset.isDark ? 'dark' : 'light'
   for (const [key, value] of Object.entries(preset.vars)) {
     root.style.setProperty(key, value)
   }

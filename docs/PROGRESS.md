@@ -3861,3 +3861,26 @@ Transferencia → adjuntar fotografía → confirmar que el nombre permanece →
 upload OK → Evidence persistida → botón habilitado → Generar PDF → 200 →
 PDF abre. Repetir con PNG (screenshot) y JPEG; HEIC/HEIF ahora aceptado
 (transcode server-side diferido en `DEFERRED-FINAL-019`).
+
+### 2026-08-31 — ORDEN MAESTRA CORRECTIVA · PR A (Horizon Light real + topbar light + FAB)
+
+Rama: `feat/oc-a-horizon-light-real`.
+
+Corrige la contradicción de §3: `DEFAULT_THEME_ID = 'nexora-horizon-light'`
+pero `applyToDom` desactivaba la capa de theming para el default.
+
+- **`ThemeProvider.applyToDom`**: `data-nx-themed` es SIEMPRE `'on'`. El
+  Theme Engine gobierna también el default; no hay modo "sin tema".
+- **`themes.css`**: capa activa reescrita y ampliada — canvas, **topbar
+  LIGHT CLEAN** (superficie del tema, texto/iconos/select/badge/edit-access
+  oscuros), sidebar, cards, stat-cards, chart-cards, tablas, formularios,
+  botón primario y bottom-nav leen los tokens `--nx-theme-*`. Se añadieron
+  `--nx-theme-surface-2` y `--nx-theme-accent-contrast` a los 11 presets.
+- **`BottomNav`**: composición de 5 slots de la Opción 2 — Inicio ·
+  [lateral RBAC] · **FAB azul central (+)** · [lateral RBAC] · Más.
+- **`QuickCreate`** (§10): bottom-sheet con acciones reales filtradas por
+  permisos (comprobante, gasto, remesa, factura proveedor, cobro,
+  evidencia, proyecto) — cada una navega a su módulo.
+- Icono `plus` añadido al design system.
+- Tests: `BottomNav.test.tsx` (+1 FAB/QuickCreate). Frontend 164 passed;
+  typecheck/lint/build verdes.

@@ -33,6 +33,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: false,
     vars: {
       '--nx-theme-page-bg': '#eef3f9',
+      '--nx-theme-surface-2': '#f4f7fb',
+      '--nx-theme-accent-contrast': '#ffffff',
       '--nx-theme-surface': '#ffffff',
       '--nx-theme-text': '#102844',
       '--nx-theme-text-muted': '#4f6176',
@@ -51,6 +53,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: false,
     vars: {
       '--nx-theme-page-bg': '#eef3f9',
+      '--nx-theme-surface-2': '#eef3f9',
+      '--nx-theme-accent-contrast': '#ffffff',
       '--nx-theme-surface': '#ffffff',
       '--nx-theme-text': '#102844',
       '--nx-theme-text-muted': '#4f6176',
@@ -69,6 +73,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: true,
     vars: {
       '--nx-theme-page-bg': '#0b1220',
+      '--nx-theme-surface-2': '#1b2740',
+      '--nx-theme-accent-contrast': '#ffffff',
       '--nx-theme-surface': '#141d2e',
       '--nx-theme-text': '#e7edf6',
       '--nx-theme-text-muted': '#9fb0c6',
@@ -87,6 +93,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: false,
     vars: {
       '--nx-theme-page-bg': '#f5f6f7',
+      '--nx-theme-surface-2': '#eef1f4',
+      '--nx-theme-accent-contrast': '#ffffff',
       '--nx-theme-surface': '#ffffff',
       '--nx-theme-text': '#1d2d3e',
       '--nx-theme-text-muted': '#556b82',
@@ -105,6 +113,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: true,
     vars: {
       '--nx-theme-page-bg': '#12171c',
+      '--nx-theme-surface-2': '#242c33',
+      '--nx-theme-accent-contrast': '#0b0f12',
       '--nx-theme-surface': '#1c2329',
       '--nx-theme-text': '#eaeef2',
       '--nx-theme-text-muted': '#a7b4c0',
@@ -123,6 +133,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: false,
     vars: {
       '--nx-theme-page-bg': '#fafafa',
+      '--nx-theme-surface-2': '#f2f2f2',
+      '--nx-theme-accent-contrast': '#ffffff',
       '--nx-theme-surface': '#ffffff',
       '--nx-theme-text': '#32363a',
       '--nx-theme-text-muted': '#6a6d70',
@@ -141,6 +153,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: true,
     vars: {
       '--nx-theme-page-bg': '#1c1c1c',
+      '--nx-theme-surface-2': '#35383b',
+      '--nx-theme-accent-contrast': '#0b0f14',
       '--nx-theme-surface': '#2a2c2e',
       '--nx-theme-text': '#eaecee',
       '--nx-theme-text-muted': '#a9adb0',
@@ -159,6 +173,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: true,
     vars: {
       '--nx-theme-page-bg': '#000000',
+      '--nx-theme-surface-2': '#0a0a0a',
+      '--nx-theme-accent-contrast': '#000000',
       '--nx-theme-surface': '#000000',
       '--nx-theme-text': '#ffffff',
       '--nx-theme-text-muted': '#e0e0e0',
@@ -177,6 +193,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: false,
     vars: {
       '--nx-theme-page-bg': '#ffffff',
+      '--nx-theme-surface-2': '#f0f0f0',
+      '--nx-theme-accent-contrast': '#ffffff',
       '--nx-theme-surface': '#ffffff',
       '--nx-theme-text': '#000000',
       '--nx-theme-text-muted': '#1a1a1a',
@@ -195,6 +213,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: false,
     vars: {
       '--nx-theme-page-bg': '#f2f0ec',
+      '--nx-theme-surface-2': '#eae7df',
+      '--nx-theme-accent-contrast': '#ffffff',
       '--nx-theme-surface': '#ffffff',
       '--nx-theme-text': '#1b1a17',
       '--nx-theme-text-muted': '#5a564d',
@@ -213,6 +233,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     isDark: false,
     vars: {
       '--nx-theme-page-bg': '#eef2f7',
+      '--nx-theme-surface-2': '#e7edf4',
+      '--nx-theme-accent-contrast': '#ffffff',
       '--nx-theme-surface': '#ffffff',
       '--nx-theme-text': '#0f2033',
       '--nx-theme-text-muted': '#4a5a6c',

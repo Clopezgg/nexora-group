@@ -14,6 +14,9 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
   '/finanzas/contabilidad': async () => ({
     Component: (await import('../features/accounting/AccountingPage')).AccountingPage,
   }),
+  '/finanzas/conciliacion-subledger': async () => ({
+    Component: (await import('../features/finance/SubledgerReconciliationPage')).SubledgerReconciliationPage,
+  }),
   '/finanzas/tesoreria': async () => ({
     Component: (await import('../features/treasury/TreasuryPage')).TreasuryPage,
   }),

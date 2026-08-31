@@ -477,6 +477,10 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await page.goto('/finanzas/control')
     await expect(page.getByRole('heading', { name: 'Centro de Control Financiero' })).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText('Posición de caja y bancos')).toBeVisible({ timeout: 10_000 })
+
+    await page.goto('/finanzas/conciliacion-subledger')
+    await expect(page.getByRole('heading', { name: 'Conciliación Subledger ↔ GL' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/subledgers cuadran contra el GL|Hay descuadres/)).toBeVisible({ timeout: 10_000 })
   })
 
   await test.step('Documents + multipart Evidence with real selectors', async () => {

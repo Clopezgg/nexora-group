@@ -1,8 +1,32 @@
 export class ApiError extends Error {
   status: number
-  constructor(message: string, status: number) {
+  correlationId: string | null
+  constructor(message: string, status: number, correlationId: string | null = null) {
     super(message)
     this.status = status
+    this.correlationId = correlationId
+  }
+}
+
+/** Human-facing message by HTTP status, so a page never shows a bare
+ *  "Error 500" and a dropped session is not mistaken for a real failure. */
+export function friendlyApiMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) return 'No se pudo contactar el servidor. Revisa tu conexión.'
+  switch (error.status) {
+    case 401:
+      return 'Tu sesión expiró. Inicia sesión nuevamente.'
+    case 403:
+      return 'No tienes permiso para ver esta información.'
+    case 404:
+      return 'El recurso solicitado no existe.'
+    case 409:
+      return error.message || 'La operación entra en conflicto con el estado actual.'
+    case 422:
+      return error.message || 'Los datos enviados no son válidos.'
+    default:
+      return error.status >= 500
+        ? `Error interno del servidor${error.correlationId ? ` (ref. ${error.correlationId})` : ''}.`
+        : error.message || `Error ${error.status}`
   }
 }
 
@@ -13,14 +37,24 @@ function resolveApiBaseUrl(): string {
     if (!configured) {
       throw new Error('VITE_API_BASE_URL is required for the Nexora production build')
     }
-    let parsed: URL
-    try {
-      parsed = new URL(configured)
-    } catch {
-      throw new Error('VITE_API_BASE_URL must be an absolute HTTPS URL in production')
-    }
-    if (parsed.protocol !== 'https:') {
-      throw new Error('VITE_API_BASE_URL must use HTTPS in production')
+    // Production must be first-party: either a same-origin absolute path
+    // (served by the Static Web Apps linked backend as `/api`, which keeps
+    // the session cookie first-party and works in Safari/WebKit ITP), or an
+    // absolute HTTPS origin. A cleartext or relative-without-leading-slash
+    // value is rejected.
+    const isSameOriginPath = configured.startsWith('/') && !configured.startsWith('//')
+    if (!isSameOriginPath) {
+      let parsed: URL
+      try {
+        parsed = new URL(configured)
+      } catch {
+        throw new Error(
+          'VITE_API_BASE_URL must be a same-origin path (e.g. "/api") or an absolute HTTPS URL in production',
+        )
+      }
+      if (parsed.protocol !== 'https:') {
+        throw new Error('VITE_API_BASE_URL must use HTTPS in production')
+      }
     }
   }
 
@@ -73,11 +107,14 @@ export function hasEditCapability(): boolean {
   return Boolean(getEditCapability())
 }
 
-async function throwApiError(response: Response): Promise<never> {
+async function throwApiError(response: Response, path: string): Promise<never> {
   let message = `Error ${response.status}`
+  let correlationId: string | null =
+    response.headers.get('x-correlation-id') ?? response.headers.get('x-request-id')
   try {
     const body = await response.json()
     message = body.detail ?? body.error?.message ?? message
+    correlationId = body.error?.correlationId ?? correlationId
   } catch {
     // response without JSON body
   }
@@ -85,7 +122,18 @@ async function throwApiError(response: Response): Promise<never> {
     clearEditCapability()
     window.dispatchEvent(new CustomEvent('nexora:edit-access-required'))
   }
-  throw new ApiError(message, response.status)
+  // A 401 on any endpoint other than the session probe itself means the
+  // session is gone (expired, revoked, or — historically — a cross-site
+  // cookie the browser refused to send). Signal the app so it shows the
+  // login screen instead of a scattered "Ocurrió un error" on every page.
+  if (
+    response.status === 401 &&
+    typeof window !== 'undefined' &&
+    !path.startsWith('/auth/')
+  ) {
+    window.dispatchEvent(new CustomEvent('nexora:session-expired'))
+  }
+  throw new ApiError(message, response.status, correlationId)
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -105,7 +153,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   })
 
   if (!response.ok) {
-    return throwApiError(response)
+    return throwApiError(response, path)
   }
 
   if (response.status === 204) {
@@ -154,7 +202,7 @@ export async function apiFetchBlob(path: string): Promise<ApiDownload> {
   })
 
   if (!response.ok) {
-    return throwApiError(response)
+    return throwApiError(response, path)
   }
 
   return {

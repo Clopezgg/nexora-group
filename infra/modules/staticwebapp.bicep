@@ -16,9 +16,8 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   }
   properties: {
     // El repositorio no se liga aquí: el frontend se publica con el token
-    // obtenido por OIDC. La aplicación productiva consume el HTTPS directo
-    // de Container Apps; el workflow elimina cualquier linked backend
-    // residual para evitar un proxy /api ambiguo.
+    // obtenido por OIDC. El workflow liga el Container App como linked
+    // backend para servir `/api/*` first-party (mismo origen que el SPA).
     stagingEnvironmentPolicy: 'Enabled'
     allowConfigFileUpdates: true
   }

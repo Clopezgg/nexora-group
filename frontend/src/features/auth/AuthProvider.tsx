@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { authService } from '../../services/authService'
 import { ApiError } from '../../services/httpClient'
@@ -7,6 +7,17 @@ import { AuthContext, type AuthContextValue } from './auth-context'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
+
+  // Any authenticated call that comes back 401 means the session is gone.
+  // Drop the cached user so the router shows the login screen instead of a
+  // scattered error state across every data page.
+  useEffect(() => {
+    const onExpired = () => {
+      queryClient.setQueryData(['auth', 'me'], null)
+    }
+    window.addEventListener('nexora:session-expired', onExpired)
+    return () => window.removeEventListener('nexora:session-expired', onExpired)
+  }, [queryClient])
 
   const meQuery = useQuery<CurrentUser | null>({
     queryKey: ['auth', 'me'],

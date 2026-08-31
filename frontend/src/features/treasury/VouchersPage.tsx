@@ -219,6 +219,24 @@ function PaymentEvidenceField({
   )
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  TRANSFER: 'Transferencia',
+  DEPOSIT: 'Depósito',
+  CHECK: 'Cheque',
+  CASH: 'Efectivo',
+  REMITTANCE: 'Remesa',
+  OTHER: 'Otro',
+}
+
+/** Enmascara una cuenta bancaria dejando visibles sólo los últimos 4
+ * dígitos (§52/§53). Nunca se imprime el número completo. */
+function maskAccountReference(reference: string | null): string | null {
+  if (!reference) return null
+  const trimmed = reference.trim()
+  if (trimmed.length <= 4) return `••••${trimmed}`
+  return `••••${trimmed.slice(-4)}`
+}
+
 export function VouchersPage() {
   const handleMutationError = useMutationError()
   const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
@@ -298,6 +316,11 @@ export function VouchersPage() {
 
   const documents = documentsQuery.data ?? []
   const selected = documents.find((row) => row.id === documentId)
+  const selectedAccount = (accountsQuery.data ?? []).find((row) => row.id === treasuryAccountId) ?? null
+  const resolvedPayer = activeCompany?.voucherPayerName || activeCompany?.name || '—'
+  const resolvedApprover = approvedBy.trim() || activeCompany?.voucherApproverName || '—'
+  const canGenerate =
+    Boolean(documentId && selectedBeneficiary && paymentMethod) && !evidenceMissing && !evidenceUploading
 
   return (
     <div className="nx-treasury">
@@ -381,6 +404,22 @@ export function VouchersPage() {
               </option>
             ))}
           </Select>
+          {selectedAccount ? (
+            <div className="nx-bank-identity" aria-label="Identidad de la cuenta bancaria">
+              <span className="nx-bank-identity__icon" aria-hidden="true">
+                <Icon name="bank" />
+              </span>
+              <div className="nx-bank-identity__body">
+                <span className="nx-bank-identity__name">
+                  {selectedAccount.institution ?? selectedAccount.name}
+                </span>
+                <span className="nx-bank-identity__meta">
+                  {maskAccountReference(selectedAccount.accountReference) ?? 'Sin número de cuenta'} ·{' '}
+                  {selectedAccount.currencyCode}
+                </span>
+              </div>
+            </div>
+          ) : null}
           {documentId && needsEvidence && activeCompanyId ? (
             <PaymentEvidenceField
               key={`${activeCompanyId}:${documentId}`}
@@ -402,9 +441,47 @@ export function VouchersPage() {
               <p className="nx-field__hint">Si lo dejas vacío se usa el aprobador configurado: {activeCompany.voucherApproverName}</p>
             ) : null}
           </div>
+        </div>
+      </Card>
+
+      <Card title="Vista previa del comprobante">
+        <dl className="nx-voucher-preview">
+          <div><dt>Documento</dt><dd>{selected?.documentNumber ?? '—'}</dd></div>
+          <div><dt>Estado</dt><dd>{selected ? statusLabel(selected.status) : '—'}</dd></div>
+          <div><dt>Moneda</dt><dd>{selected?.currencyCode ?? '—'}</dd></div>
+          <div><dt>Ámbito</dt><dd>{selected?.scope ?? '—'}</dd></div>
+          <div><dt>Beneficiario</dt><dd>{selectedBeneficiary?.name ?? '—'}</dd></div>
+          <div><dt>Pagador</dt><dd>{resolvedPayer}</dd></div>
+          <div><dt>Aprobado por</dt><dd>{resolvedApprover}</dd></div>
+          <div><dt>Método de pago</dt><dd>{PAYMENT_METHOD_LABELS[paymentMethod] ?? paymentMethod}</dd></div>
+          <div>
+            <dt>Banco / cuenta</dt>
+            <dd>
+              {selectedAccount
+                ? `${selectedAccount.institution ?? selectedAccount.name} · ${
+                    maskAccountReference(selectedAccount.accountReference) ?? 'sin número'
+                  }`
+                : 'No especificado'}
+            </dd>
+          </div>
+          <div>
+            <dt>Evidencia</dt>
+            <dd>{needsEvidence ? `${evidenceCount} adjunta(s)` : 'No requerida para este método'}</dd>
+          </div>
+        </dl>
+        <p className="nx-field__hint">
+          El monto y el detalle de débitos/créditos se toman del asiento contable; el PDF no
+          puede alterarlos.
+        </p>
+        {evidenceMissing ? (
+          <p className="nx-field__error" role="alert">
+            Falta adjuntar el comprobante del pago (obligatorio para este método).
+          </p>
+        ) : null}
+        <div className="nx-voucher-preview__actions">
           <Button
             loading={download.isPending}
-            disabled={!documentId || !selectedBeneficiary || !paymentMethod || evidenceMissing || evidenceUploading}
+            disabled={!canGenerate}
             onClick={() => download.mutate()}
           >
             Generar PDF

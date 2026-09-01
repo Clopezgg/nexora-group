@@ -89,7 +89,35 @@ Ningún endpoint nuevo devuelve 404.
   asistente de proyecto a 1440/768/390 con gates reales (sin scroll
   horizontal de página, nada fuera del viewport, objetivo táctil ≥ 32px en
   móvil, sin S1..S13). Hallazgo corregido: `.nx-linkbutton` del flujo de caja
-  era 20×20 → 32px mínimo. Corre en CI vía `npm run test:e2e`.
+  era 20×20 → 32px mínimo. Corre en CI vía `npm run test:e2e`. Un hallazgo
+  posterior de la propia auditoría en CI (`.nx-theme-preview` desbordaba 10px
+  el viewport móvil por tracks `1fr` sin `minmax(0, …)`) también quedó
+  corregido.
+
+### Despliegue de la segunda iteración
+
+| Concepto | Valor |
+|---|---|
+| PR | [#94](https://github.com/Clopezgg/nexora-group/pull/94) fusionada |
+| Commit en `main` | `18b7a52c3732b94a6e01e258141087a4d999b53b` |
+| CI de rama (verde) | run `33529844855` |
+| CI de `main` (verde) | run `33531402176` |
+| Deploy Azure (real) | run **`33533096853`** — `workflow_dispatch deploy=true` |
+| "Deploy infra + apps" | **success** (NO skipped) |
+| Migración aplicada | `d5a7c9e30f66 → e6b8d0c41a77` (voucher_issuances.company_website_snapshot) |
+| Cabeza de migración | `e6b8d0c41a77` |
+| Imagen backend | `ghcr.io/clopezgg/nexora-backend:18b7a52c3732b94a6e01e258141087a4d999b53b` |
+
+Verify production del deploy: Frontend 200 · SWA `/api/healthz` + `/healthz`
+200 · API health + DB readiness 200 · Protected Edit ruta 405 / token
+inválido **403 (fail-closed)** · cookie `Secure`+`HttpOnly`+`Path=/` ·
+`auth/me` + companies (1) + projects + accounts + dashboard (HNL) + fiscal
+periods → 200 · logout 204 + relogin 200.
+
+Smoke adicional: `/` 200 · `/api/healthz` 200 · `/api/readyz` 200 ·
+`/api/financial-control/cash-flow-actual/series` 401 (registrado) ·
+`/api/evidence/{id}/render` 401 (§28 vivo) ·
+`/api/verificar/comprobante/<token>` 404 (ruta pública registrada).
 
 ## Pendiente
 

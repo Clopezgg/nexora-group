@@ -41,6 +41,7 @@ export const procurementService = {
     advancePercentage?: string
     retentionPercentage?: string
     scopeDescription?: string
+    paymentTermsType?: 'LUMP_SUM' | 'MONTHLY' | 'CUSTOM'
   }) =>
     apiFetch<SupplierContract>('/procurement/suppliers/contracts', {
       method: 'POST',

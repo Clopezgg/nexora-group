@@ -1,5 +1,38 @@
 # NEXORA GROUP — Requirements Traceability Matrix
 
+## 2026-09-01 operational-ERP integration overlay (PR #98)
+
+Auditoría de los 22 hard gates de la ORDEN MAESTRA DE INTEGRACIÓN §87 contra el
+código real de `main`. La mayoría ya estaban cubiertos por PRs #85–#97. PR #98
+(`work/nexora-operational-erp-final-20260901`) cierra los que faltaban, con
+evidencia real (tests contra PostgreSQL, typecheck/lint/build):
+
+- **§9/§28/§29 — Costo contratado de ejecución ≠ compromiso PO.**
+  `ProjectFinancialSummary` expone `executionContractValue` /
+  `executionContractPaid` / `executionContractBalance` / `poCommitted`. El
+  Project object page deja de rotular `committed` (PO) como "Costo contratado de
+  ejecución". Test: `tests/test_project_execution_contract_kpi.py`.
+- **§6 — Términos de pago explícitos.** `SupplierContract.payment_terms_type`
+  (`LUMP_SUM | MONTHLY | CUSTOM`), migración `72aed748da19`, check constraint,
+  backfill desde planes existentes.
+- **§16/§17/§18 — Allocation contractual fail-closed.**
+  `ap_service.pay_supplier_invoice` rechaza (422) pagar una factura ligada a un
+  contrato que exige plan sin asignación a cuotas; el override exige motivo
+  ≥10 car. + permiso `contract.payment:override`. Tests:
+  `tests/test_contract_payment_failclosed.py`.
+- **§4/§11/§32 — Contrato y plan de pago dentro del proyecto.**
+  `ExecutionContractForm` canónico reutilizado por Abastecimiento → Contratos y
+  el Project Cockpit; "+ Agregar contrato" y "Crear/Ver plan de pagos" inline.
+  Test: `frontend/tests/ProjectContractsTab.test.tsx`.
+
+Gates ya verificados antes de este PR (no se re-implementaron): período
+contractual ≠ fecha efectiva de pago (§13), historial sin meses futuros (§15,
+`history_through`), sobrepago bloqueado (§10), reversal reabre cuota (§26),
+voucher con evidencia + historial contractual (§34). Pendientes de mayor
+alcance documentados en el cuerpo del PR (§3 wizard 9 pasos, §8 cockpit
+command-center, §11 drawer de pago contextual con evidencia integrada E2E,
+§42/§44 auditoría visual ampliada, §47 exportes XLSX/PDF).
+
 ## 2026-08-27 final-product verification overlay
 
 PR #11 (`work/nexora-final-product`) adds current evidence for the product-facing portions of the matrix: SVG icon consistency, implemented-only navigation, HNL formatting, real dashboard aggregates/charts, remittance operations, explicit AP/AR `OperationScope`, responsive role-home shortcuts and same-origin Azure health. These items remain **IN PROGRESS** until PR CI, merge and production smoke are complete; this overlay does not rewrite historical evidence or mark unrelated deferred capabilities VERIFIED.

@@ -49,7 +49,17 @@ export interface SupplierContract {
   advancePercentage: string
   retentionPercentage: string
   paymentTerms: string | null
+  paymentTermsType: SupplierContractPaymentTermsType
   status: string
+}
+
+/** §6/§18 — modo de pago contractual explícito. */
+export type SupplierContractPaymentTermsType = 'LUMP_SUM' | 'MONTHLY' | 'CUSTOM'
+
+export const SUPPLIER_CONTRACT_PAYMENT_TERMS_LABELS: Record<SupplierContractPaymentTermsType, string> = {
+  LUMP_SUM: 'Pago único / suma alzada',
+  MONTHLY: 'Cuotas mensuales',
+  CUSTOM: 'Cuotas personalizadas',
 }
 
 export interface RequisitionLine {

@@ -287,6 +287,35 @@ def pay_supplier_invoice(
             "treasury_account_id debe usar la moneda de la factura"
         )
 
+    # Fail-closed contractual (orden maestra §16/§18): si la factura está ligada
+    # a un SupplierContract cuyo modo de pago exige plan (MONTHLY/CUSTOM) o que
+    # ya tiene un ContractPaymentSchedule, el pago DEBE traer asignaciones a
+    # cuotas. Sólo un override auditado con motivo puede saltarlo (§17).
+    if invoice.supplier_contract_id is not None and not contract_allocations:
+        from app.services import contract_payment_service
+
+        from app.models.supplier import SupplierContract
+
+        contract = db.get(SupplierContract, invoice.supplier_contract_id)
+        schedule = contract_payment_service.resolve_schedule_for_invoice(db, invoice)
+        requires_schedule = (
+            contract is not None and contract.payment_terms_type in ("MONTHLY", "CUSTOM")
+        ) or schedule is not None
+        if requires_schedule:
+            reason = (contract_override_reason or "").strip()
+            if len(reason) < 10:
+                raise InvalidFinancialReferenceError(
+                    "Este contrato requiere un plan de pagos: el pago debe asignarse "
+                    "a una o varias cuotas contractuales. Para saltar esta regla se "
+                    "necesita un override con motivo (mínimo 10 caracteres) y el "
+                    "permiso contract.payment:override."
+                )
+            if schedule is None:
+                raise InvalidFinancialReferenceError(
+                    "El contrato exige un plan de pagos MONTHLY/CUSTOM y todavía no "
+                    "tiene ninguno. Crea el plan antes de pagar."
+                )
+
     supplier = db.get(Supplier, invoice.supplier_id)
     supplier_name = supplier.legal_name if supplier is not None else str(invoice.supplier_id)
 

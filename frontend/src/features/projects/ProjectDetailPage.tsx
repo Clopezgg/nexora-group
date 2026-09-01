@@ -235,7 +235,10 @@ export function ProjectDetailPage() {
               <StatCard label="Valor comercial contratado" value={money(summary.contractValue, currency)} />
               <StatCard label="Presupuesto BASELINE" value={money(summary.baselineBudget, currency)} />
               <StatCard label="Presupuesto vigente" value={money(summary.currentBudget, currency)} />
-              <StatCard label="Comprometido" value={money(summary.committed, currency)} />
+              <StatCard label="Costo contratado de ejecución" value={money(summary.executionContractValue, currency)} />
+              <StatCard label="Órdenes de compra comprometidas" value={money(summary.poCommitted, currency)} />
+              <StatCard label="Pagado a contratos de ejecución" value={money(summary.executionContractPaid, currency)} />
+              <StatCard label="Saldo contractual de ejecución" value={money(summary.executionContractBalance, currency)} />
               <StatCard label="Devengado" value={money(summary.accrued, currency)} />
               <StatCard label="Pagado" value={money(summary.paid, currency)} />
               <StatCard label="Costo real GL" value={money(summary.actualCost, currency)} />
@@ -254,11 +257,14 @@ export function ProjectDetailPage() {
     <>
       <Card title="Costos y ejecución">
         <div className="nx-home__grid">
-          <StatCard label="Comprometido" value={money(summary.committed, currency)} />
-          <StatCard label="Devengado" value={money(summary.accrued, currency)} />
-          <StatCard label="Pagado" value={money(summary.paid, currency)} />
+          <StatCard label="Costo contratado de ejecución" value={money(summary.executionContractValue, currency)} />
+          <StatCard label="Pagado a contratos de ejecución" value={money(summary.executionContractPaid, currency)} />
+          <StatCard label="Saldo contractual de ejecución" value={money(summary.executionContractBalance, currency)} />
+          <StatCard label="Órdenes de compra comprometidas" value={money(summary.poCommitted, currency)} />
+          <StatCard label="Devengado (AP)" value={money(summary.accrued, currency)} />
+          <StatCard label="Pagado (AP)" value={money(summary.paid, currency)} />
           <StatCard label="Disponible de presupuesto" value={money(summary.available, currency)} />
-          <StatCard label="Costo real contable" value={money(summary.actualCost, currency)} />
+          <StatCard label="Costo real contable (GL)" value={money(summary.actualCost, currency)} />
         </div>
       </Card>
       <Card title="Facturación y cobros">
@@ -345,8 +351,8 @@ export function ProjectDetailPage() {
           <div><dt>Plan</dt><dd>{planText}</dd></div>
           {summary ? (
             <>
-              <div><dt>Costo contratado de ejecución</dt><dd>{money(summary.committed, currency)}</dd></div>
-              <div><dt>Pagado</dt><dd>{money(summary.paid, currency)}</dd></div>
+              <div><dt>Costo contratado de ejecución</dt><dd>{money(summary.executionContractValue, currency)}</dd></div>
+              <div><dt>Saldo contractual de ejecución</dt><dd>{money(summary.executionContractBalance, currency)}</dd></div>
             </>
           ) : null}
         </dl>

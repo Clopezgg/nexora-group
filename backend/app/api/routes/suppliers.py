@@ -159,6 +159,7 @@ def create_contract(
             advance_percentage=payload.advance_percentage,
             retention_percentage=payload.retention_percentage,
             payment_terms=payload.payment_terms,
+            payment_terms_type=payload.payment_terms_type,
         )
         audit_service.record(
             db,

@@ -222,6 +222,11 @@ def create_schedule(
             f"({total} > {contract.value})."
         )
 
+    # El plan define el modo de pago del contrato (§6): crear un
+    # MONTHLY/CUSTOM schedule promueve el contrato desde LUMP_SUM.
+    if contract.payment_terms_type != schedule_type:
+        contract.payment_terms_type = schedule_type
+
     normalized.sort(key=lambda r: (r["period_year"], r["period_month"]))
     schedule = ContractPaymentSchedule(
         company_id=contract.company_id,

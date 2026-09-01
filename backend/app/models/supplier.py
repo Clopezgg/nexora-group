@@ -2,7 +2,14 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -71,6 +78,10 @@ class SupplierContract(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UniqueConstraint(
             "company_id", "contract_number", name="uq_supplier_contracts_company_number"
         ),
+        CheckConstraint(
+            "payment_terms_type IN ('LUMP_SUM', 'MONTHLY', 'CUSTOM')",
+            name="ck_supplier_contracts_payment_terms_type",
+        ),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -94,4 +105,10 @@ class SupplierContract(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     advance_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     retention_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     payment_terms: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # §6/§18/§87 — modo de pago contractual EXPLÍCITO. LUMP_SUM puede existir sin
+    # plan de cuotas; MONTHLY/CUSTOM exigen un ContractPaymentSchedule ACTIVE
+    # antes de poder pagar (fail-closed en ap_service).
+    payment_terms_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="LUMP_SUM", server_default="LUMP_SUM"
+    )
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="DRAFT")

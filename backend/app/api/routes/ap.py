@@ -20,6 +20,7 @@ from app.services.permission_service import (
     accessible_project_ids,
     assert_company_access,
     require_permission,
+    user_has_permission,
     user_has_any_company_scope,
     user_has_company_access,
     user_has_permission,
@@ -274,6 +275,16 @@ def pay_supplier_invoice(
         action="create",
         company_id=invoice.company_id,
     )
+    if payload.contract_override_reason:
+        # §17 — saltar la asignación contractual es una excepción de negocio con
+        # permiso propio, no un fallback silencioso.
+        if not user_has_permission(
+            db, user_id=user.id, resource="contract.payment", action="override"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes el permiso contract.payment:override para saltar la asignación contractual",
+            )
     outcome = None
     request_payload = {"invoiceId": str(invoice_id), **payload.model_dump(mode="json")}
     try:

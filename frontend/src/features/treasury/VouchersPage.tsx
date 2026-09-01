@@ -18,6 +18,7 @@ import { documentService } from '../../services/documentService'
 import { friendlyApiMessage } from '../../services/httpClient'
 import { treasuryService } from '../../services/treasuryService'
 import { voucherService } from '../../services/voucherService'
+import { BeneficiaryQuickCreate } from './BeneficiaryQuickCreate'
 import type { Evidence } from '../../types/document'
 import { statusLabel } from '../../utils/statusLabels'
 import './TreasuryPage.css'
@@ -387,6 +388,12 @@ export function VouchersPage() {
               emptyMessage={beneficiariesQuery.isLoading ? 'Cargando…' : 'Sin beneficiarios registrados.'}
             />
             <p className="nx-field__hint">El beneficiario se toma del registro real (Proveedores, Personal o Comercial). No se captura texto libre.</p>
+            {activeCompanyId ? (
+              <BeneficiaryQuickCreate
+                companyId={activeCompanyId}
+                onCreated={(key) => setBeneficiaryKey(key)}
+              />
+            ) : null}
           </div>
           <div>
             <Input

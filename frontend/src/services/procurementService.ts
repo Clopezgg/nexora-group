@@ -18,13 +18,45 @@ export const procurementService = {
     legalName: string
     tradeName?: string
     taxId?: string
+    contactName?: string
+    email?: string
+    phone?: string
     addressLine1?: string
     addressLine2?: string
     city?: string
     stateDepartment?: string
     country?: string
+    partyRole?: 'SUPPLIER' | 'CONTRACTOR' | 'BOTH'
+    paymentTerms?: string
   }) =>
     apiFetch<Supplier>('/procurement/suppliers', { method: 'POST', body: JSON.stringify(payload) }),
+  updateSupplier: (
+    supplierId: string,
+    payload: Partial<{
+      legalName: string
+      tradeName: string | null
+      taxId: string | null
+      contactName: string | null
+      email: string | null
+      phone: string | null
+      addressLine1: string | null
+      addressLine2: string | null
+      city: string | null
+      stateDepartment: string | null
+      country: string | null
+      partyRole: 'SUPPLIER' | 'CONTRACTOR' | 'BOTH'
+      paymentTerms: string | null
+    }>,
+  ) =>
+    apiFetch<Supplier>(`/procurement/suppliers/${supplierId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  changeSupplierStatus: (supplierId: string, status: string, reason?: string) =>
+    apiFetch<Supplier>(`/procurement/suppliers/${supplierId}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status, reason }),
+    }),
 
   listContracts: (companyId: string) =>
     apiFetch<SupplierContract[]>(`/procurement/suppliers/contracts?company_id=${companyId}`),

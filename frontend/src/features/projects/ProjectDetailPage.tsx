@@ -17,20 +17,14 @@ import {
 import { crmService } from '../../services/crmService'
 import { masterDataService } from '../../services/masterDataService'
 import { projectService } from '../../services/projectService'
-import type { Project, ProjectStatus } from '../../types/project'
+import type { Project } from '../../types/project'
 import { formatMoney } from '../../utils/currency'
-import { statusLabel } from '../../utils/statusLabels'
+import { projectStatusLabel } from '../../utils/statusLabels'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { useActiveContext } from '../context/useActiveContext'
 import { ProjectContractsTab } from './ProjectContractsTab'
+import { ProjectStatusCard } from './ProjectStatusCard'
 import './ProjectDetailPage.css'
-
-const TRANSITIONS: Partial<Record<ProjectStatus, Array<{ status: ProjectStatus; label: string }>>> = {
-  PLANNING: [{ status: 'ACTIVE', label: 'Activar proyecto' }, { status: 'CANCELLED', label: 'Cancelar proyecto' }],
-  ACTIVE: [{ status: 'ON_HOLD', label: 'Pausar' }, { status: 'COMPLETED', label: 'Completar' }, { status: 'CANCELLED', label: 'Cancelar proyecto' }],
-  ON_HOLD: [{ status: 'ACTIVE', label: 'Reanudar' }, { status: 'CANCELLED', label: 'Cancelar proyecto' }],
-  COMPLETED: [{ status: 'CLOSED', label: 'Cerrar administrativamente' }],
-}
 
 function money(value: string | null, currency: string) {
   return value === null ? '—' : formatMoney(Number(value), currency)
@@ -169,11 +163,6 @@ export function ProjectDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['dashboard', 'summary'] })
   }
 
-  const statusMutation = useMutation({
-    mutationFn: (status: ProjectStatus) => projectService.transitionStatus(projectId as string, status),
-    onSuccess: invalidate,
-  })
-
   const selectedCustomer = useMemo(
     () => (customersQuery.data ?? []).find((customer) => customer.id === project?.customerId) ?? null,
     [customersQuery.data, project?.customerId],
@@ -203,25 +192,12 @@ export function ProjectDetailPage() {
       : '—'
 
   const statusCard = (
-    <Card title="Estado del proyecto">
-      <div className="nx-treasury__actions">
-        {(TRANSITIONS[project.status] ?? []).map((transition) => (
-          <Button
-            key={transition.status}
-            variant={transition.status === 'CANCELLED' ? 'ghost' : 'secondary'}
-            loading={statusMutation.isPending}
-            onClick={() => {
-              if (transition.status === 'CANCELLED' && !window.confirm('¿Cancelar este proyecto? La transición quedará registrada en auditoría.')) return
-              statusMutation.mutate(transition.status)
-            }}
-          >
-            {transition.label}
-          </Button>
-        ))}
-        {(TRANSITIONS[project.status] ?? []).length === 0 ? <span className="nx-field__hint">No hay más transiciones operativas disponibles.</span> : null}
-      </div>
-      {statusMutation.isError ? <p className="nx-field__error">{(statusMutation.error as Error).message}</p> : null}
-    </Card>
+    <ProjectStatusCard
+      project={project}
+      onUpdated={(updated) => {
+        if (context.activeProjectId === updated.id) setActiveProject(updated.id)
+      }}
+    />
   )
 
   const resumenTab = (
@@ -338,7 +314,7 @@ export function ProjectDetailPage() {
             <h1 className="nx-dashboard__title">{project.name}</h1>
           </div>
           <div className="nx-object-header__actions">
-            <Badge>{statusLabel(project.status)}</Badge>
+            <Badge>{projectStatusLabel(project.status)}</Badge>
             {context.activeProjectId !== project.id ? (
               <Button variant="secondary" onClick={() => setActiveProject(project.id)}>Seleccionar como contexto</Button>
             ) : <Badge tone="info">Contexto activo</Badge>}

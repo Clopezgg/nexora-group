@@ -19,7 +19,15 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 # Suppliers/Contracts (orden maestra §57-60). `banking_details` es la
 # información bancaria DEL PROVEEDOR para pagarle -- nunca confundir con
 # `TreasuryAccount` (dinero propio de la company, ver CLAUDE.md §7).
-SUPPLIER_STATUSES = ("ACTIVE", "INACTIVE", "BLOCKED")
+# Estado empresarial del tercero (§12). ARCHIVED = soft-delete (§13): el
+# registro y su historial (contratos, PO, facturas, pagos) permanecen.
+SUPPLIER_STATUSES = ("ACTIVE", "INACTIVE", "BLOCKED", "ARCHIVED")
+# BLOCKED / ARCHIVED impiden NUEVAS operaciones (contrato, PO, factura) pero
+# conservan lectura e historial.
+SUPPLIER_STATUSES_BLOCKING_NEW = ("BLOCKED", "ARCHIVED")
+# Qué tipo de tercero es (§11) — distinto de SupplierContract.contract_category
+# (qué naturaleza tiene un contrato).
+SUPPLIER_PARTY_ROLES = ("SUPPLIER", "CONTRACTOR", "BOTH")
 SUPPLIER_CONTRACT_STATUSES = ("DRAFT", "ACTIVE", "COMPLETED", "TERMINATED")
 # Naturaleza del costo del contrato de ejecución (orden maestra final §13).
 # UX ES: Mano de obra / Subcontrato / Materiales / Equipo / Servicios
@@ -64,6 +72,9 @@ class Supplier(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     state_department: Mapped[str | None] = mapped_column(String(120), nullable=True)
     country: Mapped[str | None] = mapped_column(String(2), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="ACTIVE")
+    party_role: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="SUPPLIER", server_default="SUPPLIER"
+    )
     classification: Mapped[str | None] = mapped_column(String(64), nullable=True)
     payment_terms: Mapped[str | None] = mapped_column(String(255), nullable=True)
     banking_details: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

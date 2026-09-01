@@ -56,7 +56,20 @@ export function ExecutionContractForm({
     queryFn: () => projectService.list(activeCompanyId as string),
     enabled: Boolean(activeCompanyId) && !lockedProjectId,
   })
-  const suppliers = suppliersQuery.data ?? []
+  // §19 — para un contrato de ejecución priorizamos contratistas activos.
+  // No se ocultan INACTIVE/BLOCKED/ARCHIVED del todo (un proveedor puro puede
+  // firmar un contrato de materiales), pero van al final y desactivados los que
+  // no admiten nuevos contratos.
+  const rawSuppliers = suppliersQuery.data ?? []
+  const suppliers = [...rawSuppliers].sort((a, b) => {
+    const rank = (s: (typeof rawSuppliers)[number]) => {
+      if (s.status === 'BLOCKED' || s.status === 'ARCHIVED') return 3
+      if (s.status === 'INACTIVE') return 2
+      if (s.partyRole === 'CONTRACTOR' || s.partyRole === 'BOTH') return 0
+      return 1
+    }
+    return rank(a) - rank(b) || a.legalName.localeCompare(b.legalName)
+  })
   const projects = projectsQuery.data ?? []
 
   const datesInvalid = Boolean(form.endDate && form.startDate && form.endDate < form.startDate)
@@ -114,8 +127,13 @@ export function ExecutionContractForm({
           Selecciona un contratista
         </option>
         {suppliers.map((s) => (
-          <option key={s.id} value={s.id}>
+          <option
+            key={s.id}
+            value={s.id}
+            disabled={s.status === 'BLOCKED' || s.status === 'ARCHIVED'}
+          >
             {s.legalName}
+            {s.status === 'BLOCKED' ? ' — bloqueado' : s.status === 'ARCHIVED' ? ' — archivado' : s.status === 'INACTIVE' ? ' — inactivo' : ''}
           </option>
         ))}
       </Select>

@@ -2,10 +2,20 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
-from app.models.supplier import SUPPLIER_CONTRACT_CATEGORIES
+from app.models.supplier import (
+    SUPPLIER_CONTRACT_CATEGORIES,
+    SUPPLIER_PARTY_ROLES,
+    SUPPLIER_STATUSES,
+)
 from app.schemas.base import CamelModel
+
+
+def _validate_party_role(value: str) -> str:
+    if value not in SUPPLIER_PARTY_ROLES:
+        raise ValueError(f"party_role debe ser uno de {SUPPLIER_PARTY_ROLES}")
+    return value
 
 
 class SupplierCreateRequest(CamelModel):
@@ -22,9 +32,48 @@ class SupplierCreateRequest(CamelModel):
     city: str | None = None
     state_department: str | None = None
     country: str | None = None
+    party_role: str = "SUPPLIER"
     classification: str | None = None
     payment_terms: str | None = None
     banking_details: dict | None = None
+
+    _pr = field_validator("party_role")(classmethod(lambda cls, v: _validate_party_role(v)))
+
+
+class SupplierUpdateRequest(CamelModel):
+    legal_name: str | None = Field(default=None, min_length=1, max_length=255)
+    trade_name: str | None = None
+    tax_id: str | None = None
+    contact_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    city: str | None = None
+    state_department: str | None = None
+    country: str | None = None
+    party_role: str | None = None
+    classification: str | None = None
+    payment_terms: str | None = None
+    banking_details: dict | None = None
+
+    @field_validator("party_role")
+    @classmethod
+    def _pr(cls, v: str | None) -> str | None:
+        return None if v is None else _validate_party_role(v)
+
+
+class SupplierStatusChangeRequest(CamelModel):
+    status: str
+    reason: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("status")
+    @classmethod
+    def _status(cls, v: str) -> str:
+        if v not in SUPPLIER_STATUSES:
+            raise ValueError(f"status debe ser uno de {SUPPLIER_STATUSES}")
+        return v
 
 
 class SupplierResponse(CamelModel):
@@ -43,6 +92,7 @@ class SupplierResponse(CamelModel):
     state_department: str | None = None
     country: str | None = None
     status: str
+    party_role: str = "SUPPLIER"
     classification: str | None
     payment_terms: str | None
     qualification: str | None

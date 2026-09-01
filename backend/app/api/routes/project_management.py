@@ -5,30 +5,25 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
-from app.core.business_time import business_today
 from app.models.cost_center import CostCenter
 from app.models.crm import Customer
 from app.models.project import Project
 from app.repositories import project_repository
 from app.schemas.project_control import (
     ProjectFinancialSummaryResponse,
+    ProjectLifecycleResponse,
     ProjectResponse,
     ProjectStatusTransitionRequest,
     ProjectUpdateRequest,
 )
-from app.services import audit_service, project_financial_service
-from app.services.permission_service import assert_company_access, require_permission
+from app.services import audit_service, project_financial_service, project_lifecycle_service
+from app.services.permission_service import (
+    assert_company_access,
+    require_permission,
+    user_has_permission,
+)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-
-_ALLOWED_TRANSITIONS: dict[str, set[str]] = {
-    "PLANNING": {"ACTIVE", "CANCELLED"},
-    "ACTIVE": {"ON_HOLD", "COMPLETED", "CANCELLED"},
-    "ON_HOLD": {"ACTIVE", "CANCELLED"},
-    "COMPLETED": {"CLOSED"},
-    "CLOSED": set(),
-    "CANCELLED": set(),
-}
 
 
 def _get_project_or_404(db: Session, project_id: uuid.UUID) -> Project:
@@ -114,6 +109,24 @@ def update_project(
     return ProjectResponse.model_validate(project, from_attributes=True)
 
 
+@router.get("/{project_id}/lifecycle", response_model=ProjectLifecycleResponse)
+def project_lifecycle(
+    project_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("project", "read")),
+) -> ProjectLifecycleResponse:
+    """Vista autoritativa del ciclo de vida: estado actual + transiciones
+    permitidas (con etiqueta ES y si son sensibles). El frontend NO debe tener
+    su propio grafo de transiciones — consume esto."""
+    project = _get_project_or_404(db, project_id)
+    assert_company_access(
+        db, user_id=user.id, resource="project", action="read", company_id=project.company_id
+    )
+    return ProjectLifecycleResponse.model_validate(
+        project_lifecycle_service.lifecycle_view(project)
+    )
+
+
 @router.post("/{project_id}/status", response_model=ProjectResponse)
 def transition_project_status(
     project_id: uuid.UUID,
@@ -126,30 +139,42 @@ def transition_project_status(
     assert_company_access(
         db, user_id=user.id, resource="project", action="create", company_id=project.company_id
     )
-    target = payload.status
-    allowed = _ALLOWED_TRANSITIONS.get(project.status, set())
-    if target not in allowed:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Transición de proyecto no permitida: {project.status} → {target}",
-        )
-    before_status = project.status
-    actual_end = (
-        business_today()
-        if target in {"COMPLETED", "CLOSED"} and project.actual_end is None
-        else None
+    has_lifecycle = user_has_permission(
+        db, user_id=user.id, resource="project.lifecycle", action="manage"
     )
-    project_repository.set_project_status(db, project=project, status=target, actual_end=actual_end)
+    try:
+        result = project_lifecycle_service.apply_transition(
+            project=project,
+            target=payload.status,
+            reason=payload.reason,
+            has_lifecycle_permission=has_lifecycle,
+        )
+    except project_lifecycle_service.ProjectTransitionError as exc:
+        # Error de negocio entendible (§7/§24): 409 para el conflicto de estado,
+        # 422 para motivo/permiso faltante.
+        detail = str(exc)
+        code = 422 if ("motivo" in detail or "permiso" in detail) else 409
+        raise HTTPException(status_code=code, detail=detail) from exc
+
+    if not result.changed:
+        # Idempotente: ya estaba en ese estado, sin mutación ni audit duplicado.
+        return ProjectResponse.model_validate(project, from_attributes=True)
+
+    db.flush()
     audit_service.record(
         db,
         actor_user_id=user.id,
-        action="project.status.transition",
+        action=(
+            "project.lifecycle.sensitive"
+            if result.was_sensitive
+            else "project.status.transition"
+        ),
         entity_type="project",
         entity_id=project.id,
         company_id=project.company_id,
         project_id=project.id,
-        before={"status": before_status},
-        after={"status": target, "reason": payload.reason},
+        before={"status": result.before_status},
+        after={"status": result.after_status, "reason": payload.reason},
         correlation_id=correlation_id,
     )
     db.commit()

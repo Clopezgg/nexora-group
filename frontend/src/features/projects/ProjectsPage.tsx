@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   Badge,
@@ -19,26 +19,22 @@ import { crmService } from '../../services/crmService'
 import { masterDataService } from '../../services/masterDataService'
 import { projectService } from '../../services/projectService'
 import type { Project, ProjectStatus } from '../../types/project'
-import { statusLabel } from '../../utils/statusLabels'
+import { PROJECT_STATUS_LABELS, projectStatusLabel } from '../../utils/statusLabels'
 import { useActiveContext } from '../context/useActiveContext'
 import { ProjectWizard } from './ProjectWizard'
 
-const NEXT_STATUS: Partial<Record<ProjectStatus, Array<{ status: ProjectStatus; label: string }>>> = {
-  PLANNING: [
-    { status: 'ACTIVE', label: 'Activar proyecto' },
-    { status: 'CANCELLED', label: 'Cancelar' },
-  ],
-  ACTIVE: [
-    { status: 'ON_HOLD', label: 'Pausar' },
-    { status: 'COMPLETED', label: 'Completar' },
-    { status: 'CANCELLED', label: 'Cancelar' },
-  ],
-  ON_HOLD: [
-    { status: 'ACTIVE', label: 'Reanudar' },
-    { status: 'CANCELLED', label: 'Cancelar' },
-  ],
-  COMPLETED: [{ status: 'CLOSED', label: 'Cerrar proyecto' }],
-}
+// Sin motor de transiciones local (§9): las acciones de ciclo de vida viven en
+// el Project Cockpit, que consume GET /projects/{id}/lifecycle. Aquí solo se
+// abre el proyecto o se fija como contexto de navegación.
+
+const FILTERABLE_STATUSES: ProjectStatus[] = [
+  'PLANNING',
+  'ACTIVE',
+  'ON_HOLD',
+  'COMPLETED',
+  'CLOSED',
+  'CANCELLED',
+]
 
 export function ProjectsPage() {
   const queryClient = useQueryClient()
@@ -47,11 +43,17 @@ export function ProjectsPage() {
   const { activeCompany, activeCompanyId, isLoading: companiesLoading, isError: companiesError, refetch } = useActiveCompany()
   const [wizardOpen, setWizardOpen] = useState(false)
   const [filterStatus, setFilterStatus] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
   const [filterText, setFilterText] = useState('')
 
+  const effectiveStatus = showArchived && !filterStatus ? '' : filterStatus
   const projectsQuery = useQuery({
-    queryKey: ['projects', activeCompanyId],
-    queryFn: () => projectService.list(activeCompanyId as string),
+    queryKey: ['projects', activeCompanyId, effectiveStatus || (showArchived ? 'ALL' : 'DEFAULT')],
+    queryFn: () =>
+      projectService.list(activeCompanyId as string, {
+        status: effectiveStatus || undefined,
+        includeArchived: showArchived,
+      }),
     enabled: Boolean(activeCompanyId),
   })
   const customersQuery = useQuery({
@@ -75,15 +77,9 @@ export function ProjectsPage() {
   const costCenters = Array.isArray(costCentersQuery.data) ? costCentersQuery.data : []
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['projects', activeCompanyId] })
+    queryClient.invalidateQueries({ queryKey: ['projects'] })
     queryClient.invalidateQueries({ queryKey: ['dashboard', 'summary'] })
   }
-
-  const statusMutation = useMutation({
-    mutationFn: ({ projectId, status }: { projectId: string; status: ProjectStatus }) =>
-      projectService.transitionStatus(projectId, status),
-    onSuccess: invalidate,
-  })
 
   const columns: TableColumn<Project>[] = [
     { key: 'code', header: 'Código', render: (row) => row.code ?? '—' },
@@ -96,7 +92,7 @@ export function ProjectsPage() {
         </button>
       ),
     },
-    { key: 'status', header: 'Estado', render: (row) => <Badge>{statusLabel(row.status)}</Badge> },
+    { key: 'status', header: 'Estado', render: (row) => <Badge>{projectStatusLabel(row.status)}</Badge> },
     { key: 'manager', header: 'Responsable', render: (row) => row.manager ?? '—' },
     { key: 'dates', header: 'Plan', render: (row) => row.plannedStart && row.plannedEnd ? `${row.plannedStart} → ${row.plannedEnd}` : '—' },
     {
@@ -115,21 +111,9 @@ export function ProjectsPage() {
       key: 'actions',
       header: 'Acciones',
       render: (row) => (
-        <div className="nx-treasury__actions">
-          {(NEXT_STATUS[row.status] ?? []).map((action) => (
-            <Button
-              key={action.status}
-              variant={action.status === 'CANCELLED' ? 'ghost' : 'secondary'}
-              loading={statusMutation.isPending}
-              onClick={() => {
-                if (action.status === 'CANCELLED' && !window.confirm(`¿Cancelar ${row.name}? Esta acción quedará auditada.`)) return
-                statusMutation.mutate({ projectId: row.id, status: action.status })
-              }}
-            >
-              {action.label}
-            </Button>
-          ))}
-        </div>
+        <Button variant="secondary" onClick={() => navigate(`/proyectos/${row.id}`)}>
+          Abrir
+        </Button>
       ),
     },
   ]
@@ -145,7 +129,7 @@ export function ProjectsPage() {
       <header className="nx-page__header">
         <div>
           <h1 className="nx-dashboard__title">Proyectos</h1>
-          <p className="nx-field__hint">Empresa activa: {activeCompany.name}. “Seleccionado” es solo contexto de navegación; el estado empresarial se controla por separado.</p>
+          <p className="nx-field__hint">Empresa activa: {activeCompany.name}. “Seleccionado” es solo contexto de navegación; el ciclo de vida del proyecto se administra desde su ficha.</p>
         </div>
         <Button onClick={() => setWizardOpen((open) => !open)}>
           {wizardOpen ? 'Cerrar asistente' : 'Nuevo proyecto'}
@@ -168,35 +152,42 @@ export function ProjectsPage() {
         </Card>
       ) : null}
 
-      {projects.length > 0 ? (
-        <FilterBar
-          onClear={() => {
-            setFilterStatus('')
-            setFilterText('')
-          }}
+      <FilterBar
+        onClear={() => {
+          setFilterStatus('')
+          setFilterText('')
+          setShowArchived(false)
+        }}
+      >
+        <Input
+          label="Buscar proyecto"
+          value={filterText}
+          onChange={(event) => setFilterText(event.target.value)}
+          placeholder="Nombre o código…"
+        />
+        <Select
+          label="Estado"
+          value={filterStatus}
+          onChange={(event) => setFilterStatus(event.target.value)}
         >
-          <Input
-            label="Buscar proyecto"
-            value={filterText}
-            onChange={(event) => setFilterText(event.target.value)}
-            placeholder="Nombre o código…"
-          />
-          <Select
-            label="Estado"
-            value={filterStatus}
-            onChange={(event) => setFilterStatus(event.target.value)}
+          <option value="">Todos</option>
+          {FILTERABLE_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {PROJECT_STATUS_LABELS[s]}
+            </option>
+          ))}
+          <option value="ARCHIVED">Archivados</option>
+        </Select>
+        <div className="nx-field">
+          <span className="nx-field__label">Archivados</span>
+          <Button
+            variant={showArchived ? 'secondary' : 'ghost'}
+            onClick={() => setShowArchived((v) => !v)}
           >
-            <option value="">Todos</option>
-            {(['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CLOSED', 'CANCELLED'] as ProjectStatus[]).map(
-              (s) => (
-                <option key={s} value={s}>
-                  {statusLabel(s)}
-                </option>
-              ),
-            )}
-          </Select>
-        </FilterBar>
-      ) : null}
+            {showArchived ? 'Ocultar archivados' : 'Mostrar archivados'}
+          </Button>
+        </div>
+      </FilterBar>
 
       {projectsQuery.isLoading ? (
         <LoadingState label="Cargando proyectos…" />
@@ -207,15 +198,14 @@ export function ProjectsPage() {
           columns={columns}
           rows={projects.filter(
             (row) =>
-              (!filterStatus || row.status === filterStatus) &&
-              (!filterText ||
-                row.name.toLowerCase().includes(filterText.toLowerCase()) ||
-                (row.code ?? '').toLowerCase().includes(filterText.toLowerCase())),
+              !filterText ||
+              row.name.toLowerCase().includes(filterText.toLowerCase()) ||
+              (row.code ?? '').toLowerCase().includes(filterText.toLowerCase()),
           )}
           getRowKey={(row) => row.id}
         />
       ) : (
-        <EmptyState icon="project" title="Sin proyectos" description="Crea el primer proyecto de esta compañía para empezar." />
+        <EmptyState icon="project" title="Sin proyectos" description="No hay proyectos que coincidan con el filtro." />
       )}
     </div>
   )

@@ -30,6 +30,7 @@ def create_supplier(
     classification: str | None,
     payment_terms: str | None,
     banking_details: dict | None,
+    party_role: str = "SUPPLIER",
     address_line_1: str | None = None,
     address_line_2: str | None = None,
     city: str | None = None,
@@ -50,6 +51,7 @@ def create_supplier(
         city=city,
         state_department=state_department,
         country=country,
+        party_role=party_role,
         classification=classification,
         payment_terms=payment_terms,
         banking_details=banking_details,
@@ -57,6 +59,56 @@ def create_supplier(
     db.add(supplier)
     db.flush()
     return supplier
+
+
+_SUPPLIER_EDITABLE = {
+    "legal_name",
+    "trade_name",
+    "tax_id",
+    "contact_name",
+    "email",
+    "phone",
+    "address",
+    "address_line_1",
+    "address_line_2",
+    "city",
+    "state_department",
+    "country",
+    "party_role",
+    "classification",
+    "payment_terms",
+    "banking_details",
+}
+
+
+def update_supplier(db: Session, *, supplier: Supplier, values: dict) -> Supplier:
+    for key, value in values.items():
+        if key in _SUPPLIER_EDITABLE:
+            setattr(supplier, key, value)
+    db.flush()
+    return supplier
+
+
+def set_supplier_status(db: Session, *, supplier: Supplier, status: str) -> Supplier:
+    supplier.status = status
+    db.flush()
+    return supplier
+
+
+def supplier_has_references(db: Session, supplier_id: uuid.UUID) -> bool:
+    """True si el tercero ya está referenciado por contratos/PO/facturas/pagos —
+    en ese caso 'eliminar' = ARCHIVED, nunca hard-delete (§13)."""
+    from app.models.ap import SupplierInvoice
+    from app.models.procurement import PurchaseOrder
+
+    for model, col in (
+        (SupplierContract, SupplierContract.supplier_id),
+        (PurchaseOrder, PurchaseOrder.supplier_id),
+        (SupplierInvoice, SupplierInvoice.supplier_id),
+    ):
+        if db.execute(select(model.id).where(col == supplier_id).limit(1)).first():
+            return True
+    return False
 
 
 def list_contracts(

@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.business_time import business_today
@@ -182,29 +182,35 @@ def actual(db: Session, *, company_id: uuid.UUID, as_of: date | None = None) -> 
         result.weeks = weeks
         return result
 
-    # Todas las líneas de tesorería de documentos POSTED en la ventana.
+    # Todas las líneas de tesorería de documentos POSTED. Se agrupan por la
+    # fecha ECONÓMICA (`effective_date`), no por el timestamp técnico
+    # `posted_at`: importar diez remesas de julio hoy no las concentra hoy
+    # (ORDEN MAESTRA §9/§26). Fallback a `posted_at` solo para asientos
+    # históricos anteriores a la migración que aún no tienen effective_date.
+    econ_date = func.coalesce(
+        AccountingDocument.effective_date, func.date(AccountingDocument.posted_at)
+    )
     rows = db.execute(
         select(
             JournalLine.accounting_document_id,
             JournalLine.account_id,
             JournalLine.debit_amount,
             JournalLine.credit_amount,
-            AccountingDocument.posted_at,
+            econ_date.label("economic_date"),
         )
         .join(AccountingDocument, AccountingDocument.id == JournalLine.accounting_document_id)
         .where(
             AccountingDocument.company_id == company_id,
             AccountingDocument.status.in_(_LEDGER_STATUSES),
-            AccountingDocument.posted_at.is_not(None),
             JournalLine.account_id.in_(cash_gl_ids),
         )
     ).all()
 
     per_doc: dict[uuid.UUID, list] = {}
-    for doc_id, _account_id, debit, credit, posted_at in rows:
+    for doc_id, _account_id, debit, credit, economic_date in rows:
         entry = per_doc.setdefault(doc_id, [_ZERO, None])
         entry[0] += Decimal(str(debit)) - Decimal(str(credit))
-        entry[1] = posted_at.date() if posted_at else None
+        entry[1] = date.fromisoformat(economic_date) if isinstance(economic_date, str) else economic_date
 
     # El saldo de apertura de la ventana = saldo actual − todo lo que se
     # movió DENTRO (y después) de la ventana. Lo anterior ya está incluido.

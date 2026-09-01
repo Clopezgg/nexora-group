@@ -105,6 +105,7 @@ def approve_customer_invoice(db: Session, *, invoice_id: uuid.UUID) -> CustomerI
         scope=invoice.scope,
         project_id=invoice.project_id,
         currency_code=invoice.currency_code,
+        effective_date=invoice.invoice_date,
         lines=[
             JournalLineInput(
                 account_id=invoice.receivable_account_id,
@@ -178,6 +179,7 @@ def collect_customer_receipt(
         scope=invoice.scope,
         project_id=invoice.project_id,
         currency_code=invoice.currency_code,
+        effective_date=receipt_date,
         lines=[
             JournalLineInput(
                 account_id=treasury_account.gl_account_id,

@@ -192,6 +192,7 @@ def approve_supplier_invoice(
         scope=invoice.scope,
         project_id=invoice.project_id,
         currency_code=invoice.currency_code,
+        effective_date=invoice.invoice_date,
         lines=[
             JournalLineInput(
                 account_id=invoice.expense_account_id,
@@ -296,6 +297,7 @@ def pay_supplier_invoice(
         scope=invoice.scope,
         project_id=invoice.project_id,
         currency_code=invoice.currency_code,
+        effective_date=payment_date,
         lines=[
             JournalLineInput(
                 account_id=invoice.payable_account_id,

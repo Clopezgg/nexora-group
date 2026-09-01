@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -114,6 +115,7 @@ def post_resource_cost(
     scope: str,
     project_id: uuid.UUID | None,
     description: str,
+    effective_date: date | None = None,
 ) -> AccountingDocument:
     """Post one resource cost exactly once.
 
@@ -169,6 +171,7 @@ def post_resource_cost(
         scope=scope,
         project_id=project_id,
         currency_code=company.functional_currency_code,
+        effective_date=effective_date,
         lines=[
             JournalLineInput(
                 account_id=expense.id,

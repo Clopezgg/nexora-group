@@ -142,6 +142,7 @@ def record_fuel_log(
         amount=total_cost,
         scope=scope,
         project_id=project_id,
+        effective_date=log_date,
         description=f"Combustible {log_date.isoformat()} · {vehicle_description or equipment_id or 'equipo'}",
     )
     if commit:
@@ -290,6 +291,7 @@ def update_maintenance_order(
                 amount=total_cost,
                 scope=scope,
                 project_id=equipment.project_id,
+                effective_date=order.closed_at or order.opened_at,
                 description=f"Mantenimiento {order.order_type} · {equipment.name}",
             )
 

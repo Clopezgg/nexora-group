@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -55,6 +55,14 @@ class AccountingDocument(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     fx_rate: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False, default=Decimal("1"))
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="DRAFT")
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    # `effective_date` es la fecha ECONÓMICA de la transacción (la fecha del
+    # documento fuente de negocio: remittance_date, payment_date, etc.).
+    # `posted_at` es el timestamp TÉCNICO en que NEXORA contabilizó el
+    # asiento. No se pueden confundir: importar diez remesas históricas hoy
+    # no las concentra "hoy" — cada una conserva su fecha económica real
+    # (ORDEN MAESTRA §9). Los reportes de flujo de caja agrupan por
+    # `effective_date`; la auditoría usa `posted_at`.
+    effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reversed_document_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounting_documents.id"), nullable=True

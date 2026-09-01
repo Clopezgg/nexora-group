@@ -4365,3 +4365,39 @@ verificado por la suite de CI contra BD efímera —
 `themeEngine.test.ts` (8), `ThemeSettingsCard.test.tsx` (3),
 `test_theme_preferences.py` (+1). No se ejecuta contra producción: un
 `AccountingDocument` contabilizado es inmutable (§8).
+
+### 2026-09-01 — ORDEN MAESTRA DE RECTIFICACIÓN · PR-A — `effective_date` (P0 flujo de caja §9/§26)
+
+Rama: `fix/rect-a-effective-date`.
+
+**Causa raíz** (verificada): `cash_flow_actual_service` agrupaba cada
+documento por `AccountingDocument.posted_at` — el timestamp TÉCNICO en que
+NEXORA contabilizó el asiento. `posting_service.post_manual` fija
+`posted_at = datetime.now(utc)` siempre. Importar diez remesas con fechas
+económicas de julio hoy (agosto) las concentraba todas en la semana actual.
+
+**Corrección**:
+- **`AccountingDocument.effective_date`** (`Date`, nuevo) — la fecha
+  ECONÓMICA de la transacción. Migración `a1c3e5f70b21` (single head,
+  roundtrip). Backfill NO destructivo y **sin inventar fechas**: baseline
+  `date(posted_at)`, luego se sobreescribe con la fecha fuente real donde
+  existe (remesas, pagos, cobros, transferencias, gastos, facturas AP/AR,
+  cierres de caja).
+- **`post_manual(effective_date=...)`** — parámetro explícito. Los 15 call
+  sites lo pasan desde su documento fuente: `remittance_date`,
+  `payment_date`, `receipt_date`, `transfer_date`, `expense_date`,
+  `invoice_date`, `closing_date`, `work_date`, `log_date`,
+  `order.closed_at`. El reversal usa la fecha del reversal (la plata sale
+  del banco cuando se revierte). Asiento manual sin fecha → `business_today()`,
+  nunca el timestamp UTC del contenedor.
+- **`cash_flow_actual_service`** agrupa por
+  `coalesce(effective_date, date(posted_at))`.
+- `JournalEntryResponse.effectiveDate` expuesto.
+- Invariante `INV-ACC-006`.
+
+**Tests** (`test_cash_flow_actual.py`, 7): remesa 2026-07-13 contabilizada
+hoy → aparece en la semana del 13 de julio, no en la última; lote de 10
+remesas jul/ago repartido en ≥6 semanas, ninguna concentra >3, total
+reconcilia; reversal de una remesa de julio → salida de caja HOY, cierre
+neto 0. Regresión: 168 tests en serie (posting/treasury/AP/AR/assets/
+workforce/equipment/reporting/financial-control/contract-payment) verdes.

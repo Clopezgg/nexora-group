@@ -214,6 +214,7 @@ def register_remittance(
         scope="CENTRAL",
         project_id=None,
         currency_code=currency_code,
+        effective_date=remittance_date,
         fx_rate=fx_rate,
         lines=[
             JournalLineInput(
@@ -310,6 +311,7 @@ def register_general_expense(
         company_id=company_id,
         document_type_code="GGE",
         scope=scope,
+        effective_date=expense_date,
         project_id=project_id,
         currency_code=currency_code,
         lines=[
@@ -387,6 +389,7 @@ def register_transfer(
         scope="CENTRAL",
         project_id=None,
         currency_code=currency_code,
+        effective_date=transfer_date,
         lines=[
             JournalLineInput(account_id=destination.gl_account_id, debit_amount=amount, description=notes),
             JournalLineInput(account_id=source.gl_account_id, credit_amount=amount, description=notes),
@@ -507,6 +510,7 @@ def approve_cash_closing(
             scope="GENERAL",
             project_id=None,
             currency_code=treasury_account.currency_code,
+            effective_date=closing.closing_date,
             lines=lines,
             description=f"Ajuste de cierre de caja {closing.id}",
             commit=False,

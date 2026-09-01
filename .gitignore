@@ -37,3 +37,6 @@ frontend/__azurite_db_*.json
 frontend/__blobstorage__/
 frontend/__queuestorage__/
 frontend/__tablestorage__/
+
+# Local screenshot / scratch output (visual verification)
+tmp/

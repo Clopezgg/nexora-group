@@ -118,6 +118,7 @@ def approve_time_entry(
         source_id=entry.id,
         amount=entry.labor_cost,
         scope=entry.scope,
+        effective_date=entry.work_date,
         project_id=entry.project_id,
         description=f"Mano de obra aprobada · {entry.work_date.isoformat()}",
     )

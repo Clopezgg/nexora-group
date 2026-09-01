@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from app.schemas.base import CamelModel
@@ -44,6 +45,7 @@ class JournalEntryResponse(CamelModel):
     fx_rate: Decimal
     status: str
     description: str | None
+    effective_date: date | None = None
     lines: list[JournalLineResponse]
 
 

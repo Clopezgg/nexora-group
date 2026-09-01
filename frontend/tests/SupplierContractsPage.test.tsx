@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderApp } from './testUtils'
@@ -86,7 +86,8 @@ describe('SupplierContractsPage', () => {
     expect(await screen.findByText('SC-001')).toBeInTheDocument()
     expect(screen.getByText('L 150,000.00')).toBeInTheDocument()
     // §13: la categoría del contrato es visible en la lista, en español.
-    expect(screen.getByText('Mano de obra')).toBeInTheDocument()
+    const contractRow = screen.getByText('SC-001').closest('tr') as HTMLElement
+    expect(within(contractRow).getByText('Mano de obra')).toBeInTheDocument()
   })
 
   it('creates a new supplier contract through the real API', async () => {

@@ -75,8 +75,32 @@ describe('Enterprise Theme Architecture (§8-§11, §20)', () => {
     // El compilador propaga esas diferencias a variables CSS.
     const hv = compileTheme(horizon)
     const qv = compileTheme(quartz)
+    const bv = compileTheme(belize)
     expect(hv['--nx-shape-radius-md']).not.toBe(qv['--nx-shape-radius-md'])
     expect(hv['--nx-elev-card']).not.toBe(qv['--nx-elev-card'])
+    // El shell (sidebar activo, topbar) también difiere por familia — no
+    // solo el color de superficie.
+    expect(new Set([hv['--nx-shell-sidebar-active-bg'], qv['--nx-shell-sidebar-active-bg'], bv['--nx-shell-sidebar-active-bg']]).size).toBe(3)
+    expect(new Set([hv['--nx-shell-style'], qv['--nx-shell-style'], bv['--nx-shell-style']]).size).toBeGreaterThanOrEqual(2)
+    // Altura de fila de tabla y radio de control se derivan de densidad+escala.
+    expect(hv['--nx-density-row-height']).toBeDefined()
+    expect(hv['--nx-density-control-height']).toBeDefined()
+    expect(hv['--nx-motion-easing']).not.toBe(qv['--nx-motion-easing'])
+  })
+
+  it('compileTheme emite todos los tokens estructurales que consume themes.css', () => {
+    const v = compileTheme(getThemePreset(DEFAULT_THEME_ID))
+    for (const token of [
+      '--nx-shell-sidebar-active-bg', '--nx-shell-sidebar-active-text', '--nx-shell-sidebar-text',
+      '--nx-shape-radius-xs', '--nx-shape-radius-sm', '--nx-shape-radius-md', '--nx-shape-radius-lg',
+      '--nx-shape-border-width', '--nx-elev-card', '--nx-elev-overlay',
+      '--nx-table-header-bg', '--nx-table-row-hover', '--nx-table-divider',
+      '--nx-density-row-height', '--nx-density-control-height', '--nx-density-card-padding',
+      '--nx-motion-fast', '--nx-motion-easing', '--nx-color-accent-hover', '--nx-color-border-strong',
+      '--nx-focus-ring', '--nx-focus-width', '--nx-font-base-size',
+    ]) {
+      expect(v[token], `falta ${token}`).toBeTruthy()
+    }
   })
 
   it('los temas de alto contraste cumplen 7:1 texto/fondo (WCAG AAA)', () => {

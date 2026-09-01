@@ -4462,3 +4462,28 @@ tamaño de rango; etiquetas de mes reales; drill-down lista los movimientos
 individuales ordenados. Frontend `CashForecastPage.test.tsx` (3) — rango
 real, etiquetas de calendario, drill-down. Regresión: 172 frontend +
 build; 62 backend (cash flow/financial-control/treasury).
+### 2026-09-01 — ORDEN MAESTRA DE RECTIFICACIÓN · PR-D (parcial) — capa estructural del theme + tokens
+
+Rama: `fix/rect-d-theme-structural`.
+
+- **`themes.css` — capa estructural ampliada** (§4): el estado activo/hover
+  del sidebar, el radio de botones/badges/segmented/tabs, la altura de fila
+  de tabla, el ritmo del page header y las transiciones ahora se derivan de
+  los tokens de familia (`--nx-shell-sidebar-active-bg`,
+  `--nx-shape-radius-*`, `--nx-density-row-height/control-height`,
+  `--nx-motion-*`). Reglas específicas por familia:
+  `[data-nx-family='quartz'|'belize']` quitan la barra de acento del sidebar
+  (jerarquía por superficie); Belize pone cabeceras en mayúsculas; Quartz
+  refuerza los divisores.
+- **Colores hardcodeados → tokens** (§5): `AppLayout.css` sidebar
+  (link/icono base y activo) y `FinancialCharts.tsx` (series de scope, grid,
+  líneas ingreso/gasto) pasan a `var(--nx-*)`.
+- **Tests** (`themeEngine.test.ts`, 13): Horizon/Quartz/Belize difieren en
+  shell (`--nx-shell-sidebar-active-bg` × 3 distintos, `--nx-shell-style`),
+  motion y radio; `compileTheme` emite los 23 tokens estructurales que
+  consume `themes.css`.
+
+**PENDIENTE (P1)**: profundización de dialogs/drawers/filter-bar/object-page
+por familia; auditoría visual sistemática con capturas a 390/430/768/1024/1440
+en las ~15 rutas autenticadas (§17/§23) — requiere el stack corriendo o
+credenciales de producción.

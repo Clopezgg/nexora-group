@@ -266,6 +266,46 @@ def test_voucher_pdf_is_generated_for_a_treasury_outflow(client):
     assert text.index("Informaci") < text.index("Asiento contable")
 
 
+def test_voucher_pdf_is_a_premium_corporate_document(client):
+    """ORDEN MAESTRA §27: membrete con identidad completa de la empresa
+    (incl. sitio web), etiqueta de beneficiario clara, pie de página con
+    verificación y numeración. Sin IDs técnicos."""
+    login_admin(client)
+    company, cash, _d, _c, _f = _setup(client)
+    resp = client.patch(
+        f"/api/master-data/companies/{company['id']}/profile",
+        json={
+            "legalName": "CONSTRUCTORA NEXORA S. DE R.L.",
+            "fiscalId": "08019025123456",
+            "addressLine1": "Boulevard Suyapa, Torre Nexora, piso 7",
+            "city": "Tegucigalpa",
+            "phone": "+504 2200-0000",
+            "email": "pagos@nexora.hn",
+            "website": "www.nexora.hn",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    outflow_doc = _outflow_document(client, company, cash, amount="4200.00")
+
+    pdf = client.get(
+        f"/api/treasury/vouchers/{outflow_doc}"
+        "?beneficiary=LESTER%20RIVAS&payer=NEXORA&paymentMethod=Efectivo"
+    )
+    assert pdf.status_code == 200, pdf.text
+    text = pdf.content.decode("latin-1")
+
+    assert "COMPROBANTE DE PAGO" in text
+    assert "www.nexora.hn" in text            # identidad completa (§27)
+    assert "pagos@nexora.hn" in text
+    assert "08019025123456" in text
+    assert "PAGADO A / BENEFICIARIO" in text  # etiqueta de documento, no "EMISOR/BENEFICIARIO"
+    assert "TOTAL PAGADO" in text
+    assert "L 4,200.00" in text
+    assert "Verificaci" in text               # pie de página con verificación
+    assert "P" in text and "gina" in text     # "Página N"
+    assert str(outflow_doc) not in text       # sin UUID
+
+
 def test_voucher_pdf_uses_company_fixed_payer_and_configured_approver(client):
     """Orden maestra Phase 2: el pagador sale de Company Settings (read-only),
     el aprobador es el configurado; el cliente no puede sobrescribir el

@@ -35,6 +35,32 @@ function stubAuthenticatedFetch(roles: string[], dashboard?: Record<string, unkn
       if (url.includes('/dashboard/summary') && dashboard) {
         return Promise.resolve({ ok: true, status: 200, json: async () => dashboard } as Response)
       }
+      if (url.includes('/financial-control/cash-flow-actual')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            asOf: '2026-08-31',
+            currencyCode: 'HNL',
+            openingBalance: 0,
+            closingBalance: 26000,
+            totalInflows: 65000,
+            totalOutflows: 39000,
+            inflowByCategory: { 'Aportes de capital': 65000 },
+            outflowByCategory: { 'Pagos a proveedores': 39000 },
+            weeks: Array.from({ length: 13 }, (_, i) => ({
+              weekIndex: i,
+              weekStart: '2026-06-02',
+              weekEnd: '2026-06-08',
+              inflows: 5000,
+              outflows: 3000,
+              net: 2000,
+              closingBalance: 2000 * (i + 1),
+              byCategory: {},
+            })),
+          }),
+        } as Response)
+      }
       if (url.includes('/financial-control/cash-forecast')) {
         return Promise.resolve({
           ok: true,
@@ -119,8 +145,10 @@ describe('HomePage', () => {
       '/inicio/aprobaciones',
     )
 
-    // Forecast 13 semanas y cuentas bancarias en el Home (OC PR B).
-    expect(await screen.findByText(/Flujo de caja proyectado · 13 semanas/i)).toBeInTheDocument()
+    // Flujo de caja (Realizado por defecto) y cuentas bancarias en el Home.
+    expect(await screen.findByText(/Flujo de caja real · últimas 13 semanas/i)).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Realizado' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Proyectado' })).toBeInTheDocument()
     expect(await screen.findByText('Banco Atlántida')).toBeInTheDocument()
     expect(screen.getByText('••••5852 · HNL')).toBeInTheDocument()
   })

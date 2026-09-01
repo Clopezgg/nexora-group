@@ -69,7 +69,12 @@ export interface CashFlowMovement {
 }
 
 export const cashFlowActualService = {
-  /** Forma "weeks" de compatibilidad — la usa el Home. */
+  /**
+   * @deprecated Forma "weeks" legacy (`S1..S13`). Sin consumidores en la UI
+   * desde la ORDEN MAESTRA §5/§10 — Home y CashForecastPage usan `series()` con
+   * rangos y etiquetas de calendario reales. Conservado solo por compatibilidad
+   * del endpoint; no usar en pantallas nuevas.
+   */
   get: (companyId: string) =>
     apiFetch<CashFlowActual>(
       `/financial-control/cash-flow-actual?companyId=${encodeURIComponent(companyId)}`,

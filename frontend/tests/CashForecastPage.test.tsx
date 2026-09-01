@@ -88,11 +88,14 @@ describe('CashForecastPage', () => {
     expect(screen.getByRole('tab', { name: 'Realizado' })).toHaveAttribute('aria-selected', 'true')
     // Selector de rango real, no S1..S13.
     expect(screen.getByRole('button', { name: '3M' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Agrupar')).toBeInTheDocument()
+    expect(screen.getByLabelText('Agrupación')).toBeInTheDocument()
     // Etiquetas de calendario reales.
     expect(await screen.findByText('Julio 2026')).toBeInTheDocument()
     expect(screen.getByText('Agosto 2026')).toBeInTheDocument()
     expect(screen.getByText(/Entradas L\s?13,000/)).toBeInTheDocument()
+    // Nunca "S1".."S13" como etiqueta principal (§5/§10).
+    expect(screen.queryByText(/^S1[0-3]$/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^S[1-9]$/)).not.toBeInTheDocument()
 
     // Drill-down: click en el contador de movimientos abre el detalle.
     const julioRow = screen.getByText('Julio 2026').closest('tr') as HTMLElement
@@ -105,13 +108,19 @@ describe('CashForecastPage', () => {
     stubFetch(true)
     render(renderApp('/finanzas/flujo-13-semanas'))
     await userEvent.click(await screen.findByRole('tab', { name: 'Proyectado' }))
-    expect(await screen.findByText(/Alerta de liquidez · descubierto en la semana 3/)).toBeInTheDocument()
+    const alert = await screen.findByText(/Alerta de liquidez/)
+    expect(alert).toBeInTheDocument()
+    // Fecha de calendario real en la alerta, nunca "S3".
+    expect(alert.textContent).not.toMatch(/\bS\d+\b/)
+    expect(alert.textContent).toMatch(/sep/)
   })
 
-  it('shows no alert when the projected balance stays positive', async () => {
+  it('shows no liquidity alert when the projected balance stays positive', async () => {
     stubFetch(false)
     render(renderApp('/finanzas/flujo-13-semanas'))
     await userEvent.click(await screen.findByRole('tab', { name: 'Proyectado' }))
-    expect(await screen.findByText('Sin descubierto proyectado en el horizonte')).toBeInTheDocument()
+    // El resumen proyectado se muestra sin alerta de liquidez.
+    expect(await screen.findByText(/Saldo inicial/)).toBeInTheDocument()
+    expect(screen.queryByText(/Alerta de liquidez/)).not.toBeInTheDocument()
   })
 })

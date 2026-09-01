@@ -1,141 +1,75 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import { Card, EmptyState, LoadingState } from '../../design-system'
-import { cashForecastService } from '../../services/cashForecastService'
-import { cashFlowActualService } from '../../services/cashFlowActualService'
-import { formatMoney, formatMoneyCompact } from '../../utils/currency'
-
-type Mode = 'REALIZADO' | 'PROYECTADO'
+import {
+  CashFlowChart,
+  CashFlowControls,
+  CashFlowSummary,
+  useCashFlowSeries,
+  type CashFlowGranularityOption,
+  type CashFlowMode,
+  type CashFlowRange,
+} from '../finance/cashflow'
 
 /**
- * Flujo de caja en el Home (§14): [ REALIZADO | PROYECTADO ].
- * - REALIZADO: las últimas 13 semanas de movimiento real de tesorería
- *   (`cashFlowActualService`).
- * - PROYECTADO: las próximas 13 semanas proyectadas de AP/AR
- *   (`cashForecastService`).
- * Son conceptos distintos con endpoints distintos — no se mezclan: las
- * remesas históricas viven en REALIZADO, no en la S1 del forecast (el
- * opening balance del forecast ya las incluye).
+ * Flujo de caja en el Home (ORDEN MAESTRA §5/§6/§7).
+ *
+ * Usa la MISMA arquitectura moderna que la página completa
+ * (`useCashFlowSeries` + `cashFlowActualService.series()`): rangos reales
+ * 1M/3M/6M/12M, agrupación Auto/Día/Semana/Mes y etiquetas de calendario.
+ * NUNCA "S1 S2 S3 … S13" como lenguaje principal — ni en REALIZADO ni en
+ * PROYECTADO.
  */
 export function HomeForecastCard({ companyId }: { companyId: string }) {
-  const [mode, setMode] = useState<Mode>('REALIZADO')
+  const [mode, setMode] = useState<CashFlowMode>('REALIZADO')
+  const [range, setRange] = useState<CashFlowRange>('3M')
+  const [granularity, setGranularity] = useState<CashFlowGranularityOption>('auto')
 
-  const actualQuery = useQuery({
-    queryKey: ['financial-control', 'cash-flow-actual', companyId],
-    queryFn: () => cashFlowActualService.get(companyId),
-    enabled: Boolean(companyId) && mode === 'REALIZADO',
+  const { rows, summary, hasMovement, isLoading, isError, refetch } = useCashFlowSeries({
+    companyId,
+    mode,
+    range,
+    granularity,
   })
-  const forecastQuery = useQuery({
-    queryKey: ['financial-control', 'cash-forecast', companyId],
-    queryFn: () => cashForecastService.get(companyId),
-    enabled: Boolean(companyId) && mode === 'PROYECTADO',
-  })
-
-  const query = mode === 'REALIZADO' ? actualQuery : forecastQuery
-  const currency =
-    (mode === 'REALIZADO' ? actualQuery.data?.currencyCode : forecastQuery.data?.currencyCode) ?? 'HNL'
-  const abbreviate = (value: number | string) => formatMoneyCompact(value, currency)
-  const exact = (value: number | string) => formatMoney(Number(value), currency)
-
-  const data: Array<{ label: string; Entradas: number; Salidas: number; Saldo: number }> =
-    mode === 'REALIZADO'
-      ? (actualQuery.data?.weeks ?? []).map((week) => ({
-          label: `S${week.weekIndex + 1}`,
-          Entradas: week.inflows,
-          Salidas: -Math.abs(week.outflows),
-          Saldo: week.closingBalance,
-        }))
-      : (forecastQuery.data?.weeks ?? []).map((week) => ({
-          label: `S${week.weekIndex + 1}`,
-          Entradas: week.inflows,
-          Salidas: -Math.abs(week.outflows),
-          Saldo: week.projectedBalance,
-        }))
-  const hasData = data.some((row) => row.Entradas !== 0 || row.Salidas !== 0)
-
-  const liquidityAlert =
-    mode === 'PROYECTADO' && forecastQuery.data?.hasLiquidityAlert ? forecastQuery.data : null
+  const currency = summary?.currencyCode ?? 'HNL'
 
   return (
-    <Card
-      title={
-        mode === 'REALIZADO'
-          ? 'Flujo de caja real · últimas 13 semanas'
-          : 'Flujo de caja proyectado · próximas 13 semanas'
-      }
-    >
-      <div className="nx-segmented" role="tablist" aria-label="Modo de flujo de caja">
-        {(['REALIZADO', 'PROYECTADO'] as const).map((option) => (
-          <button
-            key={option}
-            type="button"
-            role="tab"
-            aria-selected={mode === option}
-            className={`nx-segmented__option${mode === option ? ' nx-segmented__option--active' : ''}`}
-            onClick={() => setMode(option)}
-          >
-            {option === 'REALIZADO' ? 'Realizado' : 'Proyectado'}
-          </button>
-        ))}
-      </div>
+    <Card title="Flujo de caja">
+      <CashFlowControls
+        mode={mode}
+        onModeChange={setMode}
+        range={range}
+        onRangeChange={setRange}
+        granularity={granularity}
+        onGranularityChange={setGranularity}
+        compact
+      />
 
-      {query.isLoading ? (
+      {isLoading ? (
         <LoadingState label="Cargando flujo de caja…" />
-      ) : !hasData ? (
+      ) : isError ? (
+        <div className="nx-home__forecast-empty">
+          <EmptyState icon="chart" title="No se pudo cargar el flujo de caja" />
+          <button type="button" className="nx-linkbutton" onClick={refetch}>
+            Reintentar
+          </button>
+        </div>
+      ) : !hasMovement ? (
         <div className="nx-home__forecast-empty">
           <EmptyState
             icon="chart"
             title={
               mode === 'REALIZADO'
-                ? 'Todavía no hay movimientos de tesorería en las últimas 13 semanas'
-                : 'Aún no hay movimientos suficientes para proyectar 13 semanas'
+                ? 'Sin movimientos de tesorería en el rango seleccionado'
+                : 'Aún no hay compromisos AP/AR suficientes para proyectar'
             }
           />
           <Link to="/finanzas/flujo-13-semanas">Abrir Flujo de caja →</Link>
         </div>
       ) : (
         <>
-          {liquidityAlert ? (
-            <p className="nx-field__error" role="status">
-              Alerta de liquidez: saldo mínimo proyectado {exact(liquidityAlert.minProjectedBalance)}
-              {liquidityAlert.firstNegativeWeekIndex != null
-                ? ` (negativo desde S${liquidityAlert.firstNegativeWeekIndex + 1})`
-                : ''}
-              .
-            </p>
-          ) : null}
-          <div style={{ width: '100%', height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--nx-chart-grid, #e6ecf3)" />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} />
-                <YAxis tick={{ fontSize: 10 }} width={52} tickFormatter={abbreviate} />
-                <Tooltip formatter={(value) => exact(Number(value))} />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="Entradas" fill="var(--nx-color-positive, #0f9f6e)" barSize={8} />
-                <Bar dataKey="Salidas" fill="var(--nx-color-negative, #dc3f50)" barSize={8} />
-                <Line
-                  type="monotone"
-                  dataKey="Saldo"
-                  stroke="var(--nx-color-accent, #1769d2)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
+          {summary ? <CashFlowSummary summary={summary} /> : null}
+          <CashFlowChart rows={rows} currency={currency} height={220} />
           <Link to="/finanzas/flujo-13-semanas">Ver flujo de caja completo →</Link>
         </>
       )}

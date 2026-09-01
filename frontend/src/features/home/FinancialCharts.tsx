@@ -9,10 +9,12 @@ const scopeLabels: Record<string, string> = {
   PROJECT: 'Proyecto',
 }
 
+// Series de scope: se leen de los tokens de charts del tema (§5). La serie 1
+// es el accent, 2/3/4 los colores de gráfico del preset activo.
 const scopeColors: Record<string, string> = {
-  CENTRAL: '#1d5fd6',
-  GENERAL: '#0f766e',
-  PROJECT: '#7c3aed',
+  CENTRAL: 'var(--nx-chart-series-1, #1769d2)',
+  GENERAL: 'var(--nx-chart-series-2, #0f9f6e)',
+  PROJECT: 'var(--nx-chart-series-4, #c67c11)',
 }
 
 interface FinancialChartsProps {
@@ -42,13 +44,13 @@ export default function FinancialCharts({ cashFlow, expensesByScope, currency }:
         emptyMessage="Sin movimientos en este período."
       >
         <LineChart data={cashFlow} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e6ecf3" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--nx-chart-grid, #e6ecf3)" />
           <XAxis dataKey="period" tick={{ fontSize: 11 }} tickMargin={6} />
           <YAxis tick={{ fontSize: 11 }} width={52} tickFormatter={abbreviate} tickCount={4} />
           <Tooltip formatter={(value) => exact(Number(value))} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
-          <Line type="monotone" dataKey="income" name="Ingresos" stroke="#0f9f6e" strokeWidth={2.5} dot={false} />
-          <Line type="monotone" dataKey="expense" name="Gastos" stroke="#dc3f50" strokeWidth={2.5} dot={false} />
+          <Line type="monotone" dataKey="income" name="Ingresos" stroke="var(--nx-color-positive, #0f9f6e)" strokeWidth={2.5} dot={false} />
+          <Line type="monotone" dataKey="expense" name="Gastos" stroke="var(--nx-color-negative, #dc3f50)" strokeWidth={2.5} dot={false} />
         </LineChart>
       </ChartCard>
 
@@ -60,13 +62,13 @@ export default function FinancialCharts({ cashFlow, expensesByScope, currency }:
         emptyMessage="Sin gastos registrados por alcance."
       >
         <BarChart data={scopeData} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e6ecf3" />
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--nx-chart-grid, #e6ecf3)" />
           <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={abbreviate} tickCount={4} />
           <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} width={70} />
           <Tooltip formatter={(value) => exact(Number(value))} />
           <Bar dataKey="amount" name="Gasto" radius={[0, 4, 4, 0]} barSize={22}>
             {scopeData.map((item) => (
-              <Cell key={item.scope} fill={scopeColors[item.scope] ?? '#64748b'} />
+              <Cell key={item.scope} fill={scopeColors[item.scope] ?? "var(--nx-color-text-subtle, #64748b)"} />
             ))}
           </Bar>
         </BarChart>

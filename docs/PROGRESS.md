@@ -4434,3 +4434,31 @@ aceptado como PIN** (403) y el PIN real sí emite capability;
 `/edit-access/verify` responde 503 NOT_CONFIGURED sin secretos de servidor;
 rate limit / lockout / capability firmada / session-bound / expiración ya
 cubiertos.
+
+### 2026-09-01 — ORDEN MAESTRA DE RECTIFICACIÓN · PR-C — Flujo de caja: rango real + gráfico financiero (§10/§11)
+
+Rama: `fix/rect-c-cashflow-ux`.
+
+- **Eliminado S1..S13 como UX principal**. `GET /api/financial-control/cash-flow-actual/series?from=&to=&granularity=`:
+  - Rango de fechas real (el frontend ofrece 1M/3M/6M/12M/personalizado).
+  - Granularidad **Auto/Día/Semana/Mes** — Auto: ≤45 días → día · 46-120 →
+    semana · 121-400 → mes (`resolve_granularity`).
+  - Etiquetas de calendario reales: "13 ago", "3–9 ago", "Agosto 2026".
+  - Cada período trae `movementCount` y `byCategory`.
+- **`GET .../cash-flow-actual/movements?from=&to=`** — drill-down: los
+  movimientos individuales del período (documento, fecha económica,
+  categoría, dirección, importe, concepto), orden descendente.
+- **Frontend `CashForecastPage`**: selector de rango + granularidad;
+  **`ComposedChart`** con Entradas (barras `--nx-color-positive`), Salidas
+  (barras `--nx-color-negative`), Saldo (línea acumulada `--nx-color-accent`);
+  tooltip con período + nº de movimientos; click en barra/fila abre el
+  `Modal` de movimientos. `HomeForecastCard` recoloreado a tokens
+  semánticos (§5, sin `#` hardcodeados).
+- `cash_flow_actual_service.actual()` conservado como wrapper de
+  compatibilidad ("weeks") para el Home.
+
+**Tests** (`test_cash_flow_actual.py` +3, 12 total): granularidad Auto por
+tamaño de rango; etiquetas de mes reales; drill-down lista los movimientos
+individuales ordenados. Frontend `CashForecastPage.test.tsx` (3) — rango
+real, etiquetas de calendario, drill-down. Regresión: 172 frontend +
+build; 62 backend (cash flow/financial-control/treasury).

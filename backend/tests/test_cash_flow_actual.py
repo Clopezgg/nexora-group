@@ -233,3 +233,80 @@ def test_reversal_of_historical_remittance_is_a_cash_movement_at_reversal_time(c
     cf = client.get(f"/api/financial-control/cash-flow-actual?companyId={company['id']}").json()
     # Entrada de julio + salida del reversal → neto 0.
     assert Decimal(cf["closingBalance"]) == Decimal("0.00")
+
+
+def test_cash_flow_series_uses_real_calendar_dates_and_auto_granularity(client):
+    """§10/§11 — el endpoint /series agrupa por fechas de calendario reales
+    (no S1..S13). Auto: rango de ~3 meses → granularidad mensual."""
+    login_admin(client)
+    company, bank = _company_with_bank(client)
+    equity = create_account(client, company_id=company["id"], code="3100", name="Aportes", account_type="EQUITY")
+    _remittance(client, company, bank, counter_id=equity["id"], origin_type="CAPITAL_CONTRIBUTION",
+                amount="5000.00", remittance_date="2026-07-10")
+    _remittance(client, company, bank, counter_id=equity["id"], origin_type="CAPITAL_CONTRIBUTION",
+                amount="8000.00", remittance_date="2026-08-05")
+
+    # 123 días → Auto elige mes (§10: 121-400 días → mes).
+    r = client.get(
+        f"/api/financial-control/cash-flow-actual/series"
+        f"?companyId={company['id']}&from=2026-05-01&to=2026-08-31"
+    )
+    assert r.status_code == 200, r.text
+    s = r.json()
+    assert s["granularity"] == "month"
+    labels = [p["label"] for p in s["periods"]]
+    assert labels == ["Mayo 2026", "Junio 2026", "Julio 2026", "Agosto 2026"]
+    julio = next(p for p in s["periods"] if p["label"] == "Julio 2026")
+    agosto = next(p for p in s["periods"] if p["label"] == "Agosto 2026")
+    assert Decimal(julio["inflows"]) == Decimal("5000.00")
+    assert julio["movementCount"] == 1
+    assert Decimal(agosto["inflows"]) == Decimal("8000.00")
+    assert Decimal(s["totalInflows"]) == Decimal("13000.00")
+    assert Decimal(s["closingBalance"]) == Decimal("13000.00")
+
+
+def test_cash_flow_series_day_granularity_for_short_range(client):
+    """§10 — Auto: rango <=45 días → granularidad diaria con etiqueta de día."""
+    login_admin(client)
+    company, bank = _company_with_bank(client)
+    equity = create_account(client, company_id=company["id"], code="3100", name="Aportes", account_type="EQUITY")
+    _remittance(client, company, bank, counter_id=equity["id"], origin_type="CAPITAL_CONTRIBUTION",
+                amount="1200.00", remittance_date="2026-08-13")
+
+    r = client.get(
+        f"/api/financial-control/cash-flow-actual/series"
+        f"?companyId={company['id']}&from=2026-08-01&to=2026-08-20"
+    ).json()
+    assert r["granularity"] == "day"
+    day13 = next(p for p in r["periods"] if p["label"] == "13 ago")
+    assert Decimal(day13["inflows"]) == Decimal("1200.00")
+
+
+def test_cash_flow_movements_drilldown_lists_individual_movements(client):
+    """§10/§11 — click en una barra abre el detalle de movimientos."""
+    login_admin(client)
+    company, bank = _company_with_bank(client)
+    equity = create_account(client, company_id=company["id"], code="3100", name="Aportes", account_type="EQUITY")
+    _remittance(client, company, bank, counter_id=equity["id"], origin_type="CAPITAL_CONTRIBUTION",
+                amount="4000.00", remittance_date="2026-08-07")
+    expense_gl = create_account(client, company_id=company["id"], code="5210", name="Servicios", account_type="EXPENSE")
+    client.post("/api/treasury/general-expenses", json={
+        "companyId": company["id"], "treasuryAccountId": bank["id"], "expenseAccountId": expense_gl["id"],
+        "category": "Luz", "amount": "700.00", "currencyCode": "HNL",
+        "expenseDate": "2026-08-09", "description": "Energía agosto",
+    })
+
+    r = client.get(
+        f"/api/financial-control/cash-flow-actual/movements"
+        f"?companyId={company['id']}&from=2026-08-01&to=2026-08-31"
+    )
+    assert r.status_code == 200, r.text
+    rows = r.json()
+    assert len(rows) == 2
+    # Orden descendente por fecha económica.
+    assert rows[0]["effectiveDate"] == "2026-08-09"
+    assert rows[0]["direction"] == "OUTFLOW"
+    assert rows[0]["category"] == "Gastos pagados"
+    assert Decimal(rows[0]["amount"]) == Decimal("700.00")
+    assert rows[1]["direction"] == "INFLOW"
+    assert Decimal(rows[1]["amount"]) == Decimal("4000.00")

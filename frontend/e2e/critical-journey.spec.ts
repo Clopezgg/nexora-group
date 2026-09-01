@@ -547,7 +547,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     }
 
     await page.goto('/finanzas/flujo-13-semanas')
-    await expect(page.getByRole('heading', { name: 'Flujo de caja · 13 semanas' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: 'Flujo de caja' })).toBeVisible({ timeout: 10_000 })
     // Realizado por defecto (§14); el toggle Proyectado sigue disponible.
     await expect(page.getByRole('tab', { name: 'Realizado' })).toHaveAttribute('aria-selected', 'true')
     const actual = await api<any>(page.request, 'get', `/financial-control/cash-flow-actual?companyId=${companyId}`)

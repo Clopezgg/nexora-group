@@ -26,6 +26,9 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
   '/finanzas/inspector': async () => ({
     Component: (await import('../features/finance/TransactionInspectorPage')).TransactionInspectorPage,
   }),
+  '/finanzas/libro-contractual': async () => ({
+    Component: (await import('../features/finance/ContractPaymentLedgerPage')).ContractPaymentLedgerPage,
+  }),
   '/finanzas/flujo-13-semanas': async () => ({
     Component: (await import('../features/finance/CashForecastPage')).CashForecastPage,
   }),

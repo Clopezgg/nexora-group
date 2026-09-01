@@ -72,6 +72,34 @@ class ContractSummary:
     currency_code: str
 
 
+@dataclass(frozen=True)
+class LedgerAllocationRow:
+    payment_id: uuid.UUID
+    payment_date: date
+    installment_sequence: int
+    installment_period_label: str
+    amount_applied: Decimal
+    bank_transaction_reference: str | None
+    reversed: bool
+
+
+@dataclass(frozen=True)
+class ContractLedgerEntry:
+    schedule_id: uuid.UUID
+    supplier_contract_id: uuid.UUID
+    contract_number: str
+    supplier_legal_name: str | None
+    project_id: uuid.UUID | None
+    currency_code: str
+    contract_value: Decimal
+    scheduled_to_date: Decimal
+    paid_accumulated: Decimal
+    contract_balance: Decimal
+    overdue_balance: Decimal
+    installments: list[InstallmentSummary]
+    allocations: list[LedgerAllocationRow]
+
+
 _MONTHS_ES = [
     "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -352,6 +380,85 @@ def contract_summary(
         next_due_amount=nxt.remaining if nxt else None,
         currency_code=schedule.currency_code,
     )
+
+
+def contract_payment_ledger(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    supplier_contract_id: uuid.UUID | None = None,
+    as_of: date | None = None,
+) -> list[ContractLedgerEntry]:
+    """Libro contractual de pagos (§54): por cada contrato con plan, sus
+    cuotas con estado real + las asignaciones de pago que las liquidaron.
+    Solo lectura; no toca contabilidad."""
+    from app.models.ap import SupplierInvoice, SupplierPayment
+
+    as_of = as_of or date.today()
+    q = (
+        select(ContractPaymentSchedule)
+        .where(ContractPaymentSchedule.company_id == company_id)
+        .order_by(ContractPaymentSchedule.created_at)
+    )
+    if supplier_contract_id is not None:
+        q = q.where(ContractPaymentSchedule.supplier_contract_id == supplier_contract_id)
+    schedules = list(db.execute(q).scalars())
+
+    entries: list[ContractLedgerEntry] = []
+    for schedule in schedules:
+        contract = db.get(SupplierContract, schedule.supplier_contract_id)
+        supplier = (
+            db.get(Supplier, contract.supplier_id) if contract is not None else None
+        )
+        summary = contract_summary(db, schedule_id=schedule.id, as_of=as_of)
+        installments = installment_summaries(db, schedule_id=schedule.id, as_of=as_of)
+        by_installment = {i.installment_id: i for i in installments}
+
+        alloc_rows = list(
+            db.execute(
+                select(ContractPaymentAllocation, SupplierPayment)
+                .join(
+                    SupplierPayment,
+                    SupplierPayment.id == ContractPaymentAllocation.supplier_payment_id,
+                )
+                .where(
+                    ContractPaymentAllocation.installment_id.in_(list(by_installment.keys()))
+                )
+                .order_by(SupplierPayment.payment_date, ContractPaymentAllocation.applied_at)
+            ).all()
+        ) if by_installment else []
+
+        allocations = [
+            LedgerAllocationRow(
+                payment_id=payment.id,
+                payment_date=payment.payment_date,
+                installment_sequence=by_installment[alloc.installment_id].sequence,
+                installment_period_label=by_installment[alloc.installment_id].period_label,
+                amount_applied=_q(alloc.amount_applied),
+                bank_transaction_reference=payment.bank_transaction_reference,
+                reversed=alloc.reversed_at is not None,
+            )
+            for alloc, payment in alloc_rows
+        ]
+
+        entries.append(
+            ContractLedgerEntry(
+                schedule_id=schedule.id,
+                supplier_contract_id=schedule.supplier_contract_id,
+                contract_number=contract.contract_number if contract else "—",
+                supplier_legal_name=getattr(supplier, "legal_name", None),
+                project_id=schedule.project_id,
+                currency_code=schedule.currency_code,
+                contract_value=summary.contract_value,
+                scheduled_to_date=summary.total_scheduled_to_date,
+                paid_accumulated=summary.paid_accumulated,
+                contract_balance=summary.contract_balance,
+                overdue_balance=summary.overdue_balance,
+                installments=installments,
+                allocations=allocations,
+            )
+        )
+    return entries
 
 
 # --------------------------------------------------------------------------- #

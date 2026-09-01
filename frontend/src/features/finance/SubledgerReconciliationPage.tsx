@@ -20,6 +20,7 @@ const SUBLEDGER_LABEL: Record<ReconciliationLine['subledger'], string> = {
   TREASURY: 'Tesorería',
   ACCOUNTS_PAYABLE: 'Cuentas por pagar',
   ACCOUNTS_RECEIVABLE: 'Cuentas por cobrar',
+  CONTRACT_PAYMENTS: 'Pagos contractuales',
 }
 
 export function SubledgerReconciliationPage() {

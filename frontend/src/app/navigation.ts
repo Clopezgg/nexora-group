@@ -34,6 +34,7 @@ export const navGroups: NavGroup[] = [
       { path: '/finanzas/cierre', label: 'Centro de Cierre', icon: 'shield', requiredAny: read('accounting.closing:read') },
       { path: '/finanzas/excepciones', label: 'Exception Center', icon: 'warning', requiredAny: read('treasury.account:read', 'accounting.journal_entry:read') },
       { path: '/finanzas/inspector', label: 'Transaction Inspector', icon: 'search', requiredAny: read('accounting.journal_entry:read') },
+      { path: '/finanzas/libro-contractual', label: 'Libro contractual de pagos', icon: 'book', requiredAny: read('contract.payment_schedule:read') },
       { path: '/finanzas/flujo-13-semanas', label: 'Forecast de caja · 13 semanas', icon: 'chart', requiredAny: read('treasury.account:read') },
       { path: '/finanzas/tesoreria', label: 'Tesorería', icon: 'bank', requiredAny: read('treasury.account:read') },
       { path: '/finanzas/conciliacion', label: 'Conciliación bancaria', icon: 'shuffle', requiredAny: read('treasury.bank_reconciliation:read') },

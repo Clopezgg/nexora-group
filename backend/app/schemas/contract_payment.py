@@ -74,3 +74,38 @@ class FifoPreviewItem(CamelModel):
     installment_id: uuid.UUID
     period_label: str
     amount_applied: Decimal
+
+
+class LedgerAllocationResponse(CamelModel):
+    payment_id: uuid.UUID
+    payment_date: date
+    installment_sequence: int
+    installment_period_label: str
+    amount_applied: Decimal
+    bank_transaction_reference: str | None
+    reversed: bool
+
+
+class ContractLedgerEntryResponse(CamelModel):
+    schedule_id: uuid.UUID
+    supplier_contract_id: uuid.UUID
+    contract_number: str
+    supplier_legal_name: str | None
+    project_id: uuid.UUID | None
+    currency_code: str
+    contract_value: Decimal
+    scheduled_to_date: Decimal
+    paid_accumulated: Decimal
+    contract_balance: Decimal
+    overdue_balance: Decimal
+    installments: list[InstallmentResponse]
+    allocations: list[LedgerAllocationResponse]
+
+
+class ContractPaymentLedgerResponse(CamelModel):
+    company_id: uuid.UUID
+    as_of: date
+    entries: list[ContractLedgerEntryResponse]
+    total_contract_value: Decimal
+    total_paid_accumulated: Decimal
+    total_contract_balance: Decimal

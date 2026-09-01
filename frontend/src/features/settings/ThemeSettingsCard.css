@@ -39,7 +39,7 @@
 }
 .nx-theme-preview__shell {
   display: grid;
-  grid-template-columns: 116px 1fr;
+  grid-template-columns: 116px minmax(0, 1fr);
   background: var(--nx-color-page-bg, #eef3f9);
   min-height: 300px;
 }
@@ -71,6 +71,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 12px;
+  min-width: 0;
 }
 .nx-theme-preview__topbar {
   display: flex;
@@ -91,7 +92,7 @@
 }
 .nx-theme-preview__kpis {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 .nx-theme-preview__kpi {

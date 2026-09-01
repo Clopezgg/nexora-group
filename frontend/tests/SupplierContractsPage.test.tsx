@@ -83,7 +83,7 @@ describe('SupplierContractsPage', () => {
     render(renderApp('/abastecimiento/contratos'))
 
     expect(await screen.findByText('SC-001')).toBeInTheDocument()
-    expect(screen.getByText('150000.00')).toBeInTheDocument()
+    expect(screen.getByText('L 150,000.00')).toBeInTheDocument()
   })
 
   it('creates a new supplier contract through the real API', async () => {

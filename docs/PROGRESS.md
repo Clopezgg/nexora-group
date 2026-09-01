@@ -4049,3 +4049,30 @@ Rama: `feat/cpc-2-allocation-ap-reversal`.
   + reversal reabre cuota y baja amount_paid; suma ≠ monto → 422; propuesta
   FIFO sobre cuotas más antiguas; factura con contrato de otro proveedor →
   422. Regresión: AP/reversals/migrations 25 verdes.
+
+### 2026-09-01 — ORDEN MAESTRA FINAL · CPC PR 3 (API + UX del plan de pagos contractual)
+
+Rama: `feat/cpc-3-contract-payment-api-ux`.
+
+- **Permiso RBAC** `contract.payment_schedule` (`read` / `manage`);
+  Administrator lo hereda automáticamente, grants a Finance Manager y
+  Procurement Manager. Self-heal en cada arranque.
+- **API** `/api/contract-payments`:
+  - `POST /schedules` — crea el plan (modo mensual `startPeriod`+`months`+
+    `monthlyAmount`, o `installments` explícitas). Valida suma ≤ valor
+    contractual → 422.
+  - `GET /schedules?companyId=&contractId=` · `GET /by-contract/{id}` —
+    devuelven el plan con cada cuota y su **estado real** (desde
+    allocations, no `note`).
+  - `GET /schedules/{id}/summary?asOf=` — valor contractual, programado a
+    fecha, pagado acumulado, saldo contractual, vencido, próximo
+    vencimiento (§23).
+  - `POST /schedules/{id}/fifo-preview` — preview FIFO (no persiste — §12).
+- **Frontend**: `ContractPaymentPlanModal` en `/abastecimiento/contratos`
+  (botón "Ver plan" por contrato) — resumen contractual + tabla de cuotas
+  (período / programado / pagado / saldo / estado con tono) y, si no hay
+  plan, formulario para crear el plan mensual. `contractPaymentService`.
+  El valor del contrato y los % ahora se formatean (§26).
+- Tests: `test_contract_payments_api.py` (3) — crear plan mensual + leer,
+  plan > valor 422, summary + FIFO preview. Regresión: contract-payments
+  12, RBAC/auth 21, frontend 167 verdes.

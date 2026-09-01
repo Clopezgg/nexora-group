@@ -5,6 +5,8 @@ import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { procurementService } from '../../services/procurementService'
 import { projectService } from '../../services/projectService'
+import { formatMoney } from '../../utils/currency'
+import { ContractPaymentPlanModal } from './ContractPaymentPlanModal'
 import type { SupplierContract } from '../../types/procurement'
 
 const emptyForm = {
@@ -29,6 +31,7 @@ export function SupplierContractsPage() {
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [planContract, setPlanContract] = useState<SupplierContract | null>(null)
 
   const contractsQuery = useQuery({
     queryKey: ['procurement', 'contracts', activeCompanyId],
@@ -77,10 +80,19 @@ export function SupplierContractsPage() {
       header: 'Proveedor',
       render: (row) => supplierNameById.get(row.supplierId) ?? row.supplierId,
     },
-    { key: 'value', header: 'Valor', render: (row) => row.value },
-    { key: 'advancePercentage', header: 'Anticipo %', render: (row) => row.advancePercentage },
-    { key: 'retentionPercentage', header: 'Retención %', render: (row) => row.retentionPercentage },
+    { key: 'value', header: 'Valor', numeric: true, render: (row) => formatMoney(row.value, row.currencyCode) },
+    { key: 'advancePercentage', header: 'Anticipo %', numeric: true, render: (row) => `${Number(row.advancePercentage).toFixed(2)}%` },
+    { key: 'retentionPercentage', header: 'Retención %', numeric: true, render: (row) => `${Number(row.retentionPercentage).toFixed(2)}%` },
     { key: 'status', header: 'Estado', render: (row) => <Badge>{row.status}</Badge> },
+    {
+      key: 'plan',
+      header: 'Plan de pagos',
+      render: (row) => (
+        <Button variant="secondary" onClick={() => setPlanContract(row)}>
+          Ver plan
+        </Button>
+      ),
+    },
   ]
 
   if (loadingCompanies) return <LoadingState label="Cargando compañías…" />
@@ -203,6 +215,14 @@ export function SupplierContractsPage() {
           ) : null}
         </form>
       </Modal>
+
+      {planContract ? (
+        <ContractPaymentPlanModal
+          contract={planContract}
+          currencyCode={planContract.currencyCode ?? 'HNL'}
+          onClose={() => setPlanContract(null)}
+        />
+      ) : null}
     </div>
   )
 }

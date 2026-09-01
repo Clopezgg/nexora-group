@@ -207,3 +207,84 @@
 :root[data-nx-density='compact'] body .nx-fcc-grid {
   gap: 0.55rem;
 }
+
+/* ==========================================================================
+ * Enterprise Theme Architecture (§8-§11) — capa estructural.
+ * El compilador compileTheme() emite estos tokens desde el ThemePreset
+ * tipado; aquí el shell los consume para que cambiar de FAMILIA cambie
+ * radio, elevación, tablas y densidad, no solo el color.
+ * ======================================================================== */
+
+/* UI Scale (90 / 100 / 110) — tamaño base de la interfaz, per-dispositivo. */
+:root[data-nx-themed='on'] body {
+  font-size: var(--nx-font-base-size, 14px);
+}
+
+/* Forma + elevación de superficies desde los tokens estructurales. */
+:root[data-nx-themed='on'] body .nx-card,
+:root[data-nx-themed='on'] body .nx-chart-card,
+:root[data-nx-themed='on'] body .nx-stat-card,
+:root[data-nx-themed='on'] body .nx-fcc-kpi {
+  border-radius: var(--nx-shape-radius-md, 9px);
+  border-width: var(--nx-shape-border-width, 1px);
+  box-shadow: var(--nx-elev-card, none);
+}
+:root[data-nx-themed='on'] body .nx-modal,
+:root[data-nx-themed='on'] body .nx-drawer,
+:root[data-nx-themed='on'] body .nx-popover {
+  border-radius: var(--nx-shape-radius-lg, 12px);
+  box-shadow: var(--nx-elev-overlay, 0 18px 50px rgba(0, 0, 0, 0.2));
+}
+
+/* Formularios / botones — radio de la familia. */
+:root[data-nx-themed='on'] body .nx-input,
+:root[data-nx-themed='on'] body .nx-select,
+:root[data-nx-themed='on'] body .nx-textarea {
+  border-radius: var(--nx-shape-radius-sm, 6px);
+  border-color: var(--nx-color-border-strong, var(--nx-theme-border));
+}
+:root[data-nx-themed='on'] body .nx-button {
+  border-radius: var(--nx-shape-radius-sm, 6px);
+}
+:root[data-nx-themed='on'] body .nx-button--primary:hover {
+  background: var(--nx-color-accent-hover, var(--nx-theme-accent));
+  filter: none;
+}
+
+/* Foco visible — ancho reforzado en alto contraste. */
+:root[data-nx-themed='on'] body :focus-visible {
+  outline: var(--nx-focus-width, 2px) solid var(--nx-focus-ring, var(--nx-theme-accent));
+  outline-offset: var(--nx-focus-offset, 2px);
+}
+
+/* Tablas — cabecera teñida según la familia (Belize la tiñe de azul,
+   Quartz la deja casi plana, Horizon un gris muy suave). */
+:root[data-nx-themed='on'] body .nx-table th {
+  background: var(--nx-table-header-bg, var(--nx-theme-surface-2));
+  color: var(--nx-table-header-text, var(--nx-theme-text-muted));
+  border-bottom-color: var(--nx-table-divider, var(--nx-theme-border));
+}
+:root[data-nx-themed='on'] body .nx-table td {
+  border-bottom-color: var(--nx-table-divider, var(--nx-theme-border));
+}
+:root[data-nx-themed='on'] body .nx-table tbody tr:hover td {
+  background: var(--nx-table-row-hover, transparent);
+}
+
+/* ---- Densidad — comfortable / compact / finance-dense ---- */
+:root[data-nx-themed='on'] body .nx-card,
+:root[data-nx-themed='on'] body .nx-chart-card {
+  padding: var(--nx-density-card-padding, 16px);
+}
+:root[data-nx-themed='on'] body .nx-table td,
+:root[data-nx-themed='on'] body .nx-table th {
+  padding-top: calc(9px * var(--nx-density-scale, 1) + 1px);
+  padding-bottom: calc(9px * var(--nx-density-scale, 1) + 1px);
+}
+:root[data-nx-density='finance-dense'] body .nx-fcc-grid,
+:root[data-nx-density='compact'] body .nx-fcc-grid {
+  gap: var(--nx-density-gap, 12px);
+}
+:root[data-nx-density='finance-dense'] body {
+  line-height: 1.35;
+}

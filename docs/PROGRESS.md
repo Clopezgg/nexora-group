@@ -4329,3 +4329,39 @@ Rama: `feat/enterprise-theme-architecture`.
   formato de dinero idéntico bajo cualquier tema (§68). `ThemeSettingsCard.test.tsx`
   (3) selects + preview. Backend `test_theme_preferences.py` +1. Regresión:
   frontend typecheck/lint/build + 171 tests.
+
+### 2026-09-01 — ORDEN MAESTRA (Fiori / Cash Flow / Treasury Direction) · Deploy Azure REAL + verificación
+
+Deploy Azure run **`33464991263`** (`workflow_dispatch`, `deploy=true`,
+`main@21e22a5`), autorización puntual del usuario (CLAUDE.md §11). ✅ success.
+
+Contenido desplegado: PR #80 (Payment Voucher solo OUTFLOW +
+`treasury_direction_service`), PR #82 (Flujo de Caja REAL — 13 semanas
+realizadas), PR #83 (Enterprise Theme Architecture).
+
+**Migraciones**: sin cambios de esquema (los 3 PRs no añaden Alembic; la
+densidad `finance-dense` es un valor de string). `alembic upgrade head` sin
+`running upgrade` → DB ya en head.
+
+**Smoke del workflow** (`Verify production`, origen first-party, imagen =
+`ghcr.io/clopezgg/nexora-backend:21e22a5`): Frontend 200 · `/api/healthz` 200
+· `/api/readyz` 200 · `/api/edit-access/verify` 405 · login → cookie
+`Secure`+`HttpOnly`+`Path=/` · `auth/me` 200 · `master-data/companies` 200
+(1) · `projects` 200 · `master-data/accounts` 200 · `dashboard/summary` 200
+(`HNL`) · `fiscal/periods/current` 200 · `logout` 204 → relogin 200 · FQDN
+directo bloqueado.
+
+**Verificación de las features nuevas** (solo lectura, sin escribir data
+real — §78): `GET /api/treasury/voucher-candidates`,
+`GET /api/financial-control/cash-flow-actual` y
+`GET /api/treasury/documents/{id}/treasury-direction` responden **401**
+(auth requerida) en producción, no 404 → registrados en el build.
+
+**Camino de escritura** (clasificación INFLOW/OUTFLOW, gate
+`NXR-VOUCHER-NOT-OUTFLOW`, flujo real 13 semanas sin doble conteo,
+`compileTheme`, familias Horizon/Quartz/Belize, finance-dense, UI scale):
+verificado por la suite de CI contra BD efímera —
+`test_treasury_direction.py` (4), `test_cash_flow_actual.py` (4),
+`themeEngine.test.ts` (8), `ThemeSettingsCard.test.tsx` (3),
+`test_theme_preferences.py` (+1). No se ejecuta contra producción: un
+`AccountingDocument` contabilizado es inmutable (§8).

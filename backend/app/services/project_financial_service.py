@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 from app.models.accounting import LEDGER_EFFECTIVE_STATUSES, AccountingDocument, JournalLine
 from app.models.ar import CustomerInvoice
 from app.models.chart_of_accounts import Account
+from app.models.contract_payment import (
+    ContractPaymentAllocation,
+    ContractPaymentInstallment,
+    ContractPaymentSchedule,
+)
 from app.models.crm import SalesContract
+from app.models.supplier import SupplierContract
 from app.repositories import budget_repository, project_control_repository, project_repository
 from app.services import budget_service, forecast_service
 
@@ -21,6 +27,14 @@ class ProjectFinancialSummary:
     baseline_budget: Decimal | None
     current_budget: Decimal | None
     committed: Decimal
+    # §9/§28/§29 — el costo contratado de EJECUCIÓN (SupplierContract del
+    # proyecto) es un concepto distinto del compromiso por Órdenes de Compra
+    # (`committed`, que sale del budget/PO). Nunca deben mezclarse ni renombrar
+    # uno como el otro.
+    po_committed: Decimal
+    execution_contract_value: Decimal
+    execution_contract_paid: Decimal
+    execution_contract_balance: Decimal
     accrued: Decimal
     paid: Decimal
     available: Decimal | None
@@ -106,6 +120,37 @@ def get_summary(db: Session, *, project_id: uuid.UUID) -> ProjectFinancialSummar
         budget_repository.sum_authorized(db, active_budget.id) if active_budget is not None else None
     )
 
+    # Costo contratado de ejecución (§28): suma del valor de los SupplierContract
+    # del proyecto que no están cancelados/terminados.
+    execution_contract_value = Decimal(
+        db.execute(
+            select(func.coalesce(func.sum(SupplierContract.value), 0)).where(
+                SupplierContract.project_id == project_id,
+                SupplierContract.status.notin_(("CANCELLED", "TERMINATED", "REJECTED")),
+            )
+        ).scalar_one()
+    )
+    # Pagado contractual efectivo: asignaciones de pago no revertidas contra
+    # cuotas de planes de este proyecto.
+    execution_contract_paid = Decimal(
+        db.execute(
+            select(func.coalesce(func.sum(ContractPaymentAllocation.amount_applied), 0))
+            .join(
+                ContractPaymentInstallment,
+                ContractPaymentInstallment.id == ContractPaymentAllocation.installment_id,
+            )
+            .join(
+                ContractPaymentSchedule,
+                ContractPaymentSchedule.id == ContractPaymentInstallment.schedule_id,
+            )
+            .where(
+                ContractPaymentSchedule.project_id == project_id,
+                ContractPaymentAllocation.reversed_at.is_(None),
+            )
+        ).scalar_one()
+    )
+    execution_contract_balance = execution_contract_value - execution_contract_paid
+
     budget_summary = budget_service.compute_summary(db, project_id=project_id)
     forecast = forecast_service.compute_forecast(db, project_id=project_id)
     latest_progress = project_control_repository.latest_progress(db, project_id)
@@ -137,6 +182,10 @@ def get_summary(db: Session, *, project_id: uuid.UUID) -> ProjectFinancialSummar
         baseline_budget=baseline_budget,
         current_budget=current_budget,
         committed=budget_summary.committed,
+        po_committed=budget_summary.committed,
+        execution_contract_value=execution_contract_value,
+        execution_contract_paid=execution_contract_paid,
+        execution_contract_balance=execution_contract_balance,
         accrued=budget_summary.accrued,
         paid=budget_summary.paid,
         available=available,

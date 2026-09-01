@@ -49,6 +49,10 @@ export interface ProjectFinancialSummary {
   baselineBudget: string | null
   currentBudget: string | null
   committed: string
+  poCommitted: string
+  executionContractValue: string
+  executionContractPaid: string
+  executionContractBalance: string
   accrued: string
   paid: string
   available: string | null

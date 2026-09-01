@@ -102,6 +102,10 @@ class ProjectFinancialSummaryResponse(CamelModel):
     baseline_budget: Decimal | None
     current_budget: Decimal | None
     committed: Decimal
+    po_committed: Decimal
+    execution_contract_value: Decimal
+    execution_contract_paid: Decimal
+    execution_contract_balance: Decimal
     accrued: Decimal
     paid: Decimal
     available: Decimal | None

@@ -4289,3 +4289,43 @@ Rama: `feat/cash-flow-actual` (sobre `feat/voucher-outflow-semantics`).
   transferencia interna no mueve la caja consolidada. Frontend
   `HomePage.test.tsx` + `CashForecastPage.test.tsx` (toggle). Regresión:
   financial-control + treasury + reporting 76 verdes; frontend 168.
+
+### 2026-09-01 — ORDEN MAESTRA (Fiori / Cash Flow / Treasury Direction) · PR 3 — Enterprise Theme Architecture
+
+Rama: `feat/enterprise-theme-architecture`.
+
+- **`ThemePreset` reestructurado**: ya no es un `vars: Record<string,string>`
+  plano. Ahora tiene DOMINIO TIPADO — `palette`, `typography`, `shell`,
+  `shape`, `elevation`, `motion`, `tables`, `charts`, `iconography`,
+  `focus`, `family`, `contrast`, `densityDefault`. El compilador
+  `compileTheme(preset, density, scale)` deriva las variables CSS (nuevas
+  `--nx-color-*` / `--nx-shape-*` / `--nx-shell-*` / `--nx-elev-*` /
+  `--nx-table-*` / `--nx-chart-*` + alias históricos `--nx-theme-*` para
+  compatibilidad).
+- **Rasgos estructurales por familia** (`FAMILY_TRAITS`): Horizon (radio
+  amable, sombra difusa, densidad cómoda), Quartz (radio mínimo, casi plano,
+  compacto), Belize (esquinas duras, shell azul teñido, cabeceras de tabla
+  teñidas), NEXORA (identidad propia). Cambiar de familia cambia radio,
+  elevación, densidad base, tratamiento de tablas y tipografía — no solo el
+  color.
+- **Densidad**: `comfortable | compact | finance-dense` (§8). Backend
+  `_ALLOWED_DENSITIES` acepta `finance-dense`.
+- **UI Scale**: 90 / 100 / 110 (§8) — per-dispositivo (`localStorage`),
+  ajusta `--nx-font-base-size` y los altos de fila/control.
+- **Presets**: Morning/Evening Horizon, Quartz Light/Dark, **Belize /
+  Belize Deep** (familia nueva), NEXORA Horizon/Executive/Dark, Horizon
+  HCB/HCW (alto contraste). `nexora-classic` plegado en `nexora-horizon-light`.
+- **Theme Settings → mini-aplicación de vista previa** (§11): shell +
+  sidebar + topbar + KPI + tabla + formulario + botones + estados + chart
+  renderizados con los tokens del tema seleccionado; selectores Familia /
+  Variante / Densidad / Escala. Reemplaza la galería de swatches planos.
+- **`themes.css`**: capa estructural — cards/inputs/botones/modales toman el
+  radio y la elevación de la familia; cabecera de tabla teñida; `:focus-visible`
+  con anillo reforzado en alto contraste; densidad finance-dense.
+- **Tests**: `themeEngine.test.ts` (8) — `ThemePreset` ya no es
+  `Record<string,string>`; Density incluye finance-dense; UI Scale cambia el
+  tamaño base; Horizon/Quartz/Belize difieren estructuralmente (radio, shell,
+  elevación); alto contraste ≥ 7:1 (AAA), todo tema normal ≥ 4.5:1 (AA);
+  formato de dinero idéntico bajo cualquier tema (§68). `ThemeSettingsCard.test.tsx`
+  (3) selects + preview. Backend `test_theme_preferences.py` +1. Regresión:
+  frontend typecheck/lint/build + 171 tests.

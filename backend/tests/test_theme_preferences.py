@@ -41,3 +41,13 @@ def test_user_preferences_rejects_invalid_density(client, db_session):
     login_admin(client)
     bad = client.put("/api/me/preferences", json={"density": "gigante"})
     assert bad.status_code == 422, bad.text
+
+
+def test_user_preferences_accepts_finance_dense_density(client, db_session):
+    """Enterprise Theme Architecture §8: la densidad Finance Dense es válida."""
+    login_admin(client)
+    ok = client.put(
+        "/api/me/preferences", json={"themeId": "nexora-executive", "density": "finance-dense"}
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["density"] == "finance-dense"

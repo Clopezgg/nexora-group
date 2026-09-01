@@ -7,7 +7,7 @@ from app.schemas.preferences import UserPreferencesResponse, UserPreferencesUpda
 
 router = APIRouter(prefix="/me", tags=["me"])
 
-_ALLOWED_DENSITIES = {"comfortable", "compact"}
+_ALLOWED_DENSITIES = {"comfortable", "compact", "finance-dense"}
 _THEME_ID_MAX_LEN = 64
 
 

@@ -1,11 +1,21 @@
+import csv
+import io
 import uuid
 from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.repositories import project_repository
+from app.schemas.contract_payment import (
+    ContractLedgerEntryResponse,
+    ContractPaymentLedgerResponse,
+    InstallmentResponse,
+    LedgerAllocationResponse,
+)
 from app.schemas.reporting import (
     BalanceSheetReportResponse,
     BudgetVsActualReportResponse,
@@ -18,7 +28,7 @@ from app.schemas.reporting import (
     TrialBalanceReportResponse,
     TrialBalanceRowResponse,
 )
-from app.services import reporting_service
+from app.services import contract_payment_service, reporting_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -227,6 +237,129 @@ def get_general_ledger(
         limit=report.limit,
         total_debit=report.total_debit,
         total_credit=report.total_credit,
+    )
+
+
+def _ledger_entry_response(entry) -> ContractLedgerEntryResponse:
+    return ContractLedgerEntryResponse(
+        schedule_id=entry.schedule_id,
+        supplier_contract_id=entry.supplier_contract_id,
+        contract_number=entry.contract_number,
+        supplier_legal_name=entry.supplier_legal_name,
+        project_id=entry.project_id,
+        currency_code=entry.currency_code,
+        contract_value=entry.contract_value,
+        scheduled_to_date=entry.scheduled_to_date,
+        paid_accumulated=entry.paid_accumulated,
+        contract_balance=entry.contract_balance,
+        overdue_balance=entry.overdue_balance,
+        installments=[
+            InstallmentResponse(
+                installment_id=i.installment_id,
+                sequence=i.sequence,
+                period_year=i.period_year,
+                period_month=i.period_month,
+                period_label=i.period_label,
+                due_date=i.due_date,
+                scheduled_amount=i.scheduled_amount,
+                retention_amount=i.retention_amount,
+                net_due=i.net_due,
+                paid=i.paid,
+                remaining=i.remaining,
+                status=i.status,
+            )
+            for i in entry.installments
+        ],
+        allocations=[
+            LedgerAllocationResponse(
+                payment_id=a.payment_id,
+                payment_date=a.payment_date,
+                installment_sequence=a.installment_sequence,
+                installment_period_label=a.installment_period_label,
+                amount_applied=a.amount_applied,
+                bank_transaction_reference=a.bank_transaction_reference,
+                reversed=a.reversed,
+            )
+            for a in entry.allocations
+        ],
+    )
+
+
+@router.get("/contract-payment-ledger", response_model=None)
+def get_contract_payment_ledger(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    contract_id: uuid.UUID | None = Query(default=None, alias="contractId"),
+    as_of: date | None = Query(default=None, alias="asOf"),
+    output_format: str = Query(default="json", alias="format"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("contract.payment_schedule", "read")),
+):
+    """Libro contractual de pagos (§54): por contrato, cuotas con estado real
+    y las asignaciones de pago que las liquidaron. `format=csv` para exportar."""
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="contract.payment_schedule",
+        action="read",
+        company_id=company_id,
+    )
+    resolved_as_of = as_of or date.today()
+    entries = contract_payment_service.contract_payment_ledger(
+        db, company_id=company_id, supplier_contract_id=contract_id, as_of=resolved_as_of
+    )
+
+    if output_format.lower() == "csv":
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            [
+                "contract_number",
+                "supplier",
+                "currency",
+                "installment_seq",
+                "period",
+                "due_date",
+                "net_due",
+                "paid",
+                "remaining",
+                "status",
+            ]
+        )
+        for entry in entries:
+            for i in entry.installments:
+                writer.writerow(
+                    [
+                        entry.contract_number,
+                        entry.supplier_legal_name or "",
+                        entry.currency_code,
+                        i.sequence,
+                        i.period_label,
+                        i.due_date.isoformat(),
+                        f"{i.net_due:.2f}",
+                        f"{i.paid:.2f}",
+                        f"{i.remaining:.2f}",
+                        i.status,
+                    ]
+                )
+        return Response(
+            content=buffer.getvalue(),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=contract-payment-ledger.csv"
+            },
+        )
+
+    return ContractPaymentLedgerResponse(
+        company_id=company_id,
+        as_of=resolved_as_of,
+        entries=[_ledger_entry_response(e) for e in entries],
+        total_contract_value=sum((e.contract_value for e in entries), Decimal("0")),
+        total_paid_accumulated=sum(
+            (e.paid_accumulated for e in entries), Decimal("0")
+        ),
+        total_contract_balance=sum(
+            (e.contract_balance for e in entries), Decimal("0")
+        ),
     )
 
 

@@ -10,11 +10,16 @@ pasivo. Este servicio expone esa comparación explícitamente.
 from dataclasses import dataclass
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.ap import SupplierInvoice
+from app.models.ap import SupplierInvoice, SupplierPayment
 from app.models.ar import CustomerInvoice
+from app.models.contract_payment import (
+    ContractPaymentAllocation,
+    ContractPaymentInstallment,
+    ContractPaymentSchedule,
+)
 from app.models.treasury import TreasuryAccount
 from app.services import treasury_service
 
@@ -119,5 +124,55 @@ def _treasury(db: Session, company_id) -> ReconciliationLine:
     )
 
 
+def _contract(db: Session, company_id) -> ReconciliationLine:
+    """Subledger contractual: total asignado a cuotas (allocations no
+    reversadas) vs. total de pagos a proveedor sobre facturas con contrato
+    (§47). Deben cuadrar — `allocate_payment` exige que la suma asignada
+    iguale el importe del pago; una diferencia revela pagos contractuales sin
+    asignar a una cuota."""
+    subledger_total = db.execute(
+        select(func.coalesce(func.sum(ContractPaymentAllocation.amount_applied), 0))
+        .join(
+            ContractPaymentInstallment,
+            ContractPaymentInstallment.id == ContractPaymentAllocation.installment_id,
+        )
+        .join(
+            ContractPaymentSchedule,
+            ContractPaymentSchedule.id == ContractPaymentInstallment.schedule_id,
+        )
+        .where(
+            ContractPaymentSchedule.company_id == company_id,
+            ContractPaymentAllocation.reversed_at.is_(None),
+        )
+    ).scalar_one()
+
+    gl_total = db.execute(
+        select(func.coalesce(func.sum(SupplierPayment.amount), 0))
+        .join(SupplierInvoice, SupplierInvoice.id == SupplierPayment.supplier_invoice_id)
+        .where(
+            SupplierInvoice.company_id == company_id,
+            SupplierInvoice.supplier_contract_id.is_not(None),
+            SupplierPayment.reversed_at.is_(None),
+        )
+    ).scalar_one()
+
+    subledger_total = Decimal(str(subledger_total))
+    gl_total = Decimal(str(gl_total))
+    difference = subledger_total - gl_total
+    return ReconciliationLine(
+        subledger="CONTRACT_PAYMENTS",
+        subledger_total=subledger_total,
+        gl_total=gl_total,
+        difference=difference,
+        reconciled=difference == Decimal("0"),
+        detail="Total asignado a cuotas contractuales vs. total de pagos no reversados sobre facturas con contrato.",
+    )
+
+
 def reconcile(db: Session, *, company_id) -> list[ReconciliationLine]:
-    return [_treasury(db, company_id), _ap(db, company_id), _ar(db, company_id)]
+    return [
+        _treasury(db, company_id),
+        _ap(db, company_id),
+        _ar(db, company_id),
+        _contract(db, company_id),
+    ]

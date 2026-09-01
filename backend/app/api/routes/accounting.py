@@ -382,4 +382,5 @@ def inspect_journal_entry(
         reversal_reason=result.reversal_reason,
         reversed_by_document_ids=[uuid.UUID(x) for x in result.reversed_by_document_ids],
         evidence=result.evidence,
+        contract=result.contract,
     )

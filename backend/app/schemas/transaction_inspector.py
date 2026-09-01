@@ -40,3 +40,4 @@ class InspectionResponse(CamelModel):
     reversal_reason: str | None
     reversed_by_document_ids: list[uuid.UUID]
     evidence: list[dict]
+    contract: dict | None = None

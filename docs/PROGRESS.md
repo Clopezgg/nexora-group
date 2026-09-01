@@ -4153,3 +4153,31 @@ Rama: `feat/cpc-6-voucher-issuance-ledger`.
   aprobador viejos; la master data nueva no aparece; sigue habiendo
   exactamente una fila de emisión. Regresión: contract-payments 11,
   treasury-operations 34, voucher/pago/reversal 22 verdes.
+
+### 2026-09-01 — ORDEN MAESTRA FINAL · CPC PR 7 (libro contractual + inspector + conciliación)
+
+Rama: `feat/cpc-7-ledger-inspector-recon` (sobre CPC PR 6).
+
+- **Libro contractual de pagos** (§54): `GET /api/reports/contract-payment-ledger?companyId=&contractId=&asOf=`
+  (`contract.payment_schedule:read`). Por cada contrato con plan: cuotas con
+  estado real (PAID / PARTIALLY_PAID / OVERDUE / DUE / UPCOMING derivado de
+  allocations, no de un `note`) y las asignaciones de pago que las
+  liquidaron, con referencia bancaria y marca de reverso. Totales
+  consolidados. `format=csv` exporta el detalle de cuotas.
+  `contract_payment_service.contract_payment_ledger`. Página
+  `/finanzas/libro-contractual` (`ContractPaymentLedgerPage.tsx`) con StatCards
+  + tarjeta por contrato.
+- **Conciliación subledger contractual ↔ GL** (§47): nueva línea
+  `CONTRACT_PAYMENTS` en `subledger_reconciliation_service.reconcile` — total
+  asignado a cuotas (allocations no reversadas) vs. total de pagos a
+  proveedor no reversados sobre facturas con `supplier_contract_id`. Una
+  diferencia revela pagos contractuales sin asignar a una cuota. Visible en
+  `/finanzas/conciliacion-subledger`.
+- **Transaction Inspector — camino contractual** (§50):
+  `InspectionResult.contract` expone PAGO → CUOTA → PLAN → CONTRATO con
+  número de contrato, saldo contractual y las asignaciones (período + marca
+  de reverso) cuando el asiento nace de un pago contractual.
+- Tests: `test_contract_payment_reporting.py` (4) — ledger JSON, ledger CSV,
+  línea de conciliación contractual, camino contractual del inspector.
+  `test_subledger_reconciliation.py` actualizado para el nuevo subledger.
+  Regresión: frontend typecheck/lint/build + 167 tests verdes.

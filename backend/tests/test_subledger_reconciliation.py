@@ -61,7 +61,12 @@ def test_subledger_gl_reconciliation_matches_after_ap_accrual(client):
     body = response.json()
     lines = {line["subledger"]: line for line in body["lines"]}
 
-    assert set(lines) == {"TREASURY", "ACCOUNTS_PAYABLE", "ACCOUNTS_RECEIVABLE"}
+    assert set(lines) == {
+        "TREASURY",
+        "ACCOUNTS_PAYABLE",
+        "ACCOUNTS_RECEIVABLE",
+        "CONTRACT_PAYMENTS",
+    }
     ap = lines["ACCOUNTS_PAYABLE"]
     assert float(ap["subledgerTotal"]) == 1000.0
     assert float(ap["glTotal"]) == 1000.0

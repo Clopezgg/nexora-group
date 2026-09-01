@@ -60,6 +60,7 @@ class InspectionResult:
     reversal_reason: str | None = None
     reversed_by_document_ids: list[str] = field(default_factory=list)
     evidence: list[dict] = field(default_factory=list)
+    contract: dict | None = None
 
 
 def _resolve_source_event(db: Session, document_id) -> SourceEvent:
@@ -125,6 +126,65 @@ def _resolve_source_event(db: Session, document_id) -> SourceEvent:
         return SourceEvent("TREASURY_TRANSFER", "Transferencia de tesorería", None, str(transfer.id))
 
     return SourceEvent("MANUAL_JOURNAL", "Asiento manual", None, None)
+
+
+def _resolve_contract_path(db: Session, document_id) -> dict | None:
+    """§50 — si el asiento nace de un pago contractual, expone el camino
+    PAGO -> CUOTA -> PLAN -> CONTRATO con las asignaciones aplicadas."""
+    from app.models.contract_payment import (
+        ContractPaymentAllocation,
+        ContractPaymentInstallment,
+        ContractPaymentSchedule,
+    )
+    from app.models.supplier import SupplierContract
+    from app.services import contract_payment_service
+
+    payment = db.execute(
+        select(SupplierPayment).where(SupplierPayment.accounting_document_id == document_id)
+    ).scalars().first()
+    if payment is None:
+        return None
+    allocations = db.execute(
+        select(ContractPaymentAllocation).where(
+            ContractPaymentAllocation.supplier_payment_id == payment.id
+        )
+    ).scalars().all()
+    if not allocations:
+        return None
+
+    first_inst = db.get(ContractPaymentInstallment, allocations[0].installment_id)
+    schedule = db.get(ContractPaymentSchedule, first_inst.schedule_id) if first_inst else None
+    contract = (
+        db.get(SupplierContract, schedule.supplier_contract_id) if schedule else None
+    )
+    summary = (
+        contract_payment_service.contract_summary(db, schedule_id=schedule.id)
+        if schedule
+        else None
+    )
+
+    def _row(alloc):
+        inst = db.get(ContractPaymentInstallment, alloc.installment_id)
+        return {
+            "installmentSequence": inst.sequence if inst else None,
+            "periodLabel": (
+                contract_payment_service.period_label(inst.period_year, inst.period_month)
+                if inst
+                else None
+            ),
+            "amountApplied": alloc.amount_applied,
+            "reversed": alloc.reversed_at is not None,
+        }
+
+    return {
+        "contractNumber": contract.contract_number if contract else None,
+        "scheduleId": str(schedule.id) if schedule else None,
+        "currencyCode": schedule.currency_code if schedule else None,
+        "contractValue": summary.contract_value if summary else None,
+        "paidAccumulated": summary.paid_accumulated if summary else None,
+        "contractBalance": summary.contract_balance if summary else None,
+        "allocations": [_row(a) for a in allocations],
+    }
 
 
 def inspect(db: Session, *, document_id) -> InspectionResult | None:
@@ -228,4 +288,5 @@ def inspect(db: Session, *, document_id) -> InspectionResult | None:
         ),
         reversed_by_document_ids=[str(r) for r in reversed_by],
         evidence=evidence,
+        contract=_resolve_contract_path(db, document.id),
     )

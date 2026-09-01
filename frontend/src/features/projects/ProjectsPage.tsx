@@ -178,15 +178,15 @@ export function ProjectsPage() {
           ))}
           <option value="ARCHIVED">Archivados</option>
         </Select>
-        <label className="nx-field">
+        <div className="nx-field">
           <span className="nx-field__label">Archivados</span>
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(event) => setShowArchived(event.target.checked)}
-          />{' '}
-          Mostrar archivados
-        </label>
+          <Button
+            variant={showArchived ? 'secondary' : 'ghost'}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Ocultar archivados' : 'Mostrar archivados'}
+          </Button>
+        </div>
       </FilterBar>
 
       {projectsQuery.isLoading ? (

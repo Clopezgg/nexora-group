@@ -911,3 +911,36 @@
   color: var(--nx-gray-400);
   font-size: 13px;
 }
+
+/* Segmented control (Realizado | Proyectado) — flujo de caja del Home (§14). */
+.nx-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 12px;
+  border-radius: var(--nx-radius-sm, 6px);
+  background: var(--nx-theme-surface-2, #eef2f7);
+  border: 1px solid var(--nx-color-border, #dbe3ec);
+}
+.nx-segmented__option {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  padding: 5px 14px;
+  font-size: var(--nx-text-label, 12px);
+  font-weight: 600;
+  border-radius: var(--nx-radius-xs, 4px);
+  color: var(--nx-theme-text-muted, #4f6176);
+  background: transparent;
+  transition: background 120ms ease, color 120ms ease;
+}
+.nx-segmented__option:hover { color: var(--nx-color-text, #1a2b3c); }
+.nx-segmented__option--active {
+  background: var(--nx-color-surface, #fff);
+  color: var(--nx-color-text, #1a2b3c);
+  box-shadow: 0 1px 2px rgba(15, 30, 50, 0.12);
+}
+.nx-segmented__option:focus-visible {
+  outline: 2px solid var(--nx-theme-accent, #1769d2);
+  outline-offset: 1px;
+}

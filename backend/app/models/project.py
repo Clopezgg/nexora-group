@@ -31,7 +31,12 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("customers.id", ondelete="SET NULL"), nullable=True
     )
     customer_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # `manager` (texto libre) se conserva por compatibilidad; `manager_user_id`
+    # es el responsable real como FK a users (orden maestra final §16).
     manager: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    manager_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     currency_code: Mapped[str | None] = mapped_column(
         String(3), ForeignKey("currencies.code"), nullable=True
     )

@@ -1,18 +1,23 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, Card, EmptyState, ErrorState, Input, LoadingState, Modal, Select, Table } from '../../design-system'
+import { Badge, Button, Card, EmptyState, ErrorState, FilterBar, Input, LoadingState, Modal, Select, Table } from '../../design-system'
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { procurementService } from '../../services/procurementService'
 import { projectService } from '../../services/projectService'
 import { formatMoney } from '../../utils/currency'
 import { ContractPaymentPlanModal } from './ContractPaymentPlanModal'
-import type { SupplierContract } from '../../types/procurement'
+import {
+  SUPPLIER_CONTRACT_CATEGORY_LABELS,
+  type SupplierContract,
+  type SupplierContractCategory,
+} from '../../types/procurement'
 
 const emptyForm = {
   supplierId: '',
   projectId: '',
   contractNumber: '',
+  contractCategory: 'LABOR' as SupplierContractCategory,
   value: '',
   currencyCode: 'HNL',
   startDate: '',
@@ -32,6 +37,8 @@ export function SupplierContractsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [planContract, setPlanContract] = useState<SupplierContract | null>(null)
+  const [filterCategory, setFilterCategory] = useState('')
+  const [filterNumber, setFilterNumber] = useState('')
 
   const contractsQuery = useQuery({
     queryKey: ['procurement', 'contracts', activeCompanyId],
@@ -60,6 +67,7 @@ export function SupplierContractsPage() {
         supplierId: form.supplierId,
         projectId: form.projectId || undefined,
         contractNumber: form.contractNumber,
+        contractCategory: form.contractCategory,
         value: form.value,
         currencyCode: form.currencyCode,
         startDate: form.startDate,
@@ -75,6 +83,15 @@ export function SupplierContractsPage() {
 
   const columns: TableColumn<SupplierContract>[] = [
     { key: 'contractNumber', header: 'Número', render: (row) => row.contractNumber },
+    {
+      key: 'contractCategory',
+      header: 'Categoría',
+      render: (row) => (
+        <Badge tone="neutral">
+          {SUPPLIER_CONTRACT_CATEGORY_LABELS[row.contractCategory] ?? row.contractCategory}
+        </Badge>
+      ),
+    },
     {
       key: 'supplierId',
       header: 'Proveedor',
@@ -118,6 +135,32 @@ export function SupplierContractsPage() {
         <p className="nx-field__error">Necesitas al menos un proveedor registrado primero.</p>
       ) : null}
 
+      <FilterBar
+        onClear={() => {
+          setFilterCategory('')
+          setFilterNumber('')
+        }}
+      >
+        <Input
+          label="Filtrar por número"
+          value={filterNumber}
+          onChange={(e) => setFilterNumber(e.target.value)}
+          placeholder="Buscar…"
+        />
+        <Select
+          label="Filtrar por categoría"
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+        >
+          <option value="">Todas</option>
+          {(Object.keys(SUPPLIER_CONTRACT_CATEGORY_LABELS) as SupplierContractCategory[]).map((c) => (
+            <option key={c} value={c}>
+              {SUPPLIER_CONTRACT_CATEGORY_LABELS[c]}
+            </option>
+          ))}
+        </Select>
+      </FilterBar>
+
       <Card>
         {contractsQuery.isLoading ? (
           <LoadingState label="Cargando contratos…" />
@@ -126,7 +169,12 @@ export function SupplierContractsPage() {
         ) : (
           <Table
             columns={columns}
-            rows={contractsQuery.data ?? []}
+            rows={(contractsQuery.data ?? []).filter(
+              (row) =>
+                (!filterCategory || row.contractCategory === filterCategory) &&
+                (!filterNumber ||
+                  row.contractNumber.toLowerCase().includes(filterNumber.toLowerCase())),
+            )}
             getRowKey={(row) => row.id}
             emptyMessage="Aún no hay contratos registrados."
           />
@@ -176,6 +224,23 @@ export function SupplierContractsPage() {
             onChange={(e) => setForm({ ...form, contractNumber: e.target.value })}
             required
           />
+          <Select
+            name="contractCategory"
+            label="Categoría del costo"
+            value={form.contractCategory}
+            onChange={(e) =>
+              setForm({ ...form, contractCategory: e.target.value as SupplierContractCategory })
+            }
+            required
+          >
+            {(
+              Object.keys(SUPPLIER_CONTRACT_CATEGORY_LABELS) as SupplierContractCategory[]
+            ).map((category) => (
+              <option key={category} value={category}>
+                {SUPPLIER_CONTRACT_CATEGORY_LABELS[category]}
+              </option>
+            ))}
+          </Select>
           <Input
             name="value"
             label="Valor"

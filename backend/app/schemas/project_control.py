@@ -19,6 +19,7 @@ class ProjectCreateRequest(CamelModel):
     customer_id: uuid.UUID | None = None
     customer_ref: str | None = Field(default=None, max_length=255)
     manager: str | None = Field(default=None, max_length=255)
+    manager_user_id: uuid.UUID | None = None
     currency_code: str | None = Field(default=None, min_length=3, max_length=3)
     cost_center_id: uuid.UUID | None = None
     planned_start: date | None = None
@@ -44,6 +45,7 @@ class ProjectUpdateRequest(CamelModel):
     customer_id: uuid.UUID | None = None
     customer_ref: str | None = Field(default=None, max_length=255)
     manager: str | None = Field(default=None, max_length=255)
+    manager_user_id: uuid.UUID | None = None
     currency_code: str | None = Field(default=None, min_length=3, max_length=3)
     cost_center_id: uuid.UUID | None = None
     planned_start: date | None = None
@@ -77,6 +79,7 @@ class ProjectResponse(CamelModel):
     customer_id: uuid.UUID | None
     customer_ref: str | None
     manager: str | None
+    manager_user_id: uuid.UUID | None = None
     currency_code: str | None
     cost_center_id: uuid.UUID | None
     planned_start: date | None

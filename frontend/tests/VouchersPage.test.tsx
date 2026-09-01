@@ -231,4 +231,53 @@ describe('VouchersPage', () => {
     const region = screen.getByText(/Evidencia del pago/i).closest('.nx-evidence') as HTMLElement
     expect(within(region).queryByText(/Evidencia cargada correctamente/i)).not.toBeInTheDocument()
   })
+
+  it('creates a beneficiary without leaving the voucher flow and auto-selects it (§30)', async () => {
+    let createdSupplierPayload: Record<string, unknown> | null = null
+    let beneficiaries: Array<Record<string, unknown>> = [
+      { beneficiaryType: 'SUPPLIER', id: 'sup-1', name: 'Ferretería El Clavo', reference: 'RTN-123' },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const method = init?.method ?? 'GET'
+        if (url.includes('/auth/me')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ id: 'u1', email: 'a@nexora.group', fullName: 'Admin', roles: ['Administrator'], permissions: ['treasury.voucher:read'] }) } as Response)
+        }
+        if (url.includes('/master-data/companies')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 'company-runtime', name: 'Constructora Nexora', functionalCurrencyCode: 'HNL' }] } as Response)
+        }
+        if (url.includes('/treasury/beneficiaries')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => beneficiaries } as Response)
+        }
+        if (url.includes('/procurement/suppliers') && method === 'POST') {
+          createdSupplierPayload = JSON.parse(String(init?.body))
+          beneficiaries = [
+            ...beneficiaries,
+            { beneficiaryType: 'SUPPLIER', id: 'sup-new', name: createdSupplierPayload?.legalName, reference: null },
+          ]
+          return Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 'sup-new', legalName: createdSupplierPayload?.legalName }) } as Response)
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
+      }),
+    )
+
+    const user = userEvent.setup()
+    render(renderApp('/finanzas/comprobantes'))
+
+    await user.click(await screen.findByRole('button', { name: '+ Crear beneficiario' }))
+    await user.type(screen.getByLabelText('Razón social'), 'Transportes del Valle')
+    await user.click(screen.getByRole('button', { name: 'Crear y seleccionar' }))
+
+    await waitFor(() => expect(createdSupplierPayload).toMatchObject({ legalName: 'Transportes del Valle' }))
+    // Queda autoseleccionado en el combobox del comprobante (el label se
+    // muestra como placeholder del control cuando hay selección).
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Beneficiario' })).toHaveAttribute(
+        'placeholder',
+        expect.stringContaining('Transportes del Valle'),
+      ),
+    )
+  })
 })

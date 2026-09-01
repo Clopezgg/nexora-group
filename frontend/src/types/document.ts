@@ -17,6 +17,8 @@ export interface Evidence {
   blobKey: string
   originalFilename: string
   mimeType: string
+  /** Formato del render derivado (JPEG) cuando el original es HEIC/HEIF (§28). */
+  derivedMimeType: string | null
   sizeBytes: number
   category: string | null
   entityType: string | null

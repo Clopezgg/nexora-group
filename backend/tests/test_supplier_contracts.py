@@ -145,6 +145,7 @@ def test_supplier_contract_create_emits_audit_entry(client):
     assert entry["projectId"] == project["id"]
     assert entry["after"] == {
         "contractNumber": "AUD-CON-001",
+        "contractCategory": "OTHER",
         "currencyCode": "HNL",
         "status": "DRAFT",
         "supplierId": supplier["id"],
@@ -227,3 +228,119 @@ def test_supplier_contracts_never_leak_across_companies(client, db_session):
     response = client.get(f"/api/procurement/suppliers/contracts?company_id={company_a['id']}")
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_contract_category_persists_and_filters(client):
+    """ORDEN MAESTRA §13: contract_category (Mano de obra / Subcontrato / ...)."""
+    login_admin(client)
+    company = create_company(client, name="Categoria Co")
+    supplier = create_supplier(client, company_id=company["id"])
+
+    labor = _create_contract(
+        client, company_id=company["id"], supplier_id=supplier["id"], contract_number="CAT-LAB"
+    )
+    assert labor.status_code == 201
+    # Sin categoría explícita -> OTHER (dato existente conservado).
+    assert labor.json()["contractCategory"] == "OTHER"
+
+    payload = {
+        "companyId": company["id"],
+        "supplierId": supplier["id"],
+        "contractNumber": "CAT-001",
+        "contractCategory": "LABOR",
+        "value": "250000.00",
+        "currencyCode": "HNL",
+        "startDate": "2026-01-01",
+    }
+    created = client.post("/api/procurement/suppliers/contracts", json=payload)
+    assert created.status_code == 201, created.text
+    assert created.json()["contractCategory"] == "LABOR"
+
+    only_labor = client.get(
+        f"/api/procurement/suppliers/contracts?company_id={company['id']}&category=LABOR"
+    )
+    assert only_labor.status_code == 200
+    assert [c["contractNumber"] for c in only_labor.json()] == ["CAT-001"]
+
+
+def test_contract_category_rejects_unknown_value(client):
+    login_admin(client)
+    company = create_company(client, name="Categoria Bad Co")
+    supplier = create_supplier(client, company_id=company["id"])
+    response = client.post(
+        "/api/procurement/suppliers/contracts",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "contractNumber": "CAT-BAD",
+            "contractCategory": "NOT_A_CATEGORY",
+            "value": "1000.00",
+            "currencyCode": "HNL",
+            "startDate": "2026-01-01",
+        },
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_contract_number_is_unique_per_company_not_globally(client):
+    """ORDEN MAESTRA §15: dos compañías pueden tener su propio 'C-001'."""
+    login_admin(client)
+    company_a = create_company(client, name="Numero A")
+    company_b = create_company(client, name="Numero B")
+    supplier_a = create_supplier(client, company_id=company_a["id"])
+    supplier_b = create_supplier(client, company_id=company_b["id"])
+
+    first = _create_contract(
+        client, company_id=company_a["id"], supplier_id=supplier_a["id"], contract_number="C-001"
+    )
+    assert first.status_code == 201, first.text
+
+    # Otra compañía, mismo número -> permitido.
+    other_company = _create_contract(
+        client, company_id=company_b["id"], supplier_id=supplier_b["id"], contract_number="C-001"
+    )
+    assert other_company.status_code == 201, other_company.text
+
+    # Misma compañía, número repetido -> rechazado con error de negocio, no 500.
+    duplicate = _create_contract(
+        client, company_id=company_a["id"], supplier_id=supplier_a["id"], contract_number="C-001"
+    )
+    assert duplicate.status_code == 422, duplicate.text
+    assert duplicate.json()["error"]["code"] == "NXR-FINANCIAL-001"
+
+
+def test_project_manager_user_id_links_a_real_user(client, db_session):
+    """ORDEN MAESTRA §16: el responsable del proyecto es una FK a users."""
+    login_admin(client)
+    company = create_company(client, name="Manager FK Co")
+    manager = create_user_with_role(
+        db_session, email="site-manager@nexora.group", role_name="Project Manager"
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/projects",
+        json={
+            "companyId": company["id"],
+            "name": "Obra con responsable",
+            "currencyCode": "HNL",
+            "managerUserId": str(manager.id),
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["managerUserId"] == str(manager.id)
+
+
+def test_project_manager_user_id_rejects_unknown_user(client):
+    login_admin(client)
+    company = create_company(client, name="Manager FK Bad Co")
+    response = client.post(
+        "/api/projects",
+        json={
+            "companyId": company["id"],
+            "name": "Obra sin responsable válido",
+            "currencyCode": "HNL",
+            "managerUserId": "00000000-0000-0000-0000-000000000000",
+        },
+    )
+    assert response.status_code == 422, response.text

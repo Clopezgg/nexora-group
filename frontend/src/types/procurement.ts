@@ -6,8 +6,32 @@ export interface Supplier {
   taxId: string | null
   email: string | null
   phone: string | null
+  address: string | null
+  addressLine1: string | null
+  addressLine2: string | null
+  city: string | null
+  stateDepartment: string | null
+  country: string | null
   status: string
   classification: string | null
+}
+
+export type SupplierContractCategory =
+  | 'LABOR'
+  | 'SUBCONTRACT'
+  | 'MATERIALS'
+  | 'EQUIPMENT'
+  | 'PROFESSIONAL_SERVICES'
+  | 'OTHER'
+
+/** UX en español para `SupplierContractCategory` (ORDEN MAESTRA §13). */
+export const SUPPLIER_CONTRACT_CATEGORY_LABELS: Record<SupplierContractCategory, string> = {
+  LABOR: 'Mano de obra',
+  SUBCONTRACT: 'Subcontrato',
+  MATERIALS: 'Materiales',
+  EQUIPMENT: 'Equipo',
+  PROFESSIONAL_SERVICES: 'Servicios profesionales',
+  OTHER: 'Otro',
 }
 
 export interface SupplierContract {
@@ -16,6 +40,7 @@ export interface SupplierContract {
   supplierId: string
   projectId: string | null
   contractNumber: string
+  contractCategory: SupplierContractCategory
   scopeDescription: string | null
   value: string
   currencyCode: string

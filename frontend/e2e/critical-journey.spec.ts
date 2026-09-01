@@ -57,17 +57,26 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     companyId = company.id
 
     await page.goto('/proyectos')
-    await expect(page.getByText('Nuevo proyecto')).toBeVisible({ timeout: 10_000 })
-    await page.getByLabel('Nombre', { exact: true }).fill('Torre Critical Journey')
+    // Alta guiada (ORDEN MAESTRA §11): asistente de pasos, no formulario plano.
+    await page.getByRole('button', { name: 'Nuevo proyecto' }).click()
+    await page.getByLabel('Nombre del proyecto').fill('Torre Critical Journey')
     await page.getByLabel('Código (opcional)').fill('CJ-001')
-    await page.getByRole('button', { name: 'Crear proyecto' }).click()
-    await expect(page.getByRole('button', { name: 'Torre Critical Journey', exact: true })).toBeVisible({ timeout: 10_000 })
-    await page.getByRole('button', { name: 'Seleccionar', exact: true }).click()
-    await expect(page.getByLabel('Proyecto seleccionado')).toHaveValue(/.+/)
+    await page.getByRole('button', { name: 'Continuar' }).click() // -> Ubicación
+    await page.getByLabel('Ciudad').fill('Tegucigalpa')
+    await page.getByRole('button', { name: 'Continuar' }).click() // -> Alcance y fechas
+    await page.getByRole('button', { name: 'Continuar' }).click() // -> Equipo
+    await page.getByRole('button', { name: 'Continuar' }).click() // -> Revisión
+    await page.getByRole('button', { name: 'Crear como borrador' }).click()
+
+    // El asistente navega al Project Cockpit (object page con pestañas).
+    await expect(page.getByRole('heading', { name: 'Torre Critical Journey' })).toBeVisible({ timeout: 15_000 })
+    await page.getByRole('button', { name: 'Seleccionar como contexto' }).click()
+    await expect(page.getByText('Contexto activo')).toBeVisible({ timeout: 10_000 })
 
     const projects = await api<any[]>(page.request, 'get', `/projects?company_id=${companyId}`)
     const project = projects.find((p: any) => p.name === 'Torre Critical Journey')
     expect(project).toBeTruthy()
+    expect(project.city).toBe('Tegucigalpa')
     projectId = project.id
   })
 

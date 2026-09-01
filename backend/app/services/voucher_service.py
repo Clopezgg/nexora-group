@@ -211,9 +211,18 @@ def _resolve_contract_context(db: Session, document: AccountingDocument) -> dict
     )
     summary = contract_payment_service.contract_summary(db, schedule_id=schedule.id)
     paid_before = summary.paid_accumulated - _q_amount(payment.amount)
+    from app.models.supplier import SUPPLIER_CONTRACT_CATEGORY_LABELS_ES
+
     return {
         "payment": payment,
         "contract_number": contract.contract_number if contract else "—",
+        "contract_category": (
+            SUPPLIER_CONTRACT_CATEGORY_LABELS_ES.get(
+                contract.contract_category, contract.contract_category
+            )
+            if contract
+            else None
+        ),
         "period_label": contract_payment_service.period_label(cutoff_year, cutoff_month),
         "cutoff": (cutoff_year, cutoff_month),
         "history": history,
@@ -264,17 +273,33 @@ def _resolve_beneficiary_details(
     supplier = db.get(Supplier, supplier_id)
     if supplier is None:
         return None, None
-    address = " · ".join(
+    tax_id = getattr(supplier, "tax_id", None) or getattr(supplier, "fiscal_id", None)
+    return format_supplier_address(supplier), tax_id
+
+
+def format_supplier_address(supplier) -> str | None:
+    """Dirección del beneficiario para el comprobante (§26).
+
+    Usa la dirección ESTRUCTURADA canónica; si está vacía, recurre al texto
+    libre `address` conservado por compatibilidad.
+    """
+    structured = " · ".join(
         str(part).strip()
         for part in (
             getattr(supplier, "address_line_1", None),
+            getattr(supplier, "address_line_2", None),
             getattr(supplier, "city", None),
+            getattr(supplier, "state_department", None),
             getattr(supplier, "country", None),
         )
         if part and str(part).strip()
-    ) or None
-    tax_id = getattr(supplier, "tax_id", None) or getattr(supplier, "fiscal_id", None)
-    return address, tax_id
+    )
+    if structured:
+        return structured
+    legacy = getattr(supplier, "address", None)
+    if legacy and str(legacy).strip():
+        return str(legacy).strip()
+    return None
 
 
 def _load_payment_evidence(db: Session, document: AccountingDocument) -> Evidence | None:
@@ -293,15 +318,20 @@ def _load_payment_evidence(db: Session, document: AccountingDocument) -> Evidenc
         return None
     proofs = [r for r in rows if (r.category or "").upper() == "PAYMENT_PROOF"]
     candidates = proofs or rows
-    images = [r for r in candidates if (r.mime_type or "").lower() in _EMBEDDABLE_IMAGE_MIME]
+    images = [
+        r
+        for r in candidates
+        if (evidence_service.render_mime_type(r) or "").lower() in _EMBEDDABLE_IMAGE_MIME
+    ]
     return (images or candidates)[0]
 
 
 def _evidence_image(evidence: Evidence, *, max_width: float, max_height: float) -> Image | None:
-    if (evidence.mime_type or "").lower() not in _EMBEDDABLE_IMAGE_MIME:
+    # §28: para un HEIC se usa el JPEG derivado; el original nunca es embebible.
+    if (evidence_service.render_mime_type(evidence) or "").lower() not in _EMBEDDABLE_IMAGE_MIME:
         return None
     try:
-        raw = b"".join(evidence_service.download_evidence(evidence))
+        raw = b"".join(evidence_service.download_render(evidence))
     except Exception:  # pragma: no cover - depende de storage real
         return None
     try:
@@ -536,9 +566,14 @@ def generate_voucher_pdf(
 
     if contract_ctx:
         info_rows.insert(0, ("Contrato", contract_ctx["contract_number"]))
-        info_rows.insert(1, ("Período contractual", contract_ctx["period_label"]))
+        _next = 1
+        if contract_ctx.get("contract_category"):
+            info_rows.insert(_next, ("Categoría del contrato", contract_ctx["contract_category"]))
+            _next += 1
+        info_rows.insert(_next, ("Período contractual", contract_ctx["period_label"]))
+        _next += 1
         info_rows.insert(
-            2,
+            _next,
             (
                 "Cuota",
                 f"{contract_ctx['installment_seq']} de {contract_ctx['installment_total']}",

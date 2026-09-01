@@ -19,6 +19,9 @@ class EvidenceResponse(CamelModel):
     entity_type: str | None
     entity_id: uuid.UUID | None
     content_hash: str | None = None
+    # §28: si el original no es renderizable (HEIC/HEIF), `derived_mime_type`
+    # indica el formato del JPEG derivado que sirve `/evidence/{id}/render`.
+    derived_mime_type: str | None = None
     uploaded_by: uuid.UUID
     created_at: datetime
 

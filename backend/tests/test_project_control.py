@@ -84,6 +84,36 @@ def test_create_and_list_project(client):
     assert any(p["id"] == project["id"] for p in listed.json())
 
 
+def test_create_project_persists_location_at_creation_time(client):
+    """ORDEN MAESTRA §17: la ubicación de la obra viaja de verdad en el alta,
+    no sólo en la edición posterior."""
+    login_admin(client)
+    company = create_company(client)
+    response = client.post(
+        "/api/projects",
+        json={
+            "companyId": company["id"],
+            "name": "Puente sobre el río",
+            "currencyCode": "HNL",
+            "addressLine1": "Km 12 carretera del norte",
+            "city": "El Progreso",
+            "stateDepartment": "Yoro",
+            "country": "HN",
+            "locationReference": "Frente a la subestación",
+        },
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["addressLine1"] == "Km 12 carretera del norte"
+    assert body["city"] == "El Progreso"
+    assert body["stateDepartment"] == "Yoro"
+    assert body["country"] == "HN"
+    assert body["locationReference"] == "Frente a la subestación"
+
+    fetched = client.get(f"/api/projects/{body['id']}").json()
+    assert fetched["city"] == "El Progreso"
+
+
 def test_wbs_hierarchy(client):
     login_admin(client)
     company = create_company(client)

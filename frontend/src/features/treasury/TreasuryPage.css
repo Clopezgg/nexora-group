@@ -156,3 +156,24 @@
   }
   .nx-voucher-preview__actions .nx-button { width: 100%; }
 }
+
+/* Contexto contractual dentro del pago real (ORDEN MAESTRA §20–§25). */
+.nx-contract-context {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--nx-color-border, #d8e0ea);
+  border-radius: var(--nx-shape-radius-md, 8px);
+  background: var(--nx-color-surface-sunken, #f6f9fc);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.nx-contract-context__fifo {
+  border-top: 1px dashed var(--nx-color-border, #d8e0ea);
+  padding-top: 0.5rem;
+}
+.nx-contract-context__alloc {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}

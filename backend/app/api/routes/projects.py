@@ -109,11 +109,18 @@ def create_project(
         customer_id=payload.customer_id,
         customer_ref=payload.customer_ref,
         manager=payload.manager,
+        manager_user_id=payload.manager_user_id,
         currency_code=payload.currency_code,
         cost_center_id=payload.cost_center_id,
         planned_start=payload.planned_start,
         planned_end=payload.planned_end,
         description=payload.description,
+        address_line_1=payload.address_line_1,
+        address_line_2=payload.address_line_2,
+        city=payload.city,
+        state_department=payload.state_department,
+        country=payload.country,
+        location_reference=payload.location_reference,
     )
     db.flush()
     # The creator must be able to continue operating the project when their

@@ -35,6 +35,29 @@ function stubAuthenticatedFetch(roles: string[], dashboard?: Record<string, unkn
       if (url.includes('/dashboard/summary') && dashboard) {
         return Promise.resolve({ ok: true, status: 200, json: async () => dashboard } as Response)
       }
+      if (url.includes('/financial-control/cash-flow-actual/series')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            dateFrom: '2026-06-01',
+            dateTo: '2026-08-31',
+            granularity: 'month',
+            currencyCode: 'HNL',
+            openingBalance: 0,
+            closingBalance: 26000,
+            totalInflows: 65000,
+            totalOutflows: 39000,
+            inflowByCategory: { 'Aportes de capital': 65000 },
+            outflowByCategory: { 'Pagos a proveedores': 39000 },
+            periods: [
+              { index: 0, periodStart: '2026-06-01', periodEnd: '2026-06-30', label: 'Junio 2026', inflows: 20000, outflows: 12000, net: 8000, closingBalance: 8000, movementCount: 3, byCategory: {} },
+              { index: 1, periodStart: '2026-07-01', periodEnd: '2026-07-31', label: 'Julio 2026', inflows: 25000, outflows: 15000, net: 10000, closingBalance: 18000, movementCount: 4, byCategory: {} },
+              { index: 2, periodStart: '2026-08-01', periodEnd: '2026-08-31', label: 'Agosto 2026', inflows: 20000, outflows: 12000, net: 8000, closingBalance: 26000, movementCount: 3, byCategory: {} },
+            ],
+          }),
+        } as Response)
+      }
       if (url.includes('/financial-control/cash-flow-actual')) {
         return Promise.resolve({
           ok: true,
@@ -46,18 +69,9 @@ function stubAuthenticatedFetch(roles: string[], dashboard?: Record<string, unkn
             closingBalance: 26000,
             totalInflows: 65000,
             totalOutflows: 39000,
-            inflowByCategory: { 'Aportes de capital': 65000 },
-            outflowByCategory: { 'Pagos a proveedores': 39000 },
-            weeks: Array.from({ length: 13 }, (_, i) => ({
-              weekIndex: i,
-              weekStart: '2026-06-02',
-              weekEnd: '2026-06-08',
-              inflows: 5000,
-              outflows: 3000,
-              net: 2000,
-              closingBalance: 2000 * (i + 1),
-              byCategory: {},
-            })),
+            inflowByCategory: {},
+            outflowByCategory: {},
+            weeks: [],
           }),
         } as Response)
       }
@@ -146,9 +160,15 @@ describe('HomePage', () => {
     )
 
     // Flujo de caja (Realizado por defecto) y cuentas bancarias en el Home.
-    expect(await screen.findByText(/Flujo de caja real · últimas 13 semanas/i)).toBeInTheDocument()
+    // Misma arquitectura moderna que la página completa: etiquetas de calendario,
+    // nunca "S1..S13" (§5/§10).
+    expect((await screen.findAllByText('Flujo de caja')).length).toBeGreaterThan(0)
     expect(screen.getByRole('tab', { name: 'Realizado' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: 'Proyectado' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '3M' })).toBeInTheDocument()
+    expect(await screen.findByText(/Entradas L\s?65,000/)).toBeInTheDocument()
+    expect(screen.queryByText(/^S[1-9]$/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^S1[0-3]$/)).not.toBeInTheDocument()
     expect(await screen.findByText('Banco Atlántida')).toBeInTheDocument()
     expect(screen.getByText('••••5852 · HNL')).toBeInTheDocument()
   })

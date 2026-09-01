@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.domain.errors import InvalidFinancialReferenceError
 from app.models.supplier import Supplier, SupplierContract
 
 
@@ -29,6 +30,11 @@ def create_supplier(
     classification: str | None,
     payment_terms: str | None,
     banking_details: dict | None,
+    address_line_1: str | None = None,
+    address_line_2: str | None = None,
+    city: str | None = None,
+    state_department: str | None = None,
+    country: str | None = None,
 ) -> Supplier:
     supplier = Supplier(
         company_id=company_id,
@@ -39,6 +45,11 @@ def create_supplier(
         email=email,
         phone=phone,
         address=address,
+        address_line_1=address_line_1 or (address.strip()[:255] if address and address.strip() else None),
+        address_line_2=address_line_2,
+        city=city,
+        state_department=state_department,
+        country=country,
         classification=classification,
         payment_terms=payment_terms,
         banking_details=banking_details,
@@ -48,12 +59,16 @@ def create_supplier(
     return supplier
 
 
-def list_contracts(db: Session, *, company_id: uuid.UUID) -> list[SupplierContract]:
+def list_contracts(
+    db: Session, *, company_id: uuid.UUID, category: str | None = None
+) -> list[SupplierContract]:
     stmt = (
         select(SupplierContract)
         .where(SupplierContract.company_id == company_id)
         .order_by(SupplierContract.contract_number)
     )
+    if category:
+        stmt = stmt.where(SupplierContract.contract_category == category)
     return list(db.execute(stmt).scalars())
 
 
@@ -64,6 +79,7 @@ def create_contract(
     supplier_id: uuid.UUID,
     project_id: uuid.UUID | None,
     contract_number: str,
+    contract_category: str = "OTHER",
     scope_description: str | None,
     value,
     currency_code: str,
@@ -73,11 +89,22 @@ def create_contract(
     retention_percentage,
     payment_terms: str | None,
 ) -> SupplierContract:
+    existing = db.execute(
+        select(SupplierContract.id).where(
+            SupplierContract.company_id == company_id,
+            SupplierContract.contract_number == contract_number,
+        )
+    ).first()
+    if existing is not None:
+        raise InvalidFinancialReferenceError(
+            f"Ya existe un contrato con el número {contract_number!r} en esta compañía"
+        )
     contract = SupplierContract(
         company_id=company_id,
         supplier_id=supplier_id,
         project_id=project_id,
         contract_number=contract_number,
+        contract_category=contract_category,
         scope_description=scope_description,
         value=value,
         currency_code=currency_code,

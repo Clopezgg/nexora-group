@@ -13,6 +13,10 @@ export function SuppliersPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [legalName, setLegalName] = useState('')
   const [taxId, setTaxId] = useState('')
+  const [addressLine1, setAddressLine1] = useState('')
+  const [city, setCity] = useState('')
+  const [stateDepartment, setStateDepartment] = useState('')
+  const [country, setCountry] = useState('')
   const queryClient = useQueryClient()
 
   const suppliersQuery = useQuery({
@@ -23,12 +27,24 @@ export function SuppliersPage() {
 
   const createMutation = useMutation({
     mutationFn: () =>
-      procurementService.createSupplier({ companyId: activeCompanyId as string, legalName, taxId: taxId || undefined }),
+      procurementService.createSupplier({
+        companyId: activeCompanyId as string,
+        legalName,
+        taxId: taxId || undefined,
+        addressLine1: addressLine1 || undefined,
+        city: city || undefined,
+        stateDepartment: stateDepartment || undefined,
+        country: country || undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['procurement', 'suppliers', activeCompanyId] })
       setModalOpen(false)
       setLegalName('')
       setTaxId('')
+      setAddressLine1('')
+      setCity('')
+      setStateDepartment('')
+      setCountry('')
     },
     onError: (error) => handleMutationError(error, 'Crear proveedor'),
   })
@@ -36,6 +52,16 @@ export function SuppliersPage() {
   const columns: TableColumn<Supplier>[] = [
     { key: 'legalName', header: 'Razón social', render: (row) => row.legalName },
     { key: 'taxId', header: 'RTN', render: (row) => row.taxId ?? '—' },
+    {
+      key: 'address',
+      header: 'Dirección',
+      render: (row) =>
+        [row.addressLine1, row.city, row.stateDepartment, row.country]
+          .filter(Boolean)
+          .join(', ') ||
+        row.address ||
+        '—',
+    },
     { key: 'status', header: 'Estado', render: (row) => <Badge>{row.status}</Badge> },
   ]
 
@@ -75,6 +101,23 @@ export function SuppliersPage() {
         >
           <Input label="Razón social" value={legalName} onChange={(e) => setLegalName(e.target.value)} required />
           <Input label="RTN / Tax ID" value={taxId} onChange={(e) => setTaxId(e.target.value)} />
+          <Input
+            label="Dirección"
+            value={addressLine1}
+            onChange={(e) => setAddressLine1(e.target.value)}
+          />
+          <Input label="Ciudad" value={city} onChange={(e) => setCity(e.target.value)} />
+          <Input
+            label="Departamento / Estado"
+            value={stateDepartment}
+            onChange={(e) => setStateDepartment(e.target.value)}
+          />
+          <Input
+            label="País (ISO-2)"
+            value={country}
+            maxLength={2}
+            onChange={(e) => setCountry(e.target.value.toUpperCase())}
+          />
           <Button type="submit" loading={createMutation.isPending} disabled={!legalName}>
             Guardar
           </Button>

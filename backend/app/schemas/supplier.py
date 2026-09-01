@@ -2,6 +2,9 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
+from pydantic import field_validator
+
+from app.models.supplier import SUPPLIER_CONTRACT_CATEGORIES
 from app.schemas.base import CamelModel
 
 
@@ -14,6 +17,11 @@ class SupplierCreateRequest(CamelModel):
     email: str | None = None
     phone: str | None = None
     address: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    city: str | None = None
+    state_department: str | None = None
+    country: str | None = None
     classification: str | None = None
     payment_terms: str | None = None
     banking_details: dict | None = None
@@ -29,6 +37,11 @@ class SupplierResponse(CamelModel):
     email: str | None
     phone: str | None
     address: str | None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    city: str | None = None
+    state_department: str | None = None
+    country: str | None = None
     status: str
     classification: str | None
     payment_terms: str | None
@@ -40,6 +53,7 @@ class SupplierContractCreateRequest(CamelModel):
     supplier_id: uuid.UUID
     project_id: uuid.UUID | None = None
     contract_number: str
+    contract_category: str = "OTHER"
     scope_description: str | None = None
     value: Decimal
     currency_code: str
@@ -49,6 +63,16 @@ class SupplierContractCreateRequest(CamelModel):
     retention_percentage: Decimal = Decimal("0")
     payment_terms: str | None = None
 
+    @field_validator("contract_category")
+    @classmethod
+    def _validate_category(cls, value: str) -> str:
+        if value not in SUPPLIER_CONTRACT_CATEGORIES:
+            raise ValueError(
+                f"contract_category inválida: {value!r}. "
+                f"Debe ser una de {SUPPLIER_CONTRACT_CATEGORIES}"
+            )
+        return value
+
 
 class SupplierContractResponse(CamelModel):
     id: uuid.UUID
@@ -56,6 +80,7 @@ class SupplierContractResponse(CamelModel):
     supplier_id: uuid.UUID
     project_id: uuid.UUID | None
     contract_number: str
+    contract_category: str
     scope_description: str | None
     value: Decimal
     currency_code: str

@@ -413,3 +413,72 @@ def test_evidence_upload_persists_content_hash(client, db_session, monkeypatch):
         select(Evidence).where(Evidence.id == uuid.UUID(response.json()["id"]))
     ).scalar_one()
     assert row.content_hash == hashlib.sha256(content).hexdigest()
+
+
+def _real_heic_bytes() -> bytes:
+    """Un HEIC real y decodificable, generado en el test (§28)."""
+    import io
+
+    import pillow_heif
+    from PIL import Image
+
+    pillow_heif.register_heif_opener()
+    buffer = io.BytesIO()
+    Image.new("RGB", (32, 24), (200, 120, 40)).save(buffer, format="HEIF")
+    return buffer.getvalue()
+
+
+def test_evidence_heic_gets_a_derived_jpeg_render(client, db_session, monkeypatch):
+    """ORDEN MAESTRA §28: una foto HEIC de iPhone se guarda tal cual y ADEMÁS
+    se genera un JPEG derivado para el visor y el PDF del comprobante."""
+    login_admin(client)
+    company = create_company(client, name="Evidence HEIC Render Co")
+
+    class RenderingContainer(FakeContainerClient):
+        def __init__(self):
+            super().__init__()
+            self.blobs: dict[str, bytes] = {}
+
+        def upload_blob(self, **kwargs):
+            super().upload_blob(**kwargs)
+            self.blobs[kwargs["name"]] = kwargs["data"]
+
+        def download_blob(self, blob_key: str):
+            payload = self.blobs[blob_key]
+
+            class _D:
+                def chunks(self_inner):
+                    yield payload
+
+            return _D()
+
+    container = RenderingContainer()
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: container,
+    )
+
+    heic = _real_heic_bytes()
+    response = _upload(
+        client,
+        company_id=company["id"],
+        filename="IMG_9001.HEIC",
+        content=heic,
+        mime="image/heic",
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["mimeType"] == "image/heic"
+    assert body["derivedMimeType"] == "image/jpeg"
+
+    # Se subieron dos blobs: el original HEIC + el derivado JPEG.
+    names = [u["name"] for u in container.uploaded]
+    assert len(names) == 2
+    derived_name = next(n for n in names if n.endswith(".derived.jpg"))
+    assert container.blobs[derived_name].startswith(b"\xff\xd8\xff")  # firma JPEG
+
+    # `/render` devuelve el JPEG derivado, no el HEIC.
+    render = client.get(f"/api/evidence/{body['id']}/render")
+    assert render.status_code == 200, render.text
+    assert render.headers["content-type"].startswith("image/jpeg")
+    assert render.content.startswith(b"\xff\xd8\xff")

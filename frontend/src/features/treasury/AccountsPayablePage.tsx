@@ -19,10 +19,18 @@ import { useMutationError } from '../../hooks/useMutationError'
 import { masterDataService } from '../../services/masterDataService'
 import { projectService } from '../../services/projectService'
 import { procurementService } from '../../services/procurementService'
+import {
+  SUPPLIER_CONTRACT_CATEGORY_LABELS,
+  type SupplierContract,
+} from '../../types/procurement'
 import { treasuryService } from '../../services/treasuryService'
 import { apService, type SupplierInvoice } from '../../services/apArService'
 import { formatMoney } from '../../utils/currency'
 import type { TreasuryAccount } from '../../types/treasury'
+import {
+  ContractInstallmentPanel,
+  type ContractAllocationDraft,
+} from './ContractInstallmentPanel'
 import './TreasuryPage.css'
 
 export function AccountsPayablePage() {
@@ -52,6 +60,11 @@ export function AccountsPayablePage() {
   const invoicesQuery = useQuery({
     queryKey: ['ap', 'supplier-invoices', activeCompanyId],
     queryFn: () => apService.listInvoices(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const contractsQuery = useQuery({
+    queryKey: ['procurement', 'contracts', activeCompanyId],
+    queryFn: () => procurementService.listContracts(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
   const suppliersQuery = useQuery({
@@ -85,6 +98,7 @@ export function AccountsPayablePage() {
   const treasuryAccounts = treasuryAccountsQuery.data ?? []
   const invoices = invoicesQuery.data ?? []
   const suppliers = suppliersQuery.data ?? []
+  const contracts = contractsQuery.data ?? []
   const supplierNameById = new Map(suppliers.map((s) => [s.id, s.legalName]))
 
   const columns: TableColumn<SupplierInvoice>[] = [
@@ -123,9 +137,9 @@ export function AccountsPayablePage() {
           {['APPROVED', 'SCHEDULED', 'PARTIALLY_PAID'].includes(row.status) &&
           treasuryAccounts.length > 0 ? (
             <PaySupplierInvoiceButton
-              invoiceId={row.id}
+              invoice={row}
+              companyId={activeCompanyId as string}
               treasuryAccounts={treasuryAccounts}
-              currencyCode={row.currencyCode}
               remaining={row.amount + row.taxAmount - row.amountPaid}
             />
           ) : null}
@@ -184,6 +198,7 @@ export function AccountsPayablePage() {
           expenseAccounts={expenseAccounts}
           payableAccounts={payableAccounts}
           suppliers={suppliers}
+          contracts={contracts}
           onClose={() => setOpenCreate(false)}
           onCreated={() =>
             queryClient.invalidateQueries({
@@ -282,6 +297,7 @@ function CreateSupplierInvoiceModal({
   expenseAccounts,
   payableAccounts,
   suppliers,
+  contracts,
   onClose,
   onCreated,
 }: {
@@ -289,9 +305,11 @@ function CreateSupplierInvoiceModal({
   expenseAccounts: { id: string; name: string }[]
   payableAccounts: { id: string; name: string }[]
   suppliers: { id: string; legalName: string }[]
+  contracts: SupplierContract[]
   onClose: () => void
   onCreated: (invoice: SupplierInvoice) => void
 }) {
+  const [supplierContractId, setSupplierContractId] = useState('')
   const [supplierId, setSupplierId] = useState<string | null>(null)
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [amount, setAmount] = useState<number | null>(null)
@@ -300,6 +318,21 @@ function CreateSupplierInvoiceModal({
   const [expenseAccountId, setExpenseAccountId] = useState(expenseAccounts[0]?.id ?? '')
   const [payableAccountId, setPayableAccountId] = useState(payableAccounts[0]?.id ?? '')
   const handleMutationError = useMutationError()
+
+  const selectedContract = contracts.find((c) => c.id === supplierContractId) ?? null
+
+  // Al elegir un contrato de ejecución, la factura hereda su proveedor,
+  // proyecto y moneda (ORDEN MAESTRA §14/§22): el contrato manda.
+  function applyContract(nextContractId: string) {
+    setSupplierContractId(nextContractId)
+    const contract = contracts.find((c) => c.id === nextContractId)
+    if (!contract) return
+    setSupplierId(contract.supplierId)
+    if (contract.projectId) {
+      setScope('PROJECT')
+      setProjectId(contract.projectId)
+    }
+  }
 
   const projectsQuery = useQuery({
     queryKey: ['projects', companyId],
@@ -314,12 +347,13 @@ function CreateSupplierInvoiceModal({
       apService.createInvoice({
         companyId,
         supplierId,
+        supplierContractId: supplierContractId || null,
         invoiceNumber,
         scope,
         projectId: scope === 'PROJECT' ? projectId : null,
         expenseAccountId,
         payableAccountId,
-        currencyCode: 'HNL',
+        currencyCode: selectedContract?.currencyCode ?? 'HNL',
         amount: String(amount ?? 0),
         invoiceDate: new Date().toISOString().slice(0, 10),
         dueDate: new Date().toISOString().slice(0, 10),
@@ -340,6 +374,26 @@ function CreateSupplierInvoiceModal({
           mutation.mutate()
         }}
       >
+        <Select
+          label="Contrato de ejecución (opcional)"
+          value={supplierContractId}
+          onChange={(event) => applyContract(event.target.value)}
+        >
+          <option value="">Sin contrato — factura suelta</option>
+          {contracts.map((contract) => (
+            <option key={contract.id} value={contract.id}>
+              {contract.contractNumber} ·{' '}
+              {SUPPLIER_CONTRACT_CATEGORY_LABELS[contract.contractCategory] ??
+                contract.contractCategory}
+            </option>
+          ))}
+        </Select>
+        {selectedContract ? (
+          <p className="nx-field__hint">
+            La factura hereda el proveedor, el proyecto y la moneda del contrato. Al pagarla, el
+            monto se asignará por FIFO a las cuotas del plan de pagos.
+          </p>
+        ) : null}
         <Select
           label="Alcance de la operación"
           value={scope}
@@ -417,16 +471,18 @@ function CreateSupplierInvoiceModal({
 }
 
 function PaySupplierInvoiceButton({
-  invoiceId,
+  invoice,
+  companyId,
   treasuryAccounts,
-  currencyCode,
   remaining,
 }: {
-  invoiceId: string
+  invoice: SupplierInvoice
+  companyId: string
   treasuryAccounts: TreasuryAccount[]
-  currencyCode: string
   remaining: number
 }) {
+  const invoiceId = invoice.id
+  const currencyCode = invoice.currencyCode
   const queryClient = useQueryClient()
   const handleMutationError = useMutationError()
   const eligibleTreasuryAccounts = treasuryAccounts.filter(
@@ -438,6 +494,7 @@ function PaySupplierInvoiceButton({
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10))
   const [bankReference, setBankReference] = useState('')
   const [observations, setObservations] = useState('')
+  const [contractAllocations, setContractAllocations] = useState<ContractAllocationDraft[]>([])
 
   const mutation = useMutation({
     mutationFn: async ({
@@ -480,6 +537,8 @@ function PaySupplierInvoiceButton({
                   paymentDate,
                   bankTransactionReference: bankReference.trim() || undefined,
                   paymentObservations: observations.trim() || undefined,
+                  contractAllocations:
+                    contractAllocations.length > 0 ? contractAllocations : undefined,
                 },
                 idempotencyKey: crypto.randomUUID(),
               })
@@ -509,6 +568,15 @@ function PaySupplierInvoiceButton({
                 required
               />
             </label>
+            {invoice.supplierContractId ? (
+              <ContractInstallmentPanel
+                companyId={companyId}
+                supplierContractId={invoice.supplierContractId}
+                amount={amount}
+                asOf={paymentDate}
+                onAllocationsChange={setContractAllocations}
+              />
+            ) : null}
             <Input
               label="Referencia bancaria del movimiento (opcional)"
               value={bankReference}

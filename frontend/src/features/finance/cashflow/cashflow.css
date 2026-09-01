@@ -9,6 +9,10 @@
   min-width: 140px;
 }
 
+.nx-cashflow-summary {
+  margin: 0.5rem 0 0.25rem;
+}
+
 .nx-linkbutton {
   appearance: none;
   border: 0;

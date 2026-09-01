@@ -144,6 +144,22 @@ Smoke adicional: `/` 200 · `/api/healthz` 200 · `/api/readyz` 200 ·
 - Tests: `themeEngine.test.ts` +1 (`la ESTRUCTURA … difiere por familia`),
   tokens estructurales verificados en `compileTheme`.
 
+### Despliegue de la tercera iteración
+
+| Concepto | Valor |
+|---|---|
+| PR | [#96](https://github.com/Clopezgg/nexora-group/pull/96) fusionada |
+| Commit en `main` | `a8d49f4c22864b023253b6a63980f613d9760b07` |
+| CI de rama / de `main` | run `33538523187` ✅ / run `33539984163` ✅ |
+| Deploy Azure (real) | run **`33541534773`** — `workflow_dispatch deploy=true`, "Deploy infra + apps" **success** |
+| Migraciones | ninguna nueva (head `e6b8d0c41a77`) |
+| Imagen backend | `ghcr.io/clopezgg/nexora-backend:a8d49f4c22864b023253b6a63980f613d9760b07` |
+
+Verify production: Frontend 200 · SWA healthz/`/healthz` 200 · API health + DB
+readiness 200 · Protected Edit 405 / token inválido **403** · cookie
+Secure+HttpOnly+Path=/ · auth/me + companies (1) + projects + accounts +
+dashboard (HNL) + fiscal periods → 200 · logout 204 + relogin 200.
+
 ## Pendiente
 
 - **WS7** — captura visual del Home DESPLEGADO en producción confirmando

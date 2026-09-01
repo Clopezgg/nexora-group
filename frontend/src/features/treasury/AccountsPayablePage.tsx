@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   EmptyState,
+  FilterBar,
   Input,
   LoadingState,
   Modal,
@@ -39,6 +40,8 @@ export function AccountsPayablePage() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [openCreate, setOpenCreate] = useState(false)
   const [submitInvoiceId, setSubmitInvoiceId] = useState<string | null>(null)
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterSupplier, setFilterSupplier] = useState('')
 
   const companiesQuery = useQuery({
     queryKey: ['master-data', 'companies'],
@@ -185,9 +188,47 @@ export function AccountsPayablePage() {
         ) : null}
       </Card>
 
+      {invoices.length > 0 ? (
+        <FilterBar
+          onClear={() => {
+            setFilterStatus('')
+            setFilterSupplier('')
+          }}
+        >
+          <Select
+            label="Estado"
+            value={filterStatus}
+            onChange={(event) => setFilterStatus(event.target.value)}
+          >
+            <option value="">Todos</option>
+            {['DRAFT', 'APPROVED', 'SCHEDULED', 'PARTIALLY_PAID', 'PAID', 'CANCELLED'].map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="Proveedor"
+            value={filterSupplier}
+            onChange={(event) => setFilterSupplier(event.target.value)}
+          >
+            <option value="">Todos</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.legalName}
+              </option>
+            ))}
+          </Select>
+        </FilterBar>
+      ) : null}
+
       <Table
         columns={columns}
-        rows={invoices}
+        rows={invoices.filter(
+          (row) =>
+            (!filterStatus || row.status === filterStatus) &&
+            (!filterSupplier || row.supplierId === filterSupplier),
+        )}
         getRowKey={(row) => row.id}
         emptyMessage="Aún no hay facturas de proveedor registradas."
       />

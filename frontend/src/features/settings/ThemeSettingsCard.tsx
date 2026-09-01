@@ -55,8 +55,13 @@ function ThemePreviewApp({ themeId, density, scale }: { themeId: string; density
               <tr><td>Agosto 2026</td><td>L 55,000.00</td><td>L 1,195,000.00</td></tr>
             </tbody>
           </table>
+          <div className="nx-theme-preview__filterbar">
+            <span className="nx-theme-preview__field-label">Categoría</span>
+            <span className="nx-theme-preview__input">Todas</span>
+          </div>
           <div className="nx-theme-preview__form">
-            <span className="nx-theme-preview__input">Beneficiario…</span>
+            <span className="nx-theme-preview__field-label">Beneficiario</span>
+            <span className="nx-theme-preview__input">Buscar…</span>
             <button className="nx-theme-preview__btn" type="button" tabIndex={-1}>Generar</button>
             <span className="nx-theme-preview__status nx-theme-preview__status--ok">Conciliado</span>
             <span className="nx-theme-preview__status nx-theme-preview__status--warn">Pendiente</span>
@@ -65,6 +70,11 @@ function ThemePreviewApp({ themeId, density, scale }: { themeId: string; density
             {[40, 70, 55, 90, 65, 80].map((h, i) => (
               <span key={i} style={{ height: `${h}%` }} />
             ))}
+          </div>
+          {/* Anatomía de diálogo: cabecera con el tratamiento de la familia. */}
+          <div className="nx-theme-preview__dialog" aria-hidden="true">
+            <div className="nx-theme-preview__dialog-header">Confirmar pago</div>
+            <div className="nx-theme-preview__dialog-body">L 50,000.00 · Julio 2026</div>
           </div>
         </div>
       </div>

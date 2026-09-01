@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderApp } from './testUtils'
@@ -47,7 +47,8 @@ describe('ProjectsPage', () => {
     render(renderApp('/proyectos'))
 
     expect(await screen.findByText('Torre Nexora II')).toBeInTheDocument()
-    expect(screen.getByText('Planificación')).toBeInTheDocument()
+    const row = screen.getByText('Torre Nexora II').closest('tr') as HTMLElement
+    expect(within(row).getByText('Planificación')).toBeInTheDocument()
   })
 
   it('creates a project through the guided wizard, sending the real location (§11/§17)', async () => {

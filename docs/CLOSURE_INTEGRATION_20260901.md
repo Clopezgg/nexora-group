@@ -119,15 +119,39 @@ Smoke adicional: `/` 200 · `/api/healthz` 200 · `/api/readyz` 200 ·
 `/api/evidence/{id}/render` 401 (§28 vivo) ·
 `/api/verificar/comprobante/<token>` 404 (ruta pública registrada).
 
+## Tercera iteración (PR #96 — WS6 §31-38 estructural)
+
+- **`ThemeStructure`** — nuevo dominio tipado del `ThemePreset`:
+  `dialogHeaderBorder`, `dialogAccentRail`, `overlayScrim`,
+  `inputBorderWidth`, `inputBg`, `fieldLabelTransform`, `filterBarBg`,
+  `filterBarBorder`, `objectHeaderBg`, `objectHeaderAccentRail`. Cada familia
+  tiene su combinación:
+  - **Horizon** — sin regla de cabecera (la sombra la marca), input en caja,
+    filter-bar transparente.
+  - **Quartz** — hairline en todo, input en caja sobre superficie hundida,
+    filter-bar hundido con borde fino.
+  - **Belize** — regla dura 1.5px en cabeceras, **input subrayado** (sólo
+    borde inferior), etiquetas en **VERSALITAS**, filter-bar como banda
+    teñida con borde inferior.
+  - **NEXORA** — **riel de acento** en diálogo, drawer, filter-bar y
+    object-header; input en caja con foco.
+- `compileTheme` emite 10 tokens nuevos; `themes.css` los consume en
+  `.nx-modal`, `.nx-drawer`, `.nx-filter-bar`, `.nx-input`, `.nx-field__label`,
+  `.nx-object-header`. La vista previa de temas (§37) muestra la nueva
+  anatomía (filter-bar + diálogo con su tratamiento).
+- **§36** — FilterBar añadido a **Proyectos** (estado + texto) y **Cuentas
+  por pagar** (estado + proveedor); ya existía en Contratos y Auditoría.
+- Tests: `themeEngine.test.ts` +1 (`la ESTRUCTURA … difiere por familia`),
+  tokens estructurales verificados en `compileTheme`.
+
 ## Pendiente
 
-- **WS6 §31-38** — profundización estructural adicional de temas por familia
-  (dialogs/drawers/object-page con tratamientos perceptiblemente distintos
-  entre Horizon/Quartz/Belize/NEXORA más allá de lo ya diferenciado en PR-D).
 - **WS7** — captura visual del Home DESPLEGADO en producción confirmando
   ausencia de S1–S13 en el navegador (requiere credenciales de la sesión de
   producción, que no están disponibles en este entorno) y verificación
-  visual de los 4 temas en el build de producción.
+  visual de los 4 temas en el build de producción. Los gates de S1–S13 y
+  anti-overflow ya se ejercen en CI (`e2e/visual-audit.spec.ts`) sobre el
+  mismo build.
 
-No se usa la frase reservada de cierre: queda §31-38 estructural y la
-verificación visual en el navegador de producción.
+No se usa la frase reservada de cierre: queda la verificación visual en el
+navegador de producción (bloqueada por falta de credenciales de sesión).

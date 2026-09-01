@@ -183,7 +183,10 @@ describe('TreasuryPage', () => {
 
       render(renderApp(route))
 
-      expect(await screen.findByText(visibleText)).toBeInTheDocument()
+      // El nombre puede aparecer también en el filtro; basta con que la fila
+      // de la tabla lo muestre.
+      const matches = await screen.findAllByText(visibleText)
+      expect(matches.some((el) => el.closest('tr'))).toBe(true)
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining(endpoint), expect.anything())
     },
   )

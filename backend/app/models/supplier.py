@@ -25,6 +25,14 @@ SUPPLIER_CONTRACT_CATEGORIES = (
     "PROFESSIONAL_SERVICES",
     "OTHER",
 )
+SUPPLIER_CONTRACT_CATEGORY_LABELS_ES = {
+    "LABOR": "Mano de obra",
+    "SUBCONTRACT": "Subcontrato",
+    "MATERIALS": "Materiales",
+    "EQUIPMENT": "Equipo",
+    "PROFESSIONAL_SERVICES": "Servicios profesionales",
+    "OTHER": "Otro",
+}
 
 
 class Supplier(UUIDPrimaryKeyMixin, TimestampMixin, Base):

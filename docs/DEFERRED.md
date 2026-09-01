@@ -258,16 +258,16 @@ certificar el 100%.
   rechazan doble reversal y registran auditoría. Las páginas separadas de
   AP y Collections muestran historial, estado reversado y modal de motivo;
   el Critical Journey ejecuta ambos reversals y comprueba la restauración.
-- `DEFERRED-FINAL-019` — **Normalización server-side de evidencia HEIC/HEIF a
-  JPEG.** El backend ya ACEPTA fotos HEIC/HEIF (iOS Safari/iPhone): valida la
-  firma real ISO-BMFF `ftyp` (`evidence_service._detect_heif_mime`), sanea el
-  nombre, aplica límite de tamaño y las guarda PRIVADAS en Blob igual que el
-  resto. Lo que queda diferido es transcodificarlas a JPEG en el servidor
-  para que cualquier visor las abra sin depender del soporte HEIC del sistema
-  operativo. Requiere una dependencia de decodificación (p. ej. `pillow-heif`
-  o `pyvips`) que hoy no se quiere añadir al contenedor; no es bloqueante
-  porque el archivo original queda íntegro y descargable. Volver a evaluarlo
-  al 90% junto con miniaturas de evidencia.
+- ~~`DEFERRED-FINAL-019`~~ — **RESUELTO (2026-09-01, ORDEN MAESTRA §28).**
+  `pillow-heif` está en `requirements.txt`. Al subir una foto HEIC/HEIF, el
+  original privado se guarda tal cual y `evidence_service._derive_display_jpeg`
+  genera un JPEG derivado (`evidence.derived_blob_key` / `derived_mime_type`,
+  migración `d5a7c9e30f66`). `GET /evidence/{id}/render` sirve ese derivado
+  (inline) y el PDF del comprobante lo embebe vía `voucher_service._evidence_image`
+  (usa `render_mime_type` / `download_render`). Conversión real probada en
+  `test_evidence.py::test_evidence_heic_gets_a_derived_jpeg_render` con un HEIC
+  decodificable generado en el test. Si la decodificación falla, el upload no
+  se rompe: el original queda íntegro y descargable.
 
 ## Bloqueos externos
 

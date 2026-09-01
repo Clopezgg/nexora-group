@@ -393,6 +393,27 @@ def download_evidence(
     )
 
 
+@router.get("/{evidence_id}/render")
+def render_evidence(
+    evidence_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("document.evidence", "read")),
+) -> StreamingResponse:
+    """Render mostrable de una evidencia (§28): el JPEG derivado para un HEIC,
+    o el original si ya es renderizable. Inline, no attachment."""
+    evidence = _authorize_evidence_read(db, evidence_id=evidence_id, user=user)
+    stream = evidence_service.download_render(evidence)
+    return StreamingResponse(
+        stream,
+        media_type=evidence_service.render_mime_type(evidence),
+        headers={
+            "Content-Disposition": "inline",
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.get("/{evidence_id}", response_model=EvidenceResponse)
 def get_evidence(
     evidence_id: uuid.UUID,

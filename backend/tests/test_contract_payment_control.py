@@ -28,13 +28,16 @@ from tests.helpers import (
 )
 
 
-def _contract(client, *, company_id, supplier_id, value="500000.00", number="CTR-2026-001"):
+def _contract(
+    client, *, company_id, supplier_id, value="500000.00", number="CTR-2026-001", category="LABOR"
+):
     r = client.post(
         "/api/procurement/suppliers/contracts",
         json={
             "companyId": company_id,
             "supplierId": supplier_id,
             "contractNumber": number,
+            "contractCategory": category,
             "value": value,
             "currencyCode": "HNL",
             "startDate": "2026-08-01",
@@ -422,6 +425,9 @@ def test_contract_voucher_pdf_shows_accumulative_history_and_totals(client, db_s
     assert "Agosto 2026" in text
     assert "Septiembre 2026" not in text  # aún no ocurrió (§38)
     assert "CTR-2026-001" in text
+    # §25: el comprobante resuelve la categoría del contrato en español.
+    assert "ategor" in text  # "Categoría del contrato" (tolerante a codificación PDF)
+    assert "Mano de obra" in text
     assert "Valor contractual" in text
     assert "Pago actual" in text
     assert "ATL-93829172" in text

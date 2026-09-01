@@ -48,6 +48,11 @@ class Evidence(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     blob_key: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     mime_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    # Render derivado para formatos que el visor/PDF no soporta nativamente
+    # (HEIC/HEIF de iPhone, orden maestra final §28). El original privado nunca
+    # se toca; este es un JPEG/PNG generado para mostrar y embeber.
+    derived_blob_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    derived_mime_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True)

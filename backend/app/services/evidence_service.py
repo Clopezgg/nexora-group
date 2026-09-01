@@ -1,4 +1,5 @@
 import hashlib
+import io
 import logging
 import re
 import unicodedata
@@ -64,8 +65,8 @@ def normalize_filename(filename: str) -> str:
 # ISO-BMFF `ftyp` brands que identifican una imagen HEIC/HEIF real. Bytes
 # 4-8 == b"ftyp", bytes 8-12 == brand. iOS a veces manda content-type vacio o
 # application/octet-stream para estas fotos, asi que la firma es la unica
-# fuente de verdad. NO se hace conversion nativa (sin pillow-heif); solo se
-# valida y se almacena tal cual -- normalizacion a JPEG queda DEFERRED.
+# fuente de verdad. El original HEIC se guarda tal cual (privado) y ademas
+# se genera un JPEG derivado para visor/PDF (orden maestra final §28).
 _HEIC_BRANDS = {b"heic", b"heix", b"hevc", b"hevx"}
 _HEIF_BRANDS = {b"mif1", b"heif", b"msf1", b"mif2"}
 
@@ -92,6 +93,27 @@ def _detect_mime(content: bytes) -> str | None:
     if len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP":
         return "image/webp"
     return _detect_heif_mime(content)
+
+
+_RENDERABLE_MIME = {"application/pdf", "image/jpeg", "image/png", "image/webp"}
+
+
+def _derive_display_jpeg(content: bytes) -> bytes | None:
+    """HEIC/HEIF -> JPEG para visor y PDF (§28). Devuelve None si no se puede
+    convertir (no rompe el upload: el original ya quedó guardado)."""
+    try:
+        import pillow_heif
+        from PIL import Image
+
+        pillow_heif.register_heif_opener()
+        with Image.open(io.BytesIO(content)) as img:
+            rgb = img.convert("RGB")
+            out = io.BytesIO()
+            rgb.save(out, format="JPEG", quality=85, optimize=True)
+        return out.getvalue()
+    except Exception:  # noqa: BLE001 - conversión best-effort
+        logger.exception("no se pudo derivar JPEG de una evidencia HEIC/HEIF")
+        return None
 
 
 def _resolve_and_validate_mime(mime_type: str, content: bytes) -> str:
@@ -224,6 +246,28 @@ def upload_evidence(
             exc, operation="upload_blob", correlation_id=correlation_id
         )
 
+    # §28: si el original no es directamente renderizable (HEIC/HEIF de
+    # iPhone), se genera y sube un JPEG derivado para el visor y el PDF. El
+    # original privado no se toca.
+    derived_blob_key: str | None = None
+    derived_mime_type: str | None = None
+    if mime_type not in _RENDERABLE_MIME:
+        derived_bytes = _derive_display_jpeg(content)
+        if derived_bytes:
+            derived_blob_key = f"{blob_key}.derived.jpg"
+            derived_mime_type = "image/jpeg"
+            try:
+                container_client.upload_blob(
+                    name=derived_blob_key,
+                    data=derived_bytes,
+                    overwrite=False,
+                    content_settings=ContentSettings(content_type=derived_mime_type),
+                )
+            except Exception:  # noqa: BLE001 - el derivado es best-effort
+                logger.exception("no se pudo subir el render derivado %s", derived_blob_key)
+                derived_blob_key = None
+                derived_mime_type = None
+
     try:
         evidence = evidence_repository.create_evidence(
             db,
@@ -237,6 +281,8 @@ def upload_evidence(
             entity_type=entity_type,
             entity_id=entity_id,
             content_hash=content_hash,
+            derived_blob_key=derived_blob_key,
+            derived_mime_type=derived_mime_type,
         )
         if commit:
             db.commit()
@@ -247,6 +293,8 @@ def upload_evidence(
     except Exception:
         db.rollback()
         _compensate_uploaded_blob(container_client, blob_key)
+        if derived_blob_key:
+            _compensate_uploaded_blob(container_client, derived_blob_key)
         raise
 
 
@@ -262,6 +310,32 @@ def download_evidence(evidence: Evidence) -> Iterable[bytes]:
         container_client = get_evidence_container_client(get_settings())
         downloader = container_client.download_blob(evidence.blob_key)
         return downloader.chunks()
+    except Exception as exc:  # noqa: BLE001 - se re-clasifica o re-lanza
+        from app.integrations.azure_blob import EvidenceStorageNotConfigured
+
+        if isinstance(exc, EvidenceStorageNotConfigured):
+            raise
+        _raise_classified_storage_error(exc, operation="download_blob", correlation_id=None)
+
+
+def render_blob_key(evidence: Evidence) -> str:
+    """El blob que se debe MOSTRAR: el derivado (JPEG) si existe, si no el
+    original (§28)."""
+    return evidence.derived_blob_key or evidence.blob_key
+
+
+def render_mime_type(evidence: Evidence) -> str:
+    return evidence.derived_mime_type or evidence.mime_type
+
+
+def download_render(evidence: Evidence) -> Iterable[bytes]:
+    """Stream del render mostrable (derivado si existe, si no el original)."""
+    key = render_blob_key(evidence)
+    if key == evidence.blob_key:
+        return download_evidence(evidence)
+    try:
+        container_client = get_evidence_container_client(get_settings())
+        return container_client.download_blob(key).chunks()
     except Exception as exc:  # noqa: BLE001 - se re-clasifica o re-lanza
         from app.integrations.azure_blob import EvidenceStorageNotConfigured
 

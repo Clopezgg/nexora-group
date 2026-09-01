@@ -72,19 +72,59 @@ def test_edit_pin_is_hashed_and_capability_is_signed_tamper_proof_and_session_bo
         settings.edit_access_ttl_seconds = old_ttl
 
 
-def test_edit_pin_accepts_strong_long_reauthentication_secret():
+def test_edit_pin_verifies_only_against_the_configured_digest():
+    """El PIN se compara SOLO contra el digest PBKDF2 configurado. Acepta
+    tanto un PIN corto (p.ej. 6 dígitos) como un secreto largo."""
     settings = get_settings()
     old_salt = settings.edit_access_token_salt
     old_digest = settings.edit_access_token_digest
-    strong_secret = secrets.token_urlsafe(64)
-    assert len(strong_secret) > 32
+    for pin in ("051012", secrets.token_urlsafe(64)):
+        try:
+            _configure_test_pin(settings, pin)
+            assert edit_access_service.verify_pin(pin, settings)
+            assert not edit_access_service.verify_pin(pin + "x", settings)
+        finally:
+            settings.edit_access_token_salt = old_salt
+            settings.edit_access_token_digest = old_digest
+
+
+def test_administrator_password_is_not_accepted_as_the_edit_pin(client, db_session):
+    """ORDEN MAESTRA §12/§27 — el password del Administrator NO funciona como
+    PIN de Protected Edit. Son credenciales independientes; no hay fallback."""
+    settings = get_settings()
+    old_salt, old_digest = settings.edit_access_token_salt, settings.edit_access_token_digest
     try:
-        _configure_test_pin(settings, strong_secret)
-        assert edit_access_service.verify_pin(strong_secret, settings)
-        assert not edit_access_service.verify_pin(strong_secret + "x", settings)
+        _configure_test_pin(settings, "051012")
+        from tests.helpers import login_admin
+
+        login_admin(client)
+        # El password del Administrator -> rechazado (403), no una capability.
+        bad = client.post("/api/edit-access/verify", json={"token": BOOTSTRAP_ADMIN_PASSWORD})
+        assert bad.status_code == 403, bad.text
+        # El PIN real -> capability temporal.
+        good = client.post("/api/edit-access/verify", json={"token": "051012"})
+        assert good.status_code == 200, good.text
+        assert good.json()["capability"]
+        assert good.json()["usesRemaining"] >= 1
     finally:
-        settings.edit_access_token_salt = old_salt
-        settings.edit_access_token_digest = old_digest
+        settings.edit_access_token_salt, settings.edit_access_token_digest = old_salt, old_digest
+
+
+def test_edit_access_verify_is_not_configured_without_server_secrets(client, db_session):
+    """Sin `EDIT_ACCESS_TOKEN_SALT`/`DIGEST` la ruta responde 503
+    NOT_CONFIGURED — nunca acepta un token de respaldo."""
+    settings = get_settings()
+    old_salt, old_digest = settings.edit_access_token_salt, settings.edit_access_token_digest
+    try:
+        settings.edit_access_token_salt = ""
+        settings.edit_access_token_digest = ""
+        from tests.helpers import login_admin
+
+        login_admin(client)
+        r = client.post("/api/edit-access/verify", json={"token": BOOTSTRAP_ADMIN_PASSWORD})
+        assert r.status_code == 503, r.text
+    finally:
+        settings.edit_access_token_salt, settings.edit_access_token_digest = old_salt, old_digest
 
 
 def test_edit_guard_requires_unlock_then_allows_request_to_reach_route(client, db_session):

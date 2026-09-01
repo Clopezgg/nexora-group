@@ -16,9 +16,10 @@ router = APIRouter(prefix="/edit-access", tags=["edit-access"])
 
 
 class EditAccessRequest(BaseModel):
-    # Protected Edit may reuse a strong account re-authentication secret when
-    # a dedicated PIN has not been provisioned. Keep the bound finite while
-    # allowing password-manager generated credentials longer than 32 chars.
+    # El PIN de Protected Edit (credencial independiente, ORDEN MAESTRA §12).
+    # El máximo de 256 solo acota payloads hostiles; el valor real se
+    # verifica contra el digest PBKDF2 configurado, nunca contra el password
+    # del Administrator.
     token: str = Field(min_length=1, max_length=256)
 
 

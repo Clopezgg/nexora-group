@@ -41,8 +41,11 @@ def _session_fingerprint(session_token: str, settings: Settings) -> str:
 
 
 def verify_pin(pin: str, settings: Settings) -> bool:
-    # Bound hostile payload size, but permit strong password-manager generated
-    # re-authentication credentials used as the production fallback PIN.
+    # Protected Edit es una credencial INDEPENDIENTE (ORDEN MAESTRA §12): se
+    # compara SOLO contra el digest PBKDF2 configurado. No hay fallback al
+    # password del Administrator. Sin `EDIT_ACCESS_TOKEN_SALT`/`DIGEST` la
+    # función devuelve False y el arranque en producción falla (config).
+    # El límite de 256 bytes solo acota payloads hostiles.
     if not settings.edit_access_configured or not pin or len(pin) > 256:
         return False
     try:

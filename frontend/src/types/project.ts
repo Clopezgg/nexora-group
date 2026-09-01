@@ -15,6 +15,23 @@ export type ProjectStatus =
   | 'COMPLETED'
   | 'CLOSED'
   | 'CANCELLED'
+  | 'ARCHIVED'
+
+export interface ProjectAllowedTransition {
+  status: ProjectStatus
+  label: string
+  sensitive: boolean
+}
+
+export interface ProjectLifecycle {
+  currentStatus: ProjectStatus
+  currentStatusLabel: string
+  allowedTransitions: ProjectAllowedTransition[]
+  completedAt: string | null
+  closedAt: string | null
+  reopenedAt: string | null
+  archivedAt: string | null
+}
 
 export type WBSStatus = 'PLANNING' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED'
 
@@ -33,6 +50,10 @@ export interface Project {
   plannedEnd: string | null
   actualEnd: string | null
   status: ProjectStatus
+  completedAt?: string | null
+  closedAt?: string | null
+  reopenedAt?: string | null
+  archivedAt?: string | null
   description: string | null
   addressLine1: string | null
   addressLine2: string | null

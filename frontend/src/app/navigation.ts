@@ -72,7 +72,7 @@ export const navGroups: NavGroup[] = [
       { path: '/abastecimiento/recepciones', label: 'Recepciones', icon: 'truck', requiredAny: read('procurement.goods_receipt:read') },
       { path: '/abastecimiento/inventario', label: 'Inventario', icon: 'grid', requiredAny: read('inventory.stock:read', 'inventory.item:read') },
       { path: '/abastecimiento/almacenes', label: 'Almacenes', icon: 'warehouse', requiredAny: read('inventory.warehouse:read') },
-      { path: '/abastecimiento/proveedores', label: 'Proveedores', icon: 'users', requiredAny: read('procurement.supplier:read') },
+      { path: '/abastecimiento/proveedores', label: 'Proveedores y Contratistas', icon: 'users', requiredAny: read('procurement.supplier:read') },
       { path: '/abastecimiento/contratos', label: 'Contratos', icon: 'file', requiredAny: read('procurement.contract:read') },
     ],
   },

@@ -1,9 +1,13 @@
+export type SupplierPartyRole = 'SUPPLIER' | 'CONTRACTOR' | 'BOTH'
+export type SupplierStatus = 'ACTIVE' | 'INACTIVE' | 'BLOCKED' | 'ARCHIVED'
+
 export interface Supplier {
   id: string
   companyId: string
   legalName: string
   tradeName: string | null
   taxId: string | null
+  contactName?: string | null
   email: string | null
   phone: string | null
   address: string | null
@@ -13,7 +17,9 @@ export interface Supplier {
   stateDepartment: string | null
   country: string | null
   status: string
+  partyRole: SupplierPartyRole
   classification: string | null
+  paymentTerms?: string | null
 }
 
 export type SupplierContractCategory =

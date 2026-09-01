@@ -7,6 +7,7 @@ import type {
   Forecast,
   Project,
   ProjectFinancialSummary,
+  ProjectLifecycle,
   ProjectStatus,
   ProgressRecord,
   WBSFinancialSummary,
@@ -60,7 +61,13 @@ export interface WBSInput {
 }
 
 export const projectService = {
-  list: (companyId: string) => apiFetch<Project[]>(`/projects?company_id=${companyId}`),
+  list: (companyId: string, opts?: { status?: string; includeArchived?: boolean }) => {
+    const params = new URLSearchParams({ company_id: companyId })
+    if (opts?.status) params.set('status', opts.status)
+    if (opts?.includeArchived) params.set('includeArchived', 'true')
+    return apiFetch<Project[]>(`/projects?${params.toString()}`)
+  },
+  getLifecycle: (projectId: string) => apiFetch<ProjectLifecycle>(`/projects/${projectId}/lifecycle`),
   create: (input: ProjectInput) => apiFetch<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }),
   get: (projectId: string) => apiFetch<Project>(`/projects/${projectId}`),
   update: (projectId: string, input: Partial<Omit<ProjectInput, 'companyId'>>) => apiFetch<Project>(`/projects/${projectId}`, { method: 'PATCH', body: JSON.stringify(input) }),

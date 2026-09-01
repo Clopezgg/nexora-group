@@ -4255,3 +4255,37 @@ Rama: `feat/voucher-outflow-semantics`.
   vouchers migrados a documentos OUTFLOW reales (gasto general). Regresión:
   treasury+voucher+AP+contract 100 verdes en serie; frontend
   typecheck/lint/build + 167 tests. Invariante `INV-TRE-003`.
+
+### 2026-09-01 — ORDEN MAESTRA (Fiori / Cash Flow / Treasury Direction) · PR 2 — Flujo de Caja REAL
+
+Rama: `feat/cash-flow-actual` (sobre `feat/voucher-outflow-semantics`).
+
+- **`cash_flow_actual_service`** — flujo REALIZADO de las últimas 13 semanas,
+  distinto del forecast. Fuente autoritativa: el movimiento real de las
+  cuentas GL 1:1 con un `TreasuryAccount`. Por documento contabilizado que
+  tocó tesorería en la ventana: `doc_net = Σ debit − Σ credit` de sus líneas
+  de tesorería. **Sin doble conteo** (§12) — se lee la línea del asiento,
+  nunca `Remittance.amount` en paralelo. Transferencia interna → `doc_net==0`
+  → no aparece.
+  - Entradas: Cobros de clientes / Aportes de capital / Financiamiento
+    recibido / Remesas / Otros ingresos (por naturaleza de la contrapartida:
+    EQUITY, LIABILITY, REVENUE).
+  - Salidas: Pagos a proveedores / Pagos de contratos / Gastos pagados /
+    Pagos de activos / Otros egresos.
+  - Saldo de apertura = saldo actual − movimiento dentro (y después) de la
+    ventana; saldo de cierre semanal acumulado.
+- **`GET /api/financial-control/cash-flow-actual?companyId=`**.
+- **Frontend**: `HomeForecastCard` y `CashForecastPage` con toggle
+  `[ Realizado | Proyectado ]` (§14). REALIZADO = últimas 13 semanas reales;
+  PROYECTADO = próximas 13 semanas (forecast AP/AR existente). Son endpoints
+  y conceptos distintos — las remesas históricas viven en REALIZADO, no en
+  la S1 del forecast. Nuevo control segmentado en el design system
+  (`nx-segmented`).
+- **§13**: un aporte de capital / financiamiento es entrada de caja pero
+  **no** es ingreso — inherente (se lee tesorería, no el P&L); test lo
+  verifica contra el income-statement.
+- **Tests**: `test_cash_flow_actual.py` (4) — remesa L100,000 contada una
+  sola vez; aporte + financiamiento = caja pero revenue 0; gasto = salida;
+  transferencia interna no mueve la caja consolidada. Frontend
+  `HomePage.test.tsx` + `CashForecastPage.test.tsx` (toggle). Regresión:
+  financial-control + treasury + reporting 76 verdes; frontend 168.

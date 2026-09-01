@@ -32,6 +32,41 @@ bloque de la rúbrica se marca completo todavía).
 
 ## Entradas
 
+### 2026-09-01 — ORDEN MAESTRA DE INTEGRACIÓN OPERATIVA (PR #92, en progreso)
+
+Rama `work/nexora-integrated-erp-final`. PR permanente:
+https://github.com/Clopezgg/nexora-group/pull/92 (título
+`feat: integrate NEXORA project-to-payment ERP experience`).
+
+Entregado y probado en esta pasada:
+
+- **WS1 — Flujo de caja en Home sin S1–S13 (P0 §5/§6/§7/§10).**
+  `HomeForecastCard` dejaba de usar `cashFlowActualService.get()` legacy y
+  las etiquetas `S${weekIndex+1}`. Nuevo módulo compartido
+  `frontend/src/features/finance/cashflow/`:
+  `useCashFlowSeries` (rango 1M/3M/6M/12M, granularidad Auto/Día/Semana/Mes,
+  etiquetas de calendario reales, moneda), `CashFlowChart`,
+  `CashFlowControls`, `CashFlowSummary`, `formatPeriodLabel`. Home y
+  `CashForecastPage` comparten los mismos componentes — un solo gráfico.
+  El modo PROYECTADO también abandona S1..S13 (usa el rango real de cada
+  semana). `cashFlowActualService.get()` marcado `@deprecated`. Tests:
+  `cashflowPeriodLabel`, `HomePage`, `CashForecastPage`.
+- **WS2 — Contratos: categoría + número por compañía + responsable FK
+  (§13/§15/§16).** `SupplierContract.contract_category`
+  (LABOR/SUBCONTRACT/MATERIALS/EQUIPMENT/PROFESSIONAL_SERVICES/OTHER) full
+  stack. `contract_number` deja de ser único global: `UniqueConstraint(
+  company_id, contract_number)` en `supplier_contracts` y `sales_contracts`.
+  `Project.manager_user_id` FK a `users` (conserva el texto libre `manager`).
+  Migración `b2d4f6a80c33` — single head, upgrade/downgrade verificados en
+  DB fresca y existente, backfill sin fechas ni asignaciones inventadas.
+
+Pendiente en esta orden (no iniciado o parcial): WS3 flujo "Pagar cuota
+contractual" en la UI (el backend ya encadena AP→allocation→posting→
+treasury→audit), WS4 wizard de proyecto + Project Cockpit, WS5 contexto
+completo de comprobante + bug de dirección de proveedor + HEIC + beneficiario
+buscar-o-crear, WS6 profundización estructural de temas + auditoría visual,
+WS7 E2E + branch protection + deploy + verificación de producción.
+
 ### 2026-08-24 — Arranque de la ORDEN MAESTRA
 
 - `CLAUDE.md` actualizado con los pilares, invariantes contables, rúbrica

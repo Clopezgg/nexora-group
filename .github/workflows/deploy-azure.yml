@@ -75,19 +75,16 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Prepare validation Protected Edit credentials
+      - name: Require Protected Edit credentials (fail-closed, ORDEN MAESTRA §12)
         run: |
           set -euo pipefail
-          if [ -n "$EDIT_ACCESS_TOKEN_SALT" ] && [ -n "$EDIT_ACCESS_TOKEN_DIGEST" ]; then
-            exit 0
+          # Protected Edit es una credencial INDEPENDIENTE del password del
+          # Administrator. No hay fallback: si faltan los secretos, el deploy
+          # falla. BOOTSTRAP_ADMIN_PASSWORD nunca se convierte en el PIN.
+          if [ -z "$EDIT_ACCESS_TOKEN_SALT" ] || [ -z "$EDIT_ACCESS_TOKEN_DIGEST" ]; then
+            echo "::error::EDIT_ACCESS_TOKEN_SALT y EDIT_ACCESS_TOKEN_DIGEST son obligatorios. Configúralos como secretos del repositorio (PBKDF2-HMAC-SHA256, 250000 iteraciones). Sin fallback."
+            exit 1
           fi
-          IFS=$'\t' read -r DERIVED_SALT DERIVED_DIGEST < <(
-            python -c 'import base64,hashlib,os,secrets; pin=os.environ["BOOTSTRAP_ADMIN_PASSWORD"]; salt=secrets.token_bytes(16); digest=hashlib.pbkdf2_hmac("sha256", pin.encode(), salt, 250000); print(base64.urlsafe_b64encode(salt).decode()+"\t"+base64.urlsafe_b64encode(digest).decode())'
-          )
-          echo "::add-mask::$DERIVED_SALT"
-          echo "::add-mask::$DERIVED_DIGEST"
-          echo "EDIT_ACCESS_TOKEN_SALT=$DERIVED_SALT" >> "$GITHUB_ENV"
-          echo "EDIT_ACCESS_TOKEN_DIGEST=$DERIVED_DIGEST" >> "$GITHUB_ENV"
 
       - name: What-if (no crea recursos)
         run: |
@@ -143,25 +140,17 @@ jobs:
       - name: Ensure Container Apps CLI extension
         run: az extension add --name containerapp --upgrade --yes
 
-      - name: Prepare Protected Edit credentials
+      - name: Require Protected Edit credentials (fail-closed, ORDEN MAESTRA §12)
         run: |
           set -euo pipefail
-          if [ -n "$EDIT_ACCESS_TOKEN_SALT" ] && [ -n "$EDIT_ACCESS_TOKEN_DIGEST" ]; then
-            echo "EDIT_ACCESS_FALLBACK=false" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          if [ -n "$EDIT_ACCESS_TOKEN_SALT" ] || [ -n "$EDIT_ACCESS_TOKEN_DIGEST" ]; then
-            echo "::error::EDIT_ACCESS_TOKEN_SALT and EDIT_ACCESS_TOKEN_DIGEST must be configured together"
+          # Protected Edit es una credencial INDEPENDIENTE del password del
+          # Administrator. NO hay fallback: si faltan EDIT_ACCESS_TOKEN_SALT
+          # o EDIT_ACCESS_TOKEN_DIGEST, el deploy FALLA. Nunca se deriva el
+          # PIN de BOOTSTRAP_ADMIN_PASSWORD.
+          if [ -z "$EDIT_ACCESS_TOKEN_SALT" ] || [ -z "$EDIT_ACCESS_TOKEN_DIGEST" ]; then
+            echo "::error::EDIT_ACCESS_TOKEN_SALT y EDIT_ACCESS_TOKEN_DIGEST son obligatorios en producción (PBKDF2-HMAC-SHA256, 250000 iteraciones). Configúralos como secretos del repositorio. Sin fallback."
             exit 1
           fi
-          IFS=$'\t' read -r DERIVED_SALT DERIVED_DIGEST < <(
-            python -c 'import base64,hashlib,os,secrets; pin=os.environ["BOOTSTRAP_ADMIN_PASSWORD"]; salt=secrets.token_bytes(16); digest=hashlib.pbkdf2_hmac("sha256", pin.encode(), salt, 250000); print(base64.urlsafe_b64encode(salt).decode()+"\t"+base64.urlsafe_b64encode(digest).decode())'
-          )
-          echo "::add-mask::$DERIVED_SALT"
-          echo "::add-mask::$DERIVED_DIGEST"
-          echo "EDIT_ACCESS_TOKEN_SALT=$DERIVED_SALT" >> "$GITHUB_ENV"
-          echo "EDIT_ACCESS_TOKEN_DIGEST=$DERIVED_DIGEST" >> "$GITHUB_ENV"
-          echo "EDIT_ACCESS_FALLBACK=true" >> "$GITHUB_ENV"
 
       - name: Build and push backend image to GHCR
         run: |
@@ -503,16 +492,31 @@ jobs:
           # Fiscal period read (returns 200 with nulls when not configured).
           call_authed 'fiscal/periods/current' 200 "/fiscal/periods/current?companyId=$COMPANY_ID" >/dev/null
 
-          if [ "${EDIT_ACCESS_FALLBACK:-false}" = "true" ]; then
-            EDIT_PAYLOAD="$(jq -n --arg token "$ADMIN_PASSWORD" '{token:$token}')"
-            curl --fail --silent --show-error \
-              --cookie "$COOKIE_JAR" \
-              --header "Origin: $FRONTEND_URL" \
-              --header 'Content-Type: application/json' \
-              --data "$EDIT_PAYLOAD" \
-              "$API/edit-access/verify" > "$RUNNER_TEMP/edit-access.json"
-            jq -e '.capability and .expiresAt and .usesRemaining' "$RUNNER_TEMP/edit-access.json" >/dev/null
+          # Protected Edit — prueba NEGATIVA (ORDEN MAESTRA §12/§27): el
+          # smoke NO conoce el PIN real (nunca se escribe en el pipeline). Se
+          # confirma que la ruta está viva y es fail-closed: un token
+          # incorrecto es rechazado con 403 y el password del Administrator
+          # NO funciona como PIN.
+          BAD_EDIT_CODE="$(curl --silent --cookie "$COOKIE_JAR" \
+            --header "Origin: $FRONTEND_URL" --header 'Content-Type: application/json' \
+            --data '{"token":"000000-not-the-pin"}' \
+            --output /dev/null --write-out '%{http_code}' \
+            "$API/edit-access/verify")"
+          if [ "$BAD_EDIT_CODE" != "403" ]; then
+            echo "::error::Protected Edit con token inválido devolvió HTTP $BAD_EDIT_CODE (se esperaba 403). La ruta debe ser fail-closed y estar configurada (no 503)."
+            exit 1
           fi
+          echo "Protected Edit: token inválido -> 403 (fail-closed, configurado, sin fallback)"
+          ADMIN_PW_AS_PIN_CODE="$(curl --silent --cookie "$COOKIE_JAR" \
+            --header "Origin: $FRONTEND_URL" --header 'Content-Type: application/json' \
+            --data "$(jq -n --arg t "$ADMIN_PASSWORD" '{token:$t}')" \
+            --output /dev/null --write-out '%{http_code}' \
+            "$API/edit-access/verify")"
+          if [ "$ADMIN_PW_AS_PIN_CODE" = "200" ]; then
+            echo "::error::El password del Administrator fue aceptado como PIN de Protected Edit. El fallback debe estar eliminado."
+            exit 1
+          fi
+          echo "Protected Edit: password del Administrator NO es el PIN (HTTP $ADMIN_PW_AS_PIN_CODE)"
 
           # Session survives logout + relogin.
           LOGOUT_CODE="$(curl --silent --cookie "$COOKIE_JAR" --cookie-jar "$COOKIE_JAR" \

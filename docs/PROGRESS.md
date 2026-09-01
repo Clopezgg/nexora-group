@@ -4401,3 +4401,36 @@ remesas jul/ago repartido en ≥6 semanas, ninguna concentra >3, total
 reconcilia; reversal de una remesa de julio → salida de caja HOY, cierre
 neto 0. Regresión: 168 tests en serie (posting/treasury/AP/AR/assets/
 workforce/equipment/reporting/financial-control/contract-payment) verdes.
+### 2026-09-01 — ORDEN MAESTRA DE RECTIFICACIÓN · PR-B — Protected Edit sin fallback (P0 seguridad §12/§27)
+
+Rama: `fix/rect-b-protected-edit-no-fallback`.
+
+**Causa raíz**: `.github/workflows/deploy-azure.yml` ("Prepare Protected Edit
+credentials", ambos jobs) — si faltaban los secretos
+`EDIT_ACCESS_TOKEN_SALT`/`DIGEST`, el workflow **derivaba silenciosamente**
+el digest PBKDF2 desde `BOOTSTRAP_ADMIN_PASSWORD` (`EDIT_ACCESS_FALLBACK=true`).
+En producción el token de Protected Edit era el password del Administrator.
+
+**Corrección**:
+- Ambos pasos "Prepare Protected Edit credentials" → **"Require Protected
+  Edit credentials (fail-closed)"**: si falta cualquiera de los dos secretos
+  → `::error::` + `exit 1`. Eliminada toda la derivación desde
+  `BOOTSTRAP_ADMIN_PASSWORD` y la variable `EDIT_ACCESS_FALLBACK`.
+- Smoke de producción: prueba **negativa** (no conoce el PIN real) —
+  token inválido → 403; el password del Administrator como token → NO 200.
+- Backend (ya era fail-closed: `Settings.validate_production_secrets` levanta
+  si `edit_access_required and not edit_access_configured`): comentarios
+  engañosos sobre "fallback PIN" eliminados en `edit_access_service.verify_pin`
+  y en `EditAccessRequest`.
+- **Secretos reales configurados**: `EDIT_ACCESS_TOKEN_SALT` +
+  `EDIT_ACCESS_TOKEN_DIGEST` derivados del PIN del usuario con
+  PBKDF2-HMAC-SHA256 250000 iteraciones, guardados como secretos del
+  repositorio. El PIN plano nunca se escribe en código, bundle, logs, tests
+  ni docs.
+
+**Tests** (`test_edit_access.py`, 9): PIN verificado solo contra el digest
+(acepta 6 dígitos o secreto largo); **el password del Administrator NO es
+aceptado como PIN** (403) y el PIN real sí emite capability;
+`/edit-access/verify` responde 503 NOT_CONFIGURED sin secretos de servidor;
+rate limit / lockout / capability firmada / session-bound / expiración ya
+cubiertos.

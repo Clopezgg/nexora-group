@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Input,
   LoadingState,
   Modal,
   MoneyInput,
@@ -435,6 +436,8 @@ function PaySupplierInvoiceButton({
   const [treasuryAccountId, setTreasuryAccountId] = useState(eligibleTreasuryAccounts[0]?.id ?? '')
   const [amount, setAmount] = useState<number | null>(remaining)
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10))
+  const [bankReference, setBankReference] = useState('')
+  const [observations, setObservations] = useState('')
 
   const mutation = useMutation({
     mutationFn: async ({
@@ -475,6 +478,8 @@ function PaySupplierInvoiceButton({
                   treasuryAccountId,
                   amount: String(amount ?? 0),
                   paymentDate,
+                  bankTransactionReference: bankReference.trim() || undefined,
+                  paymentObservations: observations.trim() || undefined,
                 },
                 idempotencyKey: crypto.randomUUID(),
               })
@@ -504,8 +509,24 @@ function PaySupplierInvoiceButton({
                 required
               />
             </label>
+            <Input
+              label="Referencia bancaria del movimiento (opcional)"
+              value={bankReference}
+              onChange={(event) => setBankReference(event.target.value)}
+              placeholder="p. ej. ATL-93829172"
+            />
+            <label className="nx-field">
+              <span className="nx-field__label">Observaciones (opcional)</span>
+              <textarea
+                className="nx-textarea"
+                value={observations}
+                onChange={(event) => setObservations(event.target.value)}
+                rows={2}
+              />
+            </label>
             <p className="nx-field__hint">
               El proyecto ya viene de la factura; aquí solo eliges desde qué banco o caja sale el dinero.
+              La referencia bancaria y las observaciones quedan persistidas y se imprimen en el comprobante.
             </p>
             {mutation.isError ? (
               <p className="nx-field__error">{(mutation.error as Error).message}</p>

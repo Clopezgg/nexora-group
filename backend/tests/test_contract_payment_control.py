@@ -359,3 +359,87 @@ def test_invoice_rejects_contract_of_another_supplier(client, db_session):
         },
     )
     assert r.status_code == 422, r.text
+
+
+# --------------------------------------------------------------------------- #
+# PR 5 — comprobante contractual: historial acumulativo + totales en el PDF   #
+# --------------------------------------------------------------------------- #
+
+def test_contract_voucher_pdf_shows_accumulative_history_and_totals(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    client.patch(
+        f"/api/master-data/companies/{company['id']}/profile",
+        json={
+            "voucherApproverName": "CARLOS HUMBERTO LOPEZ",
+            "addressLine1": "Boulevard Morazan, Edificio Nexora",
+            "city": "Tegucigalpa",
+            "fiscalId": "08019999123456",
+        },
+    )
+    supplier = create_supplier(client, company_id=company["id"], legal_name="LESTER GEOVANY RIVAS ZEPEDA")
+    contract = _contract(client, company_id=company["id"], supplier_id=supplier["id"])
+    schedule = _monthly_plan(db_session, contract["id"])
+    bank, expense, payable = _ap_setup(client, company, tag="80")
+
+    summaries = cps.installment_summaries(db_session, schedule_id=schedule.id)
+    aug = [s for s in summaries if s.period_label == "Agosto 2026"][0]
+    sep = [s for s in summaries if s.period_label == "Septiembre 2026"][0]
+
+    def _pay_contract(number, installment, amount, *, obs, ref):
+        inv = _contract_invoice(
+            client, company=company, supplier=supplier, contract_id=contract["id"],
+            expense=expense, payable=payable, amount=amount, number=number,
+        )
+        r = client.post(
+            f"/api/ap/supplier-invoices/{inv['id']}/payments",
+            json={
+                "treasuryAccountId": bank["id"], "amount": amount, "paymentDate": "2026-09-03",
+                "contractAllocations": [
+                    {"installmentId": str(installment.installment_id), "amountApplied": amount}
+                ],
+                "bankTransactionReference": ref,
+                "paymentObservations": obs,
+            },
+        )
+        assert r.status_code == 201, r.text
+        return db_session.execute(
+            select(SupplierPayment)
+            .join(SupplierInvoice, SupplierPayment.supplier_invoice_id == SupplierInvoice.id)
+            .where(SupplierInvoice.id == inv["id"])
+        ).scalar_one()
+
+    p_aug = _pay_contract("F-AUG", aug, "50000.00", obs="Mano de obra agosto 2026", ref="ATL-93829172")
+    db_session.commit()
+
+    voucher = client.get(
+        f"/api/treasury/vouchers/{p_aug.accounting_document_id}"
+        "?beneficiary=LESTER%20GEOVANY%20RIVAS%20ZEPEDA&paymentMethod=Efectivo"
+    )
+    assert voucher.status_code == 200, voucher.text
+    text = voucher.content.decode("latin-1")
+    assert "Pagos del contrato a la fecha" in text
+    assert "Agosto 2026" in text
+    assert "Septiembre 2026" not in text  # aún no ocurrió (§38)
+    assert "CTR-2026-001" in text
+    assert "Valor contractual" in text
+    assert "Pago actual" in text
+    assert "ATL-93829172" in text
+    assert "Mano de obra agosto" in text
+    assert "Boulevard Morazan" in text
+    assert "08019999123456" in text
+    assert str(p_aug.accounting_document_id) not in text  # sin UUID
+
+    # Septiembre -> el voucher de septiembre incluye Ago + Sep, NUNCA octubre.
+    p_sep = _pay_contract("F-SEP", sep, "50000.00", obs="Mano de obra septiembre", ref="ATL-99999")
+    db_session.commit()
+    voucher_sep = client.get(
+        f"/api/treasury/vouchers/{p_sep.accounting_document_id}"
+        "?beneficiary=LESTER%20GEOVANY%20RIVAS%20ZEPEDA&paymentMethod=Efectivo"
+    )
+    assert voucher_sep.status_code == 200, voucher_sep.text
+    text_sep = voucher_sep.content.decode("latin-1")
+    assert "Agosto 2026" in text_sep
+    assert "Septiembre 2026" in text_sep
+    assert "Octubre 2026" not in text_sep
+    assert "Pagado anteriormente" in text_sep

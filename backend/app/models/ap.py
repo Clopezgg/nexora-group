@@ -107,6 +107,14 @@ class SupplierPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
     )
     reversal_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Referencia del MOVIMIENTO bancario (distinta de
+    # TreasuryAccount.account_reference, que es el número de nuestra cuenta).
+    # Orden maestra final §25 — se persiste, se audita, se imprime y la
+    # conciliación puede aprovecharla.
+    bank_transaction_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Observaciones persistidas del pago (§24) — DB, audit, inspector, voucher.
+    payment_observations: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
 
 class SupplierInvoicePaymentPlanItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """Cuota de un plan de pago de una factura de proveedor (orden maestra

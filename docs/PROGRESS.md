@@ -4100,3 +4100,32 @@ faltan en `Company`/`Project` para el PDF.
   ciudad, departamento, teléfono, correo, sitio, texto de pie).
 - Tests: `test_company_project_document_profile.py` (2). Regresión:
   master-data/migrations/edit-access 19, frontend 167 verdes.
+
+### 2026-09-01 — ORDEN MAESTRA FINAL · CPC PR 5 (comprobante contractual: historial + totales + referencia bancaria)
+
+Rama: `feat/cpc-5-contract-voucher-pdf`.
+
+- **`supplier_payments`** (§24/§25): `bank_transaction_reference` (referencia
+  del MOVIMIENTO bancario, distinta del número de nuestra cuenta) y
+  `payment_observations` — persistidos, auditados, aceptados en
+  `POST /api/ap/supplier-invoices/{id}/payments`. Migración `bbc5c029c82c`
+  (single head, roundtrip).
+- **`voucher_service`** — cuando el comprobante corresponde a un pago
+  contractual (PAY doc → SupplierPayment → `ContractPaymentAllocation` →
+  schedule):
+  - Bloque **"Pagos del contrato a la fecha"** con `history_through(período)`
+    — historial **ACUMULATIVO**, corte en el período del pago, **nunca
+    meses futuros** (§38). La cuota del pago se marca "Pago actual".
+  - **Totales de contrato** (§39): valor contractual, pagado anteriormente,
+    pago actual, pagado acumulado, saldo contractual.
+  - Info del pago: contrato, período contractual, cuota N de M, referencia
+    bancaria, observaciones (§35/§36).
+  - Bloque EMISOR con nombre comercial, RTN, dirección, teléfono, correo del
+    perfil documental de la compañía (§34).
+- **Frontend**: campos "Referencia bancaria" + "Observaciones" en el modal
+  de pago de factura de proveedor.
+- Tests: `test_contract_payment_control.py` +1 — el voucher de agosto sólo
+  muestra agosto; el de septiembre muestra Ago+Sep pero **nunca octubre**
+  (§38); contiene contrato, totales, referencia bancaria, observaciones,
+  dirección de la compañía, sin UUID. Regresión: contract-payments/AP 35,
+  frontend 167 verdes.

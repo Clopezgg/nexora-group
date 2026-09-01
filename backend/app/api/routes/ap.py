@@ -298,6 +298,8 @@ def pay_supplier_invoice(
                 else None
             ),
             contract_override_reason=payload.contract_override_reason,
+            bank_transaction_reference=payload.bank_transaction_reference,
+            payment_observations=payload.payment_observations,
             commit=outcome is None,
         )
         audit_service.record(
@@ -309,7 +311,7 @@ def pay_supplier_invoice(
             company_id=invoice.company_id,
             project_id=invoice.project_id,
             before=None,
-            after={"amount": str(payment.amount), "invoiceId": str(invoice.id)},
+            after={"amount": str(payment.amount), "invoiceId": str(invoice.id), "bankTransactionReference": payment.bank_transaction_reference, "paymentObservations": payment.payment_observations},
             correlation_id=correlation_id,
         )
         response = SupplierPaymentResponse.model_validate(payment, from_attributes=True)

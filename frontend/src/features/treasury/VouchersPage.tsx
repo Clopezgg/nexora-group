@@ -219,12 +219,15 @@ function PaymentEvidenceField({
   )
 }
 
+// El comprobante de pago documenta un EGRESO de tesorería. "Remesa" es un
+// INGRESO (TreasuryDirection INFLOW) y por eso ya no es un método de pago de
+// comprobante — la sigue registrando Tesorería y aparece en el Flujo de Caja
+// Real, pero nunca genera un Payment Voucher.
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   TRANSFER: 'Transferencia',
   DEPOSIT: 'Depósito',
   CHECK: 'Cheque',
   CASH: 'Efectivo',
-  REMITTANCE: 'Remesa',
   OTHER: 'Otro',
 }
 
@@ -338,8 +341,18 @@ export function VouchersPage() {
       <Card title="Documento contable">
         {documentsQuery.isLoading ? <LoadingState label="Cargando documentos…" /> : documentsQuery.isError ? (
           <ErrorState description="No se pudieron cargar los documentos contables." onRetry={() => documentsQuery.refetch()} />
+        ) : documents.length === 0 ? (
+          <EmptyState
+            icon="receipt"
+            title="No hay egresos para documentar"
+            description="El comprobante de pago solo se emite para un egreso de tesorería (pago a proveedor, gasto, activo). Los ingresos como las remesas se registran en Tesorería pero no generan comprobante."
+          />
         ) : (
           <div className="nx-treasury__form">
+            <p className="nx-field__hint">
+              Solo se listan egresos de tesorería. Un ingreso (remesa, aporte, financiamiento) o una
+              transferencia interna nunca genera comprobante de pago.
+            </p>
             <Select label="Asiento / documento" value={documentId} onChange={(event) => setDocumentId(event.target.value)}>
               <option value="">Selecciona un documento…</option>
               {documents.map((document) => (
@@ -389,7 +402,6 @@ export function VouchersPage() {
             <option value="DEPOSIT">Depósito</option>
             <option value="CHECK">Cheque</option>
             <option value="CASH">Efectivo</option>
-            <option value="REMITTANCE">Remesa</option>
             <option value="OTHER">Otro</option>
           </Select>
           <Select

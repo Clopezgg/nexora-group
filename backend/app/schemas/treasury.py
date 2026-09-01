@@ -189,3 +189,31 @@ class BeneficiaryOption(CamelModel):
     id: uuid.UUID
     name: str
     reference: str | None = None
+
+
+class VoucherCandidateResponse(CamelModel):
+    """AccountingDocument elegible para Payment Voucher: EXCLUSIVAMENTE
+    documentos cuya dirección de tesorería es OUTFLOW. Los inflows (remesas,
+    cobros, aportes, financiamiento) y las transferencias internas nunca
+    aparecen aquí — el filtro es server-side, no se ocultan en el browser."""
+
+    id: uuid.UUID
+    document_number: str
+    company_id: uuid.UUID
+    scope: str
+    project_id: uuid.UUID | None = None
+    currency_code: str
+    status: str
+    description: str | None = None
+    treasury_direction: str
+    treasury_net: Decimal
+
+
+class TreasuryDirectionResponse(CamelModel):
+    accounting_document_id: uuid.UUID
+    direction: str  # INFLOW | OUTFLOW | INTERNAL_TRANSFER | NON_TREASURY
+    treasury_debits: Decimal
+    treasury_credits: Decimal
+    treasury_net: Decimal
+    treasury_account_count: int
+    voucher_eligible: bool

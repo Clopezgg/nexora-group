@@ -1,5 +1,16 @@
 import { apiFetch } from './httpClient'
 
+export interface JournalDocumentOption {
+  id: string
+  documentNumber: string
+  companyId: string
+  scope: string
+  projectId: string | null
+  currencyCode: string
+  status: string
+  description: string | null
+}
+
 export interface InspectedLine {
   accountCode: string
   accountName: string
@@ -39,6 +50,13 @@ export interface Inspection {
 }
 
 export const transactionInspectorService = {
+  /** Todos los asientos de la compañía — el inspector puede analizar
+   * cualquier documento contable, no solo los egresos de tesorería. */
+  listDocuments: (companyId: string) =>
+    apiFetch<JournalDocumentOption[]>(
+      `/accounting/journal-entries?companyId=${encodeURIComponent(companyId)}&limit=250`,
+    ),
+
   inspect: (documentId: string) =>
     apiFetch<Inspection>(`/accounting/journal-entries/${documentId}/inspect`),
 }

@@ -50,6 +50,7 @@ from app.domain.errors import (
     UserEmailExistsError,
     UnbalancedJournalEntryError,
     UnsupportedEvidenceMimeTypeError,
+    VoucherNotOutflowError,
     NotFoundError,
 )
 from app.integrations.azure_blob import EvidenceStorageNotConfigured
@@ -70,6 +71,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     IdempotencyConflictError: ("NXR-IDEMPOTENCY-001", 409),
     NotAuthorizedError: ("NXR-PERM-001", 403),
     InvalidTransferError: ("NXR-TREASURY-001", 422),
+    VoucherNotOutflowError: ("NXR-VOUCHER-NOT-OUTFLOW", 422),
     InvalidInvoiceStateError: ("NXR-AP-001", 409),
     OverpaymentError: ("NXR-AP-002", 422),
     InvalidFinancialReferenceError: ("NXR-FINANCIAL-001", 422),

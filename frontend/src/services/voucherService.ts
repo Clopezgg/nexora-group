@@ -9,6 +9,10 @@ export interface JournalDocumentOption {
   currencyCode: string
   status: string
   description: string | null
+  /** INFLOW | OUTFLOW | INTERNAL_TRANSFER | NON_TREASURY. Los candidatos a
+   * comprobante son siempre OUTFLOW (filtro server-side). */
+  treasuryDirection?: string
+  treasuryNet?: string
 }
 
 export interface BeneficiaryOption {
@@ -19,9 +23,16 @@ export interface BeneficiaryOption {
 }
 
 export const voucherService = {
+  /**
+   * Documentos elegibles para Payment Voucher: EXCLUSIVAMENTE los OUTFLOW de
+   * tesorería. El filtro es server-side (§17) — un ingreso (remesa, cobro,
+   * aporte de capital, financiamiento) o una transferencia interna nunca
+   * llega aquí. El backend además rechaza (422 NXR-VOUCHER-NOT-OUTFLOW) si
+   * se intentara emitir un comprobante para un no-egreso.
+   */
   listDocuments: (companyId: string) =>
     apiFetch<JournalDocumentOption[]>(
-      `/accounting/journal-entries?companyId=${encodeURIComponent(companyId)}&limit=250`,
+      `/treasury/voucher-candidates?companyId=${encodeURIComponent(companyId)}`,
     ),
 
   listBeneficiaries: (companyId: string) =>

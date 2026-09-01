@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id, get_db
 from app.api.deps_correlation import get_correlation_id
-from app.domain.errors import InvalidFinancialReferenceError
+from app.domain.errors import InvalidFinancialReferenceError, VoucherNotOutflowError
 from app.models.accounting import AccountingDocument
 from app.models.company import Company
 from app.models.crm import Customer
@@ -37,10 +37,18 @@ from app.schemas.treasury import (
     RemittanceResponse,
     TreasuryAccountCreateRequest,
     TreasuryAccountResponse,
+    TreasuryDirectionResponse,
     TreasuryTransferCreateRequest,
     TreasuryTransferResponse,
+    VoucherCandidateResponse,
 )
-from app.services import audit_service, idempotency_service, treasury_service, voucher_service
+from app.services import (
+    audit_service,
+    idempotency_service,
+    treasury_direction_service,
+    treasury_service,
+    voucher_service,
+)
 from app.services.permission_service import (
     accessible_project_ids,
     assert_company_access,
@@ -823,6 +831,77 @@ def list_beneficiaries(
     return options
 
 
+@router.get("/voucher-candidates", response_model=list[VoucherCandidateResponse])
+def list_voucher_candidates(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("treasury.voucher", "read")),
+) -> list[VoucherCandidateResponse]:
+    """Documentos elegibles para Payment Voucher: SOLO los OUTFLOW de
+    tesorería. El filtro es server-side (§17) — una remesa o un cobro nunca
+    llega al cliente para ocultarse."""
+    assert_company_access(
+        db, user_id=user.id, resource="treasury.voucher", action="read", company_id=company_id
+    )
+    outflow_ids = treasury_direction_service.outflow_document_ids(db, company_id=company_id)
+    if not outflow_ids:
+        return []
+    documents = (
+        db.query(AccountingDocument)
+        .filter(
+            AccountingDocument.company_id == company_id,
+            AccountingDocument.id.in_(outflow_ids),
+        )
+        .order_by(AccountingDocument.posted_at.desc(), AccountingDocument.created_at.desc())
+        .all()
+    )
+    out: list[VoucherCandidateResponse] = []
+    for document in documents:
+        direction = treasury_direction_service.classify(db, document)
+        out.append(
+            VoucherCandidateResponse(
+                id=document.id,
+                document_number=document.document_number,
+                company_id=document.company_id,
+                scope=document.scope,
+                project_id=document.project_id,
+                currency_code=document.currency_code,
+                status=document.status,
+                description=document.description,
+                treasury_direction=direction.direction,
+                treasury_net=direction.treasury_net,
+            )
+        )
+    return out
+
+
+@router.get(
+    "/documents/{accounting_document_id}/treasury-direction",
+    response_model=TreasuryDirectionResponse,
+)
+def get_treasury_direction(
+    accounting_document_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("treasury.voucher", "read")),
+) -> TreasuryDirectionResponse:
+    document = db.get(AccountingDocument, accounting_document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
+    assert_company_access(
+        db, user_id=user.id, resource="treasury.voucher", action="read", company_id=document.company_id
+    )
+    d = treasury_direction_service.classify(db, document)
+    return TreasuryDirectionResponse(
+        accounting_document_id=document.id,
+        direction=d.direction,
+        treasury_debits=d.treasury_debits,
+        treasury_credits=d.treasury_credits,
+        treasury_net=d.treasury_net,
+        treasury_account_count=d.treasury_account_count,
+        voucher_eligible=d.voucher_eligible,
+    )
+
+
 # Métodos de pago que exigen comprobante de respaldo (orden maestra Phase 2).
 _METHODS_REQUIRING_EVIDENCE = {
     "TRANSFER", "TRANSFERENCIA", "WIRE",
@@ -859,6 +938,20 @@ def download_voucher(
         company_id=document.company_id,
     )
     company = db.get(Company, document.company_id)
+
+    # Defense-in-depth (§15/§16/§26): un Payment Voucher documenta
+    # EXCLUSIVAMENTE un OUTFLOW de tesorería. Aunque el candidato ya se
+    # filtra server-side, el endpoint de descarga vuelve a comprobarlo —
+    # fail-closed — para que una remesa, un cobro, un aporte de capital o
+    # una transferencia interna nunca genere un comprobante de egreso.
+    direction = treasury_direction_service.classify(db, document)
+    if not direction.voucher_eligible:
+        raise VoucherNotOutflowError(
+            "Este documento no es un egreso de tesorería "
+            f"(dirección: {direction.direction}); no puede emitir un "
+            "comprobante de pago. Los ingresos (remesas, cobros, aportes) y "
+            "las transferencias internas no generan Payment Voucher."
+        )
 
     # Beneficiario: preferimos el registro real (Supplier/Worker/Customer);
     # el texto libre `beneficiary` solo se usa como fallback.

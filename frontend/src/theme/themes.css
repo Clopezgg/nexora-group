@@ -288,3 +288,105 @@
 :root[data-nx-density='finance-dense'] body {
   line-height: 1.35;
 }
+
+/* ==========================================================================
+ * Capa estructural — shell, navegación, controles (ORDEN MAESTRA §4).
+ * Cambiar de FAMILIA cambia el tratamiento del sidebar activo, el radio de
+ * los controles, la altura de fila, badges y segmented — no solo el color.
+ * ======================================================================== */
+
+/* --- Sidebar: estado activo/hover desde los tokens de shell de la familia --- */
+:root[data-nx-themed='on'] body .nx-sidebar__link {
+  border-radius: var(--nx-shape-radius-sm, 5px);
+  transition:
+    background-color var(--nx-motion-fast, 120ms) var(--nx-motion-easing, ease),
+    color var(--nx-motion-fast, 120ms) var(--nx-motion-easing, ease);
+}
+:root[data-nx-themed='on'] body .nx-sidebar__link:hover {
+  background: color-mix(in srgb, var(--nx-shell-sidebar-active-bg, #123a68) 55%, transparent);
+  color: var(--nx-shell-sidebar-active-text, #fff);
+}
+:root[data-nx-themed='on'] body .nx-sidebar__link--active {
+  background: var(--nx-shell-sidebar-active-bg, #123a68);
+  color: var(--nx-shell-sidebar-active-text, #fff);
+  box-shadow: none;
+}
+/* Horizon/NEXORA: barra de acento a la izquierda. Quartz/Belize: sin barra,
+   el bloque teñido ya marca la selección (jerarquía por superficie). */
+:root[data-nx-family='quartz'] body .nx-sidebar__link--active::before,
+:root[data-nx-family='belize'] body .nx-sidebar__link--active::before {
+  display: none;
+}
+:root[data-nx-themed='on'] body .nx-sidebar__link--active::before {
+  background: var(--nx-color-accent, #1769d2);
+  border-radius: 0 2px 2px 0;
+}
+
+/* --- Topbar: borde/altura de la familia --- */
+:root[data-nx-themed='on'] body .nx-topbar {
+  border-bottom-width: var(--nx-shape-border-width, 1px);
+}
+
+/* --- Botones: altura y radio de densidad/familia --- */
+:root[data-nx-themed='on'] body .nx-button {
+  min-height: var(--nx-density-control-height, 36px);
+  transition:
+    background-color var(--nx-motion-fast, 120ms) var(--nx-motion-easing, ease),
+    border-color var(--nx-motion-fast, 120ms) var(--nx-motion-easing, ease);
+}
+
+/* --- Badges / status pills: radio de la familia (Belize casi recto,
+   Horizon redondeado) --- */
+:root[data-nx-themed='on'] body .nx-badge {
+  border-radius: var(--nx-shape-radius-xs, 4px);
+}
+:root[data-nx-family='horizon'] body .nx-badge,
+:root[data-nx-family='nexora'] body .nx-badge {
+  border-radius: 999px;
+}
+
+/* --- Segmented control / tabs: radio de la familia --- */
+:root[data-nx-themed='on'] body .nx-segmented {
+  border-radius: var(--nx-shape-radius-sm, 6px);
+}
+:root[data-nx-themed='on'] body .nx-segmented__option {
+  border-radius: calc(var(--nx-shape-radius-sm, 6px) - 2px);
+}
+:root[data-nx-themed='on'] body .nx-tabs__tab--active {
+  border-bottom-color: var(--nx-color-accent, #1769d2);
+}
+
+/* --- Altura de fila de tabla desde la densidad --- */
+:root[data-nx-themed='on'] body .nx-table tbody tr {
+  height: var(--nx-density-row-height, 38px);
+}
+
+/* --- Page header: ritmo de espaciado desde la densidad --- */
+:root[data-nx-themed='on'] body .nx-page__header {
+  margin-bottom: var(--nx-density-card-padding, 16px);
+}
+
+/* --- Belize: cabeceras de sección con peso (herencia SAP Belize) --- */
+:root[data-nx-family='belize'] body .nx-card__title,
+:root[data-nx-family='belize'] body .nx-page__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+/* --- Quartz: superficies más planas, divisores más marcados --- */
+:root[data-nx-family='quartz'] body .nx-card,
+:root[data-nx-family='quartz'] body .nx-chart-card {
+  border-color: var(--nx-color-border-strong, var(--nx-theme-border));
+}
+
+/* --- Sidebar: color base de link/icono desde el token de shell --- */
+:root[data-nx-themed='on'] body .nx-sidebar__link {
+  color: var(--nx-shell-sidebar-text, #c2d0df);
+}
+:root[data-nx-themed='on'] body .nx-sidebar__link .nx-icon {
+  color: color-mix(in srgb, var(--nx-shell-sidebar-text, #c2d0df) 78%, transparent);
+}
+:root[data-nx-themed='on'] body .nx-sidebar__link--active .nx-icon {
+  color: var(--nx-shell-sidebar-active-text, #fff);
+}

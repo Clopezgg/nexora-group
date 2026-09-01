@@ -119,17 +119,17 @@ export function HomeForecastCard({ companyId }: { companyId: string }) {
           <div style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e6ecf3" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--nx-chart-grid, #e6ecf3)" />
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} />
                 <YAxis tick={{ fontSize: 10 }} width={52} tickFormatter={abbreviate} />
                 <Tooltip formatter={(value) => exact(Number(value))} />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="Entradas" fill="#0f9f6e" barSize={8} />
-                <Bar dataKey="Salidas" fill="#dc3f50" barSize={8} />
+                <Bar dataKey="Entradas" fill="var(--nx-color-positive, #0f9f6e)" barSize={8} />
+                <Bar dataKey="Salidas" fill="var(--nx-color-negative, #dc3f50)" barSize={8} />
                 <Line
                   type="monotone"
                   dataKey="Saldo"
-                  stroke="#1769d2"
+                  stroke="var(--nx-color-accent, #1769d2)"
                   strokeWidth={2}
                   dot={false}
                 />

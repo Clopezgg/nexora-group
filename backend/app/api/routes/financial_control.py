@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -8,6 +9,9 @@ from app.schemas.exceptions import ExceptionCenterResponse, ExceptionResponse
 from app.schemas.financial_control import (
     ActualWeekResponse,
     CashFlowActualResponse,
+    CashFlowMovementResponse,
+    CashFlowPeriodResponse,
+    CashFlowSeriesResponse,
     CashForecastResponse,
     DailyStatusResponse,
     ForecastWeekResponse,
@@ -157,6 +161,85 @@ def cash_flow_actual(
             for w in cf.weeks
         ],
     )
+
+
+@router.get("/cash-flow-actual/series", response_model=CashFlowSeriesResponse)
+def cash_flow_actual_series(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    date_from: date | None = Query(default=None, alias="from"),
+    date_to: date | None = Query(default=None, alias="to"),
+    granularity: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current: tuple = Depends(get_current_user),
+) -> CashFlowSeriesResponse:
+    """Flujo de caja REALIZADO sobre un rango de fechas REAL con granularidad
+    Auto/Día/Semana/Mes (§10/§11). Sin obligar a interpretar S1..S13."""
+    user, _roles = current
+    assert_company_access(
+        db, user_id=user.id, resource="core.company", action="read", company_id=company_id
+    )
+    s = cash_flow_actual_service.series(
+        db, company_id=company_id, date_from=date_from, date_to=date_to, granularity=granularity
+    )
+    return CashFlowSeriesResponse(
+        date_from=s.date_from,
+        date_to=s.date_to,
+        granularity=s.granularity,
+        currency_code=s.currency_code,
+        opening_balance=s.opening_balance,
+        closing_balance=s.closing_balance,
+        total_inflows=s.total_inflows,
+        total_outflows=s.total_outflows,
+        inflow_by_category=s.inflow_by_category,
+        outflow_by_category=s.outflow_by_category,
+        periods=[
+            CashFlowPeriodResponse(
+                index=p.index,
+                period_start=p.period_start,
+                period_end=p.period_end,
+                label=p.label,
+                inflows=p.inflows,
+                outflows=p.outflows,
+                net=p.net,
+                closing_balance=p.closing_balance,
+                movement_count=p.movement_count,
+                by_category=p.by_category,
+            )
+            for p in s.periods
+        ],
+    )
+
+
+@router.get("/cash-flow-actual/movements", response_model=list[CashFlowMovementResponse])
+def cash_flow_actual_movements(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    date_from: date = Query(alias="from"),
+    date_to: date = Query(alias="to"),
+    db: Session = Depends(get_db),
+    current: tuple = Depends(get_current_user),
+) -> list[CashFlowMovementResponse]:
+    """Drill-down: los movimientos individuales de tesorería en el rango
+    (click en una barra/punto del gráfico, §10/§11)."""
+    user, _roles = current
+    assert_company_access(
+        db, user_id=user.id, resource="core.company", action="read", company_id=company_id
+    )
+    rows = cash_flow_actual_service.movements(
+        db, company_id=company_id, date_from=date_from, date_to=date_to
+    )
+    return [
+        CashFlowMovementResponse(
+            document_id=m.document_id,
+            document_number=m.document_number,
+            effective_date=m.effective_date,
+            direction=m.direction,
+            category=m.category,
+            amount=m.amount,
+            concept=m.concept,
+            counterparty=m.counterparty,
+        )
+        for m in rows
+    ]
 
 
 @router.get("/ar-metrics", response_model=None)

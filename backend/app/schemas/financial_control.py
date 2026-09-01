@@ -56,8 +56,8 @@ class ActualWeekResponse(CamelModel):
 
 
 class CashFlowActualResponse(CamelModel):
-    """Flujo de caja REALIZADO — últimas 13 semanas. Distinto del forecast:
-    esto ya ocurrió, leído del movimiento real de las cuentas de tesorería."""
+    """Flujo de caja REALIZADO — últimas 13 semanas (forma de compatibilidad
+    para el Home). Distinto del forecast."""
 
     as_of: date
     currency_code: str
@@ -68,3 +68,44 @@ class CashFlowActualResponse(CamelModel):
     inflow_by_category: dict[str, Decimal]
     outflow_by_category: dict[str, Decimal]
     weeks: list[ActualWeekResponse]
+
+
+class CashFlowPeriodResponse(CamelModel):
+    index: int
+    period_start: date
+    period_end: date
+    label: str
+    inflows: Decimal
+    outflows: Decimal
+    net: Decimal
+    closing_balance: Decimal
+    movement_count: int
+    by_category: dict[str, Decimal]
+
+
+class CashFlowSeriesResponse(CamelModel):
+    """Flujo de caja REALIZADO sobre un rango de fechas real con granularidad
+    Auto/Día/Semana/Mes y etiquetas de calendario (ORDEN MAESTRA §10/§11)."""
+
+    date_from: date
+    date_to: date
+    granularity: str
+    currency_code: str
+    opening_balance: Decimal
+    closing_balance: Decimal
+    total_inflows: Decimal
+    total_outflows: Decimal
+    inflow_by_category: dict[str, Decimal]
+    outflow_by_category: dict[str, Decimal]
+    periods: list[CashFlowPeriodResponse]
+
+
+class CashFlowMovementResponse(CamelModel):
+    document_id: uuid.UUID
+    document_number: str
+    effective_date: date
+    direction: str
+    category: str
+    amount: Decimal
+    concept: str | None = None
+    counterparty: str | None = None

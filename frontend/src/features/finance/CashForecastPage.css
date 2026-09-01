@@ -1,0 +1,31 @@
+.nx-cashflow-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.nx-cashflow-controls .nx-field {
+  min-width: 140px;
+}
+
+.nx-linkbutton {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 2px 6px;
+  border-radius: var(--nx-shape-radius-sm, 4px);
+  font: inherit;
+  font-weight: 600;
+  color: var(--nx-color-accent, #1769d2);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.nx-linkbutton:hover:not(:disabled) {
+  background: var(--nx-color-surface-sunken, #f0f5fb);
+  text-decoration: underline;
+}
+.nx-linkbutton:disabled {
+  color: var(--nx-color-text-subtle, #7c8da6);
+  cursor: default;
+}

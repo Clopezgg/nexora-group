@@ -76,6 +76,7 @@ def get_or_create(
         ),
         company_phone_snapshot=getattr(company, "phone", None),
         company_email_snapshot=getattr(company, "email", None),
+        company_website_snapshot=getattr(company, "website", None),
         company_footer_snapshot=getattr(company, "voucher_footer_text", None),
         project_name_snapshot=project.name if project else None,
         project_address_snapshot=_join(

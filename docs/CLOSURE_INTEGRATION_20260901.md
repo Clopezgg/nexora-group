@@ -74,16 +74,32 @@ Ningún endpoint nuevo devuelve 404.
   Contratos.
 - **§42** — ruleset de `main` aplicado.
 
-## Pendiente (NO entregado en esta ejecución)
+## Segunda iteración (PR #94 — WS5 §27 + WS6 §50)
 
-- **WS5 §27** — rediseño premium completo del PDF del comprobante (jerarquía
-  documental, sistema tipográfico propio). Parcial: el asiento contable ya
-  no domina la página 1.
-- **WS6 §31-38/§50** — profundización estructural de temas por familia
-  (dialogs/drawers/object-page) + auditoría visual sistemática con Playwright
-  a 390/430/768/1024/1440 sobre el build desplegado.
-- **WS7** — captura visual del Home desplegado confirmando ausencia de
-  S1–S13 en el navegador (requiere credenciales de sesión) y verificación
-  visual de los 4 temas en producción.
+- **WS5 §27** — comprobante premium: membrete corporativo con identidad
+  completa de la empresa emisora (razón comercial/legal, RTN, dirección,
+  teléfono · correo · **sitio web**) + tarjeta de metadatos del documento +
+  QR; `_styles()` documentado como sistema tipográfico DEL DOCUMENTO,
+  independiente de los temas de UI; banda "PAGADO A / BENEFICIARIO" / "PAGADO
+  POR"; `_section()` uniforma la jerarquía; bloque TOTAL PAGADO a 20pt; pie de
+  página en cada hoja (NEXORA GROUP · Comprobante · Verificación · Página X).
+  `company_website_snapshot` (migración `e6b8d0c41a77`). Test
+  `test_voucher_pdf_is_a_premium_corporate_document`.
+- **WS6 §50** — `e2e/visual-audit.spec.ts`: 8 rutas autenticadas + el
+  asistente de proyecto a 1440/768/390 con gates reales (sin scroll
+  horizontal de página, nada fuera del viewport, objetivo táctil ≥ 32px en
+  móvil, sin S1..S13). Hallazgo corregido: `.nx-linkbutton` del flujo de caja
+  era 20×20 → 32px mínimo. Corre en CI vía `npm run test:e2e`.
 
-No se usa la frase reservada de cierre: quedan P1 (§27, §50) sin resolver.
+## Pendiente
+
+- **WS6 §31-38** — profundización estructural adicional de temas por familia
+  (dialogs/drawers/object-page con tratamientos perceptiblemente distintos
+  entre Horizon/Quartz/Belize/NEXORA más allá de lo ya diferenciado en PR-D).
+- **WS7** — captura visual del Home DESPLEGADO en producción confirmando
+  ausencia de S1–S13 en el navegador (requiere credenciales de la sesión de
+  producción, que no están disponibles en este entorno) y verificación
+  visual de los 4 temas en el build de producción.
+
+No se usa la frase reservada de cierre: queda §31-38 estructural y la
+verificación visual en el navegador de producción.

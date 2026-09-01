@@ -48,6 +48,7 @@ class VoucherIssuance(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     company_address_snapshot: Mapped[str | None] = mapped_column(String(600), nullable=True)
     company_phone_snapshot: Mapped[str | None] = mapped_column(String(64), nullable=True)
     company_email_snapshot: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    company_website_snapshot: Mapped[str | None] = mapped_column(String(255), nullable=True)
     company_footer_snapshot: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # --- Snapshots de proyecto / contrato ---

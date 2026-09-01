@@ -643,8 +643,10 @@ def generate_voucher_pdf(
             )
         )
 
-    # -- Asiento contable -----------------------------------------
-    story.append(Paragraph("Asiento contable", styles["h2"]))
+    # -- Asiento contable — se difiere a la PÁGINA 2 (ORDEN MAESTRA §13:
+    #    el asiento no debe dominar visualmente la primera página; la
+    #    primera página es el documento de negocio). ------------------
+    accounting_flow: list = [Paragraph("Asiento contable", styles["h2"])]
     acc_rows = [["Código / Cuenta", "Débito", "Crédito"]]
     total_debit = Decimal("0")
     total_credit = Decimal("0")
@@ -677,8 +679,8 @@ def generate_voucher_pdf(
             ]
         )
     )
-    story.append(acc_table)
-    story.append(
+    accounting_flow.append(acc_table)
+    accounting_flow.append(
         Paragraph(
             "Doble partida: TOTAL DÉBITO = TOTAL CRÉDITO. El comprobante no puede "
             "alterar el asiento contabilizado.",
@@ -740,14 +742,17 @@ def generate_voucher_pdf(
         )
     )
 
-    # -- Página 2: evidencia a tamaño completo -----------------
+    # -- Página 2: respaldo contable + evidencia a tamaño completo ---
+    story.append(PageBreak())
+    story.extend(accounting_flow)
+
     full_image = (
         _evidence_image(evidence, max_width=17 * cm, max_height=20 * cm)
         if evidence is not None
         else None
     )
     if full_image is not None:
-        story.append(PageBreak())
+        story.append(Spacer(1, 14))
         story.append(Paragraph("Evidencia de pago", styles["h2"]))
         digest = (evidence.content_hash or "").upper()
         story.append(

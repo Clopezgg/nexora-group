@@ -6,6 +6,12 @@ export interface Supplier {
   taxId: string | null
   email: string | null
   phone: string | null
+  address: string | null
+  addressLine1: string | null
+  addressLine2: string | null
+  city: string | null
+  stateDepartment: string | null
+  country: string | null
   status: string
   classification: string | null
 }

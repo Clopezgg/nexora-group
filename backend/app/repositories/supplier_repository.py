@@ -30,6 +30,11 @@ def create_supplier(
     classification: str | None,
     payment_terms: str | None,
     banking_details: dict | None,
+    address_line_1: str | None = None,
+    address_line_2: str | None = None,
+    city: str | None = None,
+    state_department: str | None = None,
+    country: str | None = None,
 ) -> Supplier:
     supplier = Supplier(
         company_id=company_id,
@@ -40,6 +45,11 @@ def create_supplier(
         email=email,
         phone=phone,
         address=address,
+        address_line_1=address_line_1 or (address.strip()[:255] if address and address.strip() else None),
+        address_line_2=address_line_2,
+        city=city,
+        state_department=state_department,
+        country=country,
         classification=classification,
         payment_terms=payment_terms,
         banking_details=banking_details,

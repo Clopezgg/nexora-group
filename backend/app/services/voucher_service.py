@@ -264,17 +264,33 @@ def _resolve_beneficiary_details(
     supplier = db.get(Supplier, supplier_id)
     if supplier is None:
         return None, None
-    address = " · ".join(
+    tax_id = getattr(supplier, "tax_id", None) or getattr(supplier, "fiscal_id", None)
+    return format_supplier_address(supplier), tax_id
+
+
+def format_supplier_address(supplier) -> str | None:
+    """Dirección del beneficiario para el comprobante (§26).
+
+    Usa la dirección ESTRUCTURADA canónica; si está vacía, recurre al texto
+    libre `address` conservado por compatibilidad.
+    """
+    structured = " · ".join(
         str(part).strip()
         for part in (
             getattr(supplier, "address_line_1", None),
+            getattr(supplier, "address_line_2", None),
             getattr(supplier, "city", None),
+            getattr(supplier, "state_department", None),
             getattr(supplier, "country", None),
         )
         if part and str(part).strip()
-    ) or None
-    tax_id = getattr(supplier, "tax_id", None) or getattr(supplier, "fiscal_id", None)
-    return address, tax_id
+    )
+    if structured:
+        return structured
+    legacy = getattr(supplier, "address", None)
+    if legacy and str(legacy).strip():
+        return str(legacy).strip()
+    return None
 
 
 def _load_payment_evidence(db: Session, document: AccountingDocument) -> Evidence | None:

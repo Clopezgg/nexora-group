@@ -17,6 +17,11 @@ class SupplierCreateRequest(CamelModel):
     email: str | None = None
     phone: str | None = None
     address: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    city: str | None = None
+    state_department: str | None = None
+    country: str | None = None
     classification: str | None = None
     payment_terms: str | None = None
     banking_details: dict | None = None
@@ -32,6 +37,11 @@ class SupplierResponse(CamelModel):
     email: str | None
     phone: str | None
     address: str | None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    city: str | None = None
+    state_department: str | None = None
+    country: str | None = None
     status: str
     classification: str | None
     payment_terms: str | None

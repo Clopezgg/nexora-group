@@ -39,7 +39,15 @@ class Supplier(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     contact_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # `address` (texto libre) se conserva por compatibilidad. La dirección
+    # estructurada es la arquitectura canónica (orden maestra final §26) y la
+    # que consume el comprobante — mismo modelo que `projects`.
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    address_line_1: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address_line_2: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    state_department: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(2), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="ACTIVE")
     classification: Mapped[str | None] = mapped_column(String(64), nullable=True)
     payment_terms: Mapped[str | None] = mapped_column(String(255), nullable=True)

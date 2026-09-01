@@ -13,7 +13,17 @@ import type {
 export const procurementService = {
   listSuppliers: (companyId: string) =>
     apiFetch<Supplier[]>(`/procurement/suppliers?company_id=${companyId}`),
-  createSupplier: (payload: { companyId: string; legalName: string; tradeName?: string; taxId?: string }) =>
+  createSupplier: (payload: {
+    companyId: string
+    legalName: string
+    tradeName?: string
+    taxId?: string
+    addressLine1?: string
+    addressLine2?: string
+    city?: string
+    stateDepartment?: string
+    country?: string
+  }) =>
     apiFetch<Supplier>('/procurement/suppliers', { method: 'POST', body: JSON.stringify(payload) }),
 
   listContracts: (companyId: string) =>

@@ -12,6 +12,7 @@ export interface SupplierInvoice {
   amountPaid: number
   dueDate: string
   status: string
+  supplierContractId: string | null
 }
 
 export interface SupplierPayment {

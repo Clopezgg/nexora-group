@@ -17,6 +17,15 @@ export interface CompanyProfileInput {
   fiscalId?: string
   voucherPayerName?: string
   voucherApproverName?: string
+  tradeName?: string
+  addressLine1?: string
+  addressLine2?: string
+  city?: string
+  stateDepartment?: string
+  phone?: string
+  email?: string
+  website?: string
+  voucherFooterText?: string
   defaultThemeId?: string
   defaultDensity?: string
 }

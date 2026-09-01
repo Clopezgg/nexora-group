@@ -37,6 +37,15 @@ function CompanyProfileForm({ company }: { company: Company }) {
     functionalCurrencyCode: company.functionalCurrencyCode ?? 'HNL',
     voucherPayerName: company.voucherPayerName ?? '',
     voucherApproverName: company.voucherApproverName ?? '',
+    tradeName: company.tradeName ?? '',
+    addressLine1: company.addressLine1 ?? '',
+    addressLine2: company.addressLine2 ?? '',
+    city: company.city ?? '',
+    stateDepartment: company.stateDepartment ?? '',
+    phone: company.phone ?? '',
+    email: company.email ?? '',
+    website: company.website ?? '',
+    voucherFooterText: company.voucherFooterText ?? '',
   })
 
   const updateMutation = useMutation({
@@ -49,6 +58,15 @@ function CompanyProfileForm({ company }: { company: Company }) {
       functionalCurrencyCode: company.functionalCurrencyCode ? undefined : form.functionalCurrencyCode,
       voucherPayerName: company.voucherPayerName ? undefined : form.voucherPayerName || undefined,
       voucherApproverName: form.voucherApproverName || undefined,
+      tradeName: form.tradeName || undefined,
+      addressLine1: form.addressLine1 || undefined,
+      addressLine2: form.addressLine2 || undefined,
+      city: form.city || undefined,
+      stateDepartment: form.stateDepartment || undefined,
+      phone: form.phone || undefined,
+      email: form.email || undefined,
+      website: form.website || undefined,
+      voucherFooterText: form.voucherFooterText || undefined,
     }),
     onSuccess: (updatedCompany: Company) => {
       queryClient.invalidateQueries({ queryKey: ['master-data', 'companies'] })
@@ -61,6 +79,15 @@ function CompanyProfileForm({ company }: { company: Company }) {
         functionalCurrencyCode: updatedCompany.functionalCurrencyCode ?? 'HNL',
         voucherPayerName: updatedCompany.voucherPayerName ?? '',
         voucherApproverName: updatedCompany.voucherApproverName ?? '',
+        tradeName: updatedCompany.tradeName ?? '',
+        addressLine1: updatedCompany.addressLine1 ?? '',
+        addressLine2: updatedCompany.addressLine2 ?? '',
+        city: updatedCompany.city ?? '',
+        stateDepartment: updatedCompany.stateDepartment ?? '',
+        phone: updatedCompany.phone ?? '',
+        email: updatedCompany.email ?? '',
+        website: updatedCompany.website ?? '',
+        voucherFooterText: updatedCompany.voucherFooterText ?? '',
       })
     },
   })
@@ -88,6 +115,19 @@ function CompanyProfileForm({ company }: { company: Company }) {
         value={form.voucherApproverName}
         onChange={(event) => setForm({ ...form, voucherApproverName: event.target.value })}
       />
+
+      <fieldset style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
+        <legend className="nx-field__label">Documentos · datos impresos en el comprobante</legend>
+        <Input label="Nombre comercial" value={form.tradeName} onChange={(e) => setForm({ ...form, tradeName: e.target.value })} />
+        <Input label="Dirección (línea 1)" value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} />
+        <Input label="Dirección (línea 2)" value={form.addressLine2} onChange={(e) => setForm({ ...form, addressLine2: e.target.value })} />
+        <Input label="Ciudad" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+        <Input label="Departamento" value={form.stateDepartment} onChange={(e) => setForm({ ...form, stateDepartment: e.target.value })} />
+        <Input label="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <Input label="Correo" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <Input label="Sitio web" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
+        <Input label="Texto de pie del comprobante" value={form.voucherFooterText} onChange={(e) => setForm({ ...form, voucherFooterText: e.target.value })} />
+      </fieldset>
       <Select label="País" value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })}>
         <option value="HN">HN — Honduras</option>
       </Select>

@@ -35,6 +35,15 @@ class CompanyUpdateRequest(CamelModel):
     voucher_approver_name: str | None = Field(default=None, max_length=255)
     default_theme_id: str | None = Field(default=None, max_length=64)
     default_density: str | None = Field(default=None, max_length=16)
+    trade_name: str | None = Field(default=None, max_length=255)
+    address_line_1: str | None = Field(default=None, max_length=255)
+    address_line_2: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=120)
+    state_department: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=64)
+    email: str | None = Field(default=None, max_length=255)
+    website: str | None = Field(default=None, max_length=255)
+    voucher_footer_text: str | None = Field(default=None, max_length=500)
 
 
 class CompanyResponse(CamelModel):
@@ -49,6 +58,15 @@ class CompanyResponse(CamelModel):
     voucher_approver_name: str | None = None
     default_theme_id: str | None = None
     default_density: str | None = None
+    trade_name: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    city: str | None = None
+    state_department: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    website: str | None = None
+    voucher_footer_text: str | None = None
 
 
 class AccountCreateRequest(CamelModel):

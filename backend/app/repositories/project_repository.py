@@ -97,6 +97,12 @@ def update_project(db: Session, *, project: Project, values: dict) -> Project:
         "planned_start",
         "planned_end",
         "description",
+        "address_line_1",
+        "address_line_2",
+        "city",
+        "state_department",
+        "country",
+        "location_reference",
     }
     for key, value in values.items():
         if key in editable:

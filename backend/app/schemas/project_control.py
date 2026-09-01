@@ -24,6 +24,12 @@ class ProjectCreateRequest(CamelModel):
     planned_start: date | None = None
     planned_end: date | None = None
     description: str | None = Field(default=None, max_length=2000)
+    address_line_1: str | None = Field(default=None, max_length=255)
+    address_line_2: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=120)
+    state_department: str | None = Field(default=None, max_length=120)
+    country: str | None = Field(default=None, min_length=2, max_length=2)
+    location_reference: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
     def validate_planned_dates(self):
@@ -43,6 +49,13 @@ class ProjectUpdateRequest(CamelModel):
     planned_start: date | None = None
     planned_end: date | None = None
     description: str | None = Field(default=None, max_length=2000)
+    # Localización documental de la obra (orden maestra final §31).
+    address_line_1: str | None = Field(default=None, max_length=255)
+    address_line_2: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=120)
+    state_department: str | None = Field(default=None, max_length=120)
+    country: str | None = Field(default=None, min_length=2, max_length=2)
+    location_reference: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
     def validate_planned_dates(self):
@@ -71,6 +84,12 @@ class ProjectResponse(CamelModel):
     actual_end: date | None
     status: str
     description: str | None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    city: str | None = None
+    state_department: str | None = None
+    country: str | None = None
+    location_reference: str | None = None
 
 
 class ProjectFinancialSummaryResponse(CamelModel):

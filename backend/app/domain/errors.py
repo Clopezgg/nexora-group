@@ -49,6 +49,15 @@ class InvalidTransferError(Exception):
     destino, moneda incompatible, etc.)."""
 
 
+class VoucherNotOutflowError(Exception):
+    """NXR-VOUCHER-NOT-OUTFLOW: se intentó emitir un Payment Voucher para un
+    AccountingDocument que no es un OUTFLOW de tesorería (una remesa, un
+    cobro de cliente, un aporte de capital, un financiamiento recibido o una
+    transferencia interna). El Payment Voucher documenta exclusivamente
+    dinero que SALE del banco. El backend es fail-closed: rechaza aquí y
+    además nunca ofrece inflows como candidatos."""
+
+
 class InvalidInvoiceStateError(Exception):
     """Track A: transición de estado inválida sobre SupplierInvoice/
     CustomerInvoice (p.ej. pagar una factura CANCELLED)."""

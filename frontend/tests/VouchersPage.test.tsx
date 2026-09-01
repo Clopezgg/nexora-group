@@ -65,13 +65,14 @@ function stubVoucherFetch(options: FetchScenarioOptions = {}) {
           ],
         } as Response)
       }
-      if (url.includes('/accounting/journal-entries')) {
+      if (url.includes('/treasury/voucher-candidates')) {
+        // Solo egresos de tesorería (OUTFLOW) — el backend ya filtra.
         return Promise.resolve({
           ok: true,
           status: 200,
           json: async () => [
-            { id: 'document-runtime', documentNumber: 'REM-2026-0001', companyId: 'company-runtime', scope: 'CENTRAL', projectId: null, currencyCode: 'HNL', status: 'POSTED', description: 'Remesa recibida' },
-            { id: 'document-other', documentNumber: 'REM-2026-0002', companyId: 'company-runtime', scope: 'CENTRAL', projectId: null, currencyCode: 'HNL', status: 'POSTED', description: 'Segundo documento' },
+            { id: 'document-runtime', documentNumber: 'PAY-2026-0001', companyId: 'company-runtime', scope: 'CENTRAL', projectId: null, currencyCode: 'HNL', status: 'POSTED', description: 'Pago a proveedor', treasuryDirection: 'OUTFLOW', treasuryNet: '-1000.00' },
+            { id: 'document-other', documentNumber: 'PAY-2026-0002', companyId: 'company-runtime', scope: 'CENTRAL', projectId: null, currencyCode: 'HNL', status: 'POSTED', description: 'Gasto pagado', treasuryDirection: 'OUTFLOW', treasuryNet: '-250.00' },
           ],
         } as Response)
       }
@@ -126,7 +127,7 @@ describe('VouchersPage', () => {
     render(renderApp('/finanzas/comprobantes'))
 
     await selectDocumentAndBeneficiary(user)
-    expect(screen.getByText('REM-2026-0001', { selector: 'span' })).toBeInTheDocument()
+    expect(screen.getByText('PAY-2026-0001', { selector: 'span' })).toBeInTheDocument()
     // Vista previa del comprobante (OD FASE 4) — antes de generar el PDF.
     expect(screen.getByText('Vista previa del comprobante')).toBeInTheDocument()
     await user.selectOptions(screen.getByLabelText('Cuenta de tesorería (banco)'), 'acc-1')

@@ -449,7 +449,12 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     const unmatched = await api<any>(page.request, 'post', `/treasury/bank-statement-lines/${line.id}/unmatch`, {})
     expect(unmatched.status).toBe('UNMATCHED')
 
-    const documents = await api<any[]>(page.request, 'get', `/accounting/journal-entries?companyId=${companyId}&limit=250`)
+    // El Payment Voucher solo se emite para un EGRESO de tesorería: se
+    // toman los candidatos server-side (OUTFLOW), nunca la lista cruda de
+    // asientos. El gasto general del paso anterior es un OUTFLOW válido.
+    const documents = await api<any[]>(page.request, 'get', `/treasury/voucher-candidates?companyId=${companyId}`)
+    expect(documents.length).toBeGreaterThan(0)
+    expect(documents.every((d) => d.treasuryDirection === 'OUTFLOW')).toBeTruthy()
     // Un método bancario exige evidencia adjunta al documento (orden maestra Phase 2).
     const voucherBlocked = await page.request.get(
       `/api/treasury/vouchers/${documents[0].id}?beneficiary=Nexora%20Group&paymentMethod=TRANSFER`,

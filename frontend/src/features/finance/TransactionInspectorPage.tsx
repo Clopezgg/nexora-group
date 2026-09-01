@@ -13,7 +13,6 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
-import { voucherService } from '../../services/voucherService'
 import {
   transactionInspectorService,
   type InspectedLine,
@@ -31,7 +30,7 @@ export function TransactionInspectorPage() {
 
   const documentsQuery = useQuery({
     queryKey: ['accounting', 'journal-documents', activeCompanyId],
-    queryFn: () => voucherService.listDocuments(activeCompanyId as string),
+    queryFn: () => transactionInspectorService.listDocuments(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
 

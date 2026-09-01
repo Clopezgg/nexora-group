@@ -53,6 +53,38 @@ def _setup(client):
     return company, cash, diff_account, contributions, funding["accountingDocumentId"]
 
 
+_OUTFLOW_SEQ = [0]
+
+
+def _outflow_document(client, company, cash, *, amount="250.00", category="Servicios"):
+    """AccountingDocument cuya dirección de tesorería es OUTFLOW (dinero que
+    SALE del banco) — el único tipo elegible para Payment Voucher. Un gasto
+    general acredita el banco y debita el gasto."""
+    _OUTFLOW_SEQ[0] += 1
+    expense_gl = create_account(
+        client,
+        company_id=company["id"],
+        code=f"52{_OUTFLOW_SEQ[0]:02d}",
+        name="Servicios contratados",
+        account_type="EXPENSE",
+    )
+    expense = client.post(
+        "/api/treasury/general-expenses",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": cash["id"],
+            "expenseAccountId": expense_gl["id"],
+            "category": category,
+            "amount": amount,
+            "currencyCode": "HNL",
+            "expenseDate": "2026-01-15",
+            "description": f"Pago de {category}",
+        },
+    )
+    assert expense.status_code == 201, expense.text
+    return expense.json()["accountingDocumentId"]
+
+
 def _create_statement_line(client, cash, *, amount: str, description: str = "Movimiento"):
     statement_id = client.post(
         "/api/treasury/bank-statements",
@@ -196,13 +228,15 @@ def test_fund_restriction_never_transfers_money_ownership_to_project(client):
     assert float(balance["balance"]) == 1000.0
 
 
-def test_voucher_pdf_is_generated_for_a_remittance(client):
-    """Orden maestra §71: comprobante PDF vectorial real, no captura."""
+def test_voucher_pdf_is_generated_for_a_treasury_outflow(client):
+    """Orden maestra §71: comprobante PDF vectorial real, no captura. Solo
+    para un OUTFLOW de tesorería (dinero que sale del banco)."""
     login_admin(client)
-    company, _cash, _diff_account, _contributions, funding_doc = _setup(client)
+    company, cash, _diff_account, _contributions, _funding_doc = _setup(client)
+    outflow_doc = _outflow_document(client, company, cash, amount="1000.00")
 
     response = client.get(
-        f"/api/treasury/vouchers/{funding_doc}"
+        f"/api/treasury/vouchers/{outflow_doc}"
         "?beneficiary=Constructora%20Nexora&payer=Aportante&paymentMethod=Efectivo"
     )
     assert response.status_code == 200, response.text
@@ -218,10 +252,10 @@ def test_voucher_pdf_is_generated_for_a_remittance(client):
     # sin tipo de cambio 1.000000 en operaciones HNL->HNL.
     text = response.content.decode("latin-1")
     assert "1110 - Caja" in text
-    assert "3100 - Aportes" in text
+    assert "Servicios contratados" in text
     assert "L 1,000.00" in text
     assert "1.000000" not in text
-    assert str(funding_doc) not in text
+    assert str(outflow_doc) not in text
     assert "Asiento contable" in text
     assert "conforme" in text  # bloque de firmas "Recib\xed conforme"
     # prepared_by es el nombre del usuario, nunca su UUID.
@@ -233,7 +267,8 @@ def test_voucher_pdf_uses_company_fixed_payer_and_configured_approver(client):
     el aprobador es el configurado; el cliente no puede sobrescribir el
     pagador fijado."""
     login_admin(client)
-    company, _cash, _diff, _contrib, funding_doc = _setup(client)
+    company, cash, _diff, _contrib, _funding_doc = _setup(client)
+    funding_doc = _outflow_document(client, company, cash)
     patched = client.patch(
         f"/api/master-data/companies/{company['id']}",
         json={
@@ -269,7 +304,8 @@ def test_voucher_requires_evidence_for_bank_payment_methods(client, monkeypatch)
     """Orden maestra Phase 2: transferencia / depósito / cheque exigen
     evidencia adjunta al documento antes de emitir el comprobante."""
     login_admin(client)
-    company, _cash, _diff, _contrib, funding_doc = _setup(client)
+    company, cash, _diff, _contrib, _funding_doc = _setup(client)
+    funding_doc = _outflow_document(client, company, cash)
 
     # Sin evidencia -> 422 para un método bancario.
     blocked = client.get(
@@ -316,19 +352,9 @@ def test_voucher_evidence_gate_is_scoped_to_the_exact_document_and_company(clien
     a ESTE documento contable y pertenece a ESTA compania. Evidencia de otro
     documento u otra compania no habilita el PDF (orden maestra Phase 2)."""
     login_admin(client)
-    company, cash, _diff, contributions, funding_doc = _setup(client)
-    other_doc = client.post(
-        "/api/treasury/remittances",
-        json={
-            "companyId": company["id"],
-            "treasuryAccountId": cash["id"],
-            "counterAccountId": contributions["id"],
-            "sender": "Segundo fondeo",
-            "currencyCode": "HNL",
-            "originalAmount": "500.00",
-            "remittanceDate": "2026-02-01",
-        },
-    ).json()["accountingDocumentId"]
+    company, cash, _diff, contributions, _funding_doc = _setup(client)
+    funding_doc = _outflow_document(client, company, cash, category="Alquiler")
+    other_doc = _outflow_document(client, company, cash, amount="500.00", category="Papelería")
 
     container = _FakeBlobContainer()
     monkeypatch.setattr(
@@ -366,7 +392,8 @@ def test_voucher_pdf_renders_accented_and_long_names_without_dropping_text(clien
     """Regresion: nombres con tildes/ene y descripciones largas deben salir
     integros en el PDF (Helvetica/WinAnsi cubre Latin-1)."""
     login_admin(client)
-    company, _cash, _diff, _contrib, funding_doc = _setup(client)
+    company, cash, _diff, _contrib, _funding_doc = _setup(client)
+    funding_doc = _outflow_document(client, company, cash)
     client.patch(
         f"/api/master-data/companies/{company['id']}",
         json={
@@ -394,7 +421,8 @@ def test_voucher_pdf_shows_masked_bank_account_and_approval_code(client):
     + firma de aprobación (aprobador + fecha + código de verificación
     determinista)."""
     login_admin(client)
-    company, cash, _diff, _contrib, funding_doc = _setup(client)
+    company, cash, _diff, _contrib, _funding_doc = _setup(client)
+    funding_doc = _outflow_document(client, company, cash)
     bank_gl = create_account(
         client, company_id=company["id"], code="1120", name="Banco", account_type="ASSET"
     )
@@ -436,7 +464,8 @@ def test_voucher_beneficiary_resolves_from_registered_entity(client):
     """Orden maestra Phase 2: beneficiario buscable sobre entidades reales
     (Supplier/Worker/Customer), sin duplicar entidades ni capturar texto."""
     login_admin(client)
-    company, _cash, _diff, _contrib, funding_doc = _setup(client)
+    company, cash, _diff, _contrib, _funding_doc = _setup(client)
+    funding_doc = _outflow_document(client, company, cash)
     supplier = create_supplier(
         client, company_id=company["id"], legal_name="Ferretería El Clavo S.A."
     )
@@ -1184,7 +1213,8 @@ def test_voucher_pdf_embeds_qr_verification_url_and_the_token_resolves(client):
     from app.models.voucher_verification import VoucherVerification
 
     login_admin(client)
-    company, _cash, _diff, _contrib, funding_doc = _setup(client)
+    company, cash, _diff, _contrib, _funding_doc = _setup(client)
+    funding_doc = _outflow_document(client, company, cash)
     client.patch(
         f"/api/master-data/companies/{company['id']}",
         json={"voucherApproverName": "CARLOS HUMBERTO LOPEZ"},

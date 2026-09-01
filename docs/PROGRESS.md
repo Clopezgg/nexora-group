@@ -4225,3 +4225,33 @@ BD efímera —
 `test_contract_payment_reporting.py` (4). No se ejecuta contra producción:
 un `AccountingDocument` contabilizado es inmutable (CLAUDE.md §8), así que
 un smoke de escritura dejaría asientos contables reales permanentes (§78).
+
+### 2026-09-01 — ORDEN MAESTRA (Fiori / Cash Flow / Treasury Direction) · PR 1 — Vouchers OUTFLOW-only
+
+Rama: `feat/voucher-outflow-semantics`.
+
+- **`treasury_direction_service`** — clasifica un `AccountingDocument` por su
+  efecto sobre las cuentas GL 1:1 con un `TreasuryAccount`:
+  `treasury_net = Σ debit − Σ credit` de esas líneas.
+  `net > 0` → INFLOW · `net < 0` → OUTFLOW · `net == 0` con ≥2 cuentas de
+  tesorería → INTERNAL_TRANSFER · sin líneas de tesorería → NON_TREASURY.
+  `voucher_eligible` ⇔ OUTFLOW.
+- **`GET /api/treasury/voucher-candidates?companyId=`** — solo devuelve
+  documentos OUTFLOW (filtro server-side, §17); una remesa o un cobro nunca
+  llega al browser. **`GET .../documents/{id}/treasury-direction`** expone la
+  clasificación.
+- **Fail-closed** (§15/§16/§26): `download_voucher` y
+  `voucher_service.generate_voucher_pdf` rechazan cualquier documento no-
+  OUTFLOW con `NXR-VOUCHER-NOT-OUTFLOW` (422). Los asientos históricos NO se
+  tocan (§19).
+- **Frontend**: `VouchersPage` quita "Remesa" de los métodos de pago y del
+  selector; el selector de documento consume `/voucher-candidates` con
+  EmptyState explicativo. `TransactionInspectorPage` recupera su propia
+  lista de asientos (`/accounting/journal-entries`) — el inspector analiza
+  cualquier documento, no solo egresos.
+- **Tests**: `test_treasury_direction.py` (4) — remesa=INFLOW/voucher 422,
+  pago a proveedor=OUTFLOW/voucher 200, transferencia interna=INTERNAL_TRANSFER/
+  voucher 422, candidatos excluye inflows. `test_treasury_operations.py`
+  vouchers migrados a documentos OUTFLOW reales (gasto general). Regresión:
+  treasury+voucher+AP+contract 100 verdes en serie; frontend
+  typecheck/lint/build + 167 tests. Invariante `INV-TRE-003`.

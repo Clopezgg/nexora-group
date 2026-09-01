@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.money import format_money
+from app.domain.errors import VoucherNotOutflowError
 from app.models.accounting import AccountingDocument, JournalLine
 from app.models.ap import (
     SupplierInvoice,
@@ -51,6 +52,7 @@ from app.models.evidence import Evidence
 from app.models.project import Project
 from app.services import (
     evidence_service,
+    treasury_direction_service,
     voucher_issuance_service,
     voucher_verification_service,
 )
@@ -350,6 +352,16 @@ def generate_voucher_pdf(
     document = db.get(AccountingDocument, accounting_document_id)
     if document is None:
         raise ValueError(f"AccountingDocument {accounting_document_id} no existe")
+
+    # Defense-in-depth (§3/§26): el generador del PDF es la última línea. Un
+    # Payment Voucher solo se emite para un OUTFLOW de tesorería — nunca una
+    # remesa, un cobro, un aporte de capital o una transferencia interna.
+    _direction = treasury_direction_service.classify(db, document)
+    if not _direction.voucher_eligible:
+        raise VoucherNotOutflowError(
+            f"El documento {document.document_number} no es un egreso de "
+            f"tesorería (dirección: {_direction.direction})."
+        )
 
     company = db.get(Company, document.company_id)
     project = db.get(Project, document.project_id) if document.project_id else None

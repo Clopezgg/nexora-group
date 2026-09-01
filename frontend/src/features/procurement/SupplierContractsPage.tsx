@@ -1,29 +1,17 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Badge, Button, Card, EmptyState, ErrorState, FilterBar, Input, LoadingState, Modal, Select, Table } from '../../design-system'
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { procurementService } from '../../services/procurementService'
-import { projectService } from '../../services/projectService'
 import { formatMoney } from '../../utils/currency'
 import { ContractPaymentPlanModal } from './ContractPaymentPlanModal'
+import { ExecutionContractForm } from './ExecutionContractForm'
 import {
   SUPPLIER_CONTRACT_CATEGORY_LABELS,
   type SupplierContract,
   type SupplierContractCategory,
 } from '../../types/procurement'
-
-const emptyForm = {
-  supplierId: '',
-  projectId: '',
-  contractNumber: '',
-  contractCategory: 'LABOR' as SupplierContractCategory,
-  value: '',
-  currencyCode: 'HNL',
-  startDate: '',
-  advancePercentage: '',
-  retentionPercentage: '',
-}
 
 /** NXR-REQ-0059/0060. `/abastecimiento/contratos` ya existía como entrada
  * reservada ("Contratos") en navigation.ts -- no se inventó ruta nueva.
@@ -33,9 +21,7 @@ const emptyForm = {
  * proyecto. */
 export function SupplierContractsPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
-  const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm] = useState(emptyForm)
   const [planContract, setPlanContract] = useState<SupplierContract | null>(null)
   const [filterCategory, setFilterCategory] = useState('')
   const [filterNumber, setFilterNumber] = useState('')
@@ -50,36 +36,9 @@ export function SupplierContractsPage() {
     queryFn: () => procurementService.listSuppliers(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
-  const projectsQuery = useQuery({
-    queryKey: ['projects', activeCompanyId],
-    queryFn: () => projectService.list(activeCompanyId as string),
-    enabled: Boolean(activeCompanyId),
-  })
 
   const suppliers = suppliersQuery.data ?? []
-  const projects = projectsQuery.data ?? []
   const supplierNameById = new Map(suppliers.map((s) => [s.id, s.legalName]))
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      procurementService.createContract({
-        companyId: activeCompanyId as string,
-        supplierId: form.supplierId,
-        projectId: form.projectId || undefined,
-        contractNumber: form.contractNumber,
-        contractCategory: form.contractCategory,
-        value: form.value,
-        currencyCode: form.currencyCode,
-        startDate: form.startDate,
-        advancePercentage: form.advancePercentage || undefined,
-        retentionPercentage: form.retentionPercentage || undefined,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['procurement', 'contracts', activeCompanyId] })
-      setModalOpen(false)
-      setForm(emptyForm)
-    },
-  })
 
   const columns: TableColumn<SupplierContract>[] = [
     { key: 'contractNumber', header: 'Número', render: (row) => row.contractNumber },
@@ -182,103 +141,10 @@ export function SupplierContractsPage() {
       </Card>
 
       <Modal open={modalOpen} title="Nuevo contrato" onClose={() => setModalOpen(false)}>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault()
-            createMutation.mutate()
-          }}
-        >
-          <Select
-            name="supplierId"
-            label="Proveedor"
-            value={form.supplierId}
-            onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
-            required
-          >
-            <option value="" disabled>
-              Selecciona un proveedor
-            </option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.legalName}
-              </option>
-            ))}
-          </Select>
-          <Select
-            name="projectId"
-            label="Proyecto (opcional)"
-            value={form.projectId}
-            onChange={(e) => setForm({ ...form, projectId: e.target.value })}
-          >
-            <option value="">General (sin proyecto)</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-          <Input
-            name="contractNumber"
-            label="Número de contrato"
-            value={form.contractNumber}
-            onChange={(e) => setForm({ ...form, contractNumber: e.target.value })}
-            required
-          />
-          <Select
-            name="contractCategory"
-            label="Categoría del costo"
-            value={form.contractCategory}
-            onChange={(e) =>
-              setForm({ ...form, contractCategory: e.target.value as SupplierContractCategory })
-            }
-            required
-          >
-            {(
-              Object.keys(SUPPLIER_CONTRACT_CATEGORY_LABELS) as SupplierContractCategory[]
-            ).map((category) => (
-              <option key={category} value={category}>
-                {SUPPLIER_CONTRACT_CATEGORY_LABELS[category]}
-              </option>
-            ))}
-          </Select>
-          <Input
-            name="value"
-            label="Valor"
-            value={form.value}
-            onChange={(e) => setForm({ ...form, value: e.target.value })}
-            required
-          />
-          <Input
-            name="startDate"
-            label="Fecha de inicio"
-            type="date"
-            value={form.startDate}
-            onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-            required
-          />
-          <Input
-            name="advancePercentage"
-            label="Anticipo %"
-            value={form.advancePercentage}
-            onChange={(e) => setForm({ ...form, advancePercentage: e.target.value })}
-          />
-          <Input
-            name="retentionPercentage"
-            label="Retención %"
-            value={form.retentionPercentage}
-            onChange={(e) => setForm({ ...form, retentionPercentage: e.target.value })}
-          />
-          <Button
-            type="submit"
-            loading={createMutation.isPending}
-            disabled={!form.supplierId || !form.contractNumber || !form.value || !form.startDate}
-          >
-            Guardar
-          </Button>
-          {createMutation.isError ? (
-            <p className="nx-field__error">{String(createMutation.error)}</p>
-          ) : null}
-        </form>
+        <ExecutionContractForm
+          onCancel={() => setModalOpen(false)}
+          onCreated={() => setModalOpen(false)}
+        />
       </Modal>
 
       {planContract ? (

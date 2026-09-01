@@ -62,6 +62,16 @@ class SupplierContractCreateRequest(CamelModel):
     advance_percentage: Decimal = Decimal("0")
     retention_percentage: Decimal = Decimal("0")
     payment_terms: str | None = None
+    payment_terms_type: str = "LUMP_SUM"
+
+    @field_validator("payment_terms_type")
+    @classmethod
+    def _validate_payment_terms_type(cls, value: str) -> str:
+        if value not in ("LUMP_SUM", "MONTHLY", "CUSTOM"):
+            raise ValueError(
+                "payment_terms_type debe ser LUMP_SUM, MONTHLY o CUSTOM"
+            )
+        return value
 
     @field_validator("contract_category")
     @classmethod
@@ -89,4 +99,5 @@ class SupplierContractResponse(CamelModel):
     advance_percentage: Decimal
     retention_percentage: Decimal
     payment_terms: str | None
+    payment_terms_type: str
     status: str

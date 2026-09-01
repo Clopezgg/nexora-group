@@ -159,6 +159,79 @@ def _resolve_payment_schedule(
     return invoice, plan
 
 
+def _resolve_contract_context(db: Session, document: AccountingDocument) -> dict | None:
+    """Si el comprobante corresponde a un pago contractual (PAY doc ->
+    SupplierPayment -> ContractPaymentAllocation -> schedule), devuelve el
+    contexto para imprimir historial ACUMULATIVO + totales de contrato."""
+    from app.models.contract_payment import (
+        ContractPaymentAllocation,
+        ContractPaymentInstallment,
+        ContractPaymentSchedule,
+    )
+    from app.models.supplier import SupplierContract
+    from app.services import contract_payment_service
+
+    payment = db.execute(
+        select(SupplierPayment).where(
+            SupplierPayment.accounting_document_id == document.id
+        )
+    ).scalar_one_or_none()
+    if payment is None:
+        return None
+    allocations = list(
+        db.execute(
+            select(ContractPaymentAllocation).where(
+                ContractPaymentAllocation.supplier_payment_id == payment.id,
+                ContractPaymentAllocation.reversed_at.is_(None),
+            )
+        ).scalars()
+    )
+    if not allocations:
+        return None
+    installment = db.get(ContractPaymentInstallment, allocations[0].installment_id)
+    if installment is None:
+        return None
+    schedule = db.get(ContractPaymentSchedule, installment.schedule_id)
+    contract = db.get(SupplierContract, schedule.supplier_contract_id) if schedule else None
+    # El período más reciente que este pago tocó marca el corte del historial.
+    periods = []
+    for alloc in allocations:
+        inst = db.get(ContractPaymentInstallment, alloc.installment_id)
+        if inst is not None:
+            periods.append((inst.period_year, inst.period_month))
+    cutoff_year, cutoff_month = max(periods)
+    history = contract_payment_service.history_through(
+        db, schedule_id=schedule.id, period_year=cutoff_year, period_month=cutoff_month
+    )
+    summary = contract_payment_service.contract_summary(db, schedule_id=schedule.id)
+    paid_before = summary.paid_accumulated - _q_amount(payment.amount)
+    return {
+        "payment": payment,
+        "contract_number": contract.contract_number if contract else "—",
+        "period_label": contract_payment_service.period_label(cutoff_year, cutoff_month),
+        "cutoff": (cutoff_year, cutoff_month),
+        "history": history,
+        "summary": summary,
+        "paid_before": paid_before if paid_before > 0 else Decimal("0.00"),
+        "payment_amount": _q_amount(payment.amount),
+        "currency": schedule.currency_code if schedule else document.currency_code,
+        "observations": payment.payment_observations,
+        "bank_transaction_reference": payment.bank_transaction_reference,
+        "installment_seq": installment.sequence,
+        "installment_total": len(
+            db.execute(
+                select(ContractPaymentInstallment).where(
+                    ContractPaymentInstallment.schedule_id == schedule.id
+                )
+            ).scalars().all()
+        ),
+    }
+
+
+def _q_amount(value) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal("0.01"))
+
+
 def _load_payment_evidence(db: Session, document: AccountingDocument) -> Evidence | None:
     rows = evidence_service.list_evidence(
         db,
@@ -318,13 +391,36 @@ def generate_voucher_pdf(
     # -- Emisor / Beneficiario ---------------------------------------
     emisor = [
         Paragraph("EMISOR", styles["label"]),
-        Paragraph(company_name, styles["value"]),
-        Paragraph(
-            company.legal_name or "Gestión empresarial y control de construcción",
-            styles["small"],
-        ),
-        Paragraph(f"Pagador: {payer}", styles["small"]),
+        Paragraph(company.trade_name or company_name if company else company_name, styles["value"]),
     ]
+    if company and company.legal_name:
+        emisor.append(Paragraph(company.legal_name, styles["small"]))
+    if company and company.fiscal_id:
+        emisor.append(Paragraph(f"RTN {company.fiscal_id}", styles["small"]))
+    _company_addr = " · ".join(
+        part
+        for part in [
+            getattr(company, "address_line_1", None) if company else None,
+            getattr(company, "address_line_2", None) if company else None,
+            getattr(company, "city", None) if company else None,
+            getattr(company, "state_department", None) if company else None,
+        ]
+        if part
+    )
+    if _company_addr:
+        emisor.append(Paragraph(_company_addr, styles["small"]))
+    _company_contact = " · ".join(
+        part
+        for part in [
+            getattr(company, "phone", None) if company else None,
+            getattr(company, "email", None) if company else None,
+        ]
+        if part
+    )
+    if _company_contact:
+        emisor.append(Paragraph(_company_contact, styles["small"]))
+    emisor.append(Paragraph(f"Pagador: {payer}", styles["small"]))
+
     benef = [
         Paragraph("BENEFICIARIO", styles["label"]),
         Paragraph(beneficiary, styles["value"]),
@@ -352,13 +448,76 @@ def generate_voucher_pdf(
         info_rows.append(
             ("Tipo de cambio", f"1 {currency} = {document.fx_rate} {functional_currency}")
         )
+
+    contract_ctx = _resolve_contract_context(db, document)
+    if contract_ctx:
+        info_rows.insert(0, ("Contrato", contract_ctx["contract_number"]))
+        info_rows.insert(1, ("Período contractual", contract_ctx["period_label"]))
+        info_rows.insert(
+            2,
+            (
+                "Cuota",
+                f"{contract_ctx['installment_seq']} de {contract_ctx['installment_total']}",
+            ),
+        )
+        if contract_ctx.get("bank_transaction_reference"):
+            info_rows.append(("Referencia bancaria", contract_ctx["bank_transaction_reference"]))
+        if contract_ctx.get("observations"):
+            info_rows.append(("Observaciones", contract_ctx["observations"]))
     story.append(_kv_table(info_rows, styles))
     story.append(Spacer(1, 6))
     story.append(Paragraph("TOTAL PAGADO", styles["label"]))
     story.append(Paragraph(format_money(total, currency), styles["total"]))
 
-    # -- Pagos / vencimientos (si aplica) ------------------------
-    schedule = _resolve_payment_schedule(db, document)
+    # -- Pagos del contrato a la fecha (historial ACUMULATIVO, §38-§39) ----
+    if contract_ctx:
+        cc = contract_ctx
+        ccur = cc["currency"]
+        story.append(Paragraph("Pagos del contrato a la fecha", styles["h2"]))
+        rows = [["Período", "Programado", "Pagado", "Saldo", "Estado"]]
+        for s in cc["history"]:
+            is_current = (s.period_year, s.period_month) == cc["cutoff"]
+            rows.append(
+                [
+                    s.period_label,
+                    format_money(s.scheduled_amount, ccur),
+                    format_money(s.paid, ccur),
+                    format_money(s.remaining, ccur),
+                    "Pago actual" if is_current else s.status,
+                ]
+            )
+        hist_table = Table(rows, colWidths=[3.6 * cm, 3.3 * cm, 3.3 * cm, 3 * cm, 3.3 * cm])
+        hist_table.setStyle(
+            TableStyle(
+                [
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), _MUTED),
+                    ("ALIGN", (1, 0), (3, -1), "RIGHT"),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.5, _LINE),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7fb")]),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
+        story.append(hist_table)
+        story.append(Spacer(1, 6))
+        story.append(
+            _kv_table(
+                [
+                    ("Valor contractual", format_money(cc["summary"].contract_value, ccur)),
+                    ("Pagado anteriormente", format_money(cc["paid_before"], ccur)),
+                    ("Pago actual", format_money(cc["payment_amount"], ccur)),
+                    ("Pagado acumulado", format_money(cc["summary"].paid_accumulated, ccur)),
+                    ("Saldo contractual", format_money(cc["summary"].contract_balance, ccur)),
+                ],
+                styles,
+            )
+        )
+
+    # -- Pagos / vencimientos de factura (fallback si no hay contrato) -----
+    schedule = None if contract_ctx else _resolve_payment_schedule(db, document)
     if schedule is not None:
         invoice, plan = schedule
         story.append(Paragraph("Pagos / vencimientos", styles["h2"]))

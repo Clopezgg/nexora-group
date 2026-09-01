@@ -251,6 +251,8 @@ def pay_supplier_invoice(
     payment_date: date,
     contract_allocations: list[dict] | None = None,
     contract_override_reason: str | None = None,
+    bank_transaction_reference: str | None = None,
+    payment_observations: str | None = None,
     commit: bool = True,
 ) -> SupplierPayment:
     """Pago simple contra UNA factura (sin allocation multi-factura --
@@ -318,6 +320,8 @@ def pay_supplier_invoice(
         amount=amount,
         payment_date=payment_date,
         accounting_document_id=document.id,
+        bank_transaction_reference=(bank_transaction_reference or None),
+        payment_observations=(payment_observations or None),
     )
     db.add(payment)
     db.flush()

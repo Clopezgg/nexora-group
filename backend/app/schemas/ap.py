@@ -61,6 +61,8 @@ class SupplierPaymentCreateRequest(CamelModel):
     # debe igualar `amount`. Opcional: sólo aplica a facturas de contrato.
     contract_allocations: list[ContractAllocationInput] | None = None
     contract_override_reason: str | None = None
+    bank_transaction_reference: str | None = Field(default=None, max_length=120)
+    payment_observations: str | None = Field(default=None, max_length=500)
 
 
 class SupplierPaymentResponse(CamelModel):
@@ -74,6 +76,8 @@ class SupplierPaymentResponse(CamelModel):
     reversed_at: datetime | None = None
     reversed_by_user_id: uuid.UUID | None = None
     reversal_reason: str | None = None
+    bank_transaction_reference: str | None = None
+    payment_observations: str | None = None
 
 
 class PaymentPlanItemInput(CamelModel):

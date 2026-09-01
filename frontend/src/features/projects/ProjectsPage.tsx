@@ -7,11 +7,8 @@ import {
   Card,
   EmptyState,
   ErrorState,
-  Input,
   LoadingState,
-  Select,
   Table,
-  Textarea,
   type TableColumn,
 } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
@@ -21,6 +18,7 @@ import { projectService } from '../../services/projectService'
 import type { Project, ProjectStatus } from '../../types/project'
 import { statusLabel } from '../../utils/statusLabels'
 import { useActiveContext } from '../context/useActiveContext'
+import { ProjectWizard } from './ProjectWizard'
 
 const NEXT_STATUS: Partial<Record<ProjectStatus, Array<{ status: ProjectStatus; label: string }>>> = {
   PLANNING: [
@@ -39,24 +37,12 @@ const NEXT_STATUS: Partial<Record<ProjectStatus, Array<{ status: ProjectStatus; 
   COMPLETED: [{ status: 'CLOSED', label: 'Cerrar proyecto' }],
 }
 
-const EMPTY_FORM = {
-  name: '',
-  code: '',
-  customerId: '',
-  manager: '',
-  currencyCode: 'HNL',
-  costCenterId: '',
-  plannedStart: '',
-  plannedEnd: '',
-  description: '',
-}
-
 export function ProjectsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { context, setActiveProject } = useActiveContext()
   const { activeCompany, activeCompanyId, isLoading: companiesLoading, isError: companiesError, refetch } = useActiveCompany()
-  const [form, setForm] = useState(EMPTY_FORM)
+  const [wizardOpen, setWizardOpen] = useState(false)
 
   const projectsQuery = useQuery({
     queryKey: ['projects', activeCompanyId],
@@ -87,26 +73,6 @@ export function ProjectsPage() {
     queryClient.invalidateQueries({ queryKey: ['projects', activeCompanyId] })
     queryClient.invalidateQueries({ queryKey: ['dashboard', 'summary'] })
   }
-
-  const createProject = useMutation({
-    mutationFn: () =>
-      projectService.create({
-        companyId: activeCompanyId as string,
-        name: form.name.trim(),
-        code: form.code.trim() || undefined,
-        customerId: form.customerId || undefined,
-        manager: form.manager || undefined,
-        currencyCode: form.currencyCode || undefined,
-        costCenterId: form.costCenterId || undefined,
-        plannedStart: form.plannedStart || undefined,
-        plannedEnd: form.plannedEnd || undefined,
-        description: form.description.trim() || undefined,
-      }),
-    onSuccess: () => {
-      invalidate()
-      setForm(EMPTY_FORM)
-    },
-  })
 
   const statusMutation = useMutation({
     mutationFn: ({ projectId, status }: { projectId: string; status: ProjectStatus }) =>
@@ -176,45 +142,26 @@ export function ProjectsPage() {
           <h1 className="nx-dashboard__title">Proyectos</h1>
           <p className="nx-field__hint">Empresa activa: {activeCompany.name}. “Seleccionado” es solo contexto de navegación; el estado empresarial se controla por separado.</p>
         </div>
+        <Button onClick={() => setWizardOpen((open) => !open)}>
+          {wizardOpen ? 'Cerrar asistente' : 'Nuevo proyecto'}
+        </Button>
       </header>
 
-      <Card title="Nuevo proyecto">
-        <Input label="Nombre" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-        <Input label="Código (opcional)" value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} />
-        <Select label="Cliente" value={form.customerId} onChange={(event) => setForm({ ...form, customerId: event.target.value })}>
-          <option value="">Sin cliente asignado todavía</option>
-          {customers.map((customer) => (
-            <option key={customer.id} value={customer.id}>{customer.legalName}</option>
-          ))}
-        </Select>
-        <Select label="Responsable" value={form.manager} onChange={(event) => setForm({ ...form, manager: event.target.value })}>
-          <option value="">Sin responsable asignado</option>
-          {users.map((user) => (
-            <option key={user.id} value={user.fullName}>{user.fullName}</option>
-          ))}
-        </Select>
-        <Select label="Centro de costo" value={form.costCenterId} onChange={(event) => setForm({ ...form, costCenterId: event.target.value })}>
-          <option value="">Sin centro de costo</option>
-          {costCenters.map((item) => (
-            <option key={item.id} value={item.id}>{item.code} · {item.name}</option>
-          ))}
-        </Select>
-        <Select label="Moneda" value={form.currencyCode} onChange={(event) => setForm({ ...form, currencyCode: event.target.value })}>
-          <option value="HNL">HNL — Lempira hondureño</option>
-          <option value="USD">USD — Dólar estadounidense</option>
-        </Select>
-        <Input label="Inicio previsto" type="date" value={form.plannedStart} onChange={(event) => setForm({ ...form, plannedStart: event.target.value })} />
-        <Input label="Final previsto" type="date" value={form.plannedEnd} onChange={(event) => setForm({ ...form, plannedEnd: event.target.value })} />
-        <Textarea label="Descripción" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-        {createProject.isError ? <p className="nx-field__error" role="alert">{(createProject.error as Error).message}</p> : null}
-        <Button
-          disabled={!form.name.trim() || createProject.isPending || Boolean(form.plannedStart && form.plannedEnd && form.plannedEnd < form.plannedStart)}
-          loading={createProject.isPending}
-          onClick={() => createProject.mutate()}
-        >
-          Crear proyecto
-        </Button>
-      </Card>
+      {wizardOpen ? (
+        <Card title="Nuevo proyecto — asistente guiado">
+          <ProjectWizard
+            companyId={activeCompanyId}
+            customers={customers}
+            users={users}
+            costCenters={costCenters}
+            onCreated={(project) => {
+              invalidate()
+              setWizardOpen(false)
+              navigate(`/proyectos/${project.id}`)
+            }}
+          />
+        </Card>
+      ) : null}
 
       {projectsQuery.isLoading ? (
         <LoadingState label="Cargando proyectos…" />

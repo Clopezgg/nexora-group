@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderApp } from './testUtils'
 
@@ -47,5 +48,50 @@ describe('ProjectsPage', () => {
 
     expect(await screen.findByText('Torre Nexora II')).toBeInTheDocument()
     expect(screen.getByText('Planificación')).toBeInTheDocument()
+  })
+
+  it('creates a project through the guided wizard, sending the real location (§11/§17)', async () => {
+    let createPayload: Record<string, unknown> | null = null
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const method = init?.method ?? 'GET'
+        if (url.includes('/auth/me')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ id: 'u1', email: 'a@nexora.group', fullName: 'Admin', roles: ['Administrator'] }) } as Response)
+        }
+        if (url.includes('/master-data/companies')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 'c1', name: 'Constructora Nexora', code: null, legalName: null, functionalCurrencyCode: 'HNL' }] } as Response)
+        }
+        if (url.includes('/master-data/users')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 'mgr1', fullName: 'Ing. Responsable' }] } as Response)
+        }
+        if (url.endsWith('/projects') && method === 'POST') {
+          createPayload = JSON.parse(String(init?.body))
+          return Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 'p9', companyId: 'c1', name: createPayload?.name, status: 'PLANNING' }) } as Response)
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
+      }),
+    )
+
+    render(renderApp('/proyectos'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo proyecto' }))
+    await userEvent.type(screen.getByLabelText('Nombre del proyecto'), 'Puente Río Grande')
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    // Paso 2 — ubicación real.
+    await userEvent.type(screen.getByLabelText('Ciudad'), 'Comayagua')
+    await userEvent.type(screen.getByLabelText('Departamento / Estado'), 'Comayagua')
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' })) // alcance
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' })) // equipo
+    await userEvent.click(screen.getByRole('button', { name: 'Crear como borrador' }))
+
+    await waitFor(() =>
+      expect(createPayload).toMatchObject({
+        name: 'Puente Río Grande',
+        city: 'Comayagua',
+        stateDepartment: 'Comayagua',
+      }),
+    )
   })
 })

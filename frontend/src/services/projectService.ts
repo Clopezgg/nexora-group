@@ -26,11 +26,18 @@ export interface ProjectInput {
   code?: string
   customerId?: string | null
   manager?: string | null
+  managerUserId?: string | null
   currencyCode?: string
   costCenterId?: string | null
   plannedStart?: string | null
   plannedEnd?: string | null
   description?: string | null
+  addressLine1?: string | null
+  addressLine2?: string | null
+  city?: string | null
+  stateDepartment?: string | null
+  country?: string | null
+  locationReference?: string | null
 }
 
 export interface BudgetLineInput {

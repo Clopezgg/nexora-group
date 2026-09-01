@@ -1,0 +1,101 @@
+/* Project Cockpit — object page (ORDEN MAESTRA §18/§35). No es una columna
+   infinita de Cards: cabecera de objeto fija + pestañas. */
+.nx-object-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.nx-object-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--nx-color-surface, #fff);
+  border: 1px solid var(--nx-color-border, #dbe3ec);
+  border-radius: var(--nx-shape-radius-md, 10px);
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.nx-object-header__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.nx-object-header__eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nx-color-text-subtle, #6b7a90);
+}
+.nx-object-header__actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.nx-object-header__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.65rem 1.25rem;
+  margin: 0;
+}
+.nx-object-header__facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.nx-object-header__facts dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--nx-color-text-subtle, #6b7a90);
+}
+.nx-object-header__facts dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.nx-project-contracts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.75rem;
+}
+.nx-project-contracts__card {
+  border: 1px solid var(--nx-color-border, #dbe3ec);
+  border-radius: var(--nx-shape-radius-md, 10px);
+  padding: 0.85rem;
+  background: var(--nx-color-surface, #fff);
+}
+.nx-project-contracts__card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.nx-project-contracts__card dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.nx-project-contracts__card dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+}
+.nx-project-contracts__card dt { color: var(--nx-color-text-subtle, #6b7a90); }
+.nx-project-contracts__card dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 560px) {
+  .nx-object-header { position: static; }
+}

@@ -115,6 +115,12 @@ def create_project(
         planned_start=payload.planned_start,
         planned_end=payload.planned_end,
         description=payload.description,
+        address_line_1=payload.address_line_1,
+        address_line_2=payload.address_line_2,
+        city=payload.city,
+        state_department=payload.state_department,
+        country=payload.country,
+        location_reference=payload.location_reference,
     )
     db.flush()
     # The creator must be able to continue operating the project when their

@@ -11,6 +11,7 @@ import {
   LoadingState,
   Select,
   StatCard,
+  Tabs,
   Textarea,
 } from '../../design-system'
 import { crmService } from '../../services/crmService'
@@ -21,6 +22,8 @@ import { formatMoney } from '../../utils/currency'
 import { statusLabel } from '../../utils/statusLabels'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { useActiveContext } from '../context/useActiveContext'
+import { ProjectContractsTab } from './ProjectContractsTab'
+import './ProjectDetailPage.css'
 
 const TRANSITIONS: Partial<Record<ProjectStatus, Array<{ status: ProjectStatus; label: string }>>> = {
   PLANNING: [{ status: 'ACTIVE', label: 'Activar proyecto' }, { status: 'CANCELLED', label: 'Cancelar proyecto' }],
@@ -54,12 +57,18 @@ function ProjectEditForm({
     name: project.name,
     code: project.code ?? '',
     customerId: project.customerId ?? '',
-    manager: project.manager ?? '',
+    managerUserId: project.managerUserId ?? '',
     currencyCode: project.currencyCode ?? 'HNL',
     costCenterId: project.costCenterId ?? '',
     plannedStart: project.plannedStart ?? '',
     plannedEnd: project.plannedEnd ?? '',
     description: project.description ?? '',
+    addressLine1: project.addressLine1 ?? '',
+    addressLine2: project.addressLine2 ?? '',
+    city: project.city ?? '',
+    stateDepartment: project.stateDepartment ?? '',
+    country: project.country ?? '',
+    locationReference: project.locationReference ?? '',
   })
 
   const updateMutation = useMutation({
@@ -68,12 +77,18 @@ function ProjectEditForm({
         name: form.name.trim(),
         code: form.code.trim() || undefined,
         customerId: form.customerId || null,
-        manager: form.manager || null,
+        managerUserId: form.managerUserId || null,
         currencyCode: form.currencyCode,
         costCenterId: form.costCenterId || null,
         plannedStart: form.plannedStart || null,
         plannedEnd: form.plannedEnd || null,
         description: form.description.trim() || null,
+        addressLine1: form.addressLine1.trim() || null,
+        addressLine2: form.addressLine2.trim() || null,
+        city: form.city.trim() || null,
+        stateDepartment: form.stateDepartment.trim() || null,
+        country: form.country.trim() || null,
+        locationReference: form.locationReference.trim() || null,
       }),
     onSuccess: onUpdated,
   })
@@ -86,9 +101,9 @@ function ProjectEditForm({
         <option value="">Sin cliente asignado</option>
         {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.legalName}</option>)}
       </Select>
-      <Select label="Responsable" value={form.manager} onChange={(event) => setForm({ ...form, manager: event.target.value })}>
+      <Select label="Responsable" value={form.managerUserId} onChange={(event) => setForm({ ...form, managerUserId: event.target.value })}>
         <option value="">Sin responsable asignado</option>
-        {users.map((user) => <option key={user.id} value={user.fullName}>{user.fullName}</option>)}
+        {users.map((user) => <option key={user.id} value={user.id}>{user.fullName}</option>)}
       </Select>
       <Select label="Centro de costo" value={form.costCenterId} onChange={(event) => setForm({ ...form, costCenterId: event.target.value })}>
         <option value="">Sin centro de costo</option>
@@ -100,6 +115,11 @@ function ProjectEditForm({
       </Select>
       <Input label="Inicio previsto" type="date" value={form.plannedStart} onChange={(event) => setForm({ ...form, plannedStart: event.target.value })} />
       <Input label="Final previsto" type="date" value={form.plannedEnd} onChange={(event) => setForm({ ...form, plannedEnd: event.target.value })} />
+      <Input label="Dirección de la obra" value={form.addressLine1} onChange={(event) => setForm({ ...form, addressLine1: event.target.value })} />
+      <Input label="Ciudad" value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} />
+      <Input label="Departamento / Estado" value={form.stateDepartment} onChange={(event) => setForm({ ...form, stateDepartment: event.target.value })} />
+      <Input label="País (ISO-2)" value={form.country} maxLength={2} onChange={(event) => setForm({ ...form, country: event.target.value.toUpperCase() })} />
+      <Textarea label="Cómo llegar / referencia" value={form.locationReference} onChange={(event) => setForm({ ...form, locationReference: event.target.value })} />
       <Textarea label="Descripción" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
       <Button type="submit" loading={updateMutation.isPending} disabled={!form.name.trim() || Boolean(form.plannedStart && form.plannedEnd && form.plannedEnd < form.plannedStart)}>Guardar ficha</Button>
       {updateMutation.isSuccess ? <p className="nx-field__hint" role="status">Ficha actualizada.</p> : null}
@@ -169,95 +189,109 @@ export function ProjectDetailPage() {
 
   const summary = financialQuery.data
   const currency = summary?.currencyCode ?? project.currencyCode ?? 'HNL'
+  const managerName =
+    (usersQuery.data ?? []).find((u) => u.id === project.managerUserId)?.fullName ??
+    project.manager ??
+    'Sin responsable'
+  const locationText =
+    [project.addressLine1, project.city, project.stateDepartment, project.country]
+      .filter(Boolean)
+      .join(', ') || 'Sin ubicación registrada'
+  const planText =
+    project.plannedStart && project.plannedEnd
+      ? `${project.plannedStart} → ${project.plannedEnd}`
+      : '—'
 
-  return (
-    <div>
-      <header className="nx-page__header">
-        <div>
-          <p className="nx-home__eyebrow">Proyecto {project.code ?? 'sin código'}</p>
-          <h1 className="nx-dashboard__title">{project.name}</h1>
-          <p className="nx-field__hint">
-            <Badge>{statusLabel(project.status)}</Badge> · Cliente: {selectedCustomer?.legalName ?? 'Sin cliente asignado'}
-          </p>
-        </div>
-        {context.activeProjectId !== project.id ? (
-          <Button variant="secondary" onClick={() => setActiveProject(project.id)}>Seleccionar como contexto</Button>
-        ) : <Badge tone="info">Proyecto seleccionado</Badge>}
-      </header>
+  const statusCard = (
+    <Card title="Estado del proyecto">
+      <div className="nx-treasury__actions">
+        {(TRANSITIONS[project.status] ?? []).map((transition) => (
+          <Button
+            key={transition.status}
+            variant={transition.status === 'CANCELLED' ? 'ghost' : 'secondary'}
+            loading={statusMutation.isPending}
+            onClick={() => {
+              if (transition.status === 'CANCELLED' && !window.confirm('¿Cancelar este proyecto? La transición quedará registrada en auditoría.')) return
+              statusMutation.mutate(transition.status)
+            }}
+          >
+            {transition.label}
+          </Button>
+        ))}
+        {(TRANSITIONS[project.status] ?? []).length === 0 ? <span className="nx-field__hint">No hay más transiciones operativas disponibles.</span> : null}
+      </div>
+      {statusMutation.isError ? <p className="nx-field__error">{(statusMutation.error as Error).message}</p> : null}
+    </Card>
+  )
 
+  const resumenTab = (
+    <>
       {financialQuery.isLoading ? <LoadingState label="Calculando resumen financiero…" /> : null}
       {financialQuery.isError ? <ErrorState description="No se pudo calcular el resumen financiero." onRetry={() => financialQuery.refetch()} /> : null}
       {summary ? (
         <>
           <Card title="Resumen comercial y rentabilidad">
             <div className="nx-home__grid">
-              <StatCard label="Valor contractual" value={money(summary.contractValue, currency)} />
-              <StatCard label="Presupuesto de costos BASELINE" value={money(summary.baselineBudget, currency)} />
-              <StatCard label="Presupuesto de costos vigente" value={money(summary.currentBudget, currency)} />
+              <StatCard label="Valor comercial contratado" value={money(summary.contractValue, currency)} />
+              <StatCard label="Presupuesto BASELINE" value={money(summary.baselineBudget, currency)} />
+              <StatCard label="Presupuesto vigente" value={money(summary.currentBudget, currency)} />
+              <StatCard label="Comprometido" value={money(summary.committed, currency)} />
+              <StatCard label="Devengado" value={money(summary.accrued, currency)} />
+              <StatCard label="Pagado" value={money(summary.paid, currency)} />
+              <StatCard label="Costo real GL" value={money(summary.actualCost, currency)} />
               <StatCard label="Utilidad esperada" value={money(summary.expectedProfit, currency)} />
-              <StatCard label="Margen esperado" value={percent(summary.expectedMarginPercent)} />
+              <StatCard label="Utilidad actual" value={money(summary.actualProfit, currency)} />
               <StatCard label="Avance físico" value={percent(summary.progressPercent)} />
             </div>
             {summary.contractValue === null ? <p className="nx-field__hint">El valor contractual no se inventa: aparecerá cuando exista un Contrato de venta asociado a este proyecto.</p> : null}
           </Card>
-
-          <Card title="Costos y ejecución">
-            <div className="nx-home__grid">
-              <StatCard label="Comprometido" value={money(summary.committed, currency)} />
-              <StatCard label="Devengado" value={money(summary.accrued, currency)} />
-              <StatCard label="Pagado" value={money(summary.paid, currency)} />
-              <StatCard label="Disponible de presupuesto" value={money(summary.available, currency)} />
-              <StatCard label="Costo real contable" value={money(summary.actualCost, currency)} />
-            </div>
-          </Card>
-
-          <Card title="Facturación y cobros">
-            <div className="nx-home__grid">
-              <StatCard label="Facturado al cliente" value={money(summary.invoiced, currency)} />
-              <StatCard label="Cobrado" value={money(summary.collected, currency)} />
-              <StatCard label="Por cobrar" value={money(summary.receivablesOutstanding, currency)} />
-              <StatCard label="Ingreso reconocido" value={money(summary.recognizedRevenue, currency)} />
-              <StatCard label="Utilidad contable actual" value={money(summary.actualProfit, currency)} />
-              <StatCard label="Margen actual" value={percent(summary.actualMarginPercent)} />
-            </div>
-          </Card>
-
-          <Card title="Earned Value">
-            <div className="nx-home__grid">
-              <StatCard label="BAC" value={money(summary.bac, currency)} />
-              <StatCard label="PV" value={money(summary.pv, currency)} />
-              <StatCard label="EV" value={money(summary.ev, currency)} />
-              <StatCard label="AC" value={money(summary.ac, currency)} />
-              <StatCard label="CPI" value={summary.cpi ?? '—'} />
-              <StatCard label="SPI" value={summary.spi ?? '—'} />
-              <StatCard label="ETC" value={money(summary.etc, currency)} />
-              <StatCard label="EAC" value={money(summary.eac, currency)} />
-              <StatCard label="VAC" value={money(summary.vac, currency)} />
-            </div>
-          </Card>
         </>
       ) : null}
+    </>
+  )
 
-      <Card title="Estado del proyecto">
-        <div className="nx-treasury__actions">
-          {(TRANSITIONS[project.status] ?? []).map((transition) => (
-            <Button
-              key={transition.status}
-              variant={transition.status === 'CANCELLED' ? 'ghost' : 'secondary'}
-              loading={statusMutation.isPending}
-              onClick={() => {
-                if (transition.status === 'CANCELLED' && !window.confirm('¿Cancelar este proyecto? La transición quedará registrada en auditoría.')) return
-                statusMutation.mutate(transition.status)
-              }}
-            >
-              {transition.label}
-            </Button>
-          ))}
-          {(TRANSITIONS[project.status] ?? []).length === 0 ? <span className="nx-field__hint">No hay más transiciones operativas disponibles.</span> : null}
+  const finanzasTab = summary ? (
+    <>
+      <Card title="Costos y ejecución">
+        <div className="nx-home__grid">
+          <StatCard label="Comprometido" value={money(summary.committed, currency)} />
+          <StatCard label="Devengado" value={money(summary.accrued, currency)} />
+          <StatCard label="Pagado" value={money(summary.paid, currency)} />
+          <StatCard label="Disponible de presupuesto" value={money(summary.available, currency)} />
+          <StatCard label="Costo real contable" value={money(summary.actualCost, currency)} />
         </div>
-        {statusMutation.isError ? <p className="nx-field__error">{(statusMutation.error as Error).message}</p> : null}
       </Card>
+      <Card title="Facturación y cobros">
+        <div className="nx-home__grid">
+          <StatCard label="Facturado al cliente" value={money(summary.invoiced, currency)} />
+          <StatCard label="Cobrado" value={money(summary.collected, currency)} />
+          <StatCard label="Por cobrar" value={money(summary.receivablesOutstanding, currency)} />
+          <StatCard label="Ingreso reconocido" value={money(summary.recognizedRevenue, currency)} />
+          <StatCard label="Utilidad contable actual" value={money(summary.actualProfit, currency)} />
+          <StatCard label="Margen actual" value={percent(summary.actualMarginPercent)} />
+        </div>
+      </Card>
+      <Card title="Earned Value">
+        <div className="nx-home__grid">
+          <StatCard label="BAC" value={money(summary.bac, currency)} />
+          <StatCard label="PV" value={money(summary.pv, currency)} />
+          <StatCard label="EV" value={money(summary.ev, currency)} />
+          <StatCard label="AC" value={money(summary.ac, currency)} />
+          <StatCard label="CPI" value={summary.cpi ?? '—'} />
+          <StatCard label="SPI" value={summary.spi ?? '—'} />
+          <StatCard label="ETC" value={money(summary.etc, currency)} />
+          <StatCard label="EAC" value={money(summary.eac, currency)} />
+          <StatCard label="VAC" value={money(summary.vac, currency)} />
+        </div>
+      </Card>
+    </>
+  ) : (
+    <EmptyState icon="chart" title="Sin resumen financiero disponible todavía" />
+  )
 
+  const fichaTab = (
+    <>
+      {statusCard}
       <Card title="Ficha del proyecto">
         <ProjectEditForm
           key={project.id}
@@ -271,18 +305,66 @@ export function ProjectDetailPage() {
           }}
         />
       </Card>
+    </>
+  )
 
-      <Card title="Módulos del proyecto">
-        <div className="nx-treasury__actions">
-          <Link to="/proyectos/wbs">WBS</Link>
-          <Link to="/proyectos/presupuestos">Presupuesto de costos</Link>
-          <Link to="/proyectos/avances">Avances</Link>
-          <Link to="/proyectos/ordenes-de-cambio">Órdenes de cambio</Link>
-          <Link to="/comercial/contratos">Contratos de venta</Link>
-          <Link to="/comercial/facturacion">Facturación</Link>
-          <Link to="/comercial/cobros">Cobros</Link>
+  const modulosTab = (
+    <Card title="Módulos del proyecto">
+      <div className="nx-treasury__actions">
+        <Link to="/proyectos/wbs">WBS</Link>
+        <Link to="/proyectos/presupuestos">Presupuesto de costos</Link>
+        <Link to="/proyectos/avances">Avances</Link>
+        <Link to="/proyectos/ordenes-de-cambio">Órdenes de cambio</Link>
+        <Link to="/comercial/contratos">Contratos de venta</Link>
+        <Link to="/comercial/facturacion">Facturación</Link>
+        <Link to="/comercial/cobros">Cobros</Link>
+        <Link to="/finanzas/cuentas-por-pagar">Compras / AP</Link>
+      </div>
+    </Card>
+  )
+
+  return (
+    <div className="nx-object-page">
+      <header className="nx-object-header">
+        <div className="nx-object-header__top">
+          <div>
+            <p className="nx-object-header__eyebrow">Proyecto · {project.code ?? 'sin código'}</p>
+            <h1 className="nx-dashboard__title">{project.name}</h1>
+          </div>
+          <div className="nx-object-header__actions">
+            <Badge>{statusLabel(project.status)}</Badge>
+            {context.activeProjectId !== project.id ? (
+              <Button variant="secondary" onClick={() => setActiveProject(project.id)}>Seleccionar como contexto</Button>
+            ) : <Badge tone="info">Contexto activo</Badge>}
+          </div>
         </div>
-      </Card>
+        <dl className="nx-object-header__facts">
+          <div><dt>Cliente</dt><dd>{selectedCustomer?.legalName ?? 'Sin cliente asignado'}</dd></div>
+          <div><dt>Responsable</dt><dd>{managerName}</dd></div>
+          <div><dt>Ubicación</dt><dd>{locationText}</dd></div>
+          <div><dt>Plan</dt><dd>{planText}</dd></div>
+          {summary ? (
+            <>
+              <div><dt>Costo contratado de ejecución</dt><dd>{money(summary.committed, currency)}</dd></div>
+              <div><dt>Pagado</dt><dd>{money(summary.paid, currency)}</dd></div>
+            </>
+          ) : null}
+        </dl>
+      </header>
+
+      <Tabs
+        items={[
+          { key: 'resumen', label: 'Resumen', content: resumenTab },
+          { key: 'finanzas', label: 'Finanzas', content: finanzasTab },
+          {
+            key: 'contratos',
+            label: 'Contratos',
+            content: <ProjectContractsTab companyId={project.companyId} projectId={project.id} />,
+          },
+          { key: 'ficha', label: 'Ficha y estado', content: fichaTab },
+          { key: 'modulos', label: 'Módulos', content: modulosTab },
+        ]}
+      />
     </div>
   )
 }

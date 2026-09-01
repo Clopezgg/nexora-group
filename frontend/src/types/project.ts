@@ -26,6 +26,7 @@ export interface Project {
   customerId: string | null
   customerRef: string | null
   manager: string | null
+  managerUserId: string | null
   currencyCode: string | null
   costCenterId: string | null
   plannedStart: string | null
@@ -33,6 +34,12 @@ export interface Project {
   actualEnd: string | null
   status: ProjectStatus
   description: string | null
+  addressLine1: string | null
+  addressLine2: string | null
+  city: string | null
+  stateDepartment: string | null
+  country: string | null
+  locationReference: string | null
 }
 
 export interface ProjectFinancialSummary {

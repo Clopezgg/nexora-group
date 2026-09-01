@@ -63,6 +63,12 @@ def create_project(
     planned_start: date | None = None,
     planned_end: date | None = None,
     description: str | None = None,
+    address_line_1: str | None = None,
+    address_line_2: str | None = None,
+    city: str | None = None,
+    state_department: str | None = None,
+    country: str | None = None,
+    location_reference: str | None = None,
 ) -> Project:
     if customer_id is not None:
         customer = db.get(Customer, customer_id)
@@ -94,6 +100,12 @@ def create_project(
         planned_start=planned_start,
         planned_end=planned_end,
         description=description,
+        address_line_1=address_line_1,
+        address_line_2=address_line_2,
+        city=city,
+        state_department=state_department,
+        country=country,
+        location_reference=location_reference,
         status="PLANNING",
     )
     db.add(project)

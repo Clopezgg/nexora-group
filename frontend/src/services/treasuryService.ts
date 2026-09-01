@@ -250,8 +250,11 @@ export const treasuryService = {
   excludeReconciliationLine: async (lineId: string) =>
     normalizeLine(await apiFetch<BankStatementLineWire>(`/treasury/bank-statement-lines/${lineId}/exclude`, { method: 'POST' })),
 
-  listFundRestrictions: async (companyId: string) =>
-    (await apiFetch<FundRestrictionWire[]>(`/treasury/fund-restrictions?companyId=${encodeURIComponent(companyId)}`)).map(normalizeRestriction),
+  // El backend expone las restricciones de UNA cuenta de Tesorería (la pantalla
+  // muestra la disponibilidad de la cuenta seleccionada), por eso el parámetro
+  // es treasuryAccountId — NO companyId.
+  listFundRestrictions: async (treasuryAccountId: string) =>
+    (await apiFetch<FundRestrictionWire[]>(`/treasury/fund-restrictions?treasuryAccountId=${encodeURIComponent(treasuryAccountId)}`)).map(normalizeRestriction),
   createFundRestriction: async (payload: { treasuryAccountId: string; restrictedForProjectId?: string | null; amount: string; description: string }) =>
     normalizeRestriction(await apiFetch<FundRestrictionWire>('/treasury/fund-restrictions', { method: 'POST', body: JSON.stringify(payload) })),
   releaseFundRestriction: async (restrictionId: string) =>

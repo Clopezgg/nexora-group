@@ -285,9 +285,9 @@ export function FundRestrictionsPage() {
 
   const accountsQuery = useQuery({ queryKey: ['treasury', 'accounts', activeCompanyId], queryFn: () => treasuryService.listAccounts(activeCompanyId as string), enabled: Boolean(activeCompanyId) })
   const projectsQuery = useQuery({ queryKey: ['projects', activeCompanyId], queryFn: () => projectService.list(activeCompanyId as string), enabled: Boolean(activeCompanyId) })
-  const restrictionsQuery = useQuery({ queryKey: ['treasury', 'fund-restrictions', activeCompanyId], queryFn: () => treasuryService.listFundRestrictions(activeCompanyId as string), enabled: Boolean(activeCompanyId) })
   const accounts = accountsQuery.data ?? []
   const effectiveAccountId = selectedAccountId || accounts[0]?.id || ''
+  const restrictionsQuery = useQuery({ queryKey: ['treasury', 'fund-restrictions', effectiveAccountId], queryFn: () => treasuryService.listFundRestrictions(effectiveAccountId), enabled: Boolean(effectiveAccountId) })
   const availabilityQuery = useQuery({ queryKey: ['treasury', 'availability', effectiveAccountId], queryFn: () => treasuryService.getAvailability(effectiveAccountId), enabled: Boolean(effectiveAccountId) })
   const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : []
   const accountNames = new Map(accounts.map((account) => [account.id, account.name]))
@@ -295,8 +295,9 @@ export function FundRestrictionsPage() {
   const release = useMutation({
     mutationFn: (restrictionId: string) => treasuryService.releaseFundRestriction(restrictionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['treasury', 'fund-restrictions', activeCompanyId] })
+      queryClient.invalidateQueries({ queryKey: ['treasury', 'fund-restrictions', effectiveAccountId] })
       queryClient.invalidateQueries({ queryKey: ['treasury', 'availability'] })
+      queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts', activeCompanyId] })
     },
     onError: (error) => handleMutationError(error, 'Liberar restricción de fondos'),
   })
@@ -318,7 +319,7 @@ export function FundRestrictionsPage() {
       <Button onClick={() => setCreateOpen(true)} disabled={accounts.length === 0}>Nueva restricción</Button>
     </Card>
     {restrictionsQuery.isLoading ? <LoadingState label="Cargando restricciones…" /> : restrictionsQuery.isError ? <ErrorState description="No se pudieron cargar las restricciones." onRetry={() => restrictionsQuery.refetch()} /> : <Table columns={columns} rows={restrictionsQuery.data ?? []} getRowKey={(row) => row.id} emptyMessage="No hay restricciones de fondos activas o históricas." />}
-    {createOpen ? <CreateRestrictionModal accounts={accounts} projects={projects} onClose={() => setCreateOpen(false)} onCreated={() => { queryClient.invalidateQueries({ queryKey: ['treasury', 'fund-restrictions', activeCompanyId] }); queryClient.invalidateQueries({ queryKey: ['treasury', 'availability'] }) }} /> : null}
+    {createOpen ? <CreateRestrictionModal accounts={accounts} projects={projects} onClose={() => setCreateOpen(false)} onCreated={() => { queryClient.invalidateQueries({ queryKey: ['treasury', 'fund-restrictions'] }); queryClient.invalidateQueries({ queryKey: ['treasury', 'availability'] }); queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts', activeCompanyId] }) }} /> : null}
   </div></CompanyGuard>
 }
 

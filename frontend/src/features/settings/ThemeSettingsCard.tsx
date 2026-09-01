@@ -49,10 +49,10 @@ function ThemePreviewApp({ themeId, density, scale }: { themeId: string; density
             ))}
           </div>
           <table className="nx-theme-preview__table">
-            <thead><tr><th>Semana</th><th>Entradas</th><th>Saldo</th></tr></thead>
+            <thead><tr><th>Período</th><th>Entradas</th><th>Saldo</th></tr></thead>
             <tbody>
-              <tr><td>S11</td><td>L 40,000</td><td>L 1,140,000</td></tr>
-              <tr><td>S12</td><td>L 55,000</td><td>L 1,195,000</td></tr>
+              <tr><td>Julio 2026</td><td>L 40,000.00</td><td>L 1,140,000.00</td></tr>
+              <tr><td>Agosto 2026</td><td>L 55,000.00</td><td>L 1,195,000.00</td></tr>
             </tbody>
           </table>
           <div className="nx-theme-preview__form">

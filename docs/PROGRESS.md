@@ -4076,3 +4076,27 @@ Rama: `feat/cpc-3-contract-payment-api-ux`.
 - Tests: `test_contract_payments_api.py` (3) — crear plan mensual + leer,
   plan > valor 422, summary + FIFO preview. Regresión: contract-payments
   12, RBAC/auth 21, frontend 167 verdes.
+
+### 2026-09-01 — ORDEN MAESTRA FINAL · CPC PR 4 (perfil documental de compañía y proyecto)
+
+Rama: `feat/cpc-4-document-profiles`.
+
+Precondición para el comprobante empresarial (§29-§32): los datos que hoy
+faltan en `Company`/`Project` para el PDF.
+
+- **`Company`** (§29): `trade_name`, `address_line_1/2`, `city`,
+  `state_department`, `phone`, `email`, `website`, `voucher_footer_text`,
+  `logo_evidence_id`, `signature_evidence_id` (enlace informativo a
+  Evidence, sin FK para no crear ciclo companies↔evidence — mismo criterio
+  que `Evidence.entity_id`). `legal_name`/`fiscal_id`/`country` ya existían.
+  `PATCH /api/master-data/companies/{id}/profile` los acepta (los campos
+  nuevos son sobrescribibles; pagador/moneda/código siguen siendo
+  one-time).
+- **`Project`** (§31): `address_line_1/2`, `city`, `state_department`,
+  `country`, `location_reference`. `PATCH /api/projects/{id}` los acepta.
+- Migración `952f802ae816` (single head; roundtrip probado).
+- **Frontend**: fieldset "Documentos · datos impresos en el comprobante" en
+  Configuración → Perfil de la compañía (nombre comercial, dirección,
+  ciudad, departamento, teléfono, correo, sitio, texto de pie).
+- Tests: `test_company_project_document_profile.py` (2). Regresión:
+  master-data/migrations/edit-access 19, frontend 167 verdes.

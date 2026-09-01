@@ -1,6 +1,8 @@
+import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, String
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -36,5 +38,22 @@ class Company(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # de la compañía; cada usuario puede sobreescribirlos en sus preferencias.
     default_theme_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     default_density: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Perfil documental de la compañía (orden maestra final §29). Se imprimen
+    # en el comprobante -- nunca hardcodeados. Configurables desde
+    # Configuración -> Perfil de empresa -> Documentos.
+    trade_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address_line_1: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address_line_2: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    state_department: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    website: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    voucher_footer_text: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Enlace INFORMATIVO a Evidence (mismo criterio que Evidence.entity_id:
+    # sin FK, para no crear un ciclo companies<->evidence). Se valida en el
+    # servicio que la evidencia pertenezca a la compañía.
+    logo_evidence_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    signature_evidence_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     projects: Mapped[list["Project"]] = relationship(back_populates="company")

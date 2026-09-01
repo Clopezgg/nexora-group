@@ -43,5 +43,12 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     actual_end: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="PLANNING")
     description: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    # Localización documental de la obra (orden maestra final §31).
+    address_line_1: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address_line_2: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    state_department: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    location_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     company: Mapped["Company"] = relationship(back_populates="projects")

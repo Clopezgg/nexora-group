@@ -57,6 +57,15 @@ def update_company(
     voucher_approver_name: str | None = None,
     default_theme_id: str | None = None,
     default_density: str | None = None,
+    trade_name: str | None = None,
+    address_line_1: str | None = None,
+    address_line_2: str | None = None,
+    city: str | None = None,
+    state_department: str | None = None,
+    phone: str | None = None,
+    email: str | None = None,
+    website: str | None = None,
+    voucher_footer_text: str | None = None,
 ) -> Company:
     if name is not None:
         company.name = name.strip()
@@ -88,6 +97,19 @@ def update_company(
         company.voucher_payer_name = normalized_payer or None
     if voucher_approver_name is not None:
         company.voucher_approver_name = voucher_approver_name.strip() or None
+    for _field, _value in (
+        ("trade_name", trade_name),
+        ("address_line_1", address_line_1),
+        ("address_line_2", address_line_2),
+        ("city", city),
+        ("state_department", state_department),
+        ("phone", phone),
+        ("email", email),
+        ("website", website),
+        ("voucher_footer_text", voucher_footer_text),
+    ):
+        if _value is not None:
+            setattr(company, _field, _value.strip() or None)
     if default_theme_id is not None:
         company.default_theme_id = default_theme_id.strip() or None
     if default_density is not None:

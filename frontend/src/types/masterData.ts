@@ -10,6 +10,15 @@ export interface Company {
   defaultThemeId: string | null
   defaultDensity: string | null
   voucherApproverName: string | null
+  tradeName?: string | null
+  addressLine1?: string | null
+  addressLine2?: string | null
+  city?: string | null
+  stateDepartment?: string | null
+  phone?: string | null
+  email?: string | null
+  website?: string | null
+  voucherFooterText?: string | null
 }
 
 export interface Account {

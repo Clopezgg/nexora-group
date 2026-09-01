@@ -102,6 +102,34 @@ export interface ThemeIconography {
   strokeWidth: string
 }
 
+/**
+ * Tratamiento ESTRUCTURAL de los componentes compuestos por familia
+ * (ORDEN MAESTRA §31-§34): diálogos, drawers, filter-bar, object-page,
+ * inputs y etiquetas. Son diferencias de anatomía, no de color:
+ * bordes vs reglas vs bandas teñidas, inputs con caja vs subrayado,
+ * etiquetas normales vs versalitas, opacidad del scrim.
+ */
+export interface ThemeStructure {
+  /** Separador de la cabecera de diálogos/drawers. */
+  dialogHeaderBorder: string
+  /** Barra superior de acento en el diálogo (NEXORA) o `none`. */
+  dialogAccentRail: string
+  /** Opacidad del velo de overlay (0–1). */
+  overlayScrim: number
+  /** `boxed` = caja completa; `underline` = sólo borde inferior (Belize). */
+  inputBorderWidth: string
+  inputBg: 'surface' | 'sunken'
+  /** Etiqueta de campo: normal vs versalitas comprimidas. */
+  fieldLabelTransform: 'none' | 'uppercase'
+  fieldLabelSpacing: string
+  /** Fondo del filter-bar. */
+  filterBarBg: 'transparent' | 'sunken' | 'tinted'
+  filterBarBorder: string
+  /** Cabecera de object-page. */
+  objectHeaderBg: 'surface' | 'sunken' | 'tinted'
+  objectHeaderAccentRail: string
+}
+
 export interface ThemeFocus {
   ring: string
   width: string
@@ -128,6 +156,7 @@ export interface ThemePreset {
   charts: ThemeCharts
   iconography: ThemeIconography
   focus: ThemeFocus
+  structure: ThemeStructure
 }
 
 const INTER = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
@@ -146,6 +175,7 @@ interface FamilyTraits {
   headingTracking: string
   densityDefault: Density
   iconography: ThemeIconography
+  structure: ThemeStructure
 }
 
 const FAMILY_TRAITS: Record<ThemeFamily, FamilyTraits> = {
@@ -162,6 +192,19 @@ const FAMILY_TRAITS: Record<ThemeFamily, FamilyTraits> = {
     headingTracking: '-0.01em',
     densityDefault: 'comfortable',
     iconography: { style: 'line', strokeWidth: '1.6' },
+    structure: {
+      dialogHeaderBorder: 'none',
+      dialogAccentRail: 'none',
+      overlayScrim: 0.5,
+      inputBorderWidth: '1px',
+      inputBg: 'surface',
+      fieldLabelTransform: 'none',
+      fieldLabelSpacing: '0',
+      filterBarBg: 'transparent',
+      filterBarBorder: 'none',
+      objectHeaderBg: 'surface',
+      objectHeaderAccentRail: 'none',
+    },
   },
   // Quartz — esquinas mínimas, superficies casi planas, contraste alto,
   // más compacto por defecto (Fiori 3).
@@ -177,6 +220,19 @@ const FAMILY_TRAITS: Record<ThemeFamily, FamilyTraits> = {
     headingTracking: '0',
     densityDefault: 'compact',
     iconography: { style: 'line', strokeWidth: '1.4' },
+    structure: {
+      dialogHeaderBorder: '1px solid var(--nx-color-border)',
+      dialogAccentRail: 'none',
+      overlayScrim: 0.4,
+      inputBorderWidth: '1px',
+      inputBg: 'sunken',
+      fieldLabelTransform: 'none',
+      fieldLabelSpacing: '0',
+      filterBarBg: 'sunken',
+      filterBarBorder: '1px solid var(--nx-color-border)',
+      objectHeaderBg: 'sunken',
+      objectHeaderAccentRail: 'none',
+    },
   },
   // Belize — herencia SAP Belize: barras densas, esquinas duras, cabeceras
   // de tabla teñidas, tipografía compacta.
@@ -192,6 +248,19 @@ const FAMILY_TRAITS: Record<ThemeFamily, FamilyTraits> = {
     headingTracking: '0',
     densityDefault: 'compact',
     iconography: { style: 'duotone', strokeWidth: '1.5' },
+    structure: {
+      dialogHeaderBorder: '1.5px solid var(--nx-color-border-strong)',
+      dialogAccentRail: 'none',
+      overlayScrim: 0.55,
+      inputBorderWidth: '0 0 1px 0',
+      inputBg: 'sunken',
+      fieldLabelTransform: 'uppercase',
+      fieldLabelSpacing: '0.04em',
+      filterBarBg: 'tinted',
+      filterBarBorder: '2px solid var(--nx-color-border-strong)',
+      objectHeaderBg: 'tinted',
+      objectHeaderAccentRail: 'none',
+    },
   },
   // NEXORA — identidad propia: híbrido Horizon (radio) + densidad ejecutiva.
   nexora: {
@@ -206,6 +275,19 @@ const FAMILY_TRAITS: Record<ThemeFamily, FamilyTraits> = {
     headingTracking: '-0.005em',
     densityDefault: 'comfortable',
     iconography: { style: 'line', strokeWidth: '1.6' },
+    structure: {
+      dialogHeaderBorder: '1px solid var(--nx-color-border)',
+      dialogAccentRail: '3px solid var(--nx-color-accent)',
+      overlayScrim: 0.5,
+      inputBorderWidth: '1px',
+      inputBg: 'surface',
+      fieldLabelTransform: 'none',
+      fieldLabelSpacing: '0',
+      filterBarBg: 'sunken',
+      filterBarBorder: 'none',
+      objectHeaderBg: 'surface',
+      objectHeaderAccentRail: '3px solid var(--nx-color-accent)',
+    },
   },
 }
 
@@ -263,7 +345,15 @@ function makePreset(input: PresetInput): ThemePreset {
       width: contrast === 'high' ? '3px' : '2px',
       offset: '2px',
     },
+    structure: traits.structure,
   }
+}
+
+const _SURFACE_VAR: Record<'surface' | 'sunken' | 'tinted' | 'transparent', string> = {
+  surface: 'var(--nx-color-surface)',
+  sunken: 'var(--nx-color-surface-sunken)',
+  transparent: 'transparent',
+  tinted: 'color-mix(in srgb, var(--nx-color-accent) 6%, var(--nx-color-surface))',
 }
 
 export const THEME_PRESETS: ThemePreset[] = [
@@ -633,6 +723,21 @@ export function compileTheme(
     '--nx-focus-ring': preset.focus.ring,
     '--nx-focus-width': preset.focus.width,
     '--nx-focus-offset': preset.focus.offset,
+
+    // --- Estructura de componentes compuestos (§31-§34) ---
+    '--nx-dialog-header-border': preset.structure.dialogHeaderBorder,
+    '--nx-dialog-accent-rail': preset.structure.dialogAccentRail,
+    '--nx-overlay-scrim': `color-mix(in srgb, ${preset.isDark ? '#000' : '#0b1420'} ${Math.round(
+      preset.structure.overlayScrim * 100,
+    )}%, transparent)`,
+    '--nx-input-border-width': preset.structure.inputBorderWidth,
+    '--nx-input-bg': _SURFACE_VAR[preset.structure.inputBg],
+    '--nx-field-label-transform': preset.structure.fieldLabelTransform,
+    '--nx-field-label-spacing': preset.structure.fieldLabelSpacing,
+    '--nx-filterbar-bg': _SURFACE_VAR[preset.structure.filterBarBg],
+    '--nx-filterbar-border': preset.structure.filterBarBorder,
+    '--nx-objectheader-bg': _SURFACE_VAR[preset.structure.objectHeaderBg],
+    '--nx-objectheader-accent-rail': preset.structure.objectHeaderAccentRail,
 
     // --- Densidad / escala ---
     '--nx-density-row-height': `${(38 * densityScale * uiScale).toFixed(1)}px`,

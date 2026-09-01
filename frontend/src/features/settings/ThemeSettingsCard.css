@@ -180,3 +180,55 @@
   background: var(--nx-chart-series-1, #1769d2);
   border-radius: 2px 2px 0 0;
 }
+
+/* --- §31-§34: la vista previa refleja la anatomía estructural del preset --- */
+.nx-theme-preview__field-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--nx-color-text-muted, #4f6176);
+  text-transform: var(--nx-field-label-transform, none);
+  letter-spacing: var(--nx-field-label-spacing, normal);
+}
+.nx-theme-preview__filterbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--nx-shape-radius-sm, 6px);
+  background: var(--nx-filterbar-bg, transparent);
+  border-bottom: var(--nx-filterbar-border, none);
+  border-left: var(--nx-objectheader-accent-rail, none);
+}
+.nx-theme-preview__input {
+  flex: 1;
+  min-width: 80px;
+  padding: 5px 8px;
+  font-size: 0.66rem;
+  background: var(--nx-input-bg, var(--nx-color-surface, #fff));
+  color: var(--nx-color-text-muted, #4f6176);
+  border-style: solid;
+  border-width: var(--nx-input-border-width, 1px);
+  border-color: var(--nx-color-border-strong, #b9c9dc);
+  border-radius: var(--nx-shape-radius-sm, 6px);
+}
+.nx-theme-preview__dialog {
+  border: 1px solid var(--nx-color-border, #dce5ef);
+  border-top: var(--nx-dialog-accent-rail, 1px solid var(--nx-color-border, #dce5ef));
+  border-radius: var(--nx-shape-radius-md, 9px);
+  overflow: hidden;
+  box-shadow: var(--nx-elev-raised, 0 6px 20px rgba(0, 0, 0, 0.12));
+}
+.nx-theme-preview__dialog-header {
+  padding: 7px 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--nx-color-text, #102844);
+  background: var(--nx-color-surface, #fff);
+  border-bottom: var(--nx-dialog-header-border, none);
+}
+.nx-theme-preview__dialog-body {
+  padding: 8px 10px;
+  font-size: 0.64rem;
+  color: var(--nx-color-text-muted, #4f6176);
+  background: var(--nx-color-surface, #fff);
+}

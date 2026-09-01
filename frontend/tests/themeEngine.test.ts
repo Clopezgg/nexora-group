@@ -88,6 +88,43 @@ describe('Enterprise Theme Architecture (§8-§11, §20)', () => {
     expect(hv['--nx-motion-easing']).not.toBe(qv['--nx-motion-easing'])
   })
 
+  it('la ESTRUCTURA de los componentes compuestos difiere por familia (§31-§34)', () => {
+    const hv = compileTheme(getThemePreset('horizon-light'))
+    const qv = compileTheme(getThemePreset('quartz-light'))
+    const bv = compileTheme(getThemePreset('belize-light'))
+    const nv = compileTheme(getThemePreset(DEFAULT_THEME_ID)) // NEXORA
+
+    // Separador de cabecera de diálogo: Horizon sin regla, Belize regla dura.
+    expect(hv['--nx-dialog-header-border']).toBe('none')
+    expect(bv['--nx-dialog-header-border']).toContain('1.5px')
+    expect(new Set([
+      hv['--nx-dialog-header-border'],
+      qv['--nx-dialog-header-border'],
+      bv['--nx-dialog-header-border'],
+    ]).size).toBe(3)
+
+    // Input: Belize es subrayado (sólo borde inferior); el resto, caja.
+    expect(bv['--nx-input-border-width']).toBe('0 0 1px 0')
+    expect(hv['--nx-input-border-width']).toBe('1px')
+
+    // Etiqueta de campo: sólo Belize usa versalitas.
+    expect(bv['--nx-field-label-transform']).toBe('uppercase')
+    expect(hv['--nx-field-label-transform']).toBe('none')
+    expect(nv['--nx-field-label-transform']).toBe('none')
+
+    // NEXORA lleva riel de acento en diálogo y object-header; Horizon no.
+    expect(nv['--nx-dialog-accent-rail']).toContain('var(--nx-color-accent)')
+    expect(hv['--nx-dialog-accent-rail']).toBe('none')
+    expect(nv['--nx-objectheader-accent-rail']).toContain('var(--nx-color-accent)')
+
+    // El velo de overlay tiene opacidad distinta por familia.
+    expect(new Set([
+      hv['--nx-overlay-scrim'],
+      qv['--nx-overlay-scrim'],
+      bv['--nx-overlay-scrim'],
+    ]).size).toBe(3)
+  })
+
   it('compileTheme emite todos los tokens estructurales que consume themes.css', () => {
     const v = compileTheme(getThemePreset(DEFAULT_THEME_ID))
     for (const token of [
@@ -98,6 +135,9 @@ describe('Enterprise Theme Architecture (§8-§11, §20)', () => {
       '--nx-density-row-height', '--nx-density-control-height', '--nx-density-card-padding',
       '--nx-motion-fast', '--nx-motion-easing', '--nx-color-accent-hover', '--nx-color-border-strong',
       '--nx-focus-ring', '--nx-focus-width', '--nx-font-base-size',
+      '--nx-dialog-header-border', '--nx-dialog-accent-rail', '--nx-overlay-scrim',
+      '--nx-input-border-width', '--nx-input-bg', '--nx-field-label-transform',
+      '--nx-filterbar-bg', '--nx-objectheader-bg', '--nx-objectheader-accent-rail',
     ]) {
       expect(v[token], `falta ${token}`).toBeTruthy()
     }

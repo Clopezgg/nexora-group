@@ -157,16 +157,24 @@
   background: var(--nx-theme-accent);
 }
 
-/* Forms */
+/* Forms — anatomía estructural por familia (§31-§34):
+   Horizon/Quartz/NEXORA = caja completa; Belize = subrayado (input plano con
+   sólo borde inferior, herencia SAP). El fondo (superficie vs sunken) y las
+   versalitas de etiqueta también vienen del preset. */
 :root[data-nx-themed='on'] body .nx-input,
 :root[data-nx-themed='on'] body .nx-select,
 :root[data-nx-themed='on'] body .nx-textarea {
-  background: var(--nx-theme-surface);
-  border-color: var(--nx-theme-border);
+  background: var(--nx-input-bg, var(--nx-theme-surface));
+  border-style: solid;
+  border-width: var(--nx-input-border-width, 1px);
+  border-color: var(--nx-color-border, var(--nx-theme-border));
   color: var(--nx-theme-text);
+  border-radius: var(--nx-shape-radius-sm, 6px);
 }
 :root[data-nx-themed='on'] body .nx-field__label {
   color: var(--nx-theme-text);
+  text-transform: var(--nx-field-label-transform, none);
+  letter-spacing: var(--nx-field-label-spacing, normal);
 }
 
 /* Tables */
@@ -389,4 +397,69 @@
 }
 :root[data-nx-themed='on'] body .nx-sidebar__link--active .nx-icon {
   color: var(--nx-shell-sidebar-active-text, #fff);
+}
+
+/* ===========================================================================
+   ESTRUCTURA DE COMPONENTES COMPUESTOS POR FAMILIA (ORDEN MAESTRA §31-§34)
+   Diferencias de ANATOMÍA, no de color: reglas de cabecera, velos, bandas,
+   rieles de acento. Horizon = sombra suave sin regla; Quartz = plano con
+   hairline; Belize = reglas duras + bandas teñidas; NEXORA = riel de acento.
+   =========================================================================== */
+
+/* --- Diálogos (Modal) --- */
+:root[data-nx-themed='on'] body .nx-modal__overlay,
+:root[data-nx-themed='on'] body .nx-drawer__overlay {
+  background: var(--nx-overlay-scrim, rgba(5, 11, 24, 0.5));
+}
+:root[data-nx-themed='on'] body .nx-modal {
+  border-radius: var(--nx-shape-radius-lg, 12px);
+  box-shadow: var(--nx-elev-overlay, 0 18px 50px rgba(16, 40, 68, 0.2));
+  border-top: var(--nx-dialog-accent-rail, none);
+}
+:root[data-nx-themed='on'] body .nx-modal__header {
+  padding-bottom: var(--nx-density-gap, 12px);
+  border-bottom: var(--nx-dialog-header-border, none);
+  margin-bottom: var(--nx-density-gap, 12px);
+}
+
+/* --- Drawers --- */
+:root[data-nx-themed='on'] body .nx-drawer {
+  background: var(--nx-theme-surface);
+  box-shadow: var(--nx-elev-overlay, 0 18px 50px rgba(16, 40, 68, 0.2));
+  border-left: var(--nx-dialog-accent-rail, none);
+}
+:root[data-nx-themed='on'] body .nx-drawer--left {
+  border-left: 0;
+  border-right: var(--nx-dialog-accent-rail, none);
+}
+:root[data-nx-themed='on'] body .nx-drawer__header {
+  border-bottom: var(--nx-dialog-header-border, 1px solid var(--nx-theme-border));
+}
+
+/* --- Filter bar: banda teñida (Belize/NEXORA), sunken (Quartz) o
+       transparente (Horizon). NEXORA además lleva riel de acento. --- */
+:root[data-nx-themed='on'] body .nx-filter-bar {
+  background: var(--nx-filterbar-bg, transparent);
+  border: 0;
+  border-bottom: var(--nx-filterbar-border, none);
+  border-radius: var(--nx-shape-radius-sm, 6px);
+}
+:root[data-nx-family='quartz'] body .nx-filter-bar,
+:root[data-nx-family='belize'] body .nx-filter-bar,
+:root[data-nx-family='nexora'] body .nx-filter-bar {
+  padding: 10px 12px;
+}
+:root[data-nx-family='nexora'] body .nx-filter-bar {
+  border-left: 3px solid var(--nx-color-accent, #1769d2);
+}
+
+/* --- Object page header (Project Cockpit) --- */
+:root[data-nx-themed='on'] body .nx-object-header {
+  background: var(--nx-objectheader-bg, var(--nx-theme-surface));
+  border-color: var(--nx-color-border, var(--nx-theme-border));
+  border-radius: var(--nx-shape-radius-md, 10px);
+  border-top: var(--nx-objectheader-accent-rail, none);
+}
+:root[data-nx-family='belize'] body .nx-object-header {
+  border-radius: 0;
 }

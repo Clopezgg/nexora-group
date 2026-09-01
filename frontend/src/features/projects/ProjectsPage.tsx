@@ -7,7 +7,10 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  FilterBar,
+  Input,
   LoadingState,
+  Select,
   Table,
   type TableColumn,
 } from '../../design-system'
@@ -43,6 +46,8 @@ export function ProjectsPage() {
   const { context, setActiveProject } = useActiveContext()
   const { activeCompany, activeCompanyId, isLoading: companiesLoading, isError: companiesError, refetch } = useActiveCompany()
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterText, setFilterText] = useState('')
 
   const projectsQuery = useQuery({
     queryKey: ['projects', activeCompanyId],
@@ -163,12 +168,52 @@ export function ProjectsPage() {
         </Card>
       ) : null}
 
+      {projects.length > 0 ? (
+        <FilterBar
+          onClear={() => {
+            setFilterStatus('')
+            setFilterText('')
+          }}
+        >
+          <Input
+            label="Buscar proyecto"
+            value={filterText}
+            onChange={(event) => setFilterText(event.target.value)}
+            placeholder="Nombre o código…"
+          />
+          <Select
+            label="Estado"
+            value={filterStatus}
+            onChange={(event) => setFilterStatus(event.target.value)}
+          >
+            <option value="">Todos</option>
+            {(['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CLOSED', 'CANCELLED'] as ProjectStatus[]).map(
+              (s) => (
+                <option key={s} value={s}>
+                  {statusLabel(s)}
+                </option>
+              ),
+            )}
+          </Select>
+        </FilterBar>
+      ) : null}
+
       {projectsQuery.isLoading ? (
         <LoadingState label="Cargando proyectos…" />
       ) : projectsQuery.isError ? (
         <ErrorState description="No se pudieron cargar los proyectos." onRetry={() => projectsQuery.refetch()} />
       ) : projects.length > 0 ? (
-        <Table columns={columns} rows={projects} getRowKey={(row) => row.id} />
+        <Table
+          columns={columns}
+          rows={projects.filter(
+            (row) =>
+              (!filterStatus || row.status === filterStatus) &&
+              (!filterText ||
+                row.name.toLowerCase().includes(filterText.toLowerCase()) ||
+                (row.code ?? '').toLowerCase().includes(filterText.toLowerCase())),
+          )}
+          getRowKey={(row) => row.id}
+        />
       ) : (
         <EmptyState icon="project" title="Sin proyectos" description="Crea el primer proyecto de esta compañía para empezar." />
       )}

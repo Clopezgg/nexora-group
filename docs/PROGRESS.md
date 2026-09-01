@@ -4487,3 +4487,23 @@ Rama: `fix/rect-d-theme-structural`.
 por familia; auditoría visual sistemática con capturas a 390/430/768/1024/1440
 en las ~15 rutas autenticadas (§17/§23) — requiere el stack corriendo o
 credenciales de producción.
+### 2026-09-01 — ORDEN MAESTRA DE RECTIFICACIÓN · PR-E (parcial) — el asiento no domina la página 1 del comprobante (§13)
+
+Rama: `fix/rect-e-voucher-page1`.
+
+- **`voucher_service.generate_voucher_pdf`**: la sección "Asiento contable"
+  se difiere a la **página 2** (junto con la evidencia a tamaño completo).
+  La primera página es el documento de negocio: emisor / beneficiario /
+  operación / total pagado / resumen contractual / evidencia / firmas /
+  QR de verificación. El respaldo contable (débitos/créditos) queda como
+  soporte en la página 2.
+- **Test**: `test_voucher_pdf_is_generated_for_a_treasury_outflow` asserta
+  que "Asiento contable" aparece DESPUÉS del bloque de firmas ("Recibí
+  conforme") y de "Información del pago" en el flujo del PDF.
+
+**PENDIENTE (P1)**: NEXORA Document Design System completo (§13 jerarquía
+íntegra, tipografía documental separada de los UI themes); pipeline
+HEIC→derivada JPEG para render/thumbnail en el PDF (§14, hoy el original
+HEIC se acepta/valida/guarda pero no se transcodifica —
+`DEFERRED-FINAL-019`); snapshot de master data documental de terceros (§15);
+inspección visual del PDF a tamaño real (§28).

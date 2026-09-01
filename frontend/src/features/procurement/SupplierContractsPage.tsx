@@ -7,12 +7,17 @@ import { procurementService } from '../../services/procurementService'
 import { projectService } from '../../services/projectService'
 import { formatMoney } from '../../utils/currency'
 import { ContractPaymentPlanModal } from './ContractPaymentPlanModal'
-import type { SupplierContract } from '../../types/procurement'
+import {
+  SUPPLIER_CONTRACT_CATEGORY_LABELS,
+  type SupplierContract,
+  type SupplierContractCategory,
+} from '../../types/procurement'
 
 const emptyForm = {
   supplierId: '',
   projectId: '',
   contractNumber: '',
+  contractCategory: 'LABOR' as SupplierContractCategory,
   value: '',
   currencyCode: 'HNL',
   startDate: '',
@@ -60,6 +65,7 @@ export function SupplierContractsPage() {
         supplierId: form.supplierId,
         projectId: form.projectId || undefined,
         contractNumber: form.contractNumber,
+        contractCategory: form.contractCategory,
         value: form.value,
         currencyCode: form.currencyCode,
         startDate: form.startDate,
@@ -75,6 +81,15 @@ export function SupplierContractsPage() {
 
   const columns: TableColumn<SupplierContract>[] = [
     { key: 'contractNumber', header: 'Número', render: (row) => row.contractNumber },
+    {
+      key: 'contractCategory',
+      header: 'Categoría',
+      render: (row) => (
+        <Badge tone="neutral">
+          {SUPPLIER_CONTRACT_CATEGORY_LABELS[row.contractCategory] ?? row.contractCategory}
+        </Badge>
+      ),
+    },
     {
       key: 'supplierId',
       header: 'Proveedor',
@@ -176,6 +191,23 @@ export function SupplierContractsPage() {
             onChange={(e) => setForm({ ...form, contractNumber: e.target.value })}
             required
           />
+          <Select
+            name="contractCategory"
+            label="Categoría del costo"
+            value={form.contractCategory}
+            onChange={(e) =>
+              setForm({ ...form, contractCategory: e.target.value as SupplierContractCategory })
+            }
+            required
+          >
+            {(
+              Object.keys(SUPPLIER_CONTRACT_CATEGORY_LABELS) as SupplierContractCategory[]
+            ).map((category) => (
+              <option key={category} value={category}>
+                {SUPPLIER_CONTRACT_CATEGORY_LABELS[category]}
+              </option>
+            ))}
+          </Select>
           <Input
             name="value"
             label="Valor"

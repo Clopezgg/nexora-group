@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -106,6 +106,9 @@ class Quotation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 class SalesContract(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "sales_contracts"
     __table_args__ = (
+        UniqueConstraint(
+            "company_id", "contract_number", name="uq_sales_contracts_company_number"
+        ),
         CheckConstraint("amount > 0", name="ck_sales_contracts_amount_positive"),
         CheckConstraint(
             "(scope IN ('CENTRAL','GENERAL') AND project_id IS NULL) "
@@ -126,7 +129,7 @@ class SalesContract(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="RESTRICT"), nullable=True
     )
-    contract_number: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    contract_number: Mapped[str] = mapped_column(String(64), nullable=False)
     scope: Mapped[str] = mapped_column(String(16), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     currency_code: Mapped[str] = mapped_column(String(3), ForeignKey("currencies.code"), nullable=False)

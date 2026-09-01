@@ -8,6 +8,19 @@ from app.domain.errors import InvalidFinancialReferenceError
 from app.models.cost_center import CostCenter
 from app.models.crm import Customer
 from app.models.project import Project
+from app.models.user import User
+
+
+def _resolve_manager_user(db: Session, manager_user_id: uuid.UUID | None) -> uuid.UUID | None:
+    """§16: el responsable real es un usuario existente y activo."""
+    if manager_user_id is None:
+        return None
+    manager = db.get(User, manager_user_id)
+    if manager is None or not manager.is_active:
+        raise InvalidFinancialReferenceError(
+            "manager_user_id debe ser un usuario existente y activo"
+        )
+    return manager.id
 
 
 def get_by_id(db: Session, project_id: uuid.UUID) -> Project | None:
@@ -44,6 +57,7 @@ def create_project(
     customer_id: uuid.UUID | None = None,
     customer_ref: str | None = None,
     manager: str | None = None,
+    manager_user_id: uuid.UUID | None = None,
     currency_code: str | None = None,
     cost_center_id: uuid.UUID | None = None,
     planned_start: date | None = None,
@@ -66,6 +80,7 @@ def create_project(
         raise InvalidFinancialReferenceError(
             "La fecha final prevista no puede ser anterior a la fecha de inicio"
         )
+    resolved_manager_user_id = _resolve_manager_user(db, manager_user_id)
     project = Project(
         company_id=company_id,
         name=name.strip(),
@@ -73,6 +88,7 @@ def create_project(
         customer_id=customer_id,
         customer_ref=customer_ref,
         manager=manager,
+        manager_user_id=resolved_manager_user_id,
         currency_code=currency_code,
         cost_center_id=cost_center_id,
         planned_start=planned_start,
@@ -92,6 +108,7 @@ def update_project(db: Session, *, project: Project, values: dict) -> Project:
         "customer_id",
         "customer_ref",
         "manager",
+        "manager_user_id",
         "currency_code",
         "cost_center_id",
         "planned_start",
@@ -104,6 +121,11 @@ def update_project(db: Session, *, project: Project, values: dict) -> Project:
         "country",
         "location_reference",
     }
+    if "manager_user_id" in values:
+        values = {
+            **values,
+            "manager_user_id": _resolve_manager_user(db, values["manager_user_id"]),
+        }
     for key, value in values.items():
         if key in editable:
             setattr(project, key, value)

@@ -109,6 +109,7 @@ def create_project(
         customer_id=payload.customer_id,
         customer_ref=payload.customer_ref,
         manager=payload.manager,
+        manager_user_id=payload.manager_user_id,
         currency_code=payload.currency_code,
         cost_center_id=payload.cost_center_id,
         planned_start=payload.planned_start,

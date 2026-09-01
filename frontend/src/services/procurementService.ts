@@ -7,6 +7,7 @@ import type {
   Rfq,
   Supplier,
   SupplierContract,
+  SupplierContractCategory,
 } from '../types/procurement'
 
 export const procurementService = {
@@ -22,6 +23,7 @@ export const procurementService = {
     supplierId: string
     projectId?: string
     contractNumber: string
+    contractCategory?: SupplierContractCategory
     value: string
     currencyCode: string
     startDate: string

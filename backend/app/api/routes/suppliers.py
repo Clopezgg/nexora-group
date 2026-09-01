@@ -96,13 +96,16 @@ def create_supplier(
 @router.get("/contracts", response_model=list[SupplierContractResponse])
 def list_contracts(
     company_id: uuid.UUID,
+    category: str | None = None,
     db: Session = Depends(get_db),
     user=Depends(require_permission("procurement.contract", "read")),
 ):
     assert_company_access(
         db, user_id=user.id, resource="procurement.contract", action="read", company_id=company_id
     )
-    contracts = supplier_repository.list_contracts(db, company_id=company_id)
+    contracts = supplier_repository.list_contracts(
+        db, company_id=company_id, category=category
+    )
     allowed = accessible_project_ids(
         db, user_id=user.id, resource="procurement.contract", action="read"
     )
@@ -142,6 +145,7 @@ def create_contract(
             supplier_id=payload.supplier_id,
             project_id=payload.project_id,
             contract_number=payload.contract_number,
+            contract_category=payload.contract_category,
             scope_description=payload.scope_description,
             value=payload.value,
             currency_code=payload.currency_code,
@@ -162,6 +166,7 @@ def create_contract(
             before=None,
             after={
                 "contractNumber": contract.contract_number,
+                "contractCategory": contract.contract_category,
                 "currencyCode": contract.currency_code,
                 "status": contract.status,
                 "supplierId": str(contract.supplier_id),

@@ -30,6 +30,7 @@ const CONTRACT = {
   retentionPercentage: '5.00',
   paymentTerms: null,
   status: 'DRAFT',
+  contractCategory: 'LABOR',
 }
 
 function stubFetch(overrides: { contracts?: unknown[]; onCreate?: () => void }) {
@@ -84,6 +85,8 @@ describe('SupplierContractsPage', () => {
 
     expect(await screen.findByText('SC-001')).toBeInTheDocument()
     expect(screen.getByText('L 150,000.00')).toBeInTheDocument()
+    // §13: la categoría del contrato es visible en la lista, en español.
+    expect(screen.getByText('Mano de obra')).toBeInTheDocument()
   })
 
   it('creates a new supplier contract through the real API', async () => {
@@ -94,6 +97,7 @@ describe('SupplierContractsPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: /nuevo contrato/i }))
     await userEvent.selectOptions(screen.getByLabelText(/proveedor/i), 's1')
     await userEvent.type(screen.getByLabelText(/número de contrato/i), 'SC-777')
+    await userEvent.selectOptions(screen.getByLabelText(/categoría del costo/i), 'SUBCONTRACT')
     await userEvent.type(screen.getByLabelText(/^valor/i), '99999.00')
     await userEvent.type(screen.getByLabelText(/fecha de inicio/i), '2026-03-01')
     await userEvent.click(screen.getByRole('button', { name: /guardar/i }))

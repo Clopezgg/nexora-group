@@ -155,6 +155,7 @@ def post_manual(
     lines: list[JournalLineInput],
     fx_rate: Decimal = Decimal("1"),
     description: str | None = None,
+    effective_date: date | None = None,
     source_type: str | None = None,
     source_id: uuid.UUID | None = None,
     tax_lines: list[tuple[uuid.UUID, Decimal, Decimal]] | None = None,
@@ -192,6 +193,10 @@ def post_manual(
         fx_rate=fx_rate,
         status="POSTED",
         description=description,
+        # Fecha económica: la del documento fuente de negocio. Si el caller
+        # no la da (asiento manual sin fecha explícita), cae en la fecha de
+        # negocio de hoy — nunca en el timestamp UTC del contenedor.
+        effective_date=effective_date or business_today(),
         posted_at=datetime.now(timezone.utc),
     )
     db.add(document)

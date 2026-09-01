@@ -197,6 +197,7 @@ def capitalize_supplier_invoice_as_asset(
         scope=invoice.scope,
         project_id=invoice.project_id,
         currency_code=invoice.currency_code,
+        effective_date=invoice.invoice_date,
         lines=[
             posting_service.JournalLineInput(
                 account_id=asset_account_id,
@@ -337,6 +338,7 @@ def generate_depreciation_entry(
             scope=asset.scope,
             project_id=asset.project_id,
             currency_code=asset.currency_code,
+            effective_date=period_end,
             lines=[
                 posting_service.JournalLineInput(
                     account_id=asset.depreciation_expense_account_id,

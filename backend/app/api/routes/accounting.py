@@ -40,6 +40,7 @@ def _to_response(document: AccountingDocument, lines: list[JournalLine]) -> Jour
         fx_rate=document.fx_rate,
         status=document.status,
         description=document.description,
+        effective_date=document.effective_date,
         lines=[
             JournalLineResponse(
                 id=line.id,

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -77,6 +77,8 @@ def _budget_to_response(db: Session, budget) -> BudgetResponse:
 @router.get("", response_model=list[ProjectResponse])
 def list_projects(
     company_id: uuid.UUID,
+    status_filter: str | None = Query(default=None, alias="status"),
+    include_archived: bool = Query(default=False, alias="includeArchived"),
     db: Session = Depends(get_db),
     user=Depends(require_permission("project", "read")),
 ) -> list[ProjectResponse]:
@@ -88,6 +90,13 @@ def list_projects(
     if allowed_project_ids is not None:
         allowed = set(allowed_project_ids)
         projects = [project for project in projects if project.id in allowed]
+    if status_filter:
+        wanted = {s.strip().upper() for s in status_filter.split(",") if s.strip()}
+        projects = [p for p in projects if p.status in wanted]
+    elif not include_archived:
+        # ARCHIVED es soft-delete: oculto de la operación diaria salvo que se
+        # pida explícitamente (§9).
+        projects = [p for p in projects if p.status != "ARCHIVED"]
     return [ProjectResponse.model_validate(project, from_attributes=True) for project in projects]
 
 

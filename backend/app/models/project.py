@@ -16,7 +16,18 @@ if TYPE_CHECKING:
 # TRE-002, ver CLAUDE.md §7 y docs/PROJECTS_WBS.md). Deliberadamente esta
 # tabla NO tiene ninguna columna de saldo/balance/cash -- ver
 # tests/test_project_control.py::test_project_has_no_money_column.
-PROJECT_STATUSES = ("PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CLOSED", "CANCELLED")
+PROJECT_STATUSES = (
+    "PLANNING",
+    "ACTIVE",
+    "ON_HOLD",
+    "COMPLETED",
+    "CLOSED",
+    "CANCELLED",
+    # ARCHIVED = soft-delete empresarial (§1). El proyecto y todo su historial
+    # (contratos, pagos, GL, Evidence, Audit) permanecen; solo se oculta de la
+    # operación diaria y es restaurable.
+    "ARCHIVED",
+)
 
 
 class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -47,6 +58,13 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     planned_end: Mapped[date | None] = mapped_column(Date, nullable=True)
     actual_end: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="PLANNING")
+    # Marcas de ciclo de vida (§8). Nunca se borran en un reopen: son historia.
+    completed_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    closed_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    reopened_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    archived_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Estado previo al archivado, para restaurar exactamente a donde estaba.
+    status_before_archive: Mapped[str | None] = mapped_column(String(32), nullable=True)
     description: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     # Localización documental de la obra (orden maestra final §31).
     address_line_1: Mapped[str | None] = mapped_column(String(255), nullable=True)

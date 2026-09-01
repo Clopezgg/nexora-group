@@ -8,7 +8,9 @@ from pydantic import Field, model_validator
 from app.schemas.base import CamelModel
 
 
-PROJECT_STATUS_VALUES = Literal["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CLOSED", "CANCELLED"]
+PROJECT_STATUS_VALUES = Literal[
+    "PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CLOSED", "CANCELLED", "ARCHIVED"
+]
 WBS_STATUS_VALUES = Literal["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"]
 
 
@@ -71,6 +73,22 @@ class ProjectStatusTransitionRequest(CamelModel):
     reason: str | None = Field(default=None, max_length=1000)
 
 
+class ProjectAllowedTransition(CamelModel):
+    status: str
+    label: str
+    sensitive: bool
+
+
+class ProjectLifecycleResponse(CamelModel):
+    current_status: str
+    current_status_label: str
+    allowed_transitions: list[ProjectAllowedTransition]
+    completed_at: str | None = None
+    closed_at: str | None = None
+    reopened_at: str | None = None
+    archived_at: str | None = None
+
+
 class ProjectResponse(CamelModel):
     id: uuid.UUID
     company_id: uuid.UUID
@@ -86,6 +104,10 @@ class ProjectResponse(CamelModel):
     planned_end: date | None
     actual_end: date | None
     status: str
+    completed_at: date | None = None
+    closed_at: date | None = None
+    reopened_at: date | None = None
+    archived_at: date | None = None
     description: str | None
     address_line_1: str | None = None
     address_line_2: str | None = None

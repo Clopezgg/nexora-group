@@ -65,6 +65,7 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     # Track B -- Project Control (orden maestra §37-43, §72).
     ("project", "create", "Crear proyectos"),
     ("project", "read", "Ver proyectos"),
+    ("project.lifecycle", "manage", "Reabrir / restaurar / archivar proyectos (acción sensible con motivo y auditoría)"),
     ("project.wbs", "create", "Crear nodos de WBS"),
     ("project.wbs", "read", "Ver WBS"),
     ("project.planning", "create", "Crear tareas/hitos de planeación"),
@@ -469,6 +470,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("core.user", "read", SCOPE_ANY),
         ("project", "create", SCOPE_OWN),
         ("project", "read", SCOPE_OWN),
+        ("project.lifecycle", "manage", SCOPE_OWN),
         ("project.wbs", "create", SCOPE_OWN),
         ("project.wbs", "read", SCOPE_OWN),
         ("project.planning", "create", SCOPE_OWN),

@@ -4181,3 +4181,47 @@ Rama: `feat/cpc-7-ledger-inspector-recon` (sobre CPC PR 6).
   línea de conciliación contractual, camino contractual del inspector.
   `test_subledger_reconciliation.py` actualizado para el nuevo subledger.
   Regresión: frontend typecheck/lint/build + 167 tests verdes.
+
+### 2026-09-01 — ORDEN MAESTRA FINAL · Deploy Azure REAL + smoke de producción (CPC)
+
+Deploy Azure run **`33458964611`** (`workflow_dispatch`, `deploy=true`,
+`main@e45719a`), autorización puntual del usuario (CLAUDE.md §11).
+
+**Migraciones aplicadas en producción** (`Run database migrations`, head =
+`4445cc3ebba5`):
+- `2640b82e65b8` — contract payment control: schedules, installments,
+  allocations + invoice-contract link (CPC PR 1)
+- `952f802ae816` — company + project document profile (CPC PR 4)
+- `bbc5c029c82c` — supplier_payments: bank_transaction_reference +
+  payment_observations (CPC PR 5)
+- `4445cc3ebba5` — voucher_issuances: snapshot inmutable del comprobante
+  (CPC PR 6)
+
+**Smoke del workflow** (`Verify production`, todo a través del origen
+first-party `$FRONTEND_URL/api`, imagen = `ghcr.io/clopezgg/nexora-backend:e45719a`):
+Frontend 200 · `/api/healthz` 200 · `/api/readyz` 200 · `/api/edit-access/verify`
+405 · login → cookie `Secure`+`HttpOnly`+`Path=/` · `auth/me` 200 ·
+`master-data/companies` 200 (1 visible) · `projects` 200 ·
+`master-data/accounts` 200 · `dashboard/summary` 200 (`HNL`) ·
+`fiscal/periods/current` 200 · `logout` 204 → relogin 200 · FQDN directo
+`*.azurecontainerapps.io` bloqueado (401).
+
+**Comprobación CPC de solo lectura sobre producción** (sin escribir nada —
+§78): los endpoints nuevos/modificados de CPC están registrados en el build
+de producción — `GET /api/reports/contract-payment-ledger`,
+`GET /api/contract-payments/schedules` y
+`GET /api/accounting/reconciliation/subledger-gl` responden **401** (auth
+requerida), no 404. Script reproducible de solo lectura para el smoke
+autenticado (login + los tres GET + CSV + verificación pública de
+comprobante, sin ningún POST): `scripts/cpc_prod_smoke.sh`.
+
+**Camino de escritura contractual** (contrato → plan → pago agosto → pago
+septiembre → historial acumulativo Ago, luego Ago+Sep sin octubre; reversal
+reabre cuotas; snapshot inmutable §62): verificado por la suite de CI contra
+BD efímera —
+`test_contract_payment_control.py::test_contract_voucher_pdf_shows_accumulative_history_and_totals`,
+`::test_issued_voucher_keeps_old_company_data_after_master_data_changes`,
+`::test_accumulative_history_never_shows_future_periods`,
+`test_contract_payment_reporting.py` (4). No se ejecuta contra producción:
+un `AccountingDocument` contabilizado es inmutable (CLAUDE.md §8), así que
+un smoke de escritura dejaría asientos contables reales permanentes (§78).

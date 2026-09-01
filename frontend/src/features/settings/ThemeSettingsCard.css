@@ -20,7 +20,9 @@
 }
 @media (max-width: 860px) {
   .nx-theme-settings {
-    grid-template-columns: 1fr;
+    /* `1fr` a secas no permite encoger bajo el min-content del hijo (la
+     * mini-app de vista previa) -- eso desbordaba el viewport en móvil. */
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -30,6 +32,8 @@
   font-size: calc(var(--nx-font-base-size, 14px) * 0.85);
   border-radius: var(--nx-shape-radius-lg, 12px);
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
   border: var(--nx-shape-border-width, 1px) solid var(--nx-color-border, #dce5ef);
   box-shadow: var(--nx-elev-raised, 0 6px 20px rgba(0, 0, 0, 0.12));
 }

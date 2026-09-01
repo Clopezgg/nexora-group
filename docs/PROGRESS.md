@@ -60,12 +60,46 @@ Entregado y probado en esta pasada:
   Migración `b2d4f6a80c33` — single head, upgrade/downgrade verificados en
   DB fresca y existente, backfill sin fechas ni asignaciones inventadas.
 
-Pendiente en esta orden (no iniciado o parcial): WS3 flujo "Pagar cuota
-contractual" en la UI (el backend ya encadena AP→allocation→posting→
-treasury→audit), WS4 wizard de proyecto + Project Cockpit, WS5 contexto
-completo de comprobante + bug de dirección de proveedor + HEIC + beneficiario
-buscar-o-crear, WS6 profundización estructural de temas + auditoría visual,
-WS7 E2E + branch protection + deploy + verificación de producción.
+- **WS3 — pago real de factura de contrato genera `ContractPaymentAllocation`
+  por FIFO (P0 §20-25).** El backend ya encadenaba AP→allocation→posting
+  (fecha económica)→treasury→audit→voucher y estaba probado. Añadido lo que
+  §3 exigía: el alta de factura de proveedor permite ligar un contrato de
+  ejecución (hereda proveedor/proyecto/moneda) y el formulario real de pago
+  muestra el contexto contractual (`ContractInstallmentPanel`: contrato /
+  categoría / valor / pagado acumulado / saldo / próxima cuota + historial
+  de cuotas) y la propuesta FIFO automática al escribir el monto, que genera
+  las asignaciones al confirmar.
+- **WS4 — asistente de alta + Project Cockpit (P0 §11/§17/§18/§19/§35).**
+  §17: la ubicación de la obra viaja en el alta (repo + route de
+  `create_project`). §11: `ProjectWizard` de pasos reales → "crear como
+  borrador" / "crear y activar". §18/§35: `ProjectDetailPage` pasa a object
+  page con cabecera de objeto fija + pestañas (Resumen / Finanzas /
+  Contratos / Ficha y estado / Módulos). §19: pestaña "Contratos" con una
+  tarjeta por contrato de ejecución (categoría / valor / pagado / pendiente /
+  próxima cuota).
+- **WS5 — comprobante + evidencia (§25/§26/§27/§28/§30).** §26: dirección
+  estructurada de proveedor (arriba). §25: el comprobante resuelve la
+  categoría del contrato en español. §28: pipeline HEIC real (cierra
+  `DEFERRED-FINAL-019`) — `pillow-heif`, `Evidence.derived_blob_key`
+  (migración `d5a7c9e30f66`), JPEG derivado, `GET /evidence/{id}/render`,
+  embebido en el PDF del comprobante. §30: `BeneficiaryQuickCreate` —
+  crear Proveedor/Trabajador/Cliente real sin salir del flujo del
+  comprobante y autoseleccionarlo. §27 (rediseño premium completo del PDF):
+  parcial — el asiento contable ya está fuera de la página 1; la jerarquía
+  documental completa queda pendiente.
+- **WS6 — temas / componentes enterprise (§31-38/§50).** §37: la vista previa
+  de temas usa períodos de calendario reales (no S11/S12). §36: FilterBar en
+  Contratos. La profundización estructural por familia
+  (dialogs/drawers/object-page) y la auditoría visual con Playwright a
+  390/430/768/1024/1440 (§50) requieren stack corriendo y quedan pendientes.
+
+Migraciones nuevas en la rama: `b2d4f6a80c33`, `c4f6a8b20d55`,
+`d5a7c9e30f66` — single head, roundtrip verificado.
+
+**Pendiente en esta orden:** WS5 §27 rediseño premium completo del PDF, WS6
+auditoría visual + profundización estructural por familia, WS7 branch
+protection de `main` + deploy a Azure + verificación de producción +
+documento de cierre.
 
 ### 2026-08-24 — Arranque de la ORDEN MAESTRA
 

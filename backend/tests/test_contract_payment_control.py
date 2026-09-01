@@ -443,3 +443,85 @@ def test_contract_voucher_pdf_shows_accumulative_history_and_totals(client, db_s
     assert "Septiembre 2026" in text_sep
     assert "Octubre 2026" not in text_sep
     assert "Pagado anteriormente" in text_sep
+
+
+def test_issued_voucher_keeps_old_company_data_after_master_data_changes(client, db_session):
+    """§62 — emitir comprobante, luego cambiar la dirección/aprobador de la
+    empresa; reimprimir el comprobante viejo debe conservar los datos viejos
+    (lee del snapshot VoucherIssuance, no de master data en vivo)."""
+    from app.models.voucher_issuance import VoucherIssuance
+
+    login_admin(client)
+    company = create_company(client)
+    client.patch(
+        f"/api/master-data/companies/{company['id']}/profile",
+        json={
+            "voucherApproverName": "CARLOS HUMBERTO LOPEZ",
+            "addressLine1": "Boulevard Morazan, Edificio Nexora",
+            "city": "Tegucigalpa",
+            "fiscalId": "08019999123456",
+        },
+    )
+    supplier = create_supplier(client, company_id=company["id"], legal_name="LESTER GEOVANY RIVAS ZEPEDA")
+    contract = _contract(client, company_id=company["id"], supplier_id=supplier["id"])
+    schedule = _monthly_plan(db_session, contract["id"])
+    bank, expense, payable = _ap_setup(client, company, tag="81")
+
+    aug = [s for s in cps.installment_summaries(db_session, schedule_id=schedule.id)
+           if s.period_label == "Agosto 2026"][0]
+    inv = _contract_invoice(
+        client, company=company, supplier=supplier, contract_id=contract["id"],
+        expense=expense, payable=payable, amount="50000.00", number="F-AUG",
+    )
+    r = client.post(
+        f"/api/ap/supplier-invoices/{inv['id']}/payments",
+        json={
+            "treasuryAccountId": bank["id"], "amount": "50000.00", "paymentDate": "2026-09-03",
+            "contractAllocations": [
+                {"installmentId": str(aug.installment_id), "amountApplied": "50000.00"}
+            ],
+        },
+    )
+    assert r.status_code == 201, r.text
+    payment = db_session.execute(
+        select(SupplierPayment).join(
+            SupplierInvoice, SupplierPayment.supplier_invoice_id == SupplierInvoice.id
+        ).where(SupplierInvoice.id == inv["id"])
+    ).scalar_one()
+    db_session.commit()
+    doc_id = payment.accounting_document_id
+
+    url = (
+        f"/api/treasury/vouchers/{doc_id}"
+        "?beneficiary=LESTER%20GEOVANY%20RIVAS%20ZEPEDA&paymentMethod=Efectivo"
+    )
+    first = client.get(url)
+    assert first.status_code == 200
+    assert "Boulevard Morazan" in first.content.decode("latin-1")
+
+    issuance_count = db_session.execute(
+        select(VoucherIssuance).where(VoucherIssuance.accounting_document_id == doc_id)
+    ).scalars().all()
+    assert len(issuance_count) == 1
+
+    # Master data cambia DESPUÉS de emitir.
+    client.patch(
+        f"/api/master-data/companies/{company['id']}/profile",
+        json={
+            "voucherApproverName": "OTRA PERSONA APROBADORA",
+            "addressLine1": "Nueva Sede Comayaguela Kilometro 5",
+            "city": "Comayaguela",
+        },
+    )
+    db_session.commit()
+
+    reprint = client.get(url)
+    assert reprint.status_code == 200
+    text = reprint.content.decode("latin-1")
+    assert "Boulevard Morazan" in text          # dirección vieja conservada
+    assert "Nueva Sede Comayaguela" not in text  # master data nueva NO aparece
+    assert "OTRA PERSONA APROBADORA" not in text
+    # sigue habiendo exactamente una fila de emisión
+    assert len(db_session.execute(
+        select(VoucherIssuance).where(VoucherIssuance.accounting_document_id == doc_id)
+    ).scalars().all()) == 1

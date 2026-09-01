@@ -4129,3 +4129,27 @@ Rama: `feat/cpc-5-contract-voucher-pdf`.
   (§38); contiene contrato, totales, referencia bancaria, observaciones,
   dirección de la compañía, sin UUID. Regresión: contract-payments/AP 35,
   frontend 167 verdes.
+
+### 2026-09-01 — ORDEN MAESTRA FINAL · CPC PR 6 (snapshot inmutable de emisión de comprobante)
+
+Rama: `feat/cpc-6-voucher-issuance-ledger`.
+
+- **`voucher_issuances`** (§27/§28/§62): fila única por `AccountingDocument`
+  que congela, en la PRIMERA emisión del PDF, todo lo que se imprime —
+  empresa (nombre legal/comercial, RTN, dirección, teléfono, correo, pie),
+  proyecto, contrato, beneficiario (dirección + ID fiscal del proveedor
+  real), pagador, aprobador, banco, método, referencia bancaria,
+  observaciones, importes y totales de contrato, y el corte del período
+  contractual. Migración `4445cc3ebba5` (single head, no destructiva, sin
+  backfill).
+- **`voucher_issuance_service.get_or_create`** — idempotente por
+  `accounting_document_id`; correcciones = reversal, nunca mutación.
+- **`voucher_service.generate_voucher_pdf`** lee emisor / beneficiario /
+  pagador / aprobador del snapshot, no de master data en vivo. Nuevo
+  `_resolve_beneficiary_details` resuelve dirección e identificación fiscal
+  del `Supplier` real cuando el pago es trazable a una factura.
+- Test §62: emitir comprobante → cambiar `addressLine1` y
+  `voucherApproverName` de la compañía → reimprimir → conserva dirección y
+  aprobador viejos; la master data nueva no aparece; sigue habiendo
+  exactamente una fila de emisión. Regresión: contract-payments 11,
+  treasury-operations 34, voucher/pago/reversal 22 verdes.

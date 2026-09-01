@@ -4507,3 +4507,42 @@ HEIC→derivada JPEG para render/thumbnail en el PDF (§14, hoy el original
 HEIC se acepta/valida/guarda pero no se transcodifica —
 `DEFERRED-FINAL-019`); snapshot de master data documental de terceros (§15);
 inspección visual del PDF a tamaño real (§28).
+
+### 2026-09-01 — ORDEN MAESTRA DE RECTIFICACIÓN · Deploy Azure REAL + verificación (PRs A–E)
+
+Deploy Azure run **`33477392374`** (`workflow_dispatch`, `deploy=true`,
+`main@4809f71`), autorización puntual del usuario. ✅ success (todos los
+jobs, incluido "Verify production").
+
+Contenido: #85 (`effective_date` P0), #86 (Protected Edit sin fallback P0),
+#87 (Cash Flow UX rango real), #88 (theme estructural), #89 (voucher §13),
+#90 (smoke de Protected Edit tolerante a 429).
+
+**Migraciones**: `a1c3e5f70b21` (`accounting_documents.effective_date`)
+aplicada en producción (runs previos `33475027889`/`33475086389` la
+corrieron; el re-deploy la encontró en head).
+
+**Verify production** (origen first-party, imagen =
+`ghcr.io/clopezgg/nexora-backend:4809f71`): Frontend 200 · `/api/healthz`
+200 · `/api/readyz` 200 · Protected Edit route 405 · login → cookie
+`Secure`+`HttpOnly`+`Path=/` · auth/me · companies (1) · projects · accounts
+· dashboard (`HNL`) · fiscal periods · **Protected Edit token inválido →
+403 (fail-closed, sin fallback — §12/§27)** · logout 204 → relogin 200 ·
+FQDN directo bloqueado. El paso "Require Protected Edit credentials
+(fail-closed)" pasó (secretos `EDIT_ACCESS_TOKEN_SALT/DIGEST` reales; sin
+derivación desde `BOOTSTRAP_ADMIN_PASSWORD`).
+
+**Endpoints nuevos verificados sobre producción** (solo lectura):
+`GET /api/treasury/voucher-candidates`,
+`GET /api/financial-control/cash-flow-actual/series`,
+`GET .../cash-flow-actual/movements` responden **401** (registrados, no 404).
+
+**Camino de escritura** (bucketing por fecha económica, gate de Protected
+Edit, drill-down, PDF §13): cubierto por CI contra BD efímera —
+`test_cash_flow_actual.py` (12), `test_edit_access.py` (9),
+`test_treasury_operations.py` voucher (10). No se ejecuta contra producción
+(§78: un `AccountingDocument` contabilizado es inmutable).
+
+**PENDIENTE (P1)** — ver PR-D/PR-E: auditoría visual sistemática con capturas
+a 390/430/768/1024/1440 en rutas autenticadas (§17/§23); NEXORA Document
+Design System completo + pipeline HEIC→JPEG derivado (§14).

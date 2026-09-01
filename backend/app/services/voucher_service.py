@@ -49,7 +49,11 @@ from app.models.chart_of_accounts import Account
 from app.models.company import Company
 from app.models.evidence import Evidence
 from app.models.project import Project
-from app.services import evidence_service, voucher_verification_service
+from app.services import (
+    evidence_service,
+    voucher_issuance_service,
+    voucher_verification_service,
+)
 
 _NAVY = colors.HexColor("#0b274a")
 _ACCENT = colors.HexColor("#1769d2")
@@ -232,6 +236,45 @@ def _q_amount(value) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"))
 
 
+def _resolve_beneficiary_details(
+    db: Session, document: AccountingDocument, contract_ctx: dict | None
+) -> tuple[str | None, str | None]:
+    """Dirección e identificación fiscal del beneficiario desde el Supplier
+    real (§32), cuando el pago se puede trazar a una factura de proveedor."""
+    from app.models.supplier import Supplier
+
+    supplier_id = None
+    if contract_ctx is not None:
+        payment = contract_ctx.get("payment")
+        invoice = db.get(SupplierInvoice, payment.supplier_invoice_id) if payment else None
+        supplier_id = invoice.supplier_id if invoice else None
+    if supplier_id is None:
+        payment = db.execute(
+            select(SupplierPayment).where(
+                SupplierPayment.accounting_document_id == document.id
+            )
+        ).scalar_one_or_none()
+        if payment is not None:
+            invoice = db.get(SupplierInvoice, payment.supplier_invoice_id)
+            supplier_id = invoice.supplier_id if invoice else None
+    if supplier_id is None:
+        return None, None
+    supplier = db.get(Supplier, supplier_id)
+    if supplier is None:
+        return None, None
+    address = " · ".join(
+        str(part).strip()
+        for part in (
+            getattr(supplier, "address_line_1", None),
+            getattr(supplier, "city", None),
+            getattr(supplier, "country", None),
+        )
+        if part and str(part).strip()
+    ) or None
+    tax_id = getattr(supplier, "tax_id", None) or getattr(supplier, "fiscal_id", None)
+    return address, tax_id
+
+
 def _load_payment_evidence(db: Session, document: AccountingDocument) -> Evidence | None:
     rows = evidence_service.list_evidence(
         db,
@@ -351,6 +394,44 @@ def generate_voucher_pdf(
     )
     verify_url = f"{settings.frontend_url.rstrip('/')}/verificar/comprobante/{token}"
 
+    # -- Contexto contractual + snapshot INMUTABLE de emisión (§27/§28) ----
+    contract_ctx = _resolve_contract_context(db, document)
+    _benef_addr, _benef_tax = _resolve_beneficiary_details(db, document, contract_ctx)
+    _bank_mask = _mask_reference(bank_reference)
+    issuance = voucher_issuance_service.get_or_create(
+        db,
+        accounting_document_id=document.id,
+        company=company,
+        project=project,
+        document_number=document.document_number,
+        issued_on=issued_on,
+        beneficiary_name=beneficiary,
+        beneficiary_address=_benef_addr,
+        beneficiary_tax_id=_benef_tax,
+        payer_name=payer,
+        approver_name=approved_by,
+        payment_method=payment_method,
+        bank_name=bank_label,
+        bank_account_mask=_bank_mask,
+        bank_transaction_reference=(contract_ctx or {}).get("bank_transaction_reference"),
+        payment_observations=(contract_ctx or {}).get("observations"),
+        amount=_q_amount(total),
+        currency_code=currency,
+        contract_number=(contract_ctx or {}).get("contract_number"),
+        contract_period=(contract_ctx or {}).get("period_label"),
+        contract_value=contract_ctx["summary"].contract_value if contract_ctx else None,
+        paid_before=contract_ctx["paid_before"] if contract_ctx else None,
+        paid_accumulated=contract_ctx["summary"].paid_accumulated if contract_ctx else None,
+        contract_balance=contract_ctx["summary"].contract_balance if contract_ctx else None,
+        verification_token=token,
+        verification_code=verification_code,
+    )
+    # A partir de aquí el PDF lee del snapshot: reimprimir un comprobante viejo
+    # nunca trae master data nueva.
+    company_name = issuance.company_name_snapshot
+    payer = issuance.payer_name_snapshot
+    approved_by = issuance.approver_name_snapshot
+
     status_label = _STATUS_LABEL.get((document.status or "").lower(), document.status or "—")
     posted = document.posted_at.strftime("%d/%m/%Y") if document.posted_at else "Sin postear"
 
@@ -388,43 +469,35 @@ def generate_voucher_pdf(
     story.append(Paragraph("Escanea el QR para verificar este comprobante.", styles["small"]))
     story.append(Spacer(1, 10))
 
-    # -- Emisor / Beneficiario ---------------------------------------
+    # -- Emisor / Beneficiario (del SNAPSHOT inmutable, §28) -----------
     emisor = [
         Paragraph("EMISOR", styles["label"]),
-        Paragraph(company.trade_name or company_name if company else company_name, styles["value"]),
+        Paragraph(
+            issuance.company_trade_name_snapshot or issuance.company_name_snapshot,
+            styles["value"],
+        ),
     ]
-    if company and company.legal_name:
-        emisor.append(Paragraph(company.legal_name, styles["small"]))
-    if company and company.fiscal_id:
-        emisor.append(Paragraph(f"RTN {company.fiscal_id}", styles["small"]))
-    _company_addr = " · ".join(
-        part
-        for part in [
-            getattr(company, "address_line_1", None) if company else None,
-            getattr(company, "address_line_2", None) if company else None,
-            getattr(company, "city", None) if company else None,
-            getattr(company, "state_department", None) if company else None,
-        ]
-        if part
-    )
-    if _company_addr:
-        emisor.append(Paragraph(_company_addr, styles["small"]))
+    if issuance.company_legal_name_snapshot:
+        emisor.append(Paragraph(issuance.company_legal_name_snapshot, styles["small"]))
+    if issuance.company_fiscal_id_snapshot:
+        emisor.append(Paragraph(f"RTN {issuance.company_fiscal_id_snapshot}", styles["small"]))
+    if issuance.company_address_snapshot:
+        emisor.append(Paragraph(issuance.company_address_snapshot, styles["small"]))
     _company_contact = " · ".join(
-        part
-        for part in [
-            getattr(company, "phone", None) if company else None,
-            getattr(company, "email", None) if company else None,
-        ]
-        if part
+        p for p in [issuance.company_phone_snapshot, issuance.company_email_snapshot] if p
     )
     if _company_contact:
         emisor.append(Paragraph(_company_contact, styles["small"]))
-    emisor.append(Paragraph(f"Pagador: {payer}", styles["small"]))
+    emisor.append(Paragraph(f"Pagador: {issuance.payer_name_snapshot}", styles["small"]))
 
     benef = [
         Paragraph("BENEFICIARIO", styles["label"]),
-        Paragraph(beneficiary, styles["value"]),
+        Paragraph(issuance.beneficiary_name_snapshot, styles["value"]),
     ]
+    if issuance.beneficiary_tax_id_snapshot:
+        benef.append(Paragraph(f"ID {issuance.beneficiary_tax_id_snapshot}", styles["small"]))
+    if issuance.beneficiary_address_snapshot:
+        benef.append(Paragraph(issuance.beneficiary_address_snapshot, styles["small"]))
     two_col = Table([[emisor, benef]], colWidths=[8.25 * cm, 8.25 * cm])
     two_col.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(two_col)
@@ -449,7 +522,6 @@ def generate_voucher_pdf(
             ("Tipo de cambio", f"1 {currency} = {document.fx_rate} {functional_currency}")
         )
 
-    contract_ctx = _resolve_contract_context(db, document)
     if contract_ctx:
         info_rows.insert(0, ("Contrato", contract_ctx["contract_number"]))
         info_rows.insert(1, ("Período contractual", contract_ctx["period_label"]))

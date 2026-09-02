@@ -966,3 +966,66 @@ PENDIENTE (documentado, no oculto):
   necesitan la base de datos productiva (mismo bloqueo que Codex). La
   herramienta forense y el motor de rebuild quedan listos y probados.
 - §52 Deploy Azure: requiere confirmación puntual del usuario (CLAUDE.md §11).
+
+## 2026-09-02 — ORDEN MAESTRA DE CIERRE CORRECTIVO POST-#102 (PR #103, main@b40e6c9, DESPLEGADO)
+
+Rama `fix/nexora-post102-final-integration` mergeada (`b40e6c9`) y desplegada a
+producción (Deploy Azure run 33603831903 — todos los steps: migraciones
+`c1a7e4f9b210`, backend revision healthy, frontend, Verify production).
+
+### Entregado
+
+- `.github/workflows/maintenance-financial-reconciliation.yml` — workflow_dispatch
+  contra la BD productiva (OIDC + PostgreSQL del deploy). modos inspect/preview/
+  apply; apply exige `confirm_apply=APPLY` + `reason`≥15 y es fail-closed con
+  pagos aplicados. Driver: `backend/scripts/financial_reconciliation.py`.
+- `financial_event_inspect.py` emite `classification` (§9).
+- **Commitment Engine** (§18-§23) — migración `c1a7e4f9b210`:
+  `purchase_orders.supplier_contract_id`, `supplier_invoices.purchase_order_id`.
+  PO ligada a contrato = desglose, no compromiso adicional.
+  `available = authorized − open_commitment − accrued`. Sin baseline →
+  `unbudgetedExposure`.
+- Dashboard agrupa por fecha económica (§23/§28/§53); `JournalEntryCreateRequest`
+  acepta `effectiveDate` (antes se descartaba en silencio).
+- `GET /accounting/documents/lookup?q=` — Centro de Control por Número de
+  Documento (§31/§32) + `allowed_actions_for` (§33). Buscador integrado en el
+  Transaction Inspector.
+- Project Home: estado honesto sin presupuesto + compromiso abierto (§24-§27).
+- 570 pytest / 188 vitest. CI verde en PR y en main.
+
+### Forensia productiva ejecutada (workflow de mantenimiento)
+
+**Contrato 10101960 / Proyecto 3201 / L50,000** — datos reales:
+
+- Contrato `e9ce0502` — valor L1,500,000, contratista JHONNY ALEXANDER
+  VALLADARES SUAZO, status DRAFT.
+- **L50,000 — CAUSA RAÍZ (clasificación `DUPLICATED_BUSINESS_EVENT`):** el
+  anticipo se registró DOS veces por caminos distintos:
+  1. `GeneralExpense GGE-2026-000001` (L50,000, fecha económica 2026-08-22):
+     Debit `5101 Costos directos de construcción` / Credit Tesorería.
+     **Es la salida de caja real** (−L50,000, una sola vez).
+  2. `SupplierInvoice 2020485218` (L50,000, APPROVED, contrato 10101960):
+     accrual `SIN-2026-000001` Debit `6101 Gastos administrativos generales` /
+     Credit `2101 CxP`. `amount_paid=0`, sin `SupplierPayment`. **Obligación
+     AP duplicada, sin pago.**
+  - Efecto en producción: GL cost L100,000 (5101+6101); cash out L50,000 (1×);
+    AP devengado no pagado L50,000; Project pagado L0.
+- **REPARACIÓN APLICADA — plan de 10101960:** `mode=apply` reconstruyó el plan
+  legacy (retención 96.70%, vencimientos a fin de mes, sin anticipo, netos
+  6,835.71 / 8,485.72) al plan canónico:
+  ANTICIPO L50,000.00 @ 22/08/2026, retención 0%, 7 mensualidades día 1:
+  6 × 207,142.85 + 1 × 207,142.90 = L1,450,000; total L1,500,000 EXACTO
+  (HARD ASSERT verificado antes del commit). AuditLog
+  `contract.payment_schedule.rebuild.maintenance`.
+- **PENDIENTE (bloqueo §74 — sign-off contable humano):** la corrección GL/AP
+  de los L50,000 (revertir el posting 5101 del GeneralExpense, cancelar la
+  factura duplicada 2020485218, reclasificar el anticipo a cuenta ASSET,
+  crear la ContractPaymentAllocation ADVANCE). Requiere revertir 3 documentos
+  POSTED/APPROVED de producción y una cuenta de anticipos configurada;
+  no se ejecuta de forma desatendida (CLAUDE.md §8, ORDEN §54/§74). Causa raíz
+  y pasos exactos quedan documentados aquí.
+
+### Pendiente
+
+- §44 auditoría visual completa de todas las rutas — no incluida.
+- Corrección GL/AP de los L50,000 (arriba).

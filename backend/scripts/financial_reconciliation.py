@@ -189,7 +189,11 @@ def _run_preview(db: Session, args, *, apply: bool) -> int:
 
 def _parse_args(argv):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--mode", choices=("inspect", "preview", "apply"), default="inspect")
+    p.add_argument(
+        "--mode",
+        choices=("inspect", "preview", "apply", "reconcile-advance-preview", "reconcile-advance-apply"),
+        default="inspect",
+    )
     p.add_argument("--company")
     p.add_argument("--project-code")
     p.add_argument("--contract-number")
@@ -205,10 +209,73 @@ def _parse_args(argv):
     p.add_argument("--regular-months", type=int)
     p.add_argument("--due-day", type=int, default=1)
     p.add_argument("--first-period")
+    # reconcile-advance: corrección del anticipo duplicado (§4-§12)
+    p.add_argument("--general-expense-number", help="nº de documento del GeneralExpense duplicado")
+    p.add_argument("--invoice-number", help="nº de la SupplierInvoice duplicada")
+    p.add_argument("--advance-account-code", help="código de la cuenta ASSET de anticipos (si no está configurada)")
     # guard de apply
     p.add_argument("--confirm")
     p.add_argument("--reason")
     return p.parse_args(argv)
+
+
+def _resolve_by_number(db: Session, model, number_field: str, number: str):
+    from sqlalchemy import select as _select
+
+    return db.execute(
+        _select(model).where(getattr(model, number_field) == number)
+    ).scalars().first()
+
+
+def _run_reconcile_advance(db: Session, args, *, apply: bool) -> int:
+    from app.models.accounting import AccountingDocument
+    from app.models.ap import SupplierInvoice
+    from app.models.treasury import GeneralExpense
+    from app.services import advance_reconciliation_service as ars
+
+    if not (args.general_expense_number and args.invoice_number and args.contract_number):
+        raise SystemExit(
+            "reconcile-advance requiere --general-expense-number, --invoice-number y --contract-number."
+        )
+    if apply:
+        if args.confirm != _APPLY_TOKEN:
+            raise SystemExit(f"apply requiere --confirm {_APPLY_TOKEN}.")
+        if not args.reason or len(args.reason.strip()) < _MIN_REASON:
+            raise SystemExit(f"apply requiere --reason de al menos {_MIN_REASON} caracteres.")
+
+    gge_doc = _resolve_by_number(db, AccountingDocument, "document_number", args.general_expense_number)
+    if gge_doc is None:
+        raise SystemExit(f"No existe el asiento {args.general_expense_number!r}")
+    gge = db.execute(
+        select(GeneralExpense).where(GeneralExpense.accounting_document_id == gge_doc.id)
+    ).scalars().first()
+    if gge is None:
+        raise SystemExit(f"{args.general_expense_number} no corresponde a un GeneralExpense")
+    invoice = _resolve_by_number(db, SupplierInvoice, "invoice_number", args.invoice_number)
+    if invoice is None:
+        raise SystemExit(f"No existe la factura {args.invoice_number!r}")
+
+    result = ars.reconcile_duplicated_advance(
+        db,
+        general_expense_id=gge.id,
+        supplier_invoice_id=invoice.id,
+        contract_number=args.contract_number,
+        advance_account_code=args.advance_account_code,
+        reason=(args.reason or "PREVIEW").strip(),
+        correlation_id=(args.reference or f"cierre-l50k-{uuid.uuid4().hex[:10]}"),
+        commit=apply,
+    )
+    if not apply:
+        db.rollback()
+    print(
+        json.dumps(
+            {"mode": "reconcile-advance-apply" if apply else "reconcile-advance-preview", **result},
+            default=_json_default,
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
+    return 0
 
 
 def main(argv=None) -> int:
@@ -217,6 +284,8 @@ def main(argv=None) -> int:
     try:
         if args.mode == "inspect":
             return _run_inspect(db, args)
+        if args.mode.startswith("reconcile-advance"):
+            return _run_reconcile_advance(db, args, apply=args.mode.endswith("apply"))
         if not args.contract_number:
             raise SystemExit("preview/apply requieren --contract-number.")
         return _run_preview(db, args, apply=(args.mode == "apply"))

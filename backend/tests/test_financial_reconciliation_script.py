@@ -91,6 +91,44 @@ def test_apply_rebuilds_canonically_and_audits(client, db_session):
     assert any(e["action"] == "contract.payment_schedule.rebuild.maintenance" for e in audit)
 
 
+def test_reconcile_advance_preview_and_apply_via_script(client, db_session, capsys):
+    """§4-§12 — el driver de mantenimiento reconcilia el anticipo duplicado."""
+    from tests.test_advance_duplicate_reconciliation import _setup
+
+    company, project, contract, schedule, bank, gge, invoice, *_ = _setup(client, db_session)
+    gge_doc_number = client.get(
+        f"/api/accounting/journal-entries/{gge['accountingDocumentId']}/inspect"
+    ).json()["documentNumber"]
+
+    base = [
+        "--contract-number", "10101960",
+        "--general-expense-number", gge_doc_number,
+        "--invoice-number", "2020485218",
+    ]
+
+    rc = fr.main(["--mode", "reconcile-advance-preview", *base])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert '"reconcile-advance-preview"' in out
+    # preview no persiste
+    db_session.expire_all()
+    assert client.get(f"/api/ap/supplier-invoices/{invoice['id']}").json()["status"] == "APPROVED"
+
+    with pytest.raises(SystemExit):
+        fr.main(["--mode", "reconcile-advance-apply", *base])  # sin confirm
+
+    rc = fr.main([
+        "--mode", "reconcile-advance-apply", *base,
+        "--confirm", "APPLY",
+        "--reason", "Duplicacion de anticipo autorizada ORDEN MAESTRA DE CIERRE",
+    ])
+    assert rc == 0
+    db_session.expire_all()
+    assert client.get(f"/api/ap/supplier-invoices/{invoice['id']}").json()["status"] == "CANCELLED"
+    summary = client.get(f"/api/contract-payments/schedules/{schedule['id']}/summary").json()
+    assert Decimal(summary["contractBalance"]) == Decimal("1450000.00")
+
+
 def test_apply_is_blocked_when_installment_paid(client, db_session):
     login_admin(client)
     company, supplier, contract, schedule = _legacy_plan(client, db_session, number="REC-4")

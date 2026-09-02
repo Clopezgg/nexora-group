@@ -111,11 +111,24 @@ class ContractPaymentAllocation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "supplier_payment_id", "installment_id",
             name="uq_contract_allocation_payment_installment",
         ),
+        UniqueConstraint(
+            "general_expense_id", "installment_id",
+            name="uq_contract_allocation_general_expense_installment",
+        ),
         CheckConstraint("amount_applied > 0", name="ck_contract_allocation_amount"),
+        CheckConstraint(
+            "(supplier_payment_id IS NOT NULL) <> (general_expense_id IS NOT NULL)",
+            name="ck_contract_allocation_one_source",
+        ),
     )
 
-    supplier_payment_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("supplier_payments.id", ondelete="RESTRICT"), nullable=False, index=True
+    supplier_payment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("supplier_payments.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    # ORDEN MAESTRA DE CIERRE §7 — fuente de caja alternativa: un anticipo cuya
+    # salida se registró como GeneralExpense. Exactamente una de las dos fuentes.
+    general_expense_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("general_expenses.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     installment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

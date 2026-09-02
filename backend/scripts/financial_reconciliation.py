@@ -227,9 +227,23 @@ def _resolve_by_number(db: Session, model, number_field: str, number: str):
     ).scalars().first()
 
 
+def _dump_asset_accounts(db: Session, company_id) -> list[dict]:
+    from app.models.chart_of_accounts import Account, ChartOfAccount
+
+    rows = db.execute(
+        select(Account.code, Account.name, Account.is_postable)
+        .join(ChartOfAccount, ChartOfAccount.id == Account.chart_of_account_id)
+        .where(ChartOfAccount.company_id == company_id, Account.account_type == "ASSET")
+        .order_by(Account.code)
+    ).all()
+    return [{"code": r[0], "name": r[1], "postable": bool(r[2])} for r in rows]
+
+
 def _run_reconcile_advance(db: Session, args, *, apply: bool) -> int:
+    from app.domain.errors import InvalidFinancialReferenceError
     from app.models.accounting import AccountingDocument
     from app.models.ap import SupplierInvoice
+    from app.models.company import Company
     from app.models.treasury import GeneralExpense
     from app.services import advance_reconciliation_service as ars
 
@@ -255,16 +269,33 @@ def _run_reconcile_advance(db: Session, args, *, apply: bool) -> int:
     if invoice is None:
         raise SystemExit(f"No existe la factura {args.invoice_number!r}")
 
-    result = ars.reconcile_duplicated_advance(
-        db,
-        general_expense_id=gge.id,
-        supplier_invoice_id=invoice.id,
-        contract_number=args.contract_number,
-        advance_account_code=args.advance_account_code,
-        reason=(args.reason or "PREVIEW").strip(),
-        correlation_id=(args.reference or f"cierre-l50k-{uuid.uuid4().hex[:10]}"),
-        commit=apply,
-    )
+    try:
+        result = ars.reconcile_duplicated_advance(
+            db,
+            general_expense_id=gge.id,
+            supplier_invoice_id=invoice.id,
+            contract_number=args.contract_number,
+            advance_account_code=args.advance_account_code,
+            reason=(args.reason or "PREVIEW").strip(),
+            correlation_id=(args.reference or f"cierre-l50k-{uuid.uuid4().hex[:10]}"),
+            commit=apply,
+        )
+    except InvalidFinancialReferenceError as exc:
+        db.rollback()
+        payload = {"mode": args.mode, "blocked": True, "reason": str(exc)}
+        if "cuenta ASSET de anticipos" in str(exc):
+            payload["companyAssetAccounts"] = _dump_asset_accounts(db, gge.company_id)
+            payload["companySupplierAdvanceAccountId"] = (
+                str(db.get(Company, gge.company_id).supplier_advance_account_id)
+                if db.get(Company, gge.company_id).supplier_advance_account_id
+                else None
+            )
+            payload["hint"] = (
+                "Pasa --advance-account-code con el código de una cuenta ASSET postable "
+                "de anticipos, o configúrala en Company Settings."
+            )
+        print(json.dumps(payload, default=_json_default, indent=2, ensure_ascii=False))
+        return 3
     if not apply:
         db.rollback()
     print(

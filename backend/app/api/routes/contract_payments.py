@@ -445,8 +445,6 @@ def rebuild_schedule(
 ) -> ScheduleResponse:
     """Corrección AUDITADA del plan (§9/§45-§47). SOLO si no hay allocations
     activas. Snapshot antes/después + AuditLog. Nunca borra el SupplierContract."""
-    from app.models.contract_payment import ContractPaymentInstallment
-
     if len((payload.reason or "").strip()) < 10:
         raise HTTPException(status_code=422, detail="Indica un motivo (mínimo 10 caracteres).")
 
@@ -460,8 +458,7 @@ def rebuild_schedule(
     if blocked_reason is not None:
         raise HTTPException(status_code=409, detail=blocked_reason)
 
-    before = cps.current_schedule_snapshot(db, schedule_id)
-    contract, rows, after = cps.build_rebuild_rows(
+    before, after = cps.apply_schedule_rebuild(
         db,
         schedule=schedule,
         regular_months=payload.regular_months,
@@ -471,50 +468,6 @@ def rebuild_schedule(
         advance_due_date=payload.advance_due_date,
         retention_percentage=payload.retention_percentage,
     )
-    rows.sort(
-        key=lambda r: (
-            {"ADVANCE": 0, "REGULAR": 1, "RETENTION_RELEASE": 2}[r["installment_kind"]],
-            r["period_year"],
-            r["period_month"],
-        )
-    )
-
-    # Persistir los términos corregidos en el contrato.
-    if payload.advance_amount is not None:
-        contract.advance_amount = payload.advance_amount
-    if payload.advance_due_date is not None:
-        contract.advance_due_date = payload.advance_due_date
-    if payload.retention_percentage is not None:
-        contract.retention_percentage = payload.retention_percentage
-
-    db.execute(
-        ContractPaymentInstallment.__table__.delete().where(
-            ContractPaymentInstallment.schedule_id == schedule_id
-        )
-    )
-    total = Decimal("0")
-    for seq, r in enumerate(rows, start=1):
-        total += Decimal(str(r["scheduled_amount"]))
-        db.add(
-            ContractPaymentInstallment(
-                schedule_id=schedule.id,
-                sequence=seq,
-                installment_kind=r["installment_kind"],
-                period_year=r["period_year"],
-                period_month=r["period_month"],
-                due_date=r["due_date"],
-                scheduled_amount=r["scheduled_amount"],
-                retention_amount=r["retention_amount"],
-                net_due=r["net_due"],
-                status="UPCOMING",
-                description=r.get("description"),
-            )
-        )
-    schedule.total_scheduled = total.quantize(Decimal("0.01"))
-    schedule.due_day = payload.due_day
-    schedule.start_period = date(rows[0]["period_year"], rows[0]["period_month"], 1)
-    schedule.end_period = date(rows[-1]["period_year"], rows[-1]["period_month"], 1)
-    db.flush()
 
     audit_service.record(
         db,

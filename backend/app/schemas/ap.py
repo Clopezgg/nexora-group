@@ -24,6 +24,7 @@ class SupplierInvoiceCreateRequest(CamelModel):
     due_date: date
     description: str | None = None
     supplier_contract_id: uuid.UUID | None = None
+    purchase_order_id: uuid.UUID | None = None
 
 
 class SupplierInvoiceSubmitRequest(CamelModel):
@@ -46,6 +47,7 @@ class SupplierInvoiceResponse(CamelModel):
     status: str
     accrual_document_id: uuid.UUID | None
     supplier_contract_id: uuid.UUID | None = None
+    purchase_order_id: uuid.UUID | None = None
 
 
 class ContractAllocationInput(CamelModel):

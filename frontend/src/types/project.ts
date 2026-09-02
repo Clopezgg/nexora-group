@@ -71,12 +71,14 @@ export interface ProjectFinancialSummary {
   currentBudget: string | null
   committed: string
   poCommitted: string
+  openCommitment?: string
   executionContractValue: string
   executionContractPaid: string
   executionContractBalance: string
   accrued: string
   paid: string
   available: string | null
+  unbudgetedExposure?: string | null
   invoiced: string
   collected: string
   receivablesOutstanding: string
@@ -149,6 +151,12 @@ export interface BudgetSummary {
   /** Anticipos/prepagos contractuales (débito a cuenta ASSET). No son costo
    *  reconocido ni consumen el presupuesto disponible (ORDEN MAESTRA §15). */
   advances?: string
+  /** Desglose del compromiso (ORDEN MAESTRA §20-§21). `committed` es el total
+   *  canónico; `openCommitment` es lo aún no devengado. */
+  contractCommitment?: string
+  standalonePoCommitment?: string
+  poUnderContract?: string
+  openCommitment?: string
 }
 
 export interface Forecast {

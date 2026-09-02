@@ -1,0 +1,187 @@
+name: Maintenance — Financial Reconciliation
+
+# Herramienta de mantenimiento de datos financieros productivos
+# (ORDEN MAESTRA §5/§6/§55). Usa la MISMA infraestructura OIDC + PostgreSQL
+# que el deploy; nunca crea recursos Azure ni revela cadenas de conexión.
+#
+#   mode=inspect   -> sólo lectura (forense). Por defecto.
+#   mode=preview   -> calcula ANTES/DESPUÉS de reconstruir un plan; no persiste.
+#   mode=apply     -> persiste + AuditLog. Requiere confirm_apply=APPLY y un
+#                     reason de al menos 15 caracteres.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "inspect | preview | apply"
+        type: choice
+        options: ["inspect", "preview", "apply"]
+        default: "inspect"
+        required: true
+      contract_number:
+        description: "Nº de contrato (preview/apply lo requieren)"
+        type: string
+        required: false
+      project_code:
+        description: "Código de proyecto (inspect)"
+        type: string
+        required: false
+      document_number:
+        description: "Nº de documento (inspect)"
+        type: string
+        required: false
+      amount:
+        description: "Importe a rastrear (inspect)"
+        type: string
+        required: false
+      date_from:
+        description: "Fecha desde YYYY-MM-DD (inspect)"
+        type: string
+        required: false
+      date_to:
+        description: "Fecha hasta YYYY-MM-DD (inspect)"
+        type: string
+        required: false
+      reference:
+        description: "Referencia / correlación (bank ref o correlation id)"
+        type: string
+        required: false
+      advance_amount:
+        description: "preview/apply: monto del anticipo"
+        type: string
+        required: false
+      advance_due_date:
+        description: "preview/apply: vencimiento del anticipo YYYY-MM-DD"
+        type: string
+        required: false
+      retention:
+        description: "preview/apply: retención %"
+        type: string
+        required: false
+      regular_months:
+        description: "preview/apply: nº de mensualidades"
+        type: string
+        required: false
+      due_day:
+        description: "preview/apply: día de pago (1-31)"
+        type: string
+        default: "1"
+        required: false
+      first_period:
+        description: "preview/apply: primer período YYYY-MM"
+        type: string
+        required: false
+      confirm_apply:
+        description: "Escribe exactamente APPLY para autorizar mode=apply"
+        type: string
+        required: false
+      reason:
+        description: "Motivo (obligatorio para apply, mínimo 15 caracteres)"
+        type: string
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: nexora-maintenance-financial-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: "${{ inputs.mode }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate inputs (fail-closed for apply)
+        run: |
+          set -euo pipefail
+          MODE="${{ inputs.mode }}"
+          if [ "$MODE" = "apply" ]; then
+            if [ "${{ inputs.confirm_apply }}" != "APPLY" ]; then
+              echo "::error::mode=apply requiere confirm_apply=APPLY"
+              exit 1
+            fi
+            REASON='${{ inputs.reason }}'
+            if [ "${#REASON}" -lt 15 ]; then
+              echo "::error::mode=apply requiere un reason de al menos 15 caracteres"
+              exit 1
+            fi
+          fi
+          if { [ "$MODE" = "preview" ] || [ "$MODE" = "apply" ]; } && [ -z "${{ inputs.contract_number }}" ]; then
+            echo "::error::preview/apply requieren contract_number"
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install backend runtime
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run reconciliation
+        working-directory: backend
+        env:
+          APP_ENV: maintenance
+        run: |
+          set -euo pipefail
+          RG=nexora-rg-dev
+          POSTGRES_FQDN="$(az postgres flexible-server list -g "$RG" --query '[0].fullyQualifiedDomainName' -o tsv)"
+          if [ -z "$POSTGRES_FQDN" ] || [ "$POSTGRES_FQDN" = "null" ]; then
+            echo "::error::PostgreSQL FQDN could not be resolved"
+            exit 1
+          fi
+          ENCODED_PASSWORD="$(python -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["POSTGRES_ADMIN_PASSWORD"], safe=""))')"
+          DATABASE_URL="postgresql+psycopg://nexoraadmin:${ENCODED_PASSWORD}@${POSTGRES_FQDN}:5432/nexora?sslmode=require"
+          echo "::add-mask::$DATABASE_URL"
+          export DATABASE_URL
+
+          ARGS=(--mode "${{ inputs.mode }}")
+          [ -n "${{ inputs.contract_number }}" ] && ARGS+=(--contract-number "${{ inputs.contract_number }}")
+          [ -n "${{ inputs.project_code }}" ]    && ARGS+=(--project-code "${{ inputs.project_code }}")
+          [ -n "${{ inputs.document_number }}" ] && ARGS+=(--document-number "${{ inputs.document_number }}")
+          [ -n "${{ inputs.amount }}" ]          && ARGS+=(--amount "${{ inputs.amount }}")
+          [ -n "${{ inputs.date_from }}" ]       && ARGS+=(--date-from "${{ inputs.date_from }}")
+          [ -n "${{ inputs.date_to }}" ]         && ARGS+=(--date-to "${{ inputs.date_to }}")
+          [ -n "${{ inputs.reference }}" ]       && ARGS+=(--reference "${{ inputs.reference }}")
+          [ -n "${{ inputs.advance_amount }}" ]  && ARGS+=(--advance-amount "${{ inputs.advance_amount }}")
+          [ -n "${{ inputs.advance_due_date }}" ] && ARGS+=(--advance-due-date "${{ inputs.advance_due_date }}")
+          [ -n "${{ inputs.retention }}" ]       && ARGS+=(--retention "${{ inputs.retention }}")
+          [ -n "${{ inputs.regular_months }}" ]  && ARGS+=(--regular-months "${{ inputs.regular_months }}")
+          [ -n "${{ inputs.due_day }}" ]         && ARGS+=(--due-day "${{ inputs.due_day }}")
+          [ -n "${{ inputs.first_period }}" ]    && ARGS+=(--first-period "${{ inputs.first_period }}")
+          if [ "${{ inputs.mode }}" = "apply" ]; then
+            ARGS+=(--confirm "${{ inputs.confirm_apply }}" --reason '${{ inputs.reason }}')
+          fi
+
+          python -m scripts.financial_reconciliation "${ARGS[@]}" | tee "$RUNNER_TEMP/reconciliation-report.txt"
+
+      - name: Record run in summary
+        if: always()
+        run: |
+          {
+            echo "### Maintenance — Financial Reconciliation"
+            echo "- Mode: \`${{ inputs.mode }}\`"
+            echo "- Actor: ${{ github.actor }}"
+            echo "- SHA: ${{ github.sha }}"
+            echo "- Contract: ${{ inputs.contract_number || '—' }}"
+            [ "${{ inputs.mode }}" = "apply" ] && echo "- Reason: ${{ inputs.reason }}"
+            echo ""
+            echo '```'
+            sed -e 's/postgresql[^ ]*/[redacted]/g' "$RUNNER_TEMP/reconciliation-report.txt" 2>/dev/null | tail -c 60000 || echo "(sin salida)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -51,6 +51,7 @@ def create_supplier_invoice(
     due_date: date,
     description: str | None,
     supplier_contract_id: uuid.UUID | None = None,
+    purchase_order_id: uuid.UUID | None = None,
     commit: bool = True,
 ) -> SupplierInvoice:
     if amount <= 0 or tax_amount < 0:
@@ -93,6 +94,33 @@ def create_supplier_invoice(
             raise InvalidFinancialReferenceError(
                 "La moneda de la factura no coincide con la del contrato"
             )
+    if purchase_order_id is not None:
+        from app.models.procurement import PurchaseOrder
+
+        po = db.get(PurchaseOrder, purchase_order_id)
+        if po is None or po.company_id != company_id:
+            raise InvalidFinancialReferenceError(
+                "purchase_order_id no existe o pertenece a otra compañía"
+            )
+        if po.supplier_id != supplier_id:
+            raise InvalidFinancialReferenceError("La orden de compra pertenece a otro proveedor")
+        if po.project_id is not None and po.project_id != project_id:
+            raise InvalidFinancialReferenceError(
+                "El proyecto de la factura no coincide con el de la orden de compra"
+            )
+        if po.currency_code != currency_code:
+            raise InvalidFinancialReferenceError(
+                "La moneda de la factura no coincide con la de la orden de compra"
+            )
+        # Si la PO pertenece a un contrato, la factura hereda ese contrato salvo
+        # que declare otro distinto (incoherencia).
+        if po.supplier_contract_id is not None:
+            if supplier_contract_id is None:
+                supplier_contract_id = po.supplier_contract_id
+            elif supplier_contract_id != po.supplier_contract_id:
+                raise InvalidFinancialReferenceError(
+                    "El contrato de la factura no coincide con el de su orden de compra"
+                )
     invoice = SupplierInvoice(
         company_id=company_id,
         supplier_id=supplier_id,
@@ -109,6 +137,7 @@ def create_supplier_invoice(
         due_date=due_date,
         description=description,
         supplier_contract_id=supplier_contract_id,
+        purchase_order_id=purchase_order_id,
         status="DRAFT",
     )
     db.add(invoice)

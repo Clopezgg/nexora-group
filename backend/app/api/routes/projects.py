@@ -415,6 +415,10 @@ def get_budget_summary(
         paid=summary.paid,
         available=summary.available,
         advances=summary.advances,
+        contract_commitment=summary.contract_commitment,
+        standalone_po_commitment=summary.standalone_po_commitment,
+        po_under_contract=summary.po_under_contract,
+        open_commitment=summary.open_commitment,
     )
 
 

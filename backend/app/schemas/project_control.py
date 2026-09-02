@@ -125,12 +125,14 @@ class ProjectFinancialSummaryResponse(CamelModel):
     current_budget: Decimal | None
     committed: Decimal
     po_committed: Decimal
+    open_commitment: Decimal = Decimal("0")
     execution_contract_value: Decimal
     execution_contract_paid: Decimal
     execution_contract_balance: Decimal
     accrued: Decimal
     paid: Decimal
     available: Decimal | None
+    unbudgeted_exposure: Decimal | None = None
     invoiced: Decimal
     collected: Decimal
     receivables_outstanding: Decimal
@@ -284,6 +286,10 @@ class BudgetSummaryResponse(CamelModel):
     paid: Decimal
     available: Decimal
     advances: Decimal = Decimal("0")
+    contract_commitment: Decimal = Decimal("0")
+    standalone_po_commitment: Decimal = Decimal("0")
+    po_under_contract: Decimal = Decimal("0")
+    open_commitment: Decimal = Decimal("0")
 
 
 class ForecastResponse(CamelModel):

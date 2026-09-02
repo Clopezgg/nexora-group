@@ -159,7 +159,8 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
 
     {summary ? <div className="nx-home__grid">
       <StatCard label="Presupuesto de costos autorizado" value={formatAmount(summary.authorized, currencyCode)} />
-      <StatCard label="Comprometido" value={formatAmount(summary.committed, currencyCode)} />
+      <StatCard label="Comprometido (total)" value={formatAmount(summary.committed, currencyCode)} />
+      <StatCard label="Compromiso abierto" value={formatAmount(summary.openCommitment ?? summary.committed, currencyCode)} />
       <StatCard label="Devengado (costo)" value={formatAmount(summary.accrued, currencyCode)} />
       {Number(summary.advances ?? 0) > 0 ? (
         <StatCard label="Anticipos (prepago, no costo)" value={formatAmount(summary.advances ?? '0', currencyCode)} />

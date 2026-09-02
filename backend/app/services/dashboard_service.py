@@ -1,6 +1,6 @@
 import uuid
 from collections import defaultdict
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -79,21 +79,10 @@ def get_summary(
         fiscal_year, fiscal_period = fiscal_service.get_current_period(
             db, company_id=company_id, on_date=today
         )
+    # Ventana económica del período: fechas de negocio (no timestamps UTC). El
+    # reporting agrupa por `effective_date` (ver `econ_date` abajo).
     metric_start = fiscal_period.start_date if fiscal_period else month_start
     metric_end = fiscal_period.end_date if fiscal_period else today
-    # AccountingDocument.posted_at is stored as an aware UTC timestamp. Build
-    # reporting boundaries in the business timezone and convert them to UTC;
-    # otherwise evening postings in Honduras fall on the next UTC date and
-    # disappear from the current period.
-    metric_start_utc = datetime.combine(
-        metric_start, time.min, tzinfo=BUSINESS_TZ
-    ).astimezone(timezone.utc)
-    metric_end_exclusive_utc = datetime.combine(
-        metric_end + timedelta(days=1), time.min, tzinfo=BUSINESS_TZ
-    ).astimezone(timezone.utc)
-    chart_start_utc = datetime.combine(
-        month_starts[0], time.min, tzinfo=BUSINESS_TZ
-    ).astimezone(timezone.utc)
 
     project_company_ids = _scope_for_company(
         db, user_id=user_id, resource="project", company_id=company_id
@@ -175,6 +164,14 @@ def get_summary(
             else_=JournalLine.debit_amount - JournalLine.credit_amount,
         )
 
+        # ORDEN MAESTRA §23/§28/§53 — el reporting económico agrupa por la FECHA
+        # ECONÓMICA del hecho (effective_date del documento fuente), no por el
+        # timestamp técnico de contabilización. `posted_at` sólo se usa como
+        # respaldo para filas legacy sin effective_date.
+        econ_date = func.coalesce(
+            AccountingDocument.effective_date, func.date(AccountingDocument.posted_at)
+        )
+
         period_stmt = (
             select(
                 AccountingDocument.scope,
@@ -189,9 +186,8 @@ def get_summary(
             .where(
                 AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
                 AccountingDocument.currency_code == "HNL",
-                AccountingDocument.posted_at.is_not(None),
-                AccountingDocument.posted_at >= metric_start_utc,
-                AccountingDocument.posted_at < metric_end_exclusive_utc,
+                econ_date >= metric_start,
+                econ_date <= metric_end,
                 Account.account_type.in_(("REVENUE", "EXPENSE")),
             )
             .group_by(AccountingDocument.scope, Account.account_type)
@@ -212,8 +208,8 @@ def get_summary(
             if scope_totals.get(scope, 0) != 0
         ]
 
-        year_expr = extract("year", AccountingDocument.posted_at)
-        month_expr = extract("month", AccountingDocument.posted_at)
+        year_expr = extract("year", econ_date)
+        month_expr = extract("month", econ_date)
         chart_stmt = (
             select(
                 year_expr.label("year"),
@@ -229,8 +225,7 @@ def get_summary(
             .where(
                 AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
                 AccountingDocument.currency_code == "HNL",
-                AccountingDocument.posted_at.is_not(None),
-                AccountingDocument.posted_at >= chart_start_utc,
+                econ_date >= month_starts[0],
                 Account.account_type.in_(("REVENUE", "EXPENSE")),
             )
             .group_by(year_expr, month_expr, Account.account_type)

@@ -53,6 +53,8 @@ export interface SupplierContract {
   startDate: string
   endDate: string | null
   advancePercentage: string
+  advanceAmount: string | null
+  advanceDueDate: string | null
   retentionPercentage: string
   paymentTerms: string | null
   paymentTermsType: SupplierContractPaymentTermsType

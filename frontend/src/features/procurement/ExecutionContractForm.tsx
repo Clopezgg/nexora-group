@@ -40,7 +40,10 @@ export function ExecutionContractForm({
     currencyCode: defaultCurrency,
     startDate: '',
     endDate: '',
+    advanceMode: 'AMOUNT' as 'AMOUNT' | 'PERCENT',
+    advanceAmount: '',
     advancePercentage: '',
+    advanceDueDate: '',
     retentionPercentage: '',
     scopeDescription: '',
     paymentTermsType: 'MONTHLY' as SupplierContractPaymentTermsType,
@@ -86,7 +89,14 @@ export function ExecutionContractForm({
         currencyCode: form.currencyCode,
         startDate: form.startDate,
         endDate: form.endDate || undefined,
-        advancePercentage: form.advancePercentage || undefined,
+        // El anticipo se guarda como MONTO exacto (§7/§8); el % es informativo.
+        advanceAmount:
+          form.advanceMode === 'AMOUNT' && form.advanceAmount ? form.advanceAmount : undefined,
+        advancePercentage:
+          form.advanceMode === 'PERCENT' && form.advancePercentage
+            ? form.advancePercentage
+            : undefined,
+        advanceDueDate: form.advanceDueDate || undefined,
         retentionPercentage: form.retentionPercentage || undefined,
         scopeDescription: form.scopeDescription.trim() || undefined,
         paymentTermsType: form.paymentTermsType,
@@ -199,11 +209,41 @@ export function ExecutionContractForm({
         value={form.endDate}
         onChange={(e) => setForm({ ...form, endDate: e.target.value })}
       />
+      <Select
+        label="Anticipo pactado — modo"
+        value={form.advanceMode}
+        onChange={(e) => setForm({ ...form, advanceMode: e.target.value as 'AMOUNT' | 'PERCENT' })}
+      >
+        <option value="AMOUNT">Monto</option>
+        <option value="PERCENT">Porcentaje</option>
+      </Select>
+      {form.advanceMode === 'AMOUNT' ? (
+        <Input
+          label="Anticipo pactado (monto)"
+          inputMode="decimal"
+          value={form.advanceAmount}
+          onChange={(e) => setForm({ ...form, advanceAmount: e.target.value })}
+        />
+      ) : (
+        <Input
+          label="Anticipo pactado (%)"
+          inputMode="decimal"
+          value={form.advancePercentage}
+          onChange={(e) => setForm({ ...form, advancePercentage: e.target.value })}
+        />
+      )}
+      {form.advanceMode === 'AMOUNT' && form.advanceAmount && Number(form.value) > 0 ? (
+        <p className="nx-field__hint">
+          Equivale aproximadamente a{' '}
+          {((Number(form.advanceAmount) / Number(form.value)) * 100).toFixed(4)}% — el monto exacto
+          guardado es {form.advanceAmount}.
+        </p>
+      ) : null}
       <Input
-        label="Anticipo %"
-        inputMode="decimal"
-        value={form.advancePercentage}
-        onChange={(e) => setForm({ ...form, advancePercentage: e.target.value })}
+        label="Vencimiento del anticipo (opcional)"
+        type="date"
+        value={form.advanceDueDate}
+        onChange={(e) => setForm({ ...form, advanceDueDate: e.target.value })}
       />
       <Input
         label="Retención %"

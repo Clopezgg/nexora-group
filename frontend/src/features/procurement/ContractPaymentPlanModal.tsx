@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Badge,
@@ -8,12 +8,17 @@ import {
   Input,
   LoadingState,
   Modal,
+  Select,
   Table,
   type TableColumn,
 } from '../../design-system'
 import { ApiError } from '../../services/httpClient'
 import { contractPaymentService, type ContractInstallment } from '../../services/contractPaymentService'
 import { formatMoney } from '../../utils/currency'
+import {
+  contractInstallmentKindLabel,
+  contractInstallmentStatusLabel,
+} from '../../utils/statusLabels'
 import type { SupplierContract } from '../../types/procurement'
 
 const STATUS_TONE: Record<string, 'neutral' | 'warning' | 'danger' | 'success'> = {
@@ -25,9 +30,13 @@ const STATUS_TONE: Record<string, 'neutral' | 'warning' | 'danger' | 'success'> 
   CANCELLED: 'neutral',
 }
 
-/** Plan de pagos de un contrato (orden maestra final §21-§23). Muestra el
- * historial de cuotas con estado REAL (calculado desde allocations), el
- * resumen contractual y —si no existe— permite crear un plan mensual. */
+/**
+ * Plan de pagos del contrato (CORRECTIVA §16-§20, §25-§26, §63).
+ *
+ * El ANTICIPO es parte del plan y NO consume una de las N mensualidades. El
+ * backend calcula las cuotas: base regular = valor − anticipo, cuotas iguales y
+ * la última absorbe el redondeo (Decimal exacto). El frontend solo presenta.
+ */
 export function ContractPaymentPlanModal({
   contract,
   currencyCode,
@@ -38,7 +47,8 @@ export function ContractPaymentPlanModal({
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
-  const [form, setForm] = useState({ startPeriod: '', months: '12', monthlyAmount: '' })
+  const nowMonth = new Date().toISOString().slice(0, 7)
+  const [form, setForm] = useState({ firstPeriod: nowMonth, regularMonths: '7', dueDay: '1' })
 
   const scheduleQuery = useQuery({
     queryKey: ['contract-payments', 'by-contract', contract.id],
@@ -55,34 +65,71 @@ export function ContractPaymentPlanModal({
 
   const createMutation = useMutation({
     mutationFn: () =>
-      contractPaymentService.createMonthlySchedule({
+      contractPaymentService.createContractPlan({
         supplierContractId: contract.id,
-        startPeriod: form.startPeriod,
-        months: Number(form.months),
-        monthlyAmount: form.monthlyAmount,
+        regularMonths: Number(form.regularMonths),
+        dueDay: Number(form.dueDay),
+        firstPeriod: `${form.firstPeriod}-01`,
+        advanceAmount: contract.advanceAmount ?? undefined,
+        advanceDueDate: contract.advanceDueDate ?? undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-payments', 'by-contract', contract.id] })
+      queryClient.invalidateQueries({ queryKey: ['contract-payments'] })
+      queryClient.invalidateQueries({ queryKey: ['procurement', 'contracts'] })
+      queryClient.invalidateQueries({ queryKey: ['project'] })
     },
   })
 
   const notFound = scheduleQuery.error instanceof ApiError && scheduleQuery.error.status === 404
   const currency = scheduleQuery.data?.currencyCode ?? currencyCode
 
+  const advancePreview = useMemo(() => {
+    const value = Number(contract.value)
+    const advance = Number(contract.advanceAmount ?? 0)
+    const months = Math.max(1, Number(form.regularMonths) || 1)
+    const base = value - advance
+    const per = Math.floor((base / months) * 100) / 100
+    return { advance, base, per, last: base - per * (months - 1) }
+  }, [contract.value, contract.advanceAmount, form.regularMonths])
+
   const columns: TableColumn<ContractInstallment>[] = [
-    { key: 'periodLabel', header: 'Período', render: (r) => r.periodLabel },
-    { key: 'scheduled', header: 'Programado', numeric: true, render: (r) => formatMoney(r.scheduledAmount, currency) },
+    {
+      key: 'kind',
+      header: 'Tipo',
+      render: (r) => (
+        <Badge tone={r.installmentKind === 'ADVANCE' ? 'info' : 'neutral'}>
+          {contractInstallmentKindLabel(r.installmentKind)}
+        </Badge>
+      ),
+    },
+    { key: 'n', header: '#', render: (r) => (r.installmentKind === 'REGULAR' ? String(r.regularNumber) : '—') },
+    { key: 'due', header: 'Vencimiento', render: (r) => r.dueDate },
+    { key: 'sched', header: 'Programado', numeric: true, render: (r) => formatMoney(r.scheduledAmount, currency) },
+    {
+      key: 'ret',
+      header: 'Retención',
+      numeric: true,
+      render: (r) => (Number(r.retentionAmount) > 0 ? formatMoney(r.retentionAmount, currency) : '—'),
+    },
+    { key: 'net', header: 'Neto', numeric: true, render: (r) => formatMoney(r.netDue, currency) },
     { key: 'paid', header: 'Pagado', numeric: true, render: (r) => formatMoney(r.paid, currency) },
-    { key: 'remaining', header: 'Saldo', numeric: true, render: (r) => formatMoney(r.remaining, currency) },
+    { key: 'rem', header: 'Pendiente', numeric: true, render: (r) => formatMoney(r.remaining, currency) },
     {
       key: 'status',
       header: 'Estado',
-      render: (r) => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'}>{r.status}</Badge>,
+      render: (r) => (
+        <Badge tone={STATUS_TONE[r.status] ?? 'neutral'}>{contractInstallmentStatusLabel(r.status)}</Badge>
+      ),
     },
   ]
 
   return (
-    <Modal open title={`Plan de pagos · ${contract.contractNumber}`} onClose={onClose}>
+    <Modal
+      open
+      title={`Plan de pagos · ${contract.contractNumber}`}
+      onClose={onClose}
+      size="wide"
+    >
       {scheduleQuery.isLoading ? (
         <LoadingState label="Cargando plan…" />
       ) : notFound ? (
@@ -95,36 +142,57 @@ export function ContractPaymentPlanModal({
           <EmptyState
             icon="calendar"
             title="Este contrato aún no tiene plan de pagos"
-            description="Crea un plan mensual: se generan cuotas iguales y la última absorbe el redondeo para cuadrar con el valor del contrato."
+            description="El anticipo pactado del contrato entra al plan automáticamente. Indica cuántas mensualidades y el día de pago; el sistema calcula los importes (la última cuota absorbe el redondeo)."
           />
+          <dl className="nx-voucher-preview">
+            <div><dt>Valor contractual</dt><dd>{formatMoney(contract.value, currency)}</dd></div>
+            <div>
+              <dt>Anticipo pactado</dt>
+              <dd>
+                {contract.advanceAmount
+                  ? `${formatMoney(contract.advanceAmount, currency)}${contract.advanceDueDate ? ` · vence ${contract.advanceDueDate}` : ''}`
+                  : 'Sin anticipo'}
+              </dd>
+            </div>
+            <div><dt>Base de mensualidades</dt><dd>{formatMoney(String(advancePreview.base), currency)}</dd></div>
+            <div>
+              <dt>Cuota sugerida</dt>
+              <dd>
+                {formatMoney(String(advancePreview.per), currency)} · última{' '}
+                {formatMoney(String(advancePreview.last), currency)}
+              </dd>
+            </div>
+          </dl>
           <Input
-            label="Primer período"
-            type="date"
-            value={form.startPeriod}
-            onChange={(e) => setForm({ ...form, startPeriod: e.target.value })}
+            label="Primer período (mensualidad 1)"
+            type="month"
+            value={form.firstPeriod}
+            onChange={(e) => setForm({ ...form, firstPeriod: e.target.value })}
             required
           />
           <Input
-            label="N.º de cuotas"
+            label="N.º de mensualidades"
             type="number"
             min={1}
-            value={form.months}
-            onChange={(e) => setForm({ ...form, months: e.target.value })}
+            value={form.regularMonths}
+            onChange={(e) => setForm({ ...form, regularMonths: e.target.value })}
             required
           />
-          <Input
-            label="Cuota mensual"
-            inputMode="decimal"
-            value={form.monthlyAmount}
-            onChange={(e) => setForm({ ...form, monthlyAmount: e.target.value })}
-            required
-          />
+          <Select
+            label="Día de pago de cada mes"
+            value={form.dueDay}
+            onChange={(e) => setForm({ ...form, dueDay: e.target.value })}
+          >
+            {Array.from({ length: 31 }, (_, i) => String(i + 1)).map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </Select>
           <Button
             type="submit"
             loading={createMutation.isPending}
-            disabled={!form.startPeriod || !form.months || !form.monthlyAmount}
+            disabled={!form.firstPeriod || !form.regularMonths}
           >
-            Crear plan mensual
+            Crear plan
           </Button>
           {createMutation.isError ? (
             <p className="nx-field__error" role="alert">
@@ -141,10 +209,14 @@ export function ContractPaymentPlanModal({
           {summaryQuery.data ? (
             <dl className="nx-voucher-preview">
               <div><dt>Valor contractual</dt><dd>{formatMoney(summaryQuery.data.contractValue, currency)}</dd></div>
+              <div><dt>Anticipo programado</dt><dd>{formatMoney(summaryQuery.data.advanceScheduled, currency)}</dd></div>
+              <div><dt>Anticipo pagado</dt><dd>{formatMoney(summaryQuery.data.advancePaid, currency)}</dd></div>
+              <div><dt>Base regular</dt><dd>{formatMoney(summaryQuery.data.regularScheduled, currency)}</dd></div>
+              <div><dt>Total programado</dt><dd>{formatMoney(summaryQuery.data.totalContractualScheduled, currency)}</dd></div>
               <div><dt>Programado a fecha</dt><dd>{formatMoney(summaryQuery.data.totalScheduledToDate, currency)}</dd></div>
               <div><dt>Pagado acumulado</dt><dd>{formatMoney(summaryQuery.data.paidAccumulated, currency)}</dd></div>
               <div><dt>Saldo contractual</dt><dd>{formatMoney(summaryQuery.data.contractBalance, currency)}</dd></div>
-              <div><dt>Saldo vencido</dt><dd>{formatMoney(summaryQuery.data.overdueBalance, currency)}</dd></div>
+              <div><dt>Retención pendiente</dt><dd>{formatMoney(summaryQuery.data.retentionOutstanding, currency)}</dd></div>
               <div>
                 <dt>Próximo vencimiento</dt>
                 <dd>
@@ -155,12 +227,14 @@ export function ContractPaymentPlanModal({
               </div>
             </dl>
           ) : null}
-          <Table
-            columns={columns}
-            rows={scheduleQuery.data?.installments ?? []}
-            getRowKey={(r) => r.installmentId}
-            emptyMessage="El plan no tiene cuotas."
-          />
+          <div style={{ overflowX: 'auto' }}>
+            <Table
+              columns={columns}
+              rows={scheduleQuery.data?.installments ?? []}
+              getRowKey={(r) => r.installmentId}
+              emptyMessage="El plan no tiene cuotas."
+            />
+          </div>
         </>
       )}
     </Modal>

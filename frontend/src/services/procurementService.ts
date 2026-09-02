@@ -71,6 +71,8 @@ export const procurementService = {
     startDate: string
     endDate?: string
     advancePercentage?: string
+    advanceAmount?: string
+    advanceDueDate?: string
     retentionPercentage?: string
     scopeDescription?: string
     paymentTermsType?: 'LUMP_SUM' | 'MONTHLY' | 'CUSTOM'

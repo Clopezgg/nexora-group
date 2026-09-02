@@ -109,8 +109,12 @@ class SupplierContractCreateRequest(CamelModel):
     currency_code: str
     start_date: date
     end_date: date | None = None
-    advance_percentage: Decimal = Decimal("0")
-    retention_percentage: Decimal = Decimal("0")
+    advance_percentage: Decimal = Field(default=Decimal("0"), ge=0, le=100)
+    # Representación monetaria canónica del anticipo (§7/§8). Es el monto exacto,
+    # no se reconstruye desde un porcentaje.
+    advance_amount: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=2)
+    advance_due_date: date | None = None
+    retention_percentage: Decimal = Field(default=Decimal("0"), ge=0, le=100)
     payment_terms: str | None = None
     payment_terms_type: str = "LUMP_SUM"
 
@@ -147,6 +151,8 @@ class SupplierContractResponse(CamelModel):
     start_date: date
     end_date: date | None
     advance_percentage: Decimal
+    advance_amount: Decimal | None = None
+    advance_due_date: date | None = None
     retention_percentage: Decimal
     payment_terms: str | None
     payment_terms_type: str

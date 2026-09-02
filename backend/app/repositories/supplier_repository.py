@@ -141,6 +141,8 @@ def create_contract(
     retention_percentage,
     payment_terms: str | None,
     payment_terms_type: str = "LUMP_SUM",
+    advance_amount=None,
+    advance_due_date=None,
 ) -> SupplierContract:
     existing = db.execute(
         select(SupplierContract.id).where(
@@ -164,6 +166,8 @@ def create_contract(
         start_date=start_date,
         end_date=end_date,
         advance_percentage=advance_percentage,
+        advance_amount=advance_amount,
+        advance_due_date=advance_due_date,
         retention_percentage=retention_percentage,
         payment_terms=payment_terms,
         payment_terms_type=payment_terms_type,

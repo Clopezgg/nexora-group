@@ -5,9 +5,11 @@ interface ModalProps {
   title: string
   onClose: () => void
   children: ReactNode
+  /** `wide` da más ancho para tablas financieras (§44). */
+  size?: 'default' | 'wide'
 }
 
-export function Modal({ open, title, onClose, children }: ModalProps) {
+export function Modal({ open, title, onClose, children, size = 'default' }: ModalProps) {
   if (!open) return null
   return (
     <div
@@ -26,6 +28,7 @@ export function Modal({ open, title, onClose, children }: ModalProps) {
           maxHeight: 'calc(100dvh - 32px)',
           overflowY: 'auto',
           boxSizing: 'border-box',
+          ...(size === 'wide' ? { width: 'min(1040px, 100%)', maxWidth: 'min(1040px, 100%)' } : {}),
         }}
       >
         <div className="nx-modal__header">

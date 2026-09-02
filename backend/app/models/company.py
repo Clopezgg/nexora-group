@@ -55,5 +55,12 @@ class Company(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # servicio que la evidencia pertenezca a la compañía.
     logo_evidence_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     signature_evidence_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # Cuenta contable para ANTICIPOS a proveedores/contratistas (§14). Sin ella,
+    # el pago de un anticipo falla cerrado — nunca se usa una cuenta arbitraria.
+    # Sin FK a nivel DB (mismo criterio que logo/signature: evita el ciclo
+    # companies<->accounts<->chart_of_accounts); se valida en el servicio.
+    supplier_advance_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
 
     projects: Mapped[list["Project"]] = relationship(back_populates="company")

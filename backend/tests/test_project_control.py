@@ -332,6 +332,50 @@ def test_budget_summary_excludes_a_draft_ap_invoice_from_accrued(client, db_sess
     assert Decimal(body["available"]) == Decimal("1000.00")
 
 
+def test_budget_summary_excludes_an_advance_prepayment_invoice_from_accrued(client, db_session):
+    """ORDEN MAESTRA §13/§15: a supplier invoice whose debit is an ASSET
+    account (contractual advance / prepayment) is NOT project cost. It must
+    not inflate `accrued` or shrink `available`; it surfaces as `advances`."""
+    login_admin(client)
+    company = create_company(client)
+    project = _create_project(client, company_id=company["id"])
+    supplier = _create_supplier(client, company_id=company["id"])
+    client.post(
+        f"/api/projects/{project['id']}/budgets/baseline",
+        json={"currencyCode": "HNL", "lines": [{"authorizedAmount": "1000.00"}]},
+    )
+    advance_asset = create_account(
+        client, company_id=company["id"], code="1610",
+        name="Anticipos a contratistas", account_type="ASSET",
+    )
+    payable = create_account(
+        client, company_id=company["id"], code="2400",
+        name="Cuentas por pagar", account_type="LIABILITY",
+    )
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "PRJ-ADV-1",
+            "scope": "PROJECT",
+            "projectId": project["id"],
+            "expenseAccountId": advance_asset["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "200.00",
+            "invoiceDate": "2026-01-10",
+            "dueDate": "2026-02-10",
+        },
+    ).json()
+    client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+
+    body = client.get(f"/api/projects/{project['id']}/budgets/summary").json()
+    assert Decimal(body["accrued"]) == Decimal("0")
+    assert Decimal(body["advances"]) == Decimal("200.00")
+    assert Decimal(body["available"]) == Decimal("1000.00")
+
+
 def test_budget_summary_rejects_a_non_functional_currency_ap_accrual(client, db_session):
     login_admin(client)
     company = create_company(client, currency="HNL")

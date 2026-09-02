@@ -283,6 +283,7 @@ class BudgetSummaryResponse(CamelModel):
     accrued: Decimal
     paid: Decimal
     available: Decimal
+    advances: Decimal = Decimal("0")
 
 
 class ForecastResponse(CamelModel):

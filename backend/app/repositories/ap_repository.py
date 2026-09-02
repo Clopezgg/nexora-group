@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.errors import BudgetCurrencyMismatchError, NotFoundError
 from app.models.ap import SupplierInvoice
+from app.models.chart_of_accounts import Account
 from app.models.company import Company
 
 # An invoice only carries a real accrual once posting_service has actually
@@ -27,18 +28,25 @@ def _assert_functional_currency(company: Company, currency_code: str) -> None:
         )
 
 
-def project_accrued_total(db: Session, *, company_id: uuid.UUID, project_id: uuid.UUID) -> Decimal:
-    """Accrued AP total for Budget vs Actual (NXR-REQ-0034). Mirrors
-    procurement_repository.project_commitment_total's currency-authority
-    guard: this codebase has no FX policy yet, so a foreign-currency
-    invoice on this project raises instead of silently mixing currencies
-    into one nominal figure."""
+def _project_invoice_total_by_account_type(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    project_id: uuid.UUID,
+    include_types: tuple[str, ...] | None = None,
+    exclude_types: tuple[str, ...] | None = None,
+) -> Decimal:
+    """Sum of accrued PROJECT AP invoices, filtered by the *debit* account's
+    type. ORDEN MAESTRA §13/§15: an invoice booked to an ASSET account is a
+    contractual advance / prepayment, not project cost — it must be kept out
+    of the `accrued` figure that drives Budget vs Actual."""
     company = db.get(Company, company_id)
     if company is None:
         raise NotFoundError(f"Company {company_id} no existe")
     total_expr = func.sum(SupplierInvoice.amount + SupplierInvoice.tax_amount)
     stmt = (
         select(SupplierInvoice.currency_code, total_expr.label("total"))
+        .join(Account, Account.id == SupplierInvoice.expense_account_id)
         .where(
             SupplierInvoice.company_id == company_id,
             SupplierInvoice.project_id == project_id,
@@ -46,11 +54,36 @@ def project_accrued_total(db: Session, *, company_id: uuid.UUID, project_id: uui
         )
         .group_by(SupplierInvoice.currency_code)
     )
-    accrued = Decimal("0")
+    if include_types is not None:
+        stmt = stmt.where(Account.account_type.in_(include_types))
+    if exclude_types is not None:
+        stmt = stmt.where(Account.account_type.not_in(exclude_types))
+    total = Decimal("0")
     for currency_code, nominal_total in db.execute(stmt):
         _assert_functional_currency(company, currency_code)
-        accrued += Decimal(nominal_total)
-    return accrued
+        total += Decimal(nominal_total)
+    return total
+
+
+def project_accrued_total(db: Session, *, company_id: uuid.UUID, project_id: uuid.UUID) -> Decimal:
+    """Accrued PROJECT AP cost for Budget vs Actual (NXR-REQ-0034). Mirrors
+    procurement_repository.project_commitment_total's currency-authority
+    guard: this codebase has no FX policy yet, so a foreign-currency
+    invoice on this project raises instead of silently mixing currencies
+    into one nominal figure. Advances/prepayments (ASSET debit) are excluded
+    — see `project_advance_total`."""
+    return _project_invoice_total_by_account_type(
+        db, company_id=company_id, project_id=project_id, exclude_types=("ASSET",)
+    )
+
+
+def project_advance_total(db: Session, *, company_id: uuid.UUID, project_id: uuid.UUID) -> Decimal:
+    """Accrued PROJECT AP advances/prepayments (ASSET debit). ORDEN MAESTRA
+    §15: reported separately from actual project cost — never consumes the
+    project's budget as if it were recognised cost."""
+    return _project_invoice_total_by_account_type(
+        db, company_id=company_id, project_id=project_id, include_types=("ASSET",)
+    )
 
 
 def project_paid_total(db: Session, *, company_id: uuid.UUID, project_id: uuid.UUID) -> Decimal:

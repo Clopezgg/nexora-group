@@ -56,6 +56,10 @@ class BudgetSummary:
     accrued: Decimal
     paid: Decimal
     available: Decimal
+    # ORDEN MAESTRA §15 — contractual advances / prepayments (ASSET debit).
+    # Reported alongside, never folded into `accrued` nor deducted from
+    # `available` as recognised cost.
+    advances: Decimal = Decimal("0")
 
 
 def create_baseline(
@@ -189,10 +193,18 @@ def compute_summary(db: Session, *, project_id: uuid.UUID) -> BudgetSummary:
     accrued = ap_repository.project_accrued_total(
         db, company_id=project.company_id, project_id=project_id
     )
+    advances = ap_repository.project_advance_total(
+        db, company_id=project.company_id, project_id=project_id
+    )
     paid = ap_repository.project_paid_total(
         db, company_id=project.company_id, project_id=project_id
     )
     available = authorized - committed - accrued
     return BudgetSummary(
-        authorized=authorized, committed=committed, accrued=accrued, paid=paid, available=available
+        authorized=authorized,
+        committed=committed,
+        accrued=accrued,
+        paid=paid,
+        available=available,
+        advances=advances,
     )

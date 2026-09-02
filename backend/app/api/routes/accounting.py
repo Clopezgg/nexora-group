@@ -182,6 +182,7 @@ def create_journal_entry(
         project_id=payload.project_id,
         currency_code=payload.currency_code,
         fx_rate=payload.fx_rate,
+        effective_date=payload.effective_date,
         lines=lines,
         description=payload.description,
         commit=False,

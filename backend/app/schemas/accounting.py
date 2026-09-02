@@ -21,6 +21,10 @@ class JournalEntryCreateRequest(CamelModel):
     currency_code: str
     fx_rate: Decimal = Decimal("1")
     description: str | None = None
+    # Fecha ECONÓMICA del hecho (ORDEN MAESTRA §28). Si se omite, el motor usa
+    # la fecha de negocio actual. El reporting económico agrupa por esta fecha,
+    # nunca por el timestamp técnico de contabilización.
+    effective_date: date | None = None
     lines: list[JournalLineRequest]
 
 

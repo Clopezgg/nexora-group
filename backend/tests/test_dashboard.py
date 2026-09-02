@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from app.models.permission import UserCompanyAccess, UserProjectAccess
 from app.models.project import Project
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
@@ -91,6 +93,37 @@ def test_dashboard_active_projects_respects_explicit_project_assignments(client,
 
     assert response.status_code == 200, response.text
     assert response.json()["activeProjects"] == 1
+
+
+def test_dashboard_period_metrics_group_by_effective_date_not_posted_at(client):
+    """ORDEN MAESTRA §23/§28/§53 — un asiento con fecha económica en un mes
+    anterior NO cuenta en el período económico actual, aunque se contabilice hoy."""
+    _login(client)
+    company = create_company(client, name="Dashboard EffDate")
+    expense = create_account(client, company_id=company["id"], code="5100", name="Gasto", account_type="EXPENSE")
+    payable = create_account(client, company_id=company["id"], code="2100", name="Pasivo", account_type="LIABILITY")
+
+    def _entry(eff_date, amount):
+        r = client.post(
+            "/api/accounting/journal-entries",
+            json={
+                "companyId": company["id"], "scope": "GENERAL", "currencyCode": "HNL",
+                "effectiveDate": eff_date,
+                "lines": [
+                    {"accountId": expense["id"], "debitAmount": amount},
+                    {"accountId": payable["id"], "creditAmount": amount},
+                ],
+            },
+        )
+        assert r.status_code == 201, r.text
+
+    today = date.today()
+    prev_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+    _entry(prev_month.isoformat(), "400.00")   # fuera del período económico actual
+    _entry(today.isoformat(), "125.00")        # dentro
+
+    body = client.get(f"/api/dashboard/summary?companyId={company['id']}").json()
+    assert body["periodExpense"] == 125.0
 
 
 def test_dashboard_financial_totals_net_formal_reversals(client):

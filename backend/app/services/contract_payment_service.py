@@ -528,6 +528,80 @@ def build_rebuild_rows(
     return contract, rows, after
 
 
+def apply_schedule_rebuild(
+    db: Session,
+    *,
+    schedule: ContractPaymentSchedule,
+    regular_months: int,
+    first_period: date,
+    due_day: int = 1,
+    advance_amount: Decimal | None = None,
+    advance_due_date: date | None = None,
+    retention_percentage: Decimal | None = None,
+    commit: bool = False,
+) -> tuple[dict, dict]:
+    """Reconstruye el plan con el motor canónico (§9/§11). Fail-closed si el
+    plan ya tiene pagos aplicados. Persiste (flush) y devuelve
+    `(before, after)`. El caller registra el AuditLog y decide el commit."""
+    if schedule_has_active_allocations(db, schedule.id):
+        raise InstallmentClosedError(
+            "El plan tiene pagos aplicados. No se puede recalcular: usa una "
+            "enmienda formal del plan que preserve los períodos ya pagados."
+        )
+    before = current_schedule_snapshot(db, schedule.id)
+    contract, rows, after = build_rebuild_rows(
+        db,
+        schedule=schedule,
+        regular_months=regular_months,
+        first_period=first_period,
+        due_day=due_day,
+        advance_amount=advance_amount,
+        advance_due_date=advance_due_date,
+        retention_percentage=retention_percentage,
+    )
+    rows.sort(
+        key=lambda r: (_KIND_ORDER[r["installment_kind"]], r["period_year"], r["period_month"])
+    )
+    if advance_amount is not None:
+        contract.advance_amount = advance_amount
+    if advance_due_date is not None:
+        contract.advance_due_date = advance_due_date
+    if retention_percentage is not None:
+        contract.retention_percentage = retention_percentage
+
+    db.execute(
+        ContractPaymentInstallment.__table__.delete().where(
+            ContractPaymentInstallment.schedule_id == schedule.id
+        )
+    )
+    total = _ZERO
+    for seq, r in enumerate(rows, start=1):
+        total += _q(r["scheduled_amount"])
+        db.add(
+            ContractPaymentInstallment(
+                schedule_id=schedule.id,
+                sequence=seq,
+                installment_kind=r["installment_kind"],
+                period_year=r["period_year"],
+                period_month=r["period_month"],
+                due_date=r["due_date"],
+                scheduled_amount=r["scheduled_amount"],
+                retention_amount=r["retention_amount"],
+                net_due=r["net_due"],
+                status="UPCOMING",
+                description=r.get("description"),
+            )
+        )
+    schedule.total_scheduled = _q(total)
+    schedule.due_day = due_day
+    schedule.start_period = date(rows[0]["period_year"], rows[0]["period_month"], 1)
+    schedule.end_period = date(rows[-1]["period_year"], rows[-1]["period_month"], 1)
+    db.flush()
+    if commit:
+        db.commit()
+    return before, after
+
+
 def find_contractual_duplicate_candidates(
     db: Session,
     *,

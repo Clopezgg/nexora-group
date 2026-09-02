@@ -83,6 +83,21 @@ class Report:
     resolved: dict = field(default_factory=dict)
     sections: dict = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
+    classification: dict = field(default_factory=dict)
+
+
+# Categorías forenses (§9). El reparador nunca actúa automáticamente salvo
+# clasificación de alta confianza y explícitamente segura.
+FORENSIC_CATEGORIES = (
+    "CLEAN",
+    "TWO_DISTINCT_EVENTS",
+    "DUPLICATED_BUSINESS_EVENT",
+    "CASH_OUTFLOW_WITHOUT_CONTRACT_LINK",
+    "AP_OBLIGATION_WITHOUT_PAYMENT",
+    "ADVANCE_MISCLASSIFIED_AS_EXPENSE",
+    "PARTIAL_MATCH_REQUIRES_REVIEW",
+    "NO_MATCHING_RECORDS",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -645,7 +660,89 @@ def inspect(db: Session, f: Filters) -> Report:
                 "dinero salió UNA sola vez (§11/§12)."
             )
 
+    report.classification = _classify(f, report)
     return report
+
+
+def _classify(f: Filters, report: Report) -> dict:
+    """Clasifica el hecho financiero en una categoría de `FORENSIC_CATEGORIES`
+    (§9). Solo intenta clasificar cuando hay un importe objetivo; sin él no
+    hay un 'hecho' concreto que clasificar."""
+    if f.amount is None:
+        return {"category": None, "confidence": "n/a", "evidence": []}
+
+    ges = report.sections.get("general_expenses", [])
+    invoices = report.sections.get("supplier_invoices", [])
+    payments = [p for p in report.sections.get("supplier_payments", []) if not p.get("reversed_at")]
+    contracts = report.sections.get("contracts", [])
+
+    live_invoices = [i for i in invoices if i["status"] not in ("DRAFT", "REVIEW", "CANCELLED")]
+    expense_ges = [
+        g for g in ges if "[EXPENSE]" in (g.get("expense_account") or "")
+    ]
+    advance_installments = [
+        inst
+        for c in contracts
+        for inst in c.get("installments", [])
+        if inst.get("installment_kind") == "ADVANCE"
+    ]
+    has_matching_advance = any(
+        _amount_matches(inst.get("scheduled_amount"), f.amount, f.amount_tolerance)
+        for inst in advance_installments
+    )
+    evidence: list[str] = []
+    for g in ges:
+        evidence.append(f"GeneralExpense {g['id']} · {g['amount']} · {g['expense_account']}")
+    for i in live_invoices:
+        evidence.append(
+            f"SupplierInvoice {i['invoice_number']} · {i['amount']} · {i['expense_account']} · {i['status']}"
+        )
+    for p in payments:
+        evidence.append(f"SupplierPayment {p['id']} · {p['amount']} · {p['payment_date']}")
+
+    if not ges and not live_invoices and not payments:
+        return {"category": "NO_MATCHING_RECORDS", "confidence": "high", "evidence": evidence}
+
+    # GeneralExpense a EXPENSE + factura viva por el mismo importe = mismo hecho
+    # registrado dos veces por caminos distintos.
+    if expense_ges and live_invoices:
+        cat = (
+            "ADVANCE_MISCLASSIFIED_AS_EXPENSE"
+            if has_matching_advance
+            else "DUPLICATED_BUSINESS_EVENT"
+        )
+        return {"category": cat, "confidence": "medium", "evidence": evidence}
+
+    # GeneralExpense a EXPENSE que corresponde a un anticipo contractual.
+    if expense_ges and has_matching_advance:
+        return {
+            "category": "ADVANCE_MISCLASSIFIED_AS_EXPENSE",
+            "confidence": "medium",
+            "evidence": evidence,
+        }
+
+    # GeneralExpense sin contrato ni factura relacionada.
+    if ges and not live_invoices and not contracts:
+        return {
+            "category": "CASH_OUTFLOW_WITHOUT_CONTRACT_LINK",
+            "confidence": "medium",
+            "evidence": evidence,
+        }
+
+    # Factura devengada sin pago.
+    if live_invoices and not payments:
+        return {
+            "category": "AP_OBLIGATION_WITHOUT_PAYMENT",
+            "confidence": "high",
+            "evidence": evidence,
+        }
+
+    # Factura devengada + pago que la liquida, y una salida de caja: cadena
+    # normal (obligación + pago son dos hechos legítimos de la misma cadena).
+    if live_invoices and payments and not expense_ges:
+        return {"category": "TWO_DISTINCT_EVENTS", "confidence": "medium", "evidence": evidence}
+
+    return {"category": "PARTIAL_MATCH_REQUIRES_REVIEW", "confidence": "low", "evidence": evidence}
 
 
 # --------------------------------------------------------------------------- #
@@ -671,6 +768,9 @@ def _print_human(report: Report) -> None:
             print(f" - {note}")
     else:
         print(" (sin observaciones automáticas)")
+
+    h("CLASIFICACIÓN FORENSE")
+    print(json.dumps(report.classification, default=_json_default, indent=2, ensure_ascii=False))
 
 
 def _parse_args(argv: list[str]) -> tuple[Filters, bool]:
@@ -728,6 +828,7 @@ def main(argv: list[str] | None = None) -> int:
                     "resolved": report.resolved,
                     "sections": report.sections,
                     "notes": report.notes,
+                    "classification": report.classification,
                 },
                 default=_json_default,
                 indent=2,

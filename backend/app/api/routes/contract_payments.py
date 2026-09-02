@@ -270,12 +270,13 @@ def prepare_advance_invoice(
     user=Depends(require_permission("ap.supplier_invoice", "create")),
     correlation_id: str = Depends(get_correlation_id),
 ) -> dict:
-    """Prepara (y aprueba) la obligación AP del ANTICIPO (§12/§14/§38).
+    """Prepara la obligación AP del ANTICIPO (§12/§14/§38).
 
-    Usa la cuenta contable de anticipos de la compañía como cuenta de gasto:
-    approve → Debit(anticipos)/Credit(CxP); el pago posterior → Debit(CxP)/
-    Credit(Tesorería). Efecto neto: Debit(anticipos) / Credit(Tesorería).
-    Fail-closed si la compañía no tiene configurada la cuenta de anticipos.
+    Usa la cuenta contable de anticipos de la compañía como cuenta de activo.
+    La operación queda en DRAFT: quien puede crear una obligación no obtiene
+    implícitamente facultad de aprobarla ni de contabilizar su accrual. El
+    workflow de AP aplica la aprobación/SoD antes del pago. Fail-closed si la
+    compañía no tiene configurada la cuenta de anticipos.
     """
     from app.models.company import Company
     from app.models.contract_payment import ContractPaymentInstallment
@@ -337,7 +338,6 @@ def prepare_advance_invoice(
             supplier_contract_id=contract.id,
             commit=False,
         )
-        ap_service.approve_supplier_invoice(db, invoice_id=invoice.id, commit=False)
         audit_service.record(
             db,
             actor_user_id=user.id,
@@ -358,6 +358,7 @@ def prepare_advance_invoice(
         "invoiceId": str(invoice.id),
         "advanceInstallmentId": str(advance.id),
         "amount": str(amount),
+        "status": invoice.status,
     }
 
 

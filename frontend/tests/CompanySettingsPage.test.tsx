@@ -14,6 +14,7 @@ function makeCompany() {
     fiscalId: null as string | null,
     voucherPayerName: null as string | null,
     voucherApproverName: null as string | null,
+    supplierAdvanceAccountId: null as string | null,
   }
 }
 
@@ -39,6 +40,7 @@ function stubFetch(company: ReturnType<typeof makeCompany>) {
           fiscalId?: string
           voucherPayerName?: string
           voucherApproverName?: string
+          supplierAdvanceAccountId?: string
         }
         if (body.legalName !== undefined) company.legalName = body.legalName.toUpperCase()
         if (body.fiscalId !== undefined) company.fiscalId = body.fiscalId
@@ -46,10 +48,23 @@ function stubFetch(company: ReturnType<typeof makeCompany>) {
           company.voucherPayerName = body.voucherPayerName
         }
         if (body.voucherApproverName !== undefined) company.voucherApproverName = body.voucherApproverName
+        if (body.supplierAdvanceAccountId !== undefined) {
+          company.supplierAdvanceAccountId = body.supplierAdvanceAccountId
+        }
         return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...company }) } as Response)
       }
       if (url.includes('/master-data/companies')) {
         return Promise.resolve({ ok: true, status: 200, json: async () => [{ ...company }] } as Response)
+      }
+      if (url.includes('/master-data/accounts')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [
+            { id: 'asset-advance', code: '1610', name: 'Anticipos a proveedores', accountType: 'ASSET', isPostable: true },
+            { id: 'expense-works', code: '5110', name: 'Gasto de obra', accountType: 'EXPENSE', isPostable: true },
+          ],
+        } as Response)
       }
       return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response)
     }),
@@ -128,5 +143,21 @@ describe('CompanySettingsPage', () => {
     // Tras guardar, el pagador queda fijado (read-only) y refleja el valor del servidor.
     expect(await screen.findByDisplayValue('KAREN VANNESSA LOPEZ GONZALEZ')).toBeDisabled()
     expect(screen.getByDisplayValue('CARLOS HUMBERTO LOPEZ')).not.toBeDisabled()
+  })
+
+  it('configures a postable ASSET account for supplier advances through Company Settings', async () => {
+    const company = makeCompany()
+    stubFetch(company)
+    const user = userEvent.setup()
+
+    render(renderApp('/control/configuracion'))
+
+    const advanceAccount = await screen.findByLabelText(/cuenta de anticipos a proveedores/i)
+    await screen.findByRole('option', { name: /1610.*anticipos a proveedores/i })
+    await user.selectOptions(advanceAccount, 'asset-advance')
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+
+    expect(await screen.findByText(/cambios guardados/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/cuenta de anticipos a proveedores/i)).toHaveValue('asset-advance')
   })
 })

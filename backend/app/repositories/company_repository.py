@@ -66,6 +66,7 @@ def update_company(
     email: str | None = None,
     website: str | None = None,
     voucher_footer_text: str | None = None,
+    supplier_advance_account_id: uuid.UUID | None = None,
 ) -> Company:
     if name is not None:
         company.name = name.strip()
@@ -114,5 +115,7 @@ def update_company(
         company.default_theme_id = default_theme_id.strip() or None
     if default_density is not None:
         company.default_density = default_density.strip() or None
+    if supplier_advance_account_id is not None:
+        company.supplier_advance_account_id = supplier_advance_account_id
     db.flush()
     return company

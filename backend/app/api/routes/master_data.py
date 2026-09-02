@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
-from app.domain.errors import InvalidCashFlowActivityError, NotFoundError
+from app.domain.errors import InvalidCashFlowActivityError, InvalidFinancialReferenceError, NotFoundError
 from app.models.chart_of_accounts import CASH_FLOW_ACTIVITIES, ChartOfAccount
 from app.repositories import account_repository, company_repository, role_repository
 from app.schemas.master_data import (
@@ -20,6 +20,7 @@ from app.schemas.master_data import (
 )
 from app.schemas.tax import TaxCodeCreateRequest, TaxCodeResponse
 from app.services import audit_service, tax_service, user_service
+from app.services.financial_validation_service import assert_supplier_advance_account_eligible
 from app.services.permission_service import (
     assert_company_access,
     list_user_company_ids,
@@ -99,7 +100,18 @@ def update_company(
             "fiscalId": existing.fiscal_id,
             "voucherPayerName": existing.voucher_payer_name,
             "voucherApproverName": existing.voucher_approver_name,
+            "supplierAdvanceAccountId": str(existing.supplier_advance_account_id)
+            if existing.supplier_advance_account_id else None,
         }
+        if payload.supplier_advance_account_id is not None:
+            try:
+                assert_supplier_advance_account_eligible(
+                    db,
+                    account_id=payload.supplier_advance_account_id,
+                    company_id=company_id,
+                )
+            except InvalidFinancialReferenceError as error:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
         try:
             company = company_repository.update_company(
                 db,
@@ -110,6 +122,7 @@ def update_company(
                 voucher_approver_name=payload.voucher_approver_name,
                 default_theme_id=payload.default_theme_id,
                 default_density=payload.default_density,
+                supplier_advance_account_id=payload.supplier_advance_account_id,
             )
         except ValueError as error:
             raise HTTPException(
@@ -129,6 +142,8 @@ def update_company(
                 "fiscalId": company.fiscal_id,
                 "voucherPayerName": company.voucher_payer_name,
                 "voucherApproverName": company.voucher_approver_name,
+                "supplierAdvanceAccountId": str(company.supplier_advance_account_id)
+                if company.supplier_advance_account_id else None,
             },
             correlation_id=correlation_id,
         )

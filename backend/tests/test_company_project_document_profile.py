@@ -1,6 +1,6 @@
 """Perfil documental de compañía y proyecto (orden maestra final §29-§32)."""
 
-from tests.helpers import create_company, login_admin
+from tests.helpers import create_account, create_company, login_admin
 
 
 def test_company_document_profile_persists(client):
@@ -65,3 +65,36 @@ def test_project_address_fields_persist(client):
     assert body["addressLine1"] == "Colonia Las Colinas, bloque M"
     assert body["locationReference"] == "Frente al parque, portón negro"
     assert body["country"] == "HN"
+
+
+def test_company_configures_postable_asset_account_for_supplier_advances(client):
+    login_admin(client)
+    company = create_company(client)
+    advance_asset = create_account(
+        client,
+        company_id=company["id"],
+        code="1610",
+        name="Anticipos a proveedores",
+        account_type="ASSET",
+    )
+    expense = create_account(
+        client,
+        company_id=company["id"],
+        code="5110",
+        name="Gasto de obra",
+        account_type="EXPENSE",
+    )
+
+    configured = client.patch(
+        f"/api/master-data/companies/{company['id']}/profile",
+        json={"supplierAdvanceAccountId": advance_asset["id"]},
+    )
+    assert configured.status_code == 200, configured.text
+    assert configured.json()["supplierAdvanceAccountId"] == advance_asset["id"]
+
+    rejected = client.patch(
+        f"/api/master-data/companies/{company['id']}/profile",
+        json={"supplierAdvanceAccountId": expense["id"]},
+    )
+    assert rejected.status_code == 422, rejected.text
+    assert "ASSET" in rejected.text

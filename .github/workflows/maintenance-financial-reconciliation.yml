@@ -21,6 +21,8 @@ on:
           - "apply"
           - "reconcile-advance-preview"
           - "reconcile-advance-apply"
+          - "finalize-reversed-invoice-preview"
+          - "finalize-reversed-invoice-apply"
         default: "inspect"
         required: true
       contract_number:
@@ -120,7 +122,7 @@ jobs:
           set -euo pipefail
           MODE="${{ inputs.mode }}"
           case "$MODE" in
-            apply|reconcile-advance-apply)
+            apply|reconcile-advance-apply|finalize-reversed-invoice-apply)
               if [ "${{ inputs.confirm_apply }}" != "APPLY" ]; then
                 echo "::error::$MODE requiere confirm_apply=APPLY"; exit 1
               fi
@@ -136,6 +138,8 @@ jobs:
             reconcile-advance-preview|reconcile-advance-apply)
               [ -n "${{ inputs.contract_number }}" ] && [ -n "${{ inputs.general_expense_number }}" ] && [ -n "${{ inputs.invoice_number }}" ] \
                 || { echo "::error::$MODE requiere contract_number + general_expense_number + invoice_number"; exit 1; } ;;
+            finalize-reversed-invoice-preview|finalize-reversed-invoice-apply)
+              [ -n "${{ inputs.invoice_number }}" ] || { echo "::error::$MODE requiere invoice_number"; exit 1; } ;;
           esac
 
       - uses: actions/setup-python@v6
@@ -188,7 +192,7 @@ jobs:
           [ -n "${{ inputs.invoice_number }}" ]  && ARGS+=(--invoice-number "${{ inputs.invoice_number }}")
           [ -n "${{ inputs.advance_account_code }}" ] && ARGS+=(--advance-account-code "${{ inputs.advance_account_code }}")
           case "${{ inputs.mode }}" in
-            apply|reconcile-advance-apply)
+            apply|reconcile-advance-apply|finalize-reversed-invoice-apply)
               ARGS+=(--confirm "${{ inputs.confirm_apply }}" --reason '${{ inputs.reason }}') ;;
           esac
 
@@ -203,7 +207,7 @@ jobs:
             echo "- Actor: ${{ github.actor }}"
             echo "- SHA: ${{ github.sha }}"
             echo "- Contract: ${{ inputs.contract_number || '—' }}"
-            [ "${{ inputs.mode }}" = "apply" ] && echo "- Reason: ${{ inputs.reason }}"
+            case "${{ inputs.mode }}" in *apply) echo "- Reason: ${{ inputs.reason }}" ;; esac
             echo ""
             echo '```'
             sed -e 's/postgresql[^ ]*/[redacted]/g' "$RUNNER_TEMP/reconciliation-report.txt" 2>/dev/null | tail -c 60000 || echo "(sin salida)"

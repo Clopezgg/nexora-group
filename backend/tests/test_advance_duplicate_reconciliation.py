@@ -140,6 +140,73 @@ def test_reconcile_duplicated_advance_end_to_end(client, db_session):
     assert Decimal(budget["advances"]) == Decimal("50000.00")
 
 
+def test_inspect_classifies_reconciled_advance_as_clean(client, db_session):
+    company, project, contract, schedule, bank, gge, invoice, *_ = _setup(client, db_session)
+    from decimal import Decimal as D
+
+    from scripts.financial_event_inspect import Filters, inspect
+
+    before = inspect(db_session, Filters(company=company["id"], amount=D("50000")))
+    assert before.classification["category"] in (
+        "ADVANCE_MISCLASSIFIED_AS_EXPENSE",
+        "DUPLICATED_BUSINESS_EVENT",
+    )
+
+    ars.reconcile_duplicated_advance(
+        db_session,
+        general_expense_id=gge["id"],
+        supplier_invoice_id=invoice["id"],
+        contract_number="10101960",
+        reason="Duplicación de anticipo autorizada — ORDEN MAESTRA DE CIERRE §23",
+        correlation_id="cierre-l50k-clean",
+        commit=True,
+    )
+    db_session.expire_all()
+
+    after = inspect(db_session, Filters(company=company["id"], amount=D("50000")))
+    assert after.classification["category"] == "CLEAN"
+    assert not any("POSIBLE DOBLE CONTEO" in n for n in after.notes)
+    assert any("ya reconciliado" in n for n in after.notes)
+
+
+def test_finalize_reversed_invoice_closes_stuck_approved(client, db_session):
+    company, project, contract, schedule, bank, gge, invoice, *_ = _setup(client, db_session)
+    from app.models.accounting import AccountingDocument
+    from app.models.ap import SupplierInvoice
+    from app.services import posting_service
+    from scripts import financial_reconciliation as fr
+
+    inv = db_session.get(SupplierInvoice, invoice["id"])
+    posting_service.reverse_document(
+        db_session, document_id=inv.accrual_document_id, reason="reverso sin hook " * 3, commit=False
+    )
+    # estado "atascado": el accrual quedó REVERSED pero la factura volvió a APPROVED
+    inv.status = "APPROVED"
+    db_session.commit()
+    assert db_session.get(AccountingDocument, inv.accrual_document_id).status == "REVERSED"
+
+    rc = fr.main(["--mode", "finalize-reversed-invoice-preview", "--invoice-number", "2020485218"])
+    assert rc == 0
+    db_session.expire_all()
+    assert db_session.get(SupplierInvoice, invoice["id"]).status == "APPROVED"  # preview no persiste
+
+    rc = fr.main([
+        "--mode", "finalize-reversed-invoice-apply", "--invoice-number", "2020485218",
+        "--confirm", "APPLY", "--reason", "cierre de reverso pendiente ORDEN MAESTRA DE CIERRE",
+    ])
+    assert rc == 0
+    db_session.expire_all()
+    assert db_session.get(SupplierInvoice, invoice["id"]).status == "CANCELLED"
+
+
+def test_finalize_reversed_invoice_blocks_when_accrual_still_posted(client, db_session):
+    company, *_rest, invoice, _c, _a, _adv = _setup(client, db_session)
+    from scripts import financial_reconciliation as fr
+
+    rc = fr.main(["--mode", "finalize-reversed-invoice-preview", "--invoice-number", "2020485218"])
+    assert rc == 3  # accrual sigue POSTED
+
+
 def test_reconcile_rejects_amount_mismatch(client, db_session):
     company, project, contract, schedule, bank, gge, invoice, *_ = _setup(client, db_session)
     import pytest

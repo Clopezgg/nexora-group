@@ -48,7 +48,13 @@ from app.models.contract_payment import ContractPaymentSchedule
 from app.models.supplier import SupplierContract
 from app.services import audit_service
 from app.services import contract_payment_service as cps
-from scripts.financial_event_inspect import Filters, _json_default, _print_human, inspect
+from app.services.reversal_hooks import register_default_reversal_hooks
+from scripts.financial_event_inspect import (
+    Filters,
+    _json_default,
+    _print_human,
+    inspect,
+)
 
 _APPLY_TOKEN = "APPLY"
 _MIN_REASON = 15
@@ -191,7 +197,15 @@ def _parse_args(argv):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument(
         "--mode",
-        choices=("inspect", "preview", "apply", "reconcile-advance-preview", "reconcile-advance-apply"),
+        choices=(
+            "inspect",
+            "preview",
+            "apply",
+            "reconcile-advance-preview",
+            "reconcile-advance-apply",
+            "finalize-reversed-invoice-preview",
+            "finalize-reversed-invoice-apply",
+        ),
         default="inspect",
     )
     p.add_argument("--company")
@@ -309,12 +323,87 @@ def _run_reconcile_advance(db: Session, args, *, apply: bool) -> int:
     return 0
 
 
+def _run_finalize_reversed_invoice(db: Session, args, *, apply: bool) -> int:
+    """Cierra una factura cuyo accrual ya está REVERSED pero quedó en APPROVED.
+
+    Ocurre cuando el accrual se revirtió desde un proceso que no tenía
+    registrado el hook de reversión ``supplier_invoice`` (p. ej. una versión
+    anterior de este runner). Sólo transiciona a CANCELLED; no toca el GL.
+    """
+    from app.models.accounting import AccountingDocument
+    from app.models.ap import SupplierInvoice
+
+    if not args.invoice_number:
+        raise SystemExit("finalize-reversed-invoice requiere --invoice-number.")
+    if apply:
+        if args.confirm != _APPLY_TOKEN:
+            raise SystemExit(f"apply requiere --confirm {_APPLY_TOKEN}.")
+        if not args.reason or len(args.reason.strip()) < _MIN_REASON:
+            raise SystemExit(f"apply requiere --reason de al menos {_MIN_REASON} caracteres.")
+
+    invoice = _resolve_by_number(db, SupplierInvoice, "invoice_number", args.invoice_number)
+    if invoice is None:
+        raise SystemExit(f"No existe la factura {args.invoice_number!r}")
+
+    accrual = (
+        db.get(AccountingDocument, invoice.accrual_document_id)
+        if invoice.accrual_document_id
+        else None
+    )
+    blocked = None
+    if invoice.status != "APPROVED":
+        blocked = f"la factura está en estado {invoice.status}, no APPROVED"
+    elif invoice.amount_paid and invoice.amount_paid > 0:
+        blocked = "la factura tiene pagos registrados"
+    elif accrual is None:
+        blocked = "la factura no tiene accrual contabilizado"
+    elif accrual.status != "REVERSED":
+        blocked = f"el accrual está en estado {accrual.status}, no REVERSED"
+
+    payload = {
+        "mode": args.mode,
+        "invoiceNumber": invoice.invoice_number,
+        "before": {"invoiceStatus": invoice.status, "accrualStatus": accrual.status if accrual else None},
+    }
+    if blocked is not None:
+        payload.update({"blocked": True, "reason": blocked})
+        print(json.dumps(payload, default=_json_default, indent=2, ensure_ascii=False))
+        return 3
+
+    if apply:
+        before_status = invoice.status
+        invoice.status = "CANCELLED"
+        audit_service.record(
+            db,
+            actor_user_id=None,
+            action="ap.supplier_invoice.finalize_reversed",
+            entity_type="ap.supplier_invoice",
+            entity_id=invoice.id,
+            company_id=invoice.company_id,
+            project_id=invoice.project_id,
+            before={"status": before_status},
+            after={"status": "CANCELLED", "reason": args.reason.strip(), "channel": "maintenance-workflow"},
+            correlation_id=(args.reference or f"finalize-reversed-{uuid.uuid4().hex[:12]}"),
+        )
+        db.commit()
+        payload["after"] = {"invoiceStatus": "CANCELLED", "accrualStatus": accrual.status}
+    else:
+        db.rollback()
+        payload["after"] = {"invoiceStatus": "CANCELLED (preview)", "accrualStatus": accrual.status}
+    payload["blocked"] = False
+    print(json.dumps(payload, default=_json_default, indent=2, ensure_ascii=False))
+    return 0
+
+
 def main(argv=None) -> int:
     args = _parse_args(argv if argv is not None else sys.argv[1:])
+    register_default_reversal_hooks()
     db = SessionLocal()
     try:
         if args.mode == "inspect":
             return _run_inspect(db, args)
+        if args.mode.startswith("finalize-reversed-invoice"):
+            return _run_finalize_reversed_invoice(db, args, apply=args.mode.endswith("apply"))
         if args.mode.startswith("reconcile-advance"):
             return _run_reconcile_advance(db, args, apply=args.mode.endswith("apply"))
         if not args.contract_number:

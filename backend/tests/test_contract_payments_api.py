@@ -29,9 +29,9 @@ def test_create_monthly_schedule_and_read_back(client):
         json={
             "supplierContractId": contract["id"],
             "scheduleType": "MONTHLY",
-            "startPeriod": "2026-08-01",
-            "months": 10,
-            "monthlyAmount": "50000.00",
+            "regularMonths": 10,
+            "dueDay": 1,
+            "firstPeriod": "2026-08-01",
         },
     )
     assert created.status_code == 201, created.text
@@ -49,6 +49,25 @@ def test_create_monthly_schedule_and_read_back(client):
     )
     assert listed.status_code == 200
     assert len(listed.json()) == 1
+
+
+def test_legacy_monthly_amount_schedule_shape_is_rejected(client):
+    """ORDEN MAESTRA §41: el generador legacy (startPeriod/months/monthlyAmount,
+    vencimientos a fin de mes, anticipo ignorado) ya no existe. La única ruta
+    mensual es el motor canónico (regularMonths + firstPeriod)."""
+    login_admin(client)
+    company = create_company(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    contract = _contract(client, company["id"], supplier["id"], number="CTR-API-LEG")
+
+    r = client.post(
+        "/api/contract-payments/schedules",
+        json={
+            "supplierContractId": contract["id"], "scheduleType": "MONTHLY",
+            "startPeriod": "2026-08-01", "months": 10, "monthlyAmount": "50000.00",
+        },
+    )
+    assert r.status_code == 422, r.text
 
 
 def test_schedule_over_contract_value_is_422(client):
@@ -79,7 +98,7 @@ def test_summary_and_fifo_preview(client):
         "/api/contract-payments/schedules",
         json={
             "supplierContractId": contract["id"], "scheduleType": "MONTHLY",
-            "startPeriod": "2026-08-01", "months": 10, "monthlyAmount": "50000.00",
+            "regularMonths": 10, "dueDay": 1, "firstPeriod": "2026-08-01",
         },
     ).json()
 

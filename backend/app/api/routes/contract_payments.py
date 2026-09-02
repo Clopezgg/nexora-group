@@ -113,20 +113,13 @@ def create_schedule(
             first_period=payload.first_period,
         )
         due_day = payload.due_day or 1
-    elif payload.start_period and payload.months and payload.monthly_amount:
-        rows = cps.build_monthly_installments(
-            start_period=payload.start_period,
-            count=payload.months,
-            monthly_amount=payload.monthly_amount,
-            total_value=contract.value,
-            retention_percentage=contract.retention_percentage,
-        )
     else:
         raise HTTPException(
             status_code=422,
             detail=(
-                "Indica `installments`, o (`regularMonths` + `firstPeriod` [+ `advanceAmount`]), "
-                "o (`startPeriod` + `months` + `monthlyAmount`)."
+                "Indica `installments` (plan CUSTOM), o "
+                "`regularMonths` + `firstPeriod` [+ `advanceAmount` + `dueDay`] "
+                "para el plan canónico (anticipo + N mensualidades)."
             ),
         )
 

@@ -148,8 +148,15 @@ def build_monthly_installments(
     total_value: Decimal | None = None,
     retention_percentage: Decimal = _ZERO,
 ) -> list[dict]:
-    """Cuotas mensuales iguales. La última absorbe el redondeo para que la
-    suma cuadre exactamente con `total_value` cuando se da (§14)."""
+    """Cuotas mensuales iguales, vencimiento a fin de mes. La última absorbe
+    el redondeo para que la suma cuadre con `total_value` (§14).
+
+    NO es el motor canónico de planes contractuales: no modela el ANTICIPO ni
+    el día de pago. `build_contract_plan` es el único generador que produce un
+    plan contractual completo (ORDEN MAESTRA §41). Esta función se conserva
+    solo como utilidad para construir listas de cuotas iguales en pruebas y
+    para planes CUSTOM armados explícitamente por el caller.
+    """
     monthly_amount = _q(monthly_amount)
     rows: list[dict] = []
     running = _ZERO

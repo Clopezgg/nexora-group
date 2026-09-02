@@ -95,17 +95,6 @@ export const contractPaymentService = {
   getByContract: (contractId: string) =>
     apiFetch<ContractSchedule>(`/contract-payments/by-contract/${encodeURIComponent(contractId)}`),
 
-  createMonthlySchedule: (body: {
-    supplierContractId: string
-    startPeriod: string
-    months: number
-    monthlyAmount: string
-  }) =>
-    apiFetch<ContractSchedule>('/contract-payments/schedules', {
-      method: 'POST',
-      body: JSON.stringify({ scheduleType: 'MONTHLY', ...body }),
-    }),
-
   // Modo canónico (§16-§20): el backend calcula el anticipo + N mensualidades.
   createContractPlan: (body: {
     supplierContractId: string

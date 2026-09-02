@@ -44,6 +44,13 @@ class InstallmentClosedError(InvalidFinancialReferenceError):
     """La cuota no admite más aplicaciones (PAID / CANCELLED)."""
 
 
+class ContractualExpenseConflictError(InvalidFinancialReferenceError):
+    """Un GeneralExpense PROJECT coincide con una obligación contractual
+    abierta del mismo proyecto (ORDEN MAESTRA §21). No se bloquea de forma
+    absoluta: exige un reconocimiento explícito con motivo para no volverse
+    el atajo fácil que duplica un pago contractual."""
+
+
 @dataclass(frozen=True)
 class InstallmentSummary:
     installment_id: uuid.UUID
@@ -407,6 +414,63 @@ def _status_for(
     if installment.due_date <= _add_months(date(as_of.year, as_of.month, 1), 1) - _one_day():
         return "DUE"
     return "UPCOMING"
+
+
+def find_contractual_duplicate_candidates(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    project_id: uuid.UUID,
+    amount: Decimal,
+    tolerance: Decimal = _ZERO,
+) -> list[dict]:
+    """Obligaciones contractuales ABIERTAS del proyecto cuyo importe pendiente
+    o programado coincide (± `tolerance`) con `amount`. Base del guard de §21:
+    un GeneralExpense PROJECT por ese importe probablemente es el pago de esa
+    cuota registrado por fuera del contrato."""
+    tol = _q(tolerance) if tolerance else Decimal("0.01")
+    target = _q(amount)
+    contracts = list(
+        db.execute(
+            select(SupplierContract).where(
+                SupplierContract.company_id == company_id,
+                SupplierContract.project_id == project_id,
+                SupplierContract.status == "ACTIVE",
+            )
+        ).scalars()
+    )
+    out: list[dict] = []
+    for contract in contracts:
+        schedule = db.execute(
+            select(ContractPaymentSchedule).where(
+                ContractPaymentSchedule.supplier_contract_id == contract.id
+            )
+        ).scalar_one_or_none()
+        if schedule is None:
+            continue
+        supplier = db.get(Supplier, contract.supplier_id)
+        for s in installment_summaries(db, schedule_id=schedule.id):
+            if s.status in ("PAID", "CANCELLED"):
+                continue
+            candidates = {s.remaining, s.net_due, s.scheduled_amount}
+            if any(abs(c - target) <= tol for c in candidates):
+                out.append(
+                    {
+                        "contract_id": str(contract.id),
+                        "contract_number": contract.contract_number,
+                        "supplier_name": supplier.legal_name if supplier else None,
+                        "schedule_id": str(schedule.id),
+                        "installment_id": str(s.installment_id),
+                        "installment_kind": s.installment_kind,
+                        "period_label": s.period_label,
+                        "due_date": s.due_date.isoformat(),
+                        "scheduled_amount": str(s.scheduled_amount),
+                        "net_due": str(s.net_due),
+                        "remaining": str(s.remaining),
+                        "status": s.status,
+                    }
+                )
+    return out
 
 
 def installment_summaries(

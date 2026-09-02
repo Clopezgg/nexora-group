@@ -280,6 +280,8 @@ def create_general_expense(
             currency_code=payload.currency_code,
             expense_date=payload.expense_date,
             description=payload.description,
+            acknowledge_contractual_conflict=payload.acknowledge_contractual_conflict,
+            contractual_conflict_reason=payload.contractual_conflict_reason,
             commit=False,
         )
         audit_service.record(
@@ -295,6 +297,11 @@ def create_general_expense(
                 "category": expense.category,
                 "scope": payload.scope,
                 "projectId": str(payload.project_id) if payload.project_id else None,
+                "contractualConflictOverrideReason": (
+                    payload.contractual_conflict_reason
+                    if payload.acknowledge_contractual_conflict
+                    else None
+                ),
             },
             correlation_id=correlation_id,
         )

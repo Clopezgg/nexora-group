@@ -15,6 +15,7 @@ import {
   Table,
   type TableColumn,
 } from '../../design-system'
+import { ApiError } from '../../services/httpClient'
 import { masterDataService } from '../../services/masterDataService'
 import { projectService } from '../../services/projectService'
 import {
@@ -803,6 +804,16 @@ function GeneralExpenseModal({
   const [description, setDescription] = useState('')
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10))
   const [amount, setAmount] = useState<number | null>(null)
+  // ORDEN MAESTRA §21 — guard contractual.
+  const [contractGuardMessage, setContractGuardMessage] = useState<string | null>(null)
+  const [acknowledgeContractGuard, setAcknowledgeContractGuard] = useState(false)
+  const [contractGuardReason, setContractGuardReason] = useState('')
+
+  function resetContractGuard() {
+    setContractGuardMessage(null)
+    setAcknowledgeContractGuard(false)
+    setContractGuardReason('')
+  }
 
   const projectsQuery = useQuery({
     queryKey: ['projects', companyId],
@@ -823,6 +834,11 @@ function GeneralExpenseModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
       onClose()
+    },
+    onError: (error: unknown) => {
+      if (error instanceof ApiError && error.code === 'NXR-CONTRACT-GUARD-001') {
+        setContractGuardMessage(error.message)
+      }
     },
   })
 
@@ -852,6 +868,12 @@ function GeneralExpenseModal({
               currencyCode: selectedCurrency,
               expenseDate,
               description,
+              ...(contractGuardMessage && acknowledgeContractGuard
+                ? {
+                    acknowledgeContractualConflict: true,
+                    contractualConflictReason: contractGuardReason.trim(),
+                  }
+                : {}),
             },
             idempotencyKey: crypto.randomUUID(),
           })
@@ -865,6 +887,7 @@ function GeneralExpenseModal({
             const next = event.target.value as 'GENERAL' | 'PROJECT'
             setScope(next)
             if (next !== 'PROJECT') setProjectId('')
+            resetContractGuard()
           }}
           required
         >
@@ -876,7 +899,10 @@ function GeneralExpenseModal({
             name="projectId"
             label="Proyecto"
             value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
+            onChange={(event) => {
+              setProjectId(event.target.value)
+              resetContractGuard()
+            }}
             required
           >
             <option value="">Selecciona un proyecto…</option>
@@ -949,11 +975,44 @@ function GeneralExpenseModal({
             required
           />
         </label>
-        <MoneyInput label={`Monto (${selectedCurrency})`} value={amount} onChange={setAmount} />
+        <MoneyInput
+          label={`Monto (${selectedCurrency})`}
+          value={amount}
+          onChange={(next) => {
+            setAmount(next)
+            resetContractGuard()
+          }}
+        />
         <p className="nx-field__hint">
           Retiros de socios, préstamos y reembolsos no deben clasificarse automáticamente como gasto: usa el flujo y la cuenta contable que corresponda a su naturaleza.
         </p>
-        {mutation.isError ? (
+        {contractGuardMessage ? (
+          <div className="nx-field" role="alert" style={{ borderLeft: '3px solid var(--nx-color-warning, #b26a00)', paddingLeft: 12 }}>
+            <p className="nx-field__label">Este gasto parece corresponder a un contrato</p>
+            <p className="nx-field__hint">{contractGuardMessage}</p>
+            <label className="nx-field__checkbox" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <input
+                type="checkbox"
+                checked={acknowledgeContractGuard}
+                onChange={(event) => setAcknowledgeContractGuard(event.target.checked)}
+              />
+              <span>Confirmo que este gasto NO es el pago de esa cuota contractual.</span>
+            </label>
+            {acknowledgeContractGuard ? (
+              <label className="nx-field">
+                <span className="nx-field__label">Motivo (obligatorio)</span>
+                <input
+                  className="nx-input"
+                  value={contractGuardReason}
+                  onChange={(event) => setContractGuardReason(event.target.value)}
+                  placeholder="Por qué este gasto no pasa por el contrato"
+                  required
+                />
+              </label>
+            ) : null}
+          </div>
+        ) : null}
+        {mutation.isError && !contractGuardMessage ? (
           <p className="nx-field__error">{(mutation.error as Error).message}</p>
         ) : null}
         <Button
@@ -966,10 +1025,12 @@ function GeneralExpenseModal({
             !expenseDate ||
             !treasuryAccountId ||
             !expenseAccountId ||
-            (scope === 'PROJECT' && !projectId)
+            (scope === 'PROJECT' && !projectId) ||
+            (Boolean(contractGuardMessage) &&
+              (!acknowledgeContractGuard || !contractGuardReason.trim()))
           }
         >
-          Registrar salida
+          {contractGuardMessage ? 'Registrar de todas formas' : 'Registrar salida'}
         </Button>
       </form>
     </Modal>

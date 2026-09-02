@@ -270,6 +270,8 @@ def register_general_expense(
     currency_code: str,
     expense_date: date,
     description: str,
+    acknowledge_contractual_conflict: bool = False,
+    contractual_conflict_reason: str | None = None,
     commit: bool = True,
 ) -> GeneralExpense:
     """Salida inmediata de Tesorería. Puede ser GENERAL (sin proyecto) o
@@ -283,6 +285,38 @@ def register_general_expense(
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
     if amount <= 0:
         raise InvalidFinancialReferenceError("El gasto requiere amount > 0")
+
+    # ORDEN MAESTRA §21 — guard contractual. Un gasto inmediato PROJECT que
+    # coincide con una cuota contractual abierta del mismo proyecto es casi
+    # siempre el pago de esa cuota registrado por fuera del contrato (doble
+    # hecho económico). No se bloquea de forma absoluta: se exige un
+    # reconocimiento explícito con motivo.
+    if scope == "PROJECT" and project_id is not None and not acknowledge_contractual_conflict:
+        from app.services.contract_payment_service import (
+            ContractualExpenseConflictError,
+            find_contractual_duplicate_candidates,
+        )
+
+        candidates = find_contractual_duplicate_candidates(
+            db, company_id=company_id, project_id=project_id, amount=amount
+        )
+        if candidates:
+            detalle = "; ".join(
+                f"{c['contract_number']} · {c['period_label']} · pendiente {c['remaining']}"
+                for c in candidates[:3]
+            )
+            raise ContractualExpenseConflictError(
+                "Este movimiento parece corresponder a una obligación contractual "
+                f"abierta del proyecto ({detalle}). Regístralo mediante el contrato, "
+                "o confirma explícitamente (con motivo) que es un gasto no contractual."
+            )
+    if acknowledge_contractual_conflict and scope == "PROJECT" and not (
+        contractual_conflict_reason and contractual_conflict_reason.strip()
+    ):
+        raise InvalidFinancialReferenceError(
+            "Para registrar un gasto que coincide con una obligación contractual "
+            "se requiere un motivo."
+        )
     treasury_account = db.get(TreasuryAccount, treasury_account_id)
     if treasury_account is None:
         raise ValueError(f"TreasuryAccount {treasury_account_id} no existe")

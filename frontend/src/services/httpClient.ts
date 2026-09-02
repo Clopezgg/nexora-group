@@ -1,10 +1,19 @@
 export class ApiError extends Error {
   status: number
   correlationId: string | null
-  constructor(message: string, status: number, correlationId: string | null = null) {
+  /** Standard API error code (`error.code`), e.g. "NXR-CONTRACT-GUARD-001",
+   *  so a caller can branch on a specific domain condition. */
+  code: string | null
+  constructor(
+    message: string,
+    status: number,
+    correlationId: string | null = null,
+    code: string | null = null,
+  ) {
     super(message)
     this.status = status
     this.correlationId = correlationId
+    this.code = code
   }
 }
 
@@ -111,10 +120,12 @@ async function throwApiError(response: Response, path: string): Promise<never> {
   let message = `Error ${response.status}`
   let correlationId: string | null =
     response.headers.get('x-correlation-id') ?? response.headers.get('x-request-id')
+  let code: string | null = null
   try {
     const body = await response.json()
     message = body.detail ?? body.error?.message ?? message
     correlationId = body.error?.correlationId ?? correlationId
+    code = body.error?.code ?? null
   } catch {
     // response without JSON body
   }
@@ -133,7 +144,7 @@ async function throwApiError(response: Response, path: string): Promise<never> {
   ) {
     window.dispatchEvent(new CustomEvent('nexora:session-expired'))
   }
-  throw new ApiError(message, response.status, correlationId)
+  throw new ApiError(message, response.status, correlationId, code)
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {

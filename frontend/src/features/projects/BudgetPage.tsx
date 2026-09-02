@@ -162,7 +162,7 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
       <StatCard label="Comprometido" value={formatAmount(summary.committed, currencyCode)} />
       <StatCard label="Devengado (costo)" value={formatAmount(summary.accrued, currencyCode)} />
       {Number(summary.advances ?? 0) > 0 ? (
-        <StatCard label="Anticipos (prepago, no costo)" value={formatAmount(summary.advances, currencyCode)} />
+        <StatCard label="Anticipos (prepago, no costo)" value={formatAmount(summary.advances ?? '0', currencyCode)} />
       ) : null}
       <StatCard label="Pagado" value={formatAmount(summary.paid, currencyCode)} />
       <StatCard label="Disponible" value={formatAmount(summary.available, currencyCode)} />

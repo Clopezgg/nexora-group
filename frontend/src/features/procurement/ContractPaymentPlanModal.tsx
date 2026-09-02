@@ -13,7 +13,11 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { ApiError } from '../../services/httpClient'
-import { contractPaymentService, type ContractInstallment } from '../../services/contractPaymentService'
+import {
+  contractPaymentService,
+  type ContractInstallment,
+  type SchedulePlanSnapshot,
+} from '../../services/contractPaymentService'
 import { formatMoney } from '../../utils/currency'
 import {
   contractInstallmentKindLabel,
@@ -235,8 +239,239 @@ export function ContractPaymentPlanModal({
               emptyMessage="El plan no tiene cuotas."
             />
           </div>
+          {scheduleId ? (
+            <CorrectPlanSection
+              scheduleId={scheduleId}
+              contract={contract}
+              currency={currency}
+              onApplied={() => {
+                queryClient.invalidateQueries({ queryKey: ['contract-payments'] })
+                queryClient.invalidateQueries({ queryKey: ['procurement', 'contracts'] })
+                queryClient.invalidateQueries({ queryKey: ['project'] })
+              }}
+            />
+          ) : null}
         </>
       )}
     </Modal>
+  )
+}
+
+const SNAPSHOT_COLUMNS: TableColumn<SchedulePlanSnapshot['installments'][number]>[] = [
+  { key: 'kind', header: 'Tipo', render: (r) => contractInstallmentKindLabel(r.kind) },
+  { key: 'label', header: 'Período', render: (r) => r.periodLabel },
+  { key: 'due', header: 'Vencimiento', render: (r) => r.dueDate },
+]
+
+function SnapshotTable({
+  title,
+  snapshot,
+  currency,
+}: {
+  title: string
+  snapshot: SchedulePlanSnapshot
+  currency: string
+}) {
+  const columns: TableColumn<SchedulePlanSnapshot['installments'][number]>[] = [
+    ...SNAPSHOT_COLUMNS,
+    {
+      key: 'sched',
+      header: 'Programado',
+      numeric: true,
+      render: (r) => formatMoney(r.scheduledAmount, currency),
+    },
+  ]
+  return (
+    <div style={{ flex: '1 1 320px', minWidth: 280 }}>
+      <p className="nx-field__label">
+        {title} · total {formatMoney(snapshot.totalScheduled, currency)}
+      </p>
+      <div style={{ overflowX: 'auto' }}>
+        <Table
+          columns={columns}
+          rows={snapshot.installments}
+          getRowKey={(r) => `${r.kind}-${r.periodLabel}-${r.dueDate}`}
+          emptyMessage="Sin cuotas."
+        />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Corrección del plan (ORDEN MAESTRA §9/§10): term form → previsualización
+ * ANTES/DESPUÉS con el motor canónico → motivo obligatorio → aplicar. El
+ * backend audita y rechaza si el plan ya tiene pagos aplicados.
+ */
+function CorrectPlanSection({
+  scheduleId,
+  contract,
+  currency,
+  onApplied,
+}: {
+  scheduleId: string
+  contract: SupplierContract
+  currency: string
+  onApplied: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [terms, setTerms] = useState({
+    firstPeriod: new Date().toISOString().slice(0, 7),
+    regularMonths: '7',
+    dueDay: '1',
+    advanceAmount: contract.advanceAmount ?? '',
+    advanceDueDate: contract.advanceDueDate ?? '',
+    retentionPercentage: contract.retentionPercentage ?? '0',
+  })
+
+  const payload = () => ({
+    regularMonths: Number(terms.regularMonths),
+    dueDay: Number(terms.dueDay),
+    firstPeriod: `${terms.firstPeriod}-01`,
+    advanceAmount: terms.advanceAmount || undefined,
+    advanceDueDate: terms.advanceDueDate || undefined,
+    retentionPercentage: terms.retentionPercentage || undefined,
+  })
+
+  const previewMutation = useMutation({
+    mutationFn: () => contractPaymentService.previewRebuild(scheduleId, payload()),
+  })
+  const applyMutation = useMutation({
+    mutationFn: () => contractPaymentService.rebuildPlan(scheduleId, { ...payload(), reason }),
+    onSuccess: () => {
+      previewMutation.reset()
+      setOpen(false)
+      setReason('')
+      onApplied()
+    },
+  })
+
+  const preview = previewMutation.data
+  const reasonValid = reason.trim().length >= 10
+
+  if (!open) {
+    return (
+      <div className="nx-treasury__actions" style={{ marginTop: 16 }}>
+        <Button variant="secondary" onClick={() => setOpen(true)}>
+          Corregir plan de pagos
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: 16, borderTop: '1px solid var(--nx-color-border, #ddd)', paddingTop: 16 }}>
+      <p className="nx-field__label">Corregir / recalcular el plan</p>
+      <p className="nx-field__hint">
+        Recalcula el plan completo con el motor canónico (anticipo + N mensualidades, importes exactos).
+        Requiere un motivo y queda registrado en auditoría. Si el plan ya tiene pagos aplicados no se
+        puede recalcular.
+      </p>
+      <Input
+        label="Primer período (mensualidad 1)"
+        type="month"
+        value={terms.firstPeriod}
+        onChange={(e) => setTerms({ ...terms, firstPeriod: e.target.value })}
+      />
+      <Input
+        label="N.º de mensualidades"
+        type="number"
+        min={1}
+        value={terms.regularMonths}
+        onChange={(e) => setTerms({ ...terms, regularMonths: e.target.value })}
+      />
+      <Select
+        label="Día de pago de cada mes"
+        value={terms.dueDay}
+        onChange={(e) => setTerms({ ...terms, dueDay: e.target.value })}
+      >
+        {Array.from({ length: 31 }, (_, i) => String(i + 1)).map((d) => (
+          <option key={d} value={d}>{d}</option>
+        ))}
+      </Select>
+      <Input
+        label="Anticipo (monto)"
+        value={terms.advanceAmount}
+        onChange={(e) => setTerms({ ...terms, advanceAmount: e.target.value })}
+        placeholder="0.00"
+      />
+      <Input
+        label="Vencimiento del anticipo"
+        type="date"
+        value={terms.advanceDueDate}
+        onChange={(e) => setTerms({ ...terms, advanceDueDate: e.target.value })}
+      />
+      <Input
+        label="Retención (%)"
+        value={terms.retentionPercentage}
+        onChange={(e) => setTerms({ ...terms, retentionPercentage: e.target.value })}
+      />
+      <div className="nx-treasury__actions">
+        <Button
+          variant="secondary"
+          loading={previewMutation.isPending}
+          onClick={() => previewMutation.mutate()}
+        >
+          Previsualizar cambios
+        </Button>
+        <Button variant="secondary" onClick={() => { setOpen(false); previewMutation.reset() }}>
+          Cancelar
+        </Button>
+      </div>
+      {previewMutation.isError ? (
+        <p className="nx-field__error" role="alert">
+          {previewMutation.error instanceof ApiError
+            ? previewMutation.error.message
+            : 'No se pudo previsualizar.'}
+        </p>
+      ) : null}
+
+      {preview ? (
+        <>
+          {preview.blocked ? (
+            <p className="nx-field__error" role="alert">
+              {preview.blockedReason ?? 'El plan tiene pagos aplicados; no puede recalcularse.'}
+            </p>
+          ) : null}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 12 }}>
+            <SnapshotTable title="ANTES" snapshot={preview.before} currency={currency} />
+            {preview.after ? (
+              <SnapshotTable title="DESPUÉS" snapshot={preview.after} currency={currency} />
+            ) : null}
+          </div>
+          {!preview.blocked ? (
+            <>
+              <label className="nx-field" style={{ marginTop: 12 }}>
+                <span className="nx-field__label">Motivo de la corrección (obligatorio)</span>
+                <textarea
+                  className="nx-input"
+                  rows={2}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Por qué se corrige el plan (mínimo 10 caracteres)"
+                />
+              </label>
+              <div className="nx-treasury__actions">
+                <Button
+                  loading={applyMutation.isPending}
+                  disabled={!reasonValid}
+                  onClick={() => applyMutation.mutate()}
+                >
+                  Aplicar corrección
+                </Button>
+              </div>
+              {applyMutation.isError ? (
+                <p className="nx-field__error" role="alert">
+                  {applyMutation.error instanceof ApiError
+                    ? applyMutation.error.message
+                    : 'No se pudo aplicar la corrección.'}
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </>
+      ) : null}
+    </div>
   )
 }

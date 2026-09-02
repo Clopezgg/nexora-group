@@ -44,6 +44,13 @@ class InstallmentClosedError(InvalidFinancialReferenceError):
     """La cuota no admite más aplicaciones (PAID / CANCELLED)."""
 
 
+class ContractualExpenseConflictError(InvalidFinancialReferenceError):
+    """Un GeneralExpense PROJECT coincide con una obligación contractual
+    abierta del mismo proyecto (ORDEN MAESTRA §21). No se bloquea de forma
+    absoluta: exige un reconocimiento explícito con motivo para no volverse
+    el atajo fácil que duplica un pago contractual."""
+
+
 @dataclass(frozen=True)
 class InstallmentSummary:
     installment_id: uuid.UUID
@@ -141,8 +148,15 @@ def build_monthly_installments(
     total_value: Decimal | None = None,
     retention_percentage: Decimal = _ZERO,
 ) -> list[dict]:
-    """Cuotas mensuales iguales. La última absorbe el redondeo para que la
-    suma cuadre exactamente con `total_value` cuando se da (§14)."""
+    """Cuotas mensuales iguales, vencimiento a fin de mes. La última absorbe
+    el redondeo para que la suma cuadre con `total_value` (§14).
+
+    NO es el motor canónico de planes contractuales: no modela el ANTICIPO ni
+    el día de pago. `build_contract_plan` es el único generador que produce un
+    plan contractual completo (ORDEN MAESTRA §41). Esta función se conserva
+    solo como utilidad para construir listas de cuotas iguales en pruebas y
+    para planes CUSTOM armados explícitamente por el caller.
+    """
     monthly_amount = _q(monthly_amount)
     rows: list[dict] = []
     running = _ZERO
@@ -407,6 +421,168 @@ def _status_for(
     if installment.due_date <= _add_months(date(as_of.year, as_of.month, 1), 1) - _one_day():
         return "DUE"
     return "UPCOMING"
+
+
+_KIND_ORDER = {"ADVANCE": 0, "REGULAR": 1, "RETENTION_RELEASE": 2}
+
+
+def schedule_has_active_allocations(db: Session, schedule_id: uuid.UUID) -> bool:
+    """True si alguna cuota del plan tiene un pago aplicado no revertido."""
+    inst_ids = [
+        r[0]
+        for r in db.execute(
+            select(ContractPaymentInstallment.id).where(
+                ContractPaymentInstallment.schedule_id == schedule_id
+            )
+        ).all()
+    ]
+    if not inst_ids:
+        return False
+    return (
+        db.execute(
+            select(ContractPaymentAllocation.id)
+            .where(
+                ContractPaymentAllocation.installment_id.in_(inst_ids),
+                ContractPaymentAllocation.reversed_at.is_(None),
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
+
+
+def _rows_to_snapshot(rows: list[dict]) -> list[dict]:
+    rows = sorted(
+        rows,
+        key=lambda r: (_KIND_ORDER[r["installment_kind"]], r["period_year"], r["period_month"]),
+    )
+    return [
+        {
+            "kind": r["installment_kind"],
+            "periodLabel": (
+                "Anticipo" if r["installment_kind"] == "ADVANCE"
+                else period_label(r["period_year"], r["period_month"])
+            ),
+            "dueDate": r["due_date"].isoformat(),
+            "scheduledAmount": str(_q(r["scheduled_amount"])),
+            "retentionAmount": str(_q(r["retention_amount"])),
+            "netDue": str(_q(r["net_due"])),
+        }
+        for r in rows
+    ]
+
+
+def current_schedule_snapshot(db: Session, schedule_id: uuid.UUID) -> dict:
+    summaries = installment_summaries(db, schedule_id=schedule_id)
+    return {
+        "totalScheduled": str(sum((s.scheduled_amount for s in summaries), _ZERO)),
+        "installments": [
+            {
+                "kind": s.installment_kind,
+                "periodLabel": s.period_label,
+                "dueDate": s.due_date.isoformat(),
+                "scheduledAmount": str(s.scheduled_amount),
+                "retentionAmount": str(s.retention_amount),
+                "netDue": str(s.net_due),
+            }
+            for s in summaries
+        ],
+    }
+
+
+def build_rebuild_rows(
+    db: Session,
+    *,
+    schedule: ContractPaymentSchedule,
+    regular_months: int,
+    first_period: date,
+    due_day: int = 1,
+    advance_amount: Decimal | None = None,
+    advance_due_date: date | None = None,
+    retention_percentage: Decimal | None = None,
+) -> tuple[SupplierContract, list[dict], dict]:
+    """Filas del plan reconstruido con el motor canónico + snapshot AFTER.
+
+    Devuelve `(contract, rows, after_snapshot)`. No persiste nada. Los
+    términos que llegan `None` se toman del contrato."""
+    contract = db.get(SupplierContract, schedule.supplier_contract_id)
+    if contract is None:
+        raise InvalidFinancialReferenceError("El contrato del plan ya no existe.")
+    advance = advance_amount if advance_amount is not None else (contract.advance_amount or _ZERO)
+    retention = (
+        retention_percentage if retention_percentage is not None else contract.retention_percentage
+    )
+    rows = build_contract_plan(
+        contract_value=contract.value,
+        advance_amount=advance,
+        advance_due_date=advance_due_date or contract.advance_due_date,
+        retention_percentage=retention,
+        regular_months=regular_months,
+        due_day=due_day,
+        first_period=first_period,
+    )
+    after = {
+        "totalScheduled": str(sum((_q(r["scheduled_amount"]) for r in rows), _ZERO)),
+        "installments": _rows_to_snapshot(rows),
+    }
+    return contract, rows, after
+
+
+def find_contractual_duplicate_candidates(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    project_id: uuid.UUID,
+    amount: Decimal,
+    tolerance: Decimal = _ZERO,
+) -> list[dict]:
+    """Obligaciones contractuales ABIERTAS del proyecto cuyo importe pendiente
+    o programado coincide (± `tolerance`) con `amount`. Base del guard de §21:
+    un GeneralExpense PROJECT por ese importe probablemente es el pago de esa
+    cuota registrado por fuera del contrato."""
+    tol = _q(tolerance) if tolerance else Decimal("0.01")
+    target = _q(amount)
+    contracts = list(
+        db.execute(
+            select(SupplierContract).where(
+                SupplierContract.company_id == company_id,
+                SupplierContract.project_id == project_id,
+                SupplierContract.status == "ACTIVE",
+            )
+        ).scalars()
+    )
+    out: list[dict] = []
+    for contract in contracts:
+        schedule = db.execute(
+            select(ContractPaymentSchedule).where(
+                ContractPaymentSchedule.supplier_contract_id == contract.id
+            )
+        ).scalar_one_or_none()
+        if schedule is None:
+            continue
+        supplier = db.get(Supplier, contract.supplier_id)
+        for s in installment_summaries(db, schedule_id=schedule.id):
+            if s.status in ("PAID", "CANCELLED"):
+                continue
+            candidates = {s.remaining, s.net_due, s.scheduled_amount}
+            if any(abs(c - target) <= tol for c in candidates):
+                out.append(
+                    {
+                        "contract_id": str(contract.id),
+                        "contract_number": contract.contract_number,
+                        "supplier_name": supplier.legal_name if supplier else None,
+                        "schedule_id": str(schedule.id),
+                        "installment_id": str(s.installment_id),
+                        "installment_kind": s.installment_kind,
+                        "period_label": s.period_label,
+                        "due_date": s.due_date.isoformat(),
+                        "scheduled_amount": str(s.scheduled_amount),
+                        "net_due": str(s.net_due),
+                        "remaining": str(s.remaining),
+                        "status": s.status,
+                    }
+                )
+    return out
 
 
 def installment_summaries(

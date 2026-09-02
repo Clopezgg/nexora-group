@@ -43,6 +43,10 @@ export interface CreateGeneralExpensePayload {
   currencyCode: string
   expenseDate: string
   description: string
+  /** ORDEN MAESTRA §21 — reconocer explícitamente que este gasto NO
+   *  corresponde a una obligación contractual abierta del proyecto. */
+  acknowledgeContractualConflict?: boolean
+  contractualConflictReason?: string
 }
 
 export interface CreateTransferPayload {

@@ -20,14 +20,13 @@ class InstallmentInput(CamelModel):
 class ScheduleCreateRequest(CamelModel):
     supplier_contract_id: uuid.UUID
     schedule_type: str = "MONTHLY"
-    # Modo A: cuotas explícitas.
+    # Modo A: cuotas explícitas (CUSTOM). El caller define cada vencimiento.
     installments: list[InstallmentInput] | None = None
-    # Modo B (legacy): mensual — `months` cuotas iguales desde `start_period`.
-    start_period: date | None = None
-    months: int | None = Field(default=None, ge=1, le=600)
-    monthly_amount: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=2)
-    # Modo C (canónico §16-§20): ANTICIPO + N mensualidades calculadas por el
-    # backend. `regularMonths` mensualidades desde `firstPeriod`, día `dueDay`.
+    # Modo B (canónico §16-§20, §41): ANTICIPO + N mensualidades calculadas por
+    # el ÚNICO motor (`build_contract_plan`). `regularMonths` mensualidades
+    # desde `firstPeriod`, día `dueDay`. El generador legacy por
+    # `startPeriod`/`months`/`monthlyAmount` (vencimientos a fin de mes,
+    # anticipo ignorado) quedó eliminado — ORDEN MAESTRA §41.
     advance_amount: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=2)
     advance_due_date: date | None = None
     regular_months: int | None = Field(default=None, ge=1, le=600)

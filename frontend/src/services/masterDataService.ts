@@ -28,6 +28,7 @@ export interface CompanyProfileInput {
   voucherFooterText?: string
   defaultThemeId?: string
   defaultDensity?: string
+  supplierAdvanceAccountId?: string
 }
 
 export const masterDataService = {

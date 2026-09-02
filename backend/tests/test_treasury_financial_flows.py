@@ -122,6 +122,83 @@ def test_project_immediate_expense_posts_project_dimension(client):
     assert body["projectId"] == project["id"]
 
 
+def _active_contract_with_schedule(client, db_session, company_id, *, amount="207142.85"):
+    supplier = client.post(
+        "/api/procurement/suppliers",
+        json={"companyId": company_id, "legalName": "Contratista Guard"},
+    ).json()
+    project = client.post(
+        "/api/projects",
+        json={"companyId": company_id, "name": "Obra Guard", "code": "PRJ-GUARD", "currencyCode": "HNL"},
+    ).json()
+    contract = client.post(
+        "/api/procurement/suppliers/contracts",
+        json={
+            "companyId": company_id, "supplierId": supplier["id"], "projectId": project["id"],
+            "contractNumber": "GUARD-1", "value": "1500000.00", "currencyCode": "HNL",
+            "startDate": "2026-08-01", "advanceAmount": "50000.00",
+            "advanceDueDate": "2026-08-22", "retentionPercentage": "0",
+        },
+    ).json()
+    client.post(
+        "/api/contract-payments/schedules",
+        json={
+            "supplierContractId": contract["id"], "scheduleType": "MONTHLY",
+            "regularMonths": 7, "dueDay": 1, "firstPeriod": "2026-09-01",
+        },
+    )
+    from app.models.supplier import SupplierContract
+
+    row = db_session.get(SupplierContract, contract["id"])
+    row.status = "ACTIVE"
+    db_session.commit()
+    return project, contract
+
+
+def test_project_general_expense_blocks_when_it_matches_an_open_contract_installment(client, db_session):
+    """ORDEN MAESTRA §21 — el guard contractual: un gasto inmediato PROJECT por
+    el importe de una cuota contractual abierta exige reconocimiento explícito."""
+    login_admin(client)
+    company, bank, equity, _liability, _revenue, expense = _setup_financial_accounts(client)
+    project, _contract = _active_contract_with_schedule(client, db_session, company["id"])
+    client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"], "treasuryAccountId": bank["id"], "counterAccountId": equity["id"],
+            "originType": "CAPITAL_CONTRIBUTION", "sender": "Aporte", "currencyCode": "HNL",
+            "originalAmount": "500000.00", "remittanceDate": "2026-08-27",
+        },
+    )
+    payload = {
+        "companyId": company["id"], "treasuryAccountId": bank["id"], "expenseAccountId": expense["id"],
+        "scope": "PROJECT", "projectId": project["id"], "category": "subcontrato",
+        "amount": "207142.85", "currencyCode": "HNL", "expenseDate": "2026-09-02",
+        "description": "Pago mensualidad por fuera del contrato",
+    }
+
+    blocked = client.post("/api/treasury/general-expenses", json=payload)
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["error"]["code"] == "NXR-CONTRACT-GUARD-001"
+
+    # Reconocimiento sin motivo -> 422
+    no_reason = client.post(
+        "/api/treasury/general-expenses",
+        json={**payload, "acknowledgeContractualConflict": True},
+    )
+    assert no_reason.status_code == 422, no_reason.text
+
+    # Reconocimiento con motivo -> se registra
+    ok = client.post(
+        "/api/treasury/general-expenses",
+        json={
+            **payload,
+            "acknowledgeContractualConflict": True,
+            "contractualConflictReason": "Compra puntual de materiales, no es la cuota del subcontrato",
+        },
+    )
+    assert ok.status_code == 201, ok.text
+
+
 def test_project_immediate_expense_requires_project_id(client):
     login_admin(client)
     company, bank, _equity, _liability, _revenue, expense = _setup_financial_accounts(client)

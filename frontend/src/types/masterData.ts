@@ -19,6 +19,7 @@ export interface Company {
   email?: string | null
   website?: string | null
   voucherFooterText?: string | null
+  supplierAdvanceAccountId?: string | null
 }
 
 export interface Account {

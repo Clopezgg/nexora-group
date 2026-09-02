@@ -54,6 +54,7 @@ from app.domain.errors import (
     NotFoundError,
 )
 from app.integrations.azure_blob import EvidenceStorageNotConfigured
+from app.services.contract_payment_service import ContractualExpenseConflictError
 
 """API error standard (orden maestra §108): {"error": {"code", "message",
 "field", "correlationId"}}. Cubre NXR-ACCOUNTING/NXR-IDEMPOTENCY/NXR-PERM
@@ -75,6 +76,7 @@ _ERROR_CODES: dict[type[Exception], tuple[str, int]] = {
     InvalidInvoiceStateError: ("NXR-AP-001", 409),
     OverpaymentError: ("NXR-AP-002", 422),
     InvalidFinancialReferenceError: ("NXR-FINANCIAL-001", 422),
+    ContractualExpenseConflictError: ("NXR-CONTRACT-GUARD-001", 409),
     InsufficientStockError: ("NXR-INVENTORY-001", 409),
     InvalidProcurementStateError: ("NXR-PROCUREMENT-001", 409),
     ProcurementCurrencyMismatchError: ("NXR-PROCUREMENT-002", 409),

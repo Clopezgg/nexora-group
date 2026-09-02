@@ -13,6 +13,8 @@ from app.schemas.master_data import (
     ResourcePostingConfigResponse,
 )
 from app.services import audit_service, resource_posting_service
+from app.services.financial_validation_service import assert_supplier_advance_account_eligible
+from app.domain.errors import InvalidFinancialReferenceError
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/master-data", tags=["master-data"])
@@ -39,9 +41,17 @@ def update_company_profile(
         "functionalCurrencyCode": company.functional_currency_code,
         "country": company.country,
         "fiscalId": company.fiscal_id,
+        "supplierAdvanceAccountId": str(company.supplier_advance_account_id)
+        if company.supplier_advance_account_id else None,
     }
     values = payload.model_dump(exclude_unset=True)
     try:
+        if payload.supplier_advance_account_id is not None:
+            assert_supplier_advance_account_eligible(
+                db,
+                account_id=payload.supplier_advance_account_id,
+                company_id=company.id,
+            )
         company_repository.update_company(db, company=company, **values)
         audit_service.record(
             db,
@@ -59,12 +69,17 @@ def update_company_profile(
                 "functionalCurrencyCode": company.functional_currency_code,
                 "country": company.country,
                 "fiscalId": company.fiscal_id,
+                "supplierAdvanceAccountId": str(company.supplier_advance_account_id)
+                if company.supplier_advance_account_id else None,
             },
             correlation_id=correlation_id,
         )
         db.commit()
         db.refresh(company)
         return CompanyResponse.model_validate(company, from_attributes=True)
+    except InvalidFinancialReferenceError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc

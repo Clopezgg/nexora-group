@@ -44,6 +44,7 @@ class CompanyUpdateRequest(CamelModel):
     email: str | None = Field(default=None, max_length=255)
     website: str | None = Field(default=None, max_length=255)
     voucher_footer_text: str | None = Field(default=None, max_length=500)
+    supplier_advance_account_id: uuid.UUID | None = None
 
 
 class CompanyResponse(CamelModel):
@@ -67,6 +68,7 @@ class CompanyResponse(CamelModel):
     email: str | None = None
     website: str | None = None
     voucher_footer_text: str | None = None
+    supplier_advance_account_id: uuid.UUID | None = None
 
 
 class AccountCreateRequest(CamelModel):

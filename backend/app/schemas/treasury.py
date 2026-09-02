@@ -74,6 +74,10 @@ class GeneralExpenseCreateRequest(CamelModel):
     currency_code: str
     expense_date: date
     description: str
+    # ORDEN MAESTRA §21 — reconocimiento explícito de que este gasto NO
+    # corresponde a una obligación contractual abierta del proyecto.
+    acknowledge_contractual_conflict: bool = False
+    contractual_conflict_reason: str | None = Field(default=None, max_length=500)
 
 
 class GeneralExpenseResponse(CamelModel):

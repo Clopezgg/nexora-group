@@ -414,6 +414,7 @@ def get_budget_summary(
         accrued=summary.accrued,
         paid=summary.paid,
         available=summary.available,
+        advances=summary.advances,
     )
 
 

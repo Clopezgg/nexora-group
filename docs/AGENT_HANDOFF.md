@@ -924,3 +924,45 @@ GitHub no asignó ejecución efectiva. No fusionar, desplegar ni limpiar ramas
 hasta resolver Billing/spending limit y re-ejecutar el run. Después: corregir
 cualquier fallo real, fusionar PR #24, certificar CI/deploy del SHA de main,
 smoke productivo y solo entonces limpiar ramas con `ahead_by=0`.
+
+## 2026-09-01 — ORDEN MAESTRA DE CONTINUACIÓN (rama `fix/nexora-integrated-business-logic`)
+
+Continuación del trabajo de Codex (`b9939f9`, conservado íntegro: la
+obligación de anticipo queda DRAFT + SoD, `companies.supplier_advance_account_id`).
+Base `main@cd44ddc`. Baseline verificado 546 pytest. Slices añadidos:
+
+- `36158ab` §4-6 — `backend/scripts/financial_event_inspect.py`: inspector
+  forense de SOLO LECTURA por company/proyecto/monto/fechas/nº documento/nº
+  contrato/referencia bancaria. Reconstruye contrato→plan→cuota→factura→pago
+  →GL→tesorería→voucher→evidencia→auditoría. Heurística: posible doble conteo
+  GeneralExpense+SupplierInvoice, y facturas con débito ASSET (prepago) que no
+  son costo real.
+- `749e96b` §13/§15 — las facturas de anticipo (débito a cuenta ASSET) dejan
+  de contar como `accrued` del presupuesto del proyecto; nuevo
+  `project_advance_total` y campo `advances` en `BudgetSummary` + API + UI.
+- `2ae8cd3` §21 — guard contractual: un GeneralExpense PROJECT que coincide
+  con una cuota contractual abierta → HTTP 409 `NXR-CONTRACT-GUARD-001` salvo
+  reconocimiento explícito con motivo (auditado). `ApiError.code` en el
+  cliente; UI de advertencia en el modal de gasto de Tesorería.
+- `b614823` §41 — se elimina el generador legacy de plan
+  (`startPeriod`/`months`/`monthlyAmount`, vencimientos a fin de mes, anticipo
+  ignorado). Único motor mensual: `build_contract_plan`.
+- `eda3aba` §9/§10 — `POST /contract-payments/schedules/{id}/rebuild/preview`
+  (ANTES/DESPUÉS sin persistir, flag `blocked`); UI "Corregir plan de pagos"
+  con previsualización, motivo obligatorio y aplicar.
+- `6752488` §36/§37/§40 — `test_advance_reconciliation.py`: cadena completa
+  del anticipo + reversión; Tesorería −50k exactamente una vez y restaurada,
+  subledger↔GL cuadra, presupuesto reporta `advances` no `accrued`, costo real
+  del proyecto 0.
+
+PENDIENTE (documentado, no oculto):
+- §16-§17 doble conteo de compromiso presupuestario: requiere enlace de
+  esquema PurchaseOrder↔SupplierContract y SupplierInvoice↔PurchaseOrder que
+  hoy no existe — diseño + migración propios.
+- §18-§19 semántica de Project Home (ingreso contratado vs costo de ejecución,
+  estados sin presupuesto).
+- §44 auditoría visual completa.
+- §4/§55 causa real de los L50,000 y reparación de datos de 10101960:
+  necesitan la base de datos productiva (mismo bloqueo que Codex). La
+  herramienta forense y el motor de rebuild quedan listos y probados.
+- §52 Deploy Azure: requiere confirmación puntual del usuario (CLAUDE.md §11).

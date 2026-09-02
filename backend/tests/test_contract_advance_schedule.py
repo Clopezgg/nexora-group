@@ -13,6 +13,8 @@ import pytest
 
 from app.services import contract_payment_service as cps
 from app.services.contract_payment_service import build_contract_plan
+from app.models.ap import SupplierInvoice
+from app.models.company import Company
 from tests.helpers import (
     create_account,
     create_company,
@@ -255,3 +257,39 @@ def test_advance_payment_fail_closed_without_advance_account(client):
     )
     assert r.status_code == 422, r.text
     assert "cuenta contable para anticipos" in r.text
+
+
+def test_prepare_advance_invoice_does_not_autoapprove_creator(client, db_session):
+    """Crear la obligación no concede aprobación implícita (§9 SoD)."""
+    login_admin(client)
+    company = create_company(client, name="Advance SoD Co")
+    supplier = create_supplier(client, company_id=company["id"])
+    contract = _contract_10101960(client, company["id"], supplier["id"])
+    schedule = _create_schedule(client, contract["id"]).json()
+    advance_asset = create_account(
+        client,
+        company_id=company["id"],
+        code="1610",
+        name="Anticipos a contratistas",
+        account_type="ASSET",
+    )
+    payable = create_account(
+        client,
+        company_id=company["id"],
+        code="2110",
+        name="Cuentas por pagar",
+        account_type="LIABILITY",
+    )
+    company_row = db_session.get(Company, company["id"])
+    company_row.supplier_advance_account_id = advance_asset["id"]
+    db_session.commit()
+
+    response = client.post(
+        f"/api/contract-payments/schedules/{schedule['id']}/advance-invoice",
+        json={"payableAccountId": payable["id"]},
+    )
+
+    assert response.status_code == 201, response.text
+    invoice = db_session.get(SupplierInvoice, response.json()["invoiceId"])
+    assert invoice.status == "DRAFT"
+    assert invoice.accrual_document_id is None

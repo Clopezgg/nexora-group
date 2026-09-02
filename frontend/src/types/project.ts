@@ -146,6 +146,9 @@ export interface BudgetSummary {
   accrued: string
   paid: string
   available: string
+  /** Anticipos/prepagos contractuales (débito a cuenta ASSET). No son costo
+   *  reconocido ni consumen el presupuesto disponible (ORDEN MAESTRA §15). */
+  advances?: string
 }
 
 export interface Forecast {

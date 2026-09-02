@@ -50,6 +50,36 @@ export interface ContractPaymentSummary {
   retentionOutstanding: string
 }
 
+export interface SchedulePlanSnapshotRow {
+  kind: ContractInstallmentKind
+  periodLabel: string
+  dueDate: string
+  scheduledAmount: string
+  retentionAmount: string
+  netDue: string
+}
+
+export interface SchedulePlanSnapshot {
+  totalScheduled: string
+  installments: SchedulePlanSnapshotRow[]
+}
+
+export interface SchedulePreview {
+  blocked: boolean
+  blockedReason: string | null
+  before: SchedulePlanSnapshot
+  after: SchedulePlanSnapshot | null
+}
+
+export interface RebuildTerms {
+  regularMonths: number
+  dueDay: number
+  firstPeriod: string
+  advanceAmount?: string
+  advanceDueDate?: string
+  retentionPercentage?: string
+}
+
 export interface FifoPreviewItem {
   installmentId: string
   periodLabel: string
@@ -95,17 +125,6 @@ export const contractPaymentService = {
   getByContract: (contractId: string) =>
     apiFetch<ContractSchedule>(`/contract-payments/by-contract/${encodeURIComponent(contractId)}`),
 
-  createMonthlySchedule: (body: {
-    supplierContractId: string
-    startPeriod: string
-    months: number
-    monthlyAmount: string
-  }) =>
-    apiFetch<ContractSchedule>('/contract-payments/schedules', {
-      method: 'POST',
-      body: JSON.stringify({ scheduleType: 'MONTHLY', ...body }),
-    }),
-
   // Modo canónico (§16-§20): el backend calcula el anticipo + N mensualidades.
   createContractPlan: (body: {
     supplierContractId: string
@@ -120,18 +139,14 @@ export const contractPaymentService = {
       body: JSON.stringify({ scheduleType: 'MONTHLY', ...body }),
     }),
 
-  rebuildPlan: (
-    scheduleId: string,
-    body: {
-      reason: string
-      regularMonths: number
-      dueDay: number
-      firstPeriod: string
-      advanceAmount?: string
-      advanceDueDate?: string
-      retentionPercentage?: string
-    },
-  ) =>
+  // §10 — previsualiza ANTES/DESPUÉS de una corrección del plan sin persistir.
+  previewRebuild: (scheduleId: string, terms: RebuildTerms) =>
+    apiFetch<SchedulePreview>(
+      `/contract-payments/schedules/${encodeURIComponent(scheduleId)}/rebuild/preview`,
+      { method: 'POST', body: JSON.stringify(terms) },
+    ),
+
+  rebuildPlan: (scheduleId: string, body: RebuildTerms & { reason: string }) =>
     apiFetch<ContractSchedule>(
       `/contract-payments/schedules/${encodeURIComponent(scheduleId)}/rebuild`,
       { method: 'POST', body: JSON.stringify(body) },

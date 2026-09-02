@@ -28,6 +28,10 @@ import { ThemeSettingsCard } from './ThemeSettingsCard'
 
 function CompanyProfileForm({ company }: { company: Company }) {
   const queryClient = useQueryClient()
+  const advanceAccountsQuery = useQuery({
+    queryKey: ['master-data', 'accounts', company.id, 'supplier-advance'],
+    queryFn: () => masterDataService.listAccounts(company.id),
+  })
   const [form, setForm] = useState({
     name: company.name,
     code: company.code ?? '',
@@ -46,6 +50,7 @@ function CompanyProfileForm({ company }: { company: Company }) {
     email: company.email ?? '',
     website: company.website ?? '',
     voucherFooterText: company.voucherFooterText ?? '',
+    supplierAdvanceAccountId: company.supplierAdvanceAccountId ?? '',
   })
 
   const updateMutation = useMutation({
@@ -67,6 +72,7 @@ function CompanyProfileForm({ company }: { company: Company }) {
       email: form.email || undefined,
       website: form.website || undefined,
       voucherFooterText: form.voucherFooterText || undefined,
+      supplierAdvanceAccountId: form.supplierAdvanceAccountId || undefined,
     }),
     onSuccess: (updatedCompany: Company) => {
       queryClient.invalidateQueries({ queryKey: ['master-data', 'companies'] })
@@ -88,6 +94,7 @@ function CompanyProfileForm({ company }: { company: Company }) {
         email: updatedCompany.email ?? '',
         website: updatedCompany.website ?? '',
         voucherFooterText: updatedCompany.voucherFooterText ?? '',
+        supplierAdvanceAccountId: updatedCompany.supplierAdvanceAccountId ?? '',
       })
     },
   })
@@ -115,6 +122,21 @@ function CompanyProfileForm({ company }: { company: Company }) {
         value={form.voucherApproverName}
         onChange={(event) => setForm({ ...form, voucherApproverName: event.target.value })}
       />
+      <Select
+        label="Cuenta de anticipos a proveedores"
+        value={form.supplierAdvanceAccountId}
+        onChange={(event) => setForm({ ...form, supplierAdvanceAccountId: event.target.value })}
+      >
+        <option value="">Sin configurar · los anticipos no pueden registrarse</option>
+        {(advanceAccountsQuery.data ?? [])
+          .filter((account) => account.accountType === 'ASSET' && account.isPostable)
+          .map((account) => (
+            <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+          ))}
+      </Select>
+      <p className="nx-field__hint">
+        Los anticipos se contabilizan como activo hasta su aplicación; no son gasto al pagarse.
+      </p>
 
       <fieldset style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
         <legend className="nx-field__label">Documentos · datos impresos en el comprobante</legend>

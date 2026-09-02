@@ -46,6 +46,23 @@ def assert_account_belongs_to_company(
     return account
 
 
+def assert_supplier_advance_account_eligible(
+    db: Session, *, account_id: uuid.UUID, company_id: uuid.UUID
+) -> Account:
+    """La cuenta de anticipos es un activo postable de la misma compañía."""
+    account = assert_account_belongs_to_company(
+        db,
+        account_id=account_id,
+        company_id=company_id,
+        field_name="supplier_advance_account_id",
+    )
+    if account.account_type != "ASSET":
+        raise InvalidFinancialReferenceError(
+            "supplier_advance_account_id debe ser una cuenta ASSET postable"
+        )
+    return account
+
+
 def assert_project_belongs_to_company(
     db: Session, *, project_id: uuid.UUID | None, company_id: uuid.UUID
 ) -> Project | None:

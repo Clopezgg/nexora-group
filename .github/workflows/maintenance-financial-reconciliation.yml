@@ -13,9 +13,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "inspect | preview | apply"
+        description: "inspect | preview | apply | reconcile-advance-preview | reconcile-advance-apply"
         type: choice
-        options: ["inspect", "preview", "apply"]
+        options:
+          - "inspect"
+          - "preview"
+          - "apply"
+          - "reconcile-advance-preview"
+          - "reconcile-advance-apply"
         default: "inspect"
         required: true
       contract_number:
@@ -71,6 +76,18 @@ on:
         description: "preview/apply: primer período YYYY-MM"
         type: string
         required: false
+      general_expense_number:
+        description: "reconcile-advance: nº de asiento del GeneralExpense duplicado (p.ej. GGE-2026-000001)"
+        type: string
+        required: false
+      invoice_number:
+        description: "reconcile-advance: nº de la SupplierInvoice duplicada (p.ej. 2020485218)"
+        type: string
+        required: false
+      advance_account_code:
+        description: "reconcile-advance: código de la cuenta ASSET de anticipos, si no está configurada"
+        type: string
+        required: false
       confirm_apply:
         description: "Escribe exactamente APPLY para autorizar mode=apply"
         type: string
@@ -102,21 +119,24 @@ jobs:
         run: |
           set -euo pipefail
           MODE="${{ inputs.mode }}"
-          if [ "$MODE" = "apply" ]; then
-            if [ "${{ inputs.confirm_apply }}" != "APPLY" ]; then
-              echo "::error::mode=apply requiere confirm_apply=APPLY"
-              exit 1
-            fi
-            REASON='${{ inputs.reason }}'
-            if [ "${#REASON}" -lt 15 ]; then
-              echo "::error::mode=apply requiere un reason de al menos 15 caracteres"
-              exit 1
-            fi
-          fi
-          if { [ "$MODE" = "preview" ] || [ "$MODE" = "apply" ]; } && [ -z "${{ inputs.contract_number }}" ]; then
-            echo "::error::preview/apply requieren contract_number"
-            exit 1
-          fi
+          case "$MODE" in
+            apply|reconcile-advance-apply)
+              if [ "${{ inputs.confirm_apply }}" != "APPLY" ]; then
+                echo "::error::$MODE requiere confirm_apply=APPLY"; exit 1
+              fi
+              REASON='${{ inputs.reason }}'
+              if [ "${#REASON}" -lt 15 ]; then
+                echo "::error::$MODE requiere un reason de al menos 15 caracteres"; exit 1
+              fi
+              ;;
+          esac
+          case "$MODE" in
+            preview|apply)
+              [ -n "${{ inputs.contract_number }}" ] || { echo "::error::$MODE requiere contract_number"; exit 1; } ;;
+            reconcile-advance-preview|reconcile-advance-apply)
+              [ -n "${{ inputs.contract_number }}" ] && [ -n "${{ inputs.general_expense_number }}" ] && [ -n "${{ inputs.invoice_number }}" ] \
+                || { echo "::error::$MODE requiere contract_number + general_expense_number + invoice_number"; exit 1; } ;;
+          esac
 
       - uses: actions/setup-python@v6
         with:
@@ -164,9 +184,13 @@ jobs:
           [ -n "${{ inputs.regular_months }}" ]  && ARGS+=(--regular-months "${{ inputs.regular_months }}")
           [ -n "${{ inputs.due_day }}" ]         && ARGS+=(--due-day "${{ inputs.due_day }}")
           [ -n "${{ inputs.first_period }}" ]    && ARGS+=(--first-period "${{ inputs.first_period }}")
-          if [ "${{ inputs.mode }}" = "apply" ]; then
-            ARGS+=(--confirm "${{ inputs.confirm_apply }}" --reason '${{ inputs.reason }}')
-          fi
+          [ -n "${{ inputs.general_expense_number }}" ] && ARGS+=(--general-expense-number "${{ inputs.general_expense_number }}")
+          [ -n "${{ inputs.invoice_number }}" ]  && ARGS+=(--invoice-number "${{ inputs.invoice_number }}")
+          [ -n "${{ inputs.advance_account_code }}" ] && ARGS+=(--advance-account-code "${{ inputs.advance_account_code }}")
+          case "${{ inputs.mode }}" in
+            apply|reconcile-advance-apply)
+              ARGS+=(--confirm "${{ inputs.confirm_apply }}" --reason '${{ inputs.reason }}') ;;
+          esac
 
           python -m scripts.financial_reconciliation "${ARGS[@]}" | tee "$RUNNER_TEMP/reconciliation-report.txt"
 

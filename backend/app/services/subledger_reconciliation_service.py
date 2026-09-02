@@ -20,7 +20,7 @@ from app.models.contract_payment import (
     ContractPaymentInstallment,
     ContractPaymentSchedule,
 )
-from app.models.treasury import TreasuryAccount
+from app.models.treasury import GeneralExpense, TreasuryAccount
 from app.services import treasury_service
 
 _AP_OPEN = ("APPROVED", "SCHEDULED", "PARTIALLY_PAID")
@@ -156,8 +156,23 @@ def _contract(db: Session, company_id) -> ReconciliationLine:
         )
     ).scalar_one()
 
+    # ORDEN MAESTRA DE CIERRE §7 — un anticipo cuya salida de caja se registró
+    # como GeneralExpense y se asignó a la cuota ADVANCE también es efectivo
+    # que liquidó una obligación contractual.
+    gge_total = db.execute(
+        select(func.coalesce(func.sum(GeneralExpense.amount), 0)).where(
+            GeneralExpense.company_id == company_id,
+            GeneralExpense.id.in_(
+                select(ContractPaymentAllocation.general_expense_id).where(
+                    ContractPaymentAllocation.general_expense_id.is_not(None),
+                    ContractPaymentAllocation.reversed_at.is_(None),
+                )
+            ),
+        )
+    ).scalar_one()
+
     subledger_total = Decimal(str(subledger_total))
-    gl_total = Decimal(str(gl_total))
+    gl_total = Decimal(str(gl_total)) + Decimal(str(gge_total))
     difference = subledger_total - gl_total
     return ReconciliationLine(
         subledger="CONTRACT_PAYMENTS",

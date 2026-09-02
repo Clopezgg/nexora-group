@@ -153,7 +153,7 @@ export function TransactionInspectorPage() {
             <option value="">Selecciona un asiento…</option>
             {(documentsQuery.data ?? []).map((document) => (
               <option key={document.id} value={document.id}>
-                {document.documentNumber} — {document.description ?? document.scope} — {statusLabel(document.status)}
+                {document.documentNumber} · {document.scope} · {statusLabel(document.status)}
               </option>
             ))}
           </Select>
@@ -201,15 +201,18 @@ export function TransactionInspectorPage() {
                   <div>
                     <dt>Este asiento revierte</dt>
                     <dd>
-                      <Link to="/finanzas/contabilidad">Documento {inspection.reversesDocumentId}</Link>
+                      <Link to="/finanzas/contabilidad">Ver el documento original revertido</Link>
                       {inspection.reversalReason ? ` · Motivo: ${inspection.reversalReason}` : ''}
                     </dd>
                   </div>
                 ) : null}
                 {inspection.reversedByDocumentIds.length > 0 ? (
                   <div>
-                    <dt>Este asiento fue revertido por</dt>
-                    <dd>{inspection.reversedByDocumentIds.join(', ')}</dd>
+                    <dt>Este asiento fue revertido</dt>
+                    <dd>
+                      Sí — {inspection.reversedByDocumentIds.length}{' '}
+                      {inspection.reversedByDocumentIds.length === 1 ? 'asiento de reversión' : 'asientos de reversión'}
+                    </dd>
                   </div>
                 ) : null}
                 {inspection.evidence.length > 0 ? (

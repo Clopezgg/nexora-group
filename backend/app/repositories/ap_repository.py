@@ -78,12 +78,51 @@ def project_accrued_total(db: Session, *, company_id: uuid.UUID, project_id: uui
 
 
 def project_advance_total(db: Session, *, company_id: uuid.UUID, project_id: uuid.UUID) -> Decimal:
-    """Accrued PROJECT AP advances/prepayments (ASSET debit). ORDEN MAESTRA
-    §15: reported separately from actual project cost — never consumes the
-    project's budget as if it were recognised cost."""
-    return _project_invoice_total_by_account_type(
-        db, company_id=company_id, project_id=project_id, include_types=("ASSET",)
+    """PROJECT advances / prepayments (ASSET). ORDEN MAESTRA §15/§23: reported
+    separately from recognised cost — never consumes the project's budget.
+
+    Fuente de verdad: el saldo GL (débito − crédito) de la cuenta de anticipos
+    configurada de la compañía para este proyecto — cubre tanto el accrual de
+    una factura ASSET como una reclasificación contable (§7). Más las facturas
+    ASSET devengadas cuyo débito NO es esa cuenta (para no doble contar)."""
+    from app.models.accounting import LEDGER_EFFECTIVE_STATUSES, AccountingDocument, JournalLine
+
+    company = db.get(Company, company_id)
+    if company is None:
+        raise NotFoundError(f"Company {company_id} no existe")
+
+    gl_advance = Decimal("0")
+    if company.supplier_advance_account_id is not None:
+        gl_advance = Decimal(
+            db.execute(
+                select(
+                    func.coalesce(func.sum(JournalLine.debit_amount - JournalLine.credit_amount), 0)
+                )
+                .join(AccountingDocument, AccountingDocument.id == JournalLine.accounting_document_id)
+                .where(
+                    JournalLine.account_id == company.supplier_advance_account_id,
+                    JournalLine.project_id == project_id,
+                    AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
+                )
+            ).scalar_one()
+        )
+
+    other_asset_invoices = Decimal(
+        db.execute(
+            select(func.coalesce(func.sum(SupplierInvoice.amount + SupplierInvoice.tax_amount), 0))
+            .join(Account, Account.id == SupplierInvoice.expense_account_id)
+            .where(
+                SupplierInvoice.company_id == company_id,
+                SupplierInvoice.project_id == project_id,
+                SupplierInvoice.status.in_(ACCRUED_STATUSES),
+                Account.account_type == "ASSET",
+                SupplierInvoice.expense_account_id != company.supplier_advance_account_id
+                if company.supplier_advance_account_id is not None
+                else True,
+            )
+        ).scalar_one()
     )
+    return gl_advance + other_asset_invoices
 
 
 def project_paid_total(db: Session, *, company_id: uuid.UUID, project_id: uuid.UUID) -> Decimal:

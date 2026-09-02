@@ -77,6 +77,10 @@ class SupplierInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     supplier_contract_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("supplier_contracts.id", ondelete="RESTRICT"), nullable=True
     )
+    # ORDEN MAESTRA §19/§21 — la factura releva (drawdown) una PurchaseOrder.
+    purchase_order_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("purchase_orders.id", ondelete="RESTRICT"), nullable=True
+    )
 
 
 class SupplierPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):

@@ -16,7 +16,7 @@ from app.models.contract_payment import (
 from app.models.crm import SalesContract
 from app.models.supplier import SupplierContract
 from app.repositories import budget_repository, project_control_repository, project_repository
-from app.services import budget_service, forecast_service
+from app.services import budget_service, commitment_service, forecast_service
 
 
 @dataclass
@@ -32,12 +32,19 @@ class ProjectFinancialSummary:
     # (`committed`, que sale del budget/PO). Nunca deben mezclarse ni renombrar
     # uno como el otro.
     po_committed: Decimal
+    # ORDEN MAESTRA §20-§21 — compromiso ABIERTO (compromiso total relevado por
+    # lo ya devengado). `committed` es el total canónico sin doble contar las
+    # PO que desglosan un contrato.
+    open_commitment: Decimal
     execution_contract_value: Decimal
     execution_contract_paid: Decimal
     execution_contract_balance: Decimal
     accrued: Decimal
     paid: Decimal
     available: Decimal | None
+    # §26/§52 — cuando NO hay baseline de presupuesto: exposición sin
+    # presupuesto (compromiso abierto + costo devengado). Con baseline es None.
+    unbudgeted_exposure: Decimal | None
     invoiced: Decimal
     collected: Decimal
     receivables_outstanding: Decimal
@@ -173,7 +180,15 @@ def get_summary(db: Session, *, project_id: uuid.UUID) -> ProjectFinancialSummar
             actual_margin_percent = (actual_profit / recognized_revenue) * Decimal("100")
 
     currency_code = project.currency_code or "HNL"
+    commitment = commitment_service.compute_breakdown(
+        db, company_id=project.company_id, project_id=project_id
+    )
     available = budget_summary.available if active_budget is not None else None
+    unbudgeted_exposure = (
+        None
+        if active_budget is not None
+        else commitment.open_commitment + max(actual_cost, budget_summary.accrued)
+    )
 
     return ProjectFinancialSummary(
         project_id=project.id,
@@ -181,14 +196,16 @@ def get_summary(db: Session, *, project_id: uuid.UUID) -> ProjectFinancialSummar
         contract_value=contract_value,
         baseline_budget=baseline_budget,
         current_budget=current_budget,
-        committed=budget_summary.committed,
-        po_committed=budget_summary.committed,
+        committed=commitment.total_commitment,
+        po_committed=commitment.standalone_po_commitment + commitment.po_under_contract,
+        open_commitment=commitment.open_commitment,
         execution_contract_value=execution_contract_value,
         execution_contract_paid=execution_contract_paid,
         execution_contract_balance=execution_contract_balance,
         accrued=budget_summary.accrued,
         paid=budget_summary.paid,
         available=available,
+        unbudgeted_exposure=unbudgeted_exposure,
         invoiced=invoiced,
         collected=collected,
         receivables_outstanding=invoiced - collected,

@@ -189,6 +189,7 @@ def create_purchase_order(
     supplier_quotation_id: uuid.UUID | None,
     currency_code: str,
     lines: list[dict],
+    supplier_contract_id: uuid.UUID | None = None,
 ) -> PurchaseOrder:
     order = PurchaseOrder(
         company_id=company_id,
@@ -196,6 +197,7 @@ def create_purchase_order(
         supplier_id=supplier_id,
         project_id=project_id,
         supplier_quotation_id=supplier_quotation_id,
+        supplier_contract_id=supplier_contract_id,
         currency_code=currency_code,
         status="DRAFT",
     )
@@ -230,8 +232,15 @@ def list_purchase_order_lines(db: Session, po_id: uuid.UUID) -> list[PurchaseOrd
     return list(db.execute(stmt).scalars())
 
 
+PO_COMMITMENT_STATUSES = ("APPROVED", "SENT", "PARTIALLY_RECEIVED", "RECEIVED")
+
+
 def project_commitment_total(
-    db: Session, *, company_id: uuid.UUID, project_id: uuid.UUID
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    project_id: uuid.UUID,
+    under_contract: bool | None = None,
 ) -> Decimal:
     """Documentary commitments for Budget/Project Control.
 
@@ -240,8 +249,14 @@ def project_commitment_total(
     and currency remains grouped until every row is validated against the
     company's functional currency; nominal amounts are never combined across
     currencies or leaked across project summaries.
+
+    ORDEN MAESTRA §20 — ``under_contract`` filters:
+      * ``None``  : every approved PO of the project (legacy behaviour).
+      * ``False`` : only POs NOT linked to a SupplierContract — these are the
+        commitments that add ON TOP of contract commitments.
+      * ``True``  : only POs that ARE a drawdown of a SupplierContract.
     """
-    commitment_statuses = ("APPROVED", "SENT", "PARTIALLY_RECEIVED", "RECEIVED")
+    commitment_statuses = PO_COMMITMENT_STATUSES
     company = db.get(Company, company_id)
     if company is None:
         raise NotFoundError(f"Company {company_id} no existe")
@@ -256,6 +271,10 @@ def project_commitment_total(
         )
         .group_by(PurchaseOrder.currency_code)
     )
+    if under_contract is True:
+        stmt = stmt.where(PurchaseOrder.supplier_contract_id.is_not(None))
+    elif under_contract is False:
+        stmt = stmt.where(PurchaseOrder.supplier_contract_id.is_(None))
     commitment = Decimal("0")
     for currency_code, nominal_total in db.execute(stmt):
         if company.functional_currency_code is None:

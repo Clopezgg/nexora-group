@@ -142,6 +142,11 @@ class PurchaseOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     supplier_quotation_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("supplier_quotations.id", ondelete="RESTRICT"), nullable=True
     )
+    # ORDEN MAESTRA §19-§20 — cuando la PO deriva de un contrato de ejecución
+    # es un DESGLOSE del compromiso contractual, nunca un compromiso adicional.
+    supplier_contract_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("supplier_contracts.id", ondelete="RESTRICT"), nullable=True
+    )
     currency_code: Mapped[str] = mapped_column(String(3), ForeignKey("currencies.code"), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="DRAFT")
 

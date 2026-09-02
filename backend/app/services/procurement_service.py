@@ -209,6 +209,42 @@ def create_purchase_order_from_quotation(
     return order
 
 
+def _assert_contract_coherent_with_po(
+    db: Session,
+    *,
+    supplier_contract_id: uuid.UUID | None,
+    company_id: uuid.UUID,
+    supplier_id: uuid.UUID,
+    project_id: uuid.UUID | None,
+    currency_code: str,
+) -> None:
+    """ORDEN MAESTRA §19 — una PO ligada a un contrato debe coincidir en
+    compañía, proveedor, proyecto y moneda con ese contrato."""
+    if supplier_contract_id is None:
+        return
+    from app.models.supplier import SupplierContract
+
+    contract = db.get(SupplierContract, supplier_contract_id)
+    if contract is None or contract.company_id != company_id:
+        raise InvalidFinancialReferenceError(
+            "supplier_contract_id no existe o pertenece a otra compañía"
+        )
+    if contract.status in ("CANCELLED", "TERMINATED", "REJECTED"):
+        raise InvalidFinancialReferenceError(
+            f"El contrato {contract.contract_number} está {contract.status}; no admite nuevas órdenes"
+        )
+    if contract.supplier_id != supplier_id:
+        raise InvalidFinancialReferenceError("El contrato pertenece a otro proveedor")
+    if contract.project_id is not None and contract.project_id != project_id:
+        raise InvalidFinancialReferenceError(
+            "El proyecto de la orden no coincide con el del contrato"
+        )
+    if contract.currency_code != currency_code:
+        raise InvalidFinancialReferenceError(
+            "La moneda de la orden no coincide con la del contrato"
+        )
+
+
 def create_purchase_order(
     db: Session,
     *,
@@ -217,9 +253,18 @@ def create_purchase_order(
     project_id: uuid.UUID | None,
     currency_code: str,
     lines: list[dict],
+    supplier_contract_id: uuid.UUID | None = None,
     commit: bool = True,
 ) -> PurchaseOrder:
     """PO directa sin pasar por RFQ/cotización (compras menores)."""
+    _assert_contract_coherent_with_po(
+        db,
+        supplier_contract_id=supplier_contract_id,
+        company_id=company_id,
+        supplier_id=supplier_id,
+        project_id=project_id,
+        currency_code=currency_code,
+    )
     number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="PO")
     order = procurement_repository.create_purchase_order(
         db,
@@ -230,6 +275,7 @@ def create_purchase_order(
         supplier_quotation_id=None,
         currency_code=currency_code,
         lines=lines,
+        supplier_contract_id=supplier_contract_id,
     )
     if commit:
         db.commit()

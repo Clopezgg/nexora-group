@@ -14,10 +14,10 @@ from app.models.company import Company
 from app.repositories import (
     ap_repository,
     budget_repository,
-    procurement_repository,
     project_control_repository,
     project_repository,
 )
+from app.services import commitment_service
 
 """Budget / Controlling (orden maestra §40-41, docs/BUDGET_CONTROLLING.md).
 
@@ -52,6 +52,8 @@ class BudgetLineInput:
 @dataclass
 class BudgetSummary:
     authorized: Decimal
+    # `committed` es el compromiso TOTAL canónico (contrato + PO independiente),
+    # sin doble contar las PO que desglosan un contrato (§20).
     committed: Decimal
     accrued: Decimal
     paid: Decimal
@@ -60,6 +62,11 @@ class BudgetSummary:
     # Reported alongside, never folded into `accrued` nor deducted from
     # `available` as recognised cost.
     advances: Decimal = Decimal("0")
+    # ORDEN MAESTRA §20-§21 — desglose del compromiso.
+    contract_commitment: Decimal = Decimal("0")
+    standalone_po_commitment: Decimal = Decimal("0")
+    po_under_contract: Decimal = Decimal("0")
+    open_commitment: Decimal = Decimal("0")
 
 
 def create_baseline(
@@ -187,7 +194,7 @@ def compute_summary(db: Session, *, project_id: uuid.UUID) -> BudgetSummary:
     project = project_repository.get_by_id(db, project_id)
     if project is None:
         raise ValueError(f"Project {project_id} no existe")
-    committed = procurement_repository.project_commitment_total(
+    commitment = commitment_service.compute_breakdown(
         db, company_id=project.company_id, project_id=project_id
     )
     accrued = ap_repository.project_accrued_total(
@@ -199,12 +206,19 @@ def compute_summary(db: Session, *, project_id: uuid.UUID) -> BudgetSummary:
     paid = ap_repository.project_paid_total(
         db, company_id=project.company_id, project_id=project_id
     )
-    available = authorized - committed - accrued
+    # ORDEN MAESTRA §21/§22 — el disponible descuenta el compromiso ABIERTO
+    # (relevado por lo ya devengado) más el costo devengado. El pago no vuelve
+    # a consumir presupuesto.
+    available = authorized - commitment.open_commitment - accrued
     return BudgetSummary(
         authorized=authorized,
-        committed=committed,
+        committed=commitment.total_commitment,
         accrued=accrued,
         paid=paid,
         available=available,
         advances=advances,
+        contract_commitment=commitment.contract_commitment,
+        standalone_po_commitment=commitment.standalone_po_commitment,
+        po_under_contract=commitment.po_under_contract,
+        open_commitment=commitment.open_commitment,
     )

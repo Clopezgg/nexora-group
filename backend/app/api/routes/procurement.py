@@ -379,6 +379,7 @@ def create_purchase_order(
         company_id=payload.company_id,
         supplier_id=payload.supplier_id,
         project_id=payload.project_id,
+        supplier_contract_id=payload.supplier_contract_id,
         currency_code=payload.currency_code,
         lines=[line.model_dump() for line in payload.lines],
         commit=False,

@@ -49,7 +49,29 @@ export interface Inspection {
   evidence: Array<{ id: string; originalFilename: string; mimeType: string; sizeBytes: number }>
 }
 
+export interface DocumentLookupHit {
+  domain: string
+  entityType: string
+  id: string
+  number: string
+  label: string
+  status: string | null
+  amount: string | null
+  currencyCode: string | null
+  party: string | null
+  projectId: string | null
+  accountingDocumentId: string | null
+  exact: boolean
+  allowedActions: string[]
+}
+
 export const transactionInspectorService = {
+  /** Centro de Control por Número de Documento (§31/§32). */
+  lookup: (q: string) =>
+    apiFetch<{ query: string; results: DocumentLookupHit[] }>(
+      `/accounting/documents/lookup?q=${encodeURIComponent(q)}`,
+    ),
+
   /** Todos los asientos de la compañía — el inspector puede analizar
    * cualquier documento contable, no solo los egresos de tesorería. */
   listDocuments: (companyId: string) =>

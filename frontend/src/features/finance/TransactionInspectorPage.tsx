@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   Badge,
+  Button,
   Card,
   CompanySelector,
   EmptyState,
   ErrorState,
+  Input,
   LoadingState,
   Select,
   Table,
@@ -27,6 +29,10 @@ export function TransactionInspectorPage() {
   const currency = activeCompany?.functionalCurrencyCode ?? undefined
   const [searchParams] = useSearchParams()
   const [documentId, setDocumentId] = useState(searchParams.get('documentId') ?? '')
+  const [lookupInput, setLookupInput] = useState(searchParams.get('q') ?? '')
+  const lookupMutation = useMutation({
+    mutationFn: (q: string) => transactionInspectorService.lookup(q),
+  })
 
   const documentsQuery = useQuery({
     queryKey: ['accounting', 'journal-documents', activeCompanyId],
@@ -78,6 +84,66 @@ export function TransactionInspectorPage() {
           }}
         />
       </header>
+
+      <Card title="Buscar por número de documento">
+        <form
+          className="nx-treasury__actions"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (lookupInput.trim()) lookupMutation.mutate(lookupInput.trim())
+          }}
+        >
+          <Input
+            label="Número de factura, contrato, orden, comprobante o referencia bancaria"
+            value={lookupInput}
+            onChange={(event) => setLookupInput(event.target.value)}
+            placeholder="Ej. 2020485218 · 10101960"
+          />
+          <Button type="submit" loading={lookupMutation.isPending} disabled={!lookupInput.trim()}>
+            Buscar
+          </Button>
+        </form>
+        {lookupMutation.data ? (
+          lookupMutation.data.results.length === 0 ? (
+            <EmptyState icon="search" title="Sin coincidencias" description="Ningún documento con ese número." />
+          ) : (
+            <ul className="nx-detail-list" style={{ listStyle: 'none', padding: 0 }}>
+              {lookupMutation.data.results.map((hit) => (
+                <li
+                  key={`${hit.entityType}:${hit.id}`}
+                  style={{ borderTop: '1px solid var(--nx-color-border, #ddd)', padding: '10px 0' }}
+                >
+                  <div className="nx-treasury__actions" style={{ flexWrap: 'wrap' }}>
+                    <Badge tone={hit.exact ? 'success' : 'neutral'}>{hit.domain}</Badge>
+                    <strong>{hit.number}</strong>
+                    <span>{hit.label}</span>
+                    {hit.status ? <Badge>{statusLabel(hit.status)}</Badge> : null}
+                    {hit.amount ? <span>{formatMoney(hit.amount, hit.currencyCode ?? currency)}</span> : null}
+                    {hit.party ? <span>· {hit.party}</span> : null}
+                  </div>
+                  <div className="nx-field__hint">
+                    Acciones: {hit.allowedActions.join(', ') || 'ver'}
+                    {hit.accountingDocumentId ? (
+                      <>
+                        {' · '}
+                        <Button
+                          variant="ghost"
+                          onClick={() => setDocumentId(hit.accountingDocumentId as string)}
+                        >
+                          Ver asiento y trazabilidad
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : null}
+        {lookupMutation.isError ? (
+          <p className="nx-field__error">No se pudo buscar.</p>
+        ) : null}
+      </Card>
 
       <Card title="Asiento contable">
         {documentsQuery.isLoading ? (

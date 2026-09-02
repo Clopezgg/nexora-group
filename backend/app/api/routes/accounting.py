@@ -22,7 +22,9 @@ from app.services.permission_service import (
     accessible_project_ids,
     assert_company_access,
     assert_project_access,
+    list_user_company_ids,
     require_permission,
+    user_has_any_company_scope,
 )
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
@@ -309,6 +311,29 @@ def subledger_gl_reconciliation(
             )
             for line in lines
         ],
+    )
+
+
+@router.get("/documents/lookup")
+def document_lookup(
+    q: str = Query(min_length=1, max_length=128),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("accounting.journal_entry", "read")),
+):
+    """Centro de Control por Número de Documento (§31/§32). Busca un número en
+    todos los dominios y devuelve exact-match primero con acciones permitidas."""
+    from app.schemas.transaction_inspector import DocumentLookupHit, DocumentLookupResponse
+    from app.services import document_lookup_service
+
+    if user_has_any_company_scope(
+        db, user_id=user.id, resource="accounting.journal_entry", action="read"
+    ):
+        company_ids = None
+    else:
+        company_ids = list_user_company_ids(db, user_id=user.id)
+    hits = document_lookup_service.lookup(db, query=q, company_ids=company_ids)
+    return DocumentLookupResponse(
+        query=q, results=[DocumentLookupHit(**vars(h)) for h in hits]
     )
 
 

@@ -4,6 +4,27 @@ from decimal import Decimal
 from app.schemas.base import CamelModel
 
 
+class DocumentLookupHit(CamelModel):
+    domain: str
+    entity_type: str
+    id: str
+    number: str
+    label: str
+    status: str | None = None
+    amount: str | None = None
+    currency_code: str | None = None
+    party: str | None = None
+    project_id: str | None = None
+    accounting_document_id: str | None = None
+    exact: bool = False
+    allowed_actions: list[str] = []
+
+
+class DocumentLookupResponse(CamelModel):
+    query: str
+    results: list[DocumentLookupHit]
+
+
 class InspectedLineResponse(CamelModel):
     account_code: str
     account_name: str

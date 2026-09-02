@@ -89,11 +89,19 @@ const RAW_ENUM = /(^|[\s>([])(DRAFT|POSTED|REVERSED|APPROVED|REVIEW|SCHEDULED|PA
 const RAW_UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i
 
 async function login(page: Page) {
-  await page.goto('/login')
-  await page.getByLabel('Correo electrónico').fill(ADMIN_EMAIL)
-  await page.getByLabel('Contraseña').fill(ADMIN_PASSWORD)
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click()
-  await expect(page).toHaveURL(/\/inicio/, { timeout: 15_000 })
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await page.goto('/login')
+    await page.getByLabel('Correo electrónico').fill(ADMIN_EMAIL)
+    await page.getByLabel('Contraseña').fill(ADMIN_PASSWORD)
+    await page.getByRole('button', { name: 'Iniciar sesión' }).click()
+    try {
+      await expect(page).toHaveURL(/\/inicio/, { timeout: 15_000 })
+      return
+    } catch (error) {
+      if (attempt === 3) throw error
+      await page.waitForTimeout(3_000)
+    }
+  }
 }
 
 async function ensureCompany(request: APIRequestContext) {

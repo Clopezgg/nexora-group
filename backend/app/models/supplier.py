@@ -93,6 +93,18 @@ class SupplierContract(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "payment_terms_type IN ('LUMP_SUM', 'MONTHLY', 'CUSTOM')",
             name="ck_supplier_contracts_payment_terms_type",
         ),
+        CheckConstraint(
+            "advance_percentage >= 0 AND advance_percentage <= 100",
+            name="ck_supplier_contracts_advance_pct",
+        ),
+        CheckConstraint(
+            "retention_percentage >= 0 AND retention_percentage <= 100",
+            name="ck_supplier_contracts_retention_pct",
+        ),
+        CheckConstraint(
+            "advance_amount IS NULL OR (advance_amount >= 0 AND advance_amount <= value)",
+            name="ck_supplier_contracts_advance_amount",
+        ),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -114,6 +126,11 @@ class SupplierContract(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     advance_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
+    # Representación MONETARIA exacta del anticipo pactado (§7). Fuente de verdad
+    # para contratos nuevos; `advance_percentage` se conserva por compatibilidad.
+    # Anticipo PACTADO, no pagado (§9).
+    advance_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    advance_due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     retention_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     payment_terms: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # §6/§18/§87 — modo de pago contractual EXPLÍCITO. LUMP_SUM puede existir sin

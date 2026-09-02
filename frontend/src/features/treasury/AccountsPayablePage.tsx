@@ -536,6 +536,8 @@ function PaySupplierInvoiceButton({
   const [bankReference, setBankReference] = useState('')
   const [observations, setObservations] = useState('')
   const [contractAllocations, setContractAllocations] = useState<ContractAllocationDraft[]>([])
+  const [allocationValid, setAllocationValid] = useState(true)
+  const [contractHasSchedule, setContractHasSchedule] = useState(false)
 
   const mutation = useMutation({
     mutationFn: async ({
@@ -579,7 +581,9 @@ function PaySupplierInvoiceButton({
                   bankTransactionReference: bankReference.trim() || undefined,
                   paymentObservations: observations.trim() || undefined,
                   contractAllocations:
-                    contractAllocations.length > 0 ? contractAllocations : undefined,
+                    contractHasSchedule && contractAllocations.length > 0
+                      ? contractAllocations
+                      : undefined,
                 },
                 idempotencyKey: crypto.randomUUID(),
               })
@@ -615,7 +619,11 @@ function PaySupplierInvoiceButton({
                 supplierContractId={invoice.supplierContractId}
                 amount={amount}
                 asOf={paymentDate}
-                onAllocationsChange={setContractAllocations}
+                onChange={(rows, valid, hasSchedule) => {
+                  setContractAllocations(rows)
+                  setAllocationValid(valid)
+                  setContractHasSchedule(hasSchedule)
+                }}
               />
             ) : null}
             <Input
@@ -640,10 +648,23 @@ function PaySupplierInvoiceButton({
             {mutation.isError ? (
               <p className="nx-field__error">{(mutation.error as Error).message}</p>
             ) : null}
+            {contractHasSchedule && !allocationValid ? (
+              <p className="nx-field__error" role="alert">
+                No se puede confirmar el pago porque el monto no puede asignarse íntegramente al
+                plan contractual. Revisa el plan o el monto.
+              </p>
+            ) : null}
             <Button
               type="submit"
               loading={mutation.isPending}
-              disabled={!treasuryAccountId || !amount || amount <= 0 || amount > remaining || !paymentDate}
+              disabled={
+                !treasuryAccountId ||
+                !amount ||
+                amount <= 0 ||
+                amount > remaining ||
+                !paymentDate ||
+                (contractHasSchedule && !allocationValid)
+              }
             >
               Confirmar pago
             </Button>

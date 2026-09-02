@@ -13,7 +13,7 @@ import calendar
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -48,6 +48,7 @@ class InstallmentClosedError(InvalidFinancialReferenceError):
 class InstallmentSummary:
     installment_id: uuid.UUID
     sequence: int
+    installment_kind: str
     period_year: int
     period_month: int
     period_label: str
@@ -58,6 +59,9 @@ class InstallmentSummary:
     paid: Decimal
     remaining: Decimal
     status: str
+    # Numeración visible SOLO entre cuotas REGULAR (§6): "Cuota 1 de 7".
+    regular_number: int | None = None
+    regular_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,13 @@ class ContractSummary:
     next_due_period: str | None
     next_due_amount: Decimal | None
     currency_code: str
+    # Desglose contractual (§25): ANTICIPO + BASE REGULAR = TOTAL PROGRAMADO.
+    advance_scheduled: Decimal = _ZERO
+    regular_scheduled: Decimal = _ZERO
+    total_contractual_scheduled: Decimal = _ZERO
+    advance_paid: Decimal = _ZERO
+    advance_remaining: Decimal = _ZERO
+    retention_outstanding: Decimal = _ZERO
 
 
 @dataclass(frozen=True)
@@ -161,12 +172,96 @@ def _one_day():
     return timedelta(days=1)
 
 
+def _due_on(year: int, month: int, day: int) -> date:
+    """Vencimiento en `day` del mes; si el mes es más corto, último día válido (§19)."""
+    return date(year, month, min(day, calendar.monthrange(year, month)[1]))
+
+
+def build_contract_plan(
+    *,
+    contract_value: Decimal,
+    advance_amount: Decimal = _ZERO,
+    advance_due_date: date | None = None,
+    retention_percentage: Decimal = _ZERO,
+    regular_months: int,
+    due_day: int = 1,
+    first_period: date,
+) -> list[dict]:
+    """Plan contractual completo: ANTICIPO (kind ADVANCE, si > 0) + N
+    MENSUALIDADES regulares. Todo con Decimal, nunca float (§4/§16/§18).
+
+    - base regular = `contract_value - advance_amount` (§16).
+    - cuotas 1..N-1: `quantize(base / N)`; la última absorbe el redondeo para que
+      `sum(regulares) == base` EXACTO.
+    - anticipo + regulares = valor contractual EXACTO.
+    """
+    contract_value = _q(contract_value)
+    advance_amount = _q(advance_amount)
+    if advance_amount < _ZERO or advance_amount > contract_value:
+        raise InvalidFinancialReferenceError(
+            "El anticipo debe estar entre 0 y el valor del contrato."
+        )
+    if regular_months < 1:
+        raise InvalidFinancialReferenceError("El plan debe tener al menos una mensualidad.")
+    if not 1 <= int(due_day) <= 31:
+        raise InvalidFinancialReferenceError("El día de pago debe estar entre 1 y 31.")
+    if retention_percentage < _ZERO or retention_percentage > Decimal("100"):
+        raise InvalidFinancialReferenceError("La retención debe estar entre 0 y 100%.")
+    due_day = int(due_day)
+
+    rows: list[dict] = []
+    if advance_amount > _ZERO:
+        due = advance_due_date or _due_on(first_period.year, first_period.month, due_day)
+        rows.append(
+            {
+                "installment_kind": "ADVANCE",
+                "period_year": due.year,
+                "period_month": due.month,
+                "due_date": due,
+                "scheduled_amount": advance_amount,
+                "retention_amount": _ZERO,
+                "net_due": advance_amount,
+                "description": "Anticipo contractual",
+            }
+        )
+
+    regular_base = contract_value - advance_amount
+    # Cuotas 1..N-1 se truncan a 2 decimales (ROUND_DOWN); la última absorbe el
+    # residuo para que sum(regulares) == base EXACTO (§3/§18).
+    per = (regular_base / Decimal(regular_months)).quantize(
+        Decimal("0.01"), rounding=ROUND_DOWN
+    )
+    running = _ZERO
+    for i in range(regular_months):
+        m = _add_months(date(first_period.year, first_period.month, 1), i)
+        amount = per if i < regular_months - 1 else _q(regular_base - running)
+        running += amount
+        retention = (
+            _q(amount * retention_percentage / Decimal("100"))
+            if retention_percentage
+            else _ZERO
+        )
+        rows.append(
+            {
+                "installment_kind": "REGULAR",
+                "period_year": m.year,
+                "period_month": m.month,
+                "due_date": _due_on(m.year, m.month, due_day),
+                "scheduled_amount": amount,
+                "retention_amount": retention,
+                "net_due": _q(amount - retention),
+            }
+        )
+    return rows
+
+
 def create_schedule(
     db: Session,
     *,
     supplier_contract_id: uuid.UUID,
     schedule_type: str,
     installments: list[dict],
+    due_day: int | None = None,
     commit: bool = True,
 ) -> ContractPaymentSchedule:
     contract = db.get(SupplierContract, supplier_contract_id)
@@ -199,8 +294,12 @@ def create_schedule(
         month = int(raw["period_month"])
         if not 1 <= month <= 12:
             raise InvalidFinancialReferenceError("period_month debe estar entre 1 y 12.")
+        kind = raw.get("installment_kind", "REGULAR")
+        if kind not in {"ADVANCE", "REGULAR", "RETENTION_RELEASE"}:
+            raise InvalidFinancialReferenceError(f"installment_kind inválido: {kind!r}")
         normalized.append(
             {
+                "installment_kind": kind,
                 "period_year": int(raw["period_year"]),
                 "period_month": month,
                 "due_date": raw["due_date"],
@@ -211,9 +310,11 @@ def create_schedule(
             }
         )
 
-    periods = {(r["period_year"], r["period_month"]) for r in normalized}
+    periods = {(r["period_year"], r["period_month"], r["installment_kind"]) for r in normalized}
     if len(periods) != len(normalized):
         raise InvalidFinancialReferenceError("Hay períodos contractuales duplicados en el plan.")
+    if sum(1 for r in normalized if r["installment_kind"] == "ADVANCE") > 1:
+        raise InvalidFinancialReferenceError("Un contrato no puede tener más de un anticipo.")
 
     total = sum((r["scheduled_amount"] for r in normalized), _ZERO)
     if total > _q(contract.value):
@@ -227,13 +328,19 @@ def create_schedule(
     if contract.payment_terms_type != schedule_type:
         contract.payment_terms_type = schedule_type
 
-    normalized.sort(key=lambda r: (r["period_year"], r["period_month"]))
+    # ADVANCE primero (es la primera obligación cronológica), luego REGULAR y
+    # RETENTION_RELEASE por período.
+    _KIND_ORDER = {"ADVANCE": 0, "REGULAR": 1, "RETENTION_RELEASE": 2}
+    normalized.sort(
+        key=lambda r: (_KIND_ORDER[r["installment_kind"]], r["period_year"], r["period_month"])
+    )
     schedule = ContractPaymentSchedule(
         company_id=contract.company_id,
         supplier_contract_id=contract.id,
         project_id=contract.project_id,
         currency_code=contract.currency_code,
         schedule_type=schedule_type,
+        due_day=due_day,
         start_period=date(normalized[0]["period_year"], normalized[0]["period_month"], 1),
         end_period=date(normalized[-1]["period_year"], normalized[-1]["period_month"], 1),
         total_scheduled=_q(total),
@@ -247,6 +354,7 @@ def create_schedule(
             ContractPaymentInstallment(
                 schedule_id=schedule.id,
                 sequence=seq,
+                installment_kind=r["installment_kind"],
                 period_year=r["period_year"],
                 period_month=r["period_month"],
                 due_date=r["due_date"],
@@ -313,17 +421,25 @@ def installment_summaries(
         ).scalars()
     )
     paid_map = _paid_by_installment(db, [r.id for r in rows])
+    regular_rows = [r for r in rows if r.installment_kind == "REGULAR"]
+    regular_count = len(regular_rows)
+    regular_number_by_id = {r.id: i + 1 for i, r in enumerate(regular_rows)}
     out: list[InstallmentSummary] = []
     for r in rows:
         paid = paid_map.get(r.id, _ZERO)
         net = _q(r.net_due)
+        kind = getattr(r, "installment_kind", "REGULAR")
         out.append(
             InstallmentSummary(
                 installment_id=r.id,
                 sequence=r.sequence,
+                installment_kind=kind,
                 period_year=r.period_year,
                 period_month=r.period_month,
-                period_label=period_label(r.period_year, r.period_month),
+                period_label=(
+                    "Anticipo" if kind == "ADVANCE"
+                    else period_label(r.period_year, r.period_month)
+                ),
                 due_date=r.due_date,
                 scheduled_amount=_q(r.scheduled_amount),
                 retention_amount=_q(r.retention_amount),
@@ -331,6 +447,8 @@ def installment_summaries(
                 paid=paid,
                 remaining=_q(max(net - paid, _ZERO)),
                 status=_status_for(r, paid, as_of=as_of),
+                regular_number=regular_number_by_id.get(r.id),
+                regular_count=regular_count if kind == "REGULAR" else None,
             )
         )
     return out
@@ -350,7 +468,9 @@ def history_through(
     return [
         s
         for s in installment_summaries(db, schedule_id=schedule_id, as_of=as_of)
-        if s.period_year * 12 + s.period_month <= cutoff
+        # El ANTICIPO siempre precede al historial regular (§29/§41).
+        if s.installment_kind == "ADVANCE"
+        or s.period_year * 12 + s.period_month <= cutoff
     ]
 
 
@@ -364,26 +484,48 @@ def contract_summary(
     contract = db.get(SupplierContract, schedule.supplier_contract_id)
     summaries = installment_summaries(db, schedule_id=schedule_id, as_of=as_of)
 
-    to_date = sum(
-        (s.scheduled_amount for s in summaries if date(s.period_year, s.period_month, 1) <= as_of),
-        _ZERO,
-    )
+    # "Programado a fecha" cuenta una obligación cuando su vencimiento ya pasó
+    # el corte (§27) — el anticipo entra por su due_date, no por período mensual.
+    to_date = sum((s.scheduled_amount for s in summaries if s.due_date <= as_of), _ZERO)
     paid_accumulated = sum((s.paid for s in summaries), _ZERO)
     overdue = sum((s.remaining for s in summaries if s.status == "OVERDUE"), _ZERO)
-    upcoming = [s for s in summaries if s.status in {"UPCOMING", "DUE"} and s.remaining > _ZERO]
+    upcoming = [
+        s
+        for s in summaries
+        if s.status in {"UPCOMING", "DUE", "OVERDUE"} and s.remaining > _ZERO
+    ]
     nxt = min(upcoming, key=lambda s: s.due_date) if upcoming else None
 
+    advance_scheduled = sum(
+        (s.scheduled_amount for s in summaries if s.installment_kind == "ADVANCE"), _ZERO
+    )
+    advance_paid = sum(
+        (s.paid for s in summaries if s.installment_kind == "ADVANCE"), _ZERO
+    )
+    regular_scheduled = sum(
+        (s.scheduled_amount for s in summaries if s.installment_kind == "REGULAR"), _ZERO
+    )
+    total_contractual = sum((s.scheduled_amount for s in summaries), _ZERO)
+    retention_outstanding = sum(
+        (s.retention_amount for s in summaries if s.installment_kind == "REGULAR"), _ZERO
+    )
+    value = _q(contract.value if contract else schedule.total_scheduled)
+
     return ContractSummary(
-        contract_value=_q(contract.value if contract else schedule.total_scheduled),
+        contract_value=value,
         total_scheduled_to_date=_q(to_date),
         paid_accumulated=_q(paid_accumulated),
-        contract_balance=_q(
-            (contract.value if contract else schedule.total_scheduled) - paid_accumulated
-        ),
+        contract_balance=_q(value - paid_accumulated),
         overdue_balance=_q(overdue),
         next_due_period=nxt.period_label if nxt else None,
         next_due_amount=nxt.remaining if nxt else None,
         currency_code=schedule.currency_code,
+        advance_scheduled=_q(advance_scheduled),
+        regular_scheduled=_q(regular_scheduled),
+        total_contractual_scheduled=_q(total_contractual),
+        advance_paid=_q(advance_paid),
+        advance_remaining=_q(max(advance_scheduled - advance_paid, _ZERO)),
+        retention_outstanding=_q(retention_outstanding),
     )
 
 

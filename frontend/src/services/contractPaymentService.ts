@@ -1,8 +1,11 @@
 import { apiFetch } from './httpClient'
 
+export type ContractInstallmentKind = 'ADVANCE' | 'REGULAR' | 'RETENTION_RELEASE'
+
 export interface ContractInstallment {
   installmentId: string
   sequence: number
+  installmentKind: ContractInstallmentKind
   periodYear: number
   periodMonth: number
   periodLabel: string
@@ -13,6 +16,8 @@ export interface ContractInstallment {
   paid: string
   remaining: string
   status: string
+  regularNumber: number | null
+  regularCount: number | null
 }
 
 export interface ContractSchedule {
@@ -22,6 +27,7 @@ export interface ContractSchedule {
   projectId: string | null
   currencyCode: string
   scheduleType: string
+  dueDay: number | null
   totalScheduled: string
   status: string
   installments: ContractInstallment[]
@@ -36,6 +42,12 @@ export interface ContractPaymentSummary {
   nextDuePeriod: string | null
   nextDueAmount: string | null
   currencyCode: string
+  advanceScheduled: string
+  regularScheduled: string
+  totalContractualScheduled: string
+  advancePaid: string
+  advanceRemaining: string
+  retentionOutstanding: string
 }
 
 export interface FifoPreviewItem {
@@ -93,6 +105,46 @@ export const contractPaymentService = {
       method: 'POST',
       body: JSON.stringify({ scheduleType: 'MONTHLY', ...body }),
     }),
+
+  // Modo canónico (§16-§20): el backend calcula el anticipo + N mensualidades.
+  createContractPlan: (body: {
+    supplierContractId: string
+    regularMonths: number
+    dueDay: number
+    firstPeriod: string
+    advanceAmount?: string
+    advanceDueDate?: string
+  }) =>
+    apiFetch<ContractSchedule>('/contract-payments/schedules', {
+      method: 'POST',
+      body: JSON.stringify({ scheduleType: 'MONTHLY', ...body }),
+    }),
+
+  rebuildPlan: (
+    scheduleId: string,
+    body: {
+      reason: string
+      regularMonths: number
+      dueDay: number
+      firstPeriod: string
+      advanceAmount?: string
+      advanceDueDate?: string
+      retentionPercentage?: string
+    },
+  ) =>
+    apiFetch<ContractSchedule>(
+      `/contract-payments/schedules/${encodeURIComponent(scheduleId)}/rebuild`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  prepareAdvanceInvoice: (
+    scheduleId: string,
+    body: { payableAccountId: string; costCenterId?: string; amount?: string },
+  ) =>
+    apiFetch<{ invoiceId: string; advanceInstallmentId: string; amount: string }>(
+      `/contract-payments/schedules/${encodeURIComponent(scheduleId)}/advance-invoice`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 
   summary: (scheduleId: string, asOf?: string) => {
     const qs = asOf ? `?asOf=${encodeURIComponent(asOf)}` : ''

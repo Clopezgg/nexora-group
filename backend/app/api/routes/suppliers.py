@@ -286,6 +286,8 @@ def create_contract(
             start_date=payload.start_date,
             end_date=payload.end_date,
             advance_percentage=payload.advance_percentage,
+            advance_amount=payload.advance_amount,
+            advance_due_date=payload.advance_due_date,
             retention_percentage=payload.retention_percentage,
             payment_terms=payload.payment_terms,
             payment_terms_type=payload.payment_terms_type,

@@ -32,6 +32,9 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 SCHEDULE_TYPES = ("MONTHLY", "CUSTOM")
 SCHEDULE_STATUSES = ("ACTIVE", "COMPLETED", "CANCELLED")
 INSTALLMENT_STATUSES = ("UPCOMING", "DUE", "PARTIALLY_PAID", "PAID", "OVERDUE", "CANCELLED")
+# Naturaleza de la obligación dentro del plan (§6/§10). El ANTICIPO es parte del
+# plan contractual pero NO consume una de las N mensualidades regulares.
+INSTALLMENT_KINDS = ("ADVANCE", "REGULAR", "RETENTION_RELEASE")
 
 
 class ContractPaymentSchedule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -52,6 +55,9 @@ class ContractPaymentSchedule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     currency_code: Mapped[str] = mapped_column(String(3), nullable=False)
     schedule_type: Mapped[str] = mapped_column(String(16), nullable=False, default="MONTHLY")
+    # Día de vencimiento de las mensualidades (§19). 1..31; si el mes no lo
+    # tiene, se usa el último día válido.
+    due_day: Mapped[int | None] = mapped_column(nullable=True)
     start_period: Mapped[date] = mapped_column(Date, nullable=False)
     end_period: Mapped[date | None] = mapped_column(Date, nullable=True)
     total_scheduled: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=Decimal("0"))
@@ -63,8 +69,12 @@ class ContractPaymentInstallment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("schedule_id", "sequence", name="uq_contract_installment_sequence"),
         UniqueConstraint(
-            "schedule_id", "period_year", "period_month",
+            "schedule_id", "period_year", "period_month", "installment_kind",
             name="uq_contract_installment_period",
+        ),
+        CheckConstraint(
+            "installment_kind IN ('ADVANCE', 'REGULAR', 'RETENTION_RELEASE')",
+            name="ck_contract_installment_kind",
         ),
         CheckConstraint("scheduled_amount > 0", name="ck_contract_installment_amount"),
         CheckConstraint("retention_amount >= 0", name="ck_contract_installment_retention"),
@@ -79,6 +89,9 @@ class ContractPaymentInstallment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         index=True,
     )
     sequence: Mapped[int] = mapped_column(nullable=False)
+    installment_kind: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="REGULAR", server_default="REGULAR"
+    )
     period_year: Mapped[int] = mapped_column(nullable=False)
     period_month: Mapped[int] = mapped_column(nullable=False)
     due_date: Mapped[date] = mapped_column(Date, nullable=False)

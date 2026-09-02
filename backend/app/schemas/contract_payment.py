@@ -13,6 +13,7 @@ class InstallmentInput(CamelModel):
     due_date: date
     scheduled_amount: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
     retention_amount: Decimal = Field(default=Decimal("0"), ge=0, max_digits=18, decimal_places=2)
+    installment_kind: str = "REGULAR"
     description: str | None = None
 
 
@@ -21,15 +22,23 @@ class ScheduleCreateRequest(CamelModel):
     schedule_type: str = "MONTHLY"
     # Modo A: cuotas explícitas.
     installments: list[InstallmentInput] | None = None
-    # Modo B: mensual — se generan `months` cuotas iguales desde `start_period`.
+    # Modo B (legacy): mensual — `months` cuotas iguales desde `start_period`.
     start_period: date | None = None
     months: int | None = Field(default=None, ge=1, le=600)
     monthly_amount: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=2)
+    # Modo C (canónico §16-§20): ANTICIPO + N mensualidades calculadas por el
+    # backend. `regularMonths` mensualidades desde `firstPeriod`, día `dueDay`.
+    advance_amount: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=2)
+    advance_due_date: date | None = None
+    regular_months: int | None = Field(default=None, ge=1, le=600)
+    due_day: int | None = Field(default=None, ge=1, le=31)
+    first_period: date | None = None
 
 
 class InstallmentResponse(CamelModel):
     installment_id: uuid.UUID
     sequence: int
+    installment_kind: str = "REGULAR"
     period_year: int
     period_month: int
     period_label: str
@@ -40,6 +49,8 @@ class InstallmentResponse(CamelModel):
     paid: Decimal
     remaining: Decimal
     status: str
+    regular_number: int | None = None
+    regular_count: int | None = None
 
 
 class ScheduleResponse(CamelModel):
@@ -49,6 +60,7 @@ class ScheduleResponse(CamelModel):
     project_id: uuid.UUID | None
     currency_code: str
     schedule_type: str
+    due_day: int | None = None
     total_scheduled: Decimal
     status: str
     installments: list[InstallmentResponse]
@@ -63,6 +75,12 @@ class ContractSummaryResponse(CamelModel):
     next_due_period: str | None
     next_due_amount: Decimal | None
     currency_code: str
+    advance_scheduled: Decimal = Decimal("0")
+    regular_scheduled: Decimal = Decimal("0")
+    total_contractual_scheduled: Decimal = Decimal("0")
+    advance_paid: Decimal = Decimal("0")
+    advance_remaining: Decimal = Decimal("0")
+    retention_outstanding: Decimal = Decimal("0")
 
 
 class FifoPreviewRequest(CamelModel):

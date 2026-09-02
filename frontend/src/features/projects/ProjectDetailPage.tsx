@@ -237,11 +237,26 @@ export function ProjectDetailPage() {
           <StatCard label="Pagado a contratos de ejecución" value={money(summary.executionContractPaid, currency)} />
           <StatCard label="Saldo contractual de ejecución" value={money(summary.executionContractBalance, currency)} />
           <StatCard label="Órdenes de compra comprometidas" value={money(summary.poCommitted, currency)} />
-          <StatCard label="Devengado (AP)" value={money(summary.accrued, currency)} />
+          <StatCard label="Compromiso abierto" value={money(summary.openCommitment ?? summary.committed, currency)} />
+          <StatCard label="Devengado / costo reconocido (AP)" value={money(summary.accrued, currency)} />
           <StatCard label="Pagado (AP)" value={money(summary.paid, currency)} />
-          <StatCard label="Disponible de presupuesto" value={money(summary.available, currency)} />
+          {summary.available !== null ? (
+            <StatCard label="Disponible de presupuesto" value={money(summary.available, currency)} />
+          ) : (
+            <>
+              <StatCard label="Presupuesto autorizado" value="Sin configurar" />
+              <StatCard label="Exposición sin presupuesto" value={money(summary.unbudgetedExposure ?? '0', currency)} />
+            </>
+          )}
           <StatCard label="Costo real contable (GL)" value={money(summary.actualCost, currency)} />
         </div>
+        {summary.available === null ? (
+          <p className="nx-field__hint">
+            Este proyecto no tiene un presupuesto BASELINE. La cifra mostrada es la exposición real
+            (compromiso abierto + costo reconocido), no un disponible negativo.{' '}
+            <Link to="/proyectos/presupuestos">Configurar WBS y presupuesto</Link>.
+          </p>
+        ) : null}
       </Card>
       <Card title="Facturación y cobros">
         <div className="nx-home__grid">

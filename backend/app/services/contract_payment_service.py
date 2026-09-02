@@ -423,6 +423,111 @@ def _status_for(
     return "UPCOMING"
 
 
+_KIND_ORDER = {"ADVANCE": 0, "REGULAR": 1, "RETENTION_RELEASE": 2}
+
+
+def schedule_has_active_allocations(db: Session, schedule_id: uuid.UUID) -> bool:
+    """True si alguna cuota del plan tiene un pago aplicado no revertido."""
+    inst_ids = [
+        r[0]
+        for r in db.execute(
+            select(ContractPaymentInstallment.id).where(
+                ContractPaymentInstallment.schedule_id == schedule_id
+            )
+        ).all()
+    ]
+    if not inst_ids:
+        return False
+    return (
+        db.execute(
+            select(ContractPaymentAllocation.id)
+            .where(
+                ContractPaymentAllocation.installment_id.in_(inst_ids),
+                ContractPaymentAllocation.reversed_at.is_(None),
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
+
+
+def _rows_to_snapshot(rows: list[dict]) -> list[dict]:
+    rows = sorted(
+        rows,
+        key=lambda r: (_KIND_ORDER[r["installment_kind"]], r["period_year"], r["period_month"]),
+    )
+    return [
+        {
+            "kind": r["installment_kind"],
+            "periodLabel": (
+                "Anticipo" if r["installment_kind"] == "ADVANCE"
+                else period_label(r["period_year"], r["period_month"])
+            ),
+            "dueDate": r["due_date"].isoformat(),
+            "scheduledAmount": str(_q(r["scheduled_amount"])),
+            "retentionAmount": str(_q(r["retention_amount"])),
+            "netDue": str(_q(r["net_due"])),
+        }
+        for r in rows
+    ]
+
+
+def current_schedule_snapshot(db: Session, schedule_id: uuid.UUID) -> dict:
+    summaries = installment_summaries(db, schedule_id=schedule_id)
+    return {
+        "totalScheduled": str(sum((s.scheduled_amount for s in summaries), _ZERO)),
+        "installments": [
+            {
+                "kind": s.installment_kind,
+                "periodLabel": s.period_label,
+                "dueDate": s.due_date.isoformat(),
+                "scheduledAmount": str(s.scheduled_amount),
+                "retentionAmount": str(s.retention_amount),
+                "netDue": str(s.net_due),
+            }
+            for s in summaries
+        ],
+    }
+
+
+def build_rebuild_rows(
+    db: Session,
+    *,
+    schedule: ContractPaymentSchedule,
+    regular_months: int,
+    first_period: date,
+    due_day: int = 1,
+    advance_amount: Decimal | None = None,
+    advance_due_date: date | None = None,
+    retention_percentage: Decimal | None = None,
+) -> tuple[SupplierContract, list[dict], dict]:
+    """Filas del plan reconstruido con el motor canónico + snapshot AFTER.
+
+    Devuelve `(contract, rows, after_snapshot)`. No persiste nada. Los
+    términos que llegan `None` se toman del contrato."""
+    contract = db.get(SupplierContract, schedule.supplier_contract_id)
+    if contract is None:
+        raise InvalidFinancialReferenceError("El contrato del plan ya no existe.")
+    advance = advance_amount if advance_amount is not None else (contract.advance_amount or _ZERO)
+    retention = (
+        retention_percentage if retention_percentage is not None else contract.retention_percentage
+    )
+    rows = build_contract_plan(
+        contract_value=contract.value,
+        advance_amount=advance,
+        advance_due_date=advance_due_date or contract.advance_due_date,
+        retention_percentage=retention,
+        regular_months=regular_months,
+        due_day=due_day,
+        first_period=first_period,
+    )
+    after = {
+        "totalScheduled": str(sum((_q(r["scheduled_amount"]) for r in rows), _ZERO)),
+        "installments": _rows_to_snapshot(rows),
+    }
+    return contract, rows, after
+
+
 def find_contractual_duplicate_candidates(
     db: Session,
     *,

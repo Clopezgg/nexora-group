@@ -365,6 +365,76 @@ class ScheduleRebuildRequest(CamelModel):
     first_period: date | None = None
 
 
+class SchedulePreviewRequest(CamelModel):
+    advance_amount: Decimal | None = None
+    advance_due_date: date | None = None
+    retention_percentage: Decimal | None = None
+    regular_months: int = 0
+    due_day: int = 1
+    first_period: date | None = None
+
+
+class SchedulePlanSnapshot(CamelModel):
+    total_scheduled: str
+    installments: list[dict]
+
+
+class SchedulePreviewResponse(CamelModel):
+    blocked: bool
+    blocked_reason: str | None = None
+    before: SchedulePlanSnapshot
+    after: SchedulePlanSnapshot | None = None
+
+
+def _rebuild_prechecks(db: Session, schedule_id: uuid.UUID, *, regular_months: int, first_period):
+    schedule = _schedule_or_404(db, schedule_id)
+    blocked_reason: str | None = None
+    if cps.schedule_has_active_allocations(db, schedule_id):
+        blocked_reason = (
+            "El plan tiene pagos aplicados. No se puede recalcular: usa una "
+            "enmienda formal del plan que preserve los períodos ya pagados."
+        )
+    if not regular_months or not first_period:
+        raise HTTPException(status_code=422, detail="Indica `regularMonths` y `firstPeriod`.")
+    return schedule, blocked_reason
+
+
+@router.post("/schedules/{schedule_id}/rebuild/preview", response_model=SchedulePreviewResponse)
+def preview_rebuild_schedule(
+    schedule_id: uuid.UUID,
+    payload: SchedulePreviewRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("contract.payment_schedule", "read")),
+) -> SchedulePreviewResponse:
+    """Previsualiza (§10) la corrección del plan: ANTES / DESPUÉS con el motor
+    canónico, sin persistir nada ni auditar. `blocked` avisa si hay pagos
+    aplicados (el APPLY lo rechazará)."""
+    schedule, blocked_reason = _rebuild_prechecks(
+        db, schedule_id, regular_months=payload.regular_months, first_period=payload.first_period
+    )
+    assert_company_access(
+        db, user_id=user.id, resource="contract.payment_schedule", action="read",
+        company_id=schedule.company_id,
+    )
+    before = cps.current_schedule_snapshot(db, schedule_id)
+    _contract, _rows, after = cps.build_rebuild_rows(
+        db,
+        schedule=schedule,
+        regular_months=payload.regular_months,
+        first_period=payload.first_period,
+        due_day=payload.due_day,
+        advance_amount=payload.advance_amount,
+        advance_due_date=payload.advance_due_date,
+        retention_percentage=payload.retention_percentage,
+    )
+    return SchedulePreviewResponse(
+        blocked=blocked_reason is not None,
+        blocked_reason=blocked_reason,
+        before=SchedulePlanSnapshot(**before),
+        after=SchedulePlanSnapshot(**after),
+    )
+
+
 @router.post("/schedules/{schedule_id}/rebuild", response_model=ScheduleResponse)
 def rebuild_schedule(
     schedule_id: uuid.UUID,
@@ -373,76 +443,40 @@ def rebuild_schedule(
     user=Depends(require_permission("contract.payment_schedule", "manage")),
     correlation_id: str = Depends(get_correlation_id),
 ) -> ScheduleResponse:
-    """Corrección AUDITADA del plan (§45-§47). SOLO si no hay allocations
+    """Corrección AUDITADA del plan (§9/§45-§47). SOLO si no hay allocations
     activas. Snapshot antes/después + AuditLog. Nunca borra el SupplierContract."""
-    from app.models.contract_payment import (
-        ContractPaymentAllocation,
-        ContractPaymentInstallment,
-    )
+    from app.models.contract_payment import ContractPaymentInstallment
 
-    schedule = _schedule_or_404(db, schedule_id)
+    if len((payload.reason or "").strip()) < 10:
+        raise HTTPException(status_code=422, detail="Indica un motivo (mínimo 10 caracteres).")
+
+    schedule, blocked_reason = _rebuild_prechecks(
+        db, schedule_id, regular_months=payload.regular_months, first_period=payload.first_period
+    )
     assert_company_access(
         db, user_id=user.id, resource="contract.payment_schedule", action="manage",
         company_id=schedule.company_id,
     )
-    if len((payload.reason or "").strip()) < 10:
-        raise HTTPException(status_code=422, detail="Indica un motivo (mínimo 10 caracteres).")
+    if blocked_reason is not None:
+        raise HTTPException(status_code=409, detail=blocked_reason)
 
-    inst_ids = [
-        r[0]
-        for r in db.execute(
-            select(ContractPaymentInstallment.id).where(
-                ContractPaymentInstallment.schedule_id == schedule_id
-            )
-        ).all()
-    ]
-    active_alloc = (
-        db.execute(
-            select(ContractPaymentAllocation.id).where(
-                ContractPaymentAllocation.installment_id.in_(inst_ids),
-                ContractPaymentAllocation.reversed_at.is_(None),
-            ).limit(1)
-        ).first()
-        if inst_ids
-        else None
-    )
-    if active_alloc is not None:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "El plan tiene pagos aplicados. No se puede recalcular: usa una "
-                "enmienda formal del plan que preserve los períodos ya pagados."
-            ),
-        )
-    if not payload.regular_months or not payload.first_period:
-        raise HTTPException(
-            status_code=422, detail="Indica `regularMonths` y `firstPeriod`."
-        )
-
-    contract = db.get(SupplierContract, schedule.supplier_contract_id)
-    before = {
-        "totalScheduled": str(schedule.total_scheduled),
-        "installments": [
-            {"kind": s.installment_kind, "period": s.period_label, "scheduled": str(s.scheduled_amount)}
-            for s in cps.installment_summaries(db, schedule_id=schedule_id)
-        ],
-    }
-
-    advance = payload.advance_amount
-    if advance is None:
-        advance = contract.advance_amount or Decimal("0")
-    retention = payload.retention_percentage
-    if retention is None:
-        retention = contract.retention_percentage
-
-    rows = cps.build_contract_plan(
-        contract_value=contract.value,
-        advance_amount=advance,
-        advance_due_date=payload.advance_due_date or contract.advance_due_date,
-        retention_percentage=retention,
+    before = cps.current_schedule_snapshot(db, schedule_id)
+    contract, rows, after = cps.build_rebuild_rows(
+        db,
+        schedule=schedule,
         regular_months=payload.regular_months,
-        due_day=payload.due_day,
         first_period=payload.first_period,
+        due_day=payload.due_day,
+        advance_amount=payload.advance_amount,
+        advance_due_date=payload.advance_due_date,
+        retention_percentage=payload.retention_percentage,
+    )
+    rows.sort(
+        key=lambda r: (
+            {"ADVANCE": 0, "REGULAR": 1, "RETENTION_RELEASE": 2}[r["installment_kind"]],
+            r["period_year"],
+            r["period_month"],
+        )
     )
 
     # Persistir los términos corregidos en el contrato.
@@ -458,8 +492,6 @@ def rebuild_schedule(
             ContractPaymentInstallment.schedule_id == schedule_id
         )
     )
-    _KIND_ORDER = {"ADVANCE": 0, "REGULAR": 1, "RETENTION_RELEASE": 2}
-    rows.sort(key=lambda r: (_KIND_ORDER[r["installment_kind"]], r["period_year"], r["period_month"]))
     total = Decimal("0")
     for seq, r in enumerate(rows, start=1):
         total += Decimal(str(r["scheduled_amount"]))
@@ -484,13 +516,6 @@ def rebuild_schedule(
     schedule.end_period = date(rows[-1]["period_year"], rows[-1]["period_month"], 1)
     db.flush()
 
-    after = {
-        "totalScheduled": str(schedule.total_scheduled),
-        "installments": [
-            {"kind": s.installment_kind, "period": s.period_label, "scheduled": str(s.scheduled_amount)}
-            for s in cps.installment_summaries(db, schedule_id=schedule_id)
-        ],
-    }
     audit_service.record(
         db,
         actor_user_id=user.id,

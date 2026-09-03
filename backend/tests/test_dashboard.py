@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 
+from app.core.business_time import business_today
 from app.models.permission import UserCompanyAccess, UserProjectAccess
 from app.models.project import Project
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
@@ -117,7 +118,10 @@ def test_dashboard_period_metrics_group_by_effective_date_not_posted_at(client):
         )
         assert r.status_code == 201, r.text
 
-    today = date.today()
+    # El dashboard agrupa por fecha de negocio (America/Tegucigalpa); en CI
+    # (UTC) ``date.today()`` adelanta el asiento un día entre las 18:00 y las
+    # 23:59 de Honduras y lo saca del período económico actual.
+    today = business_today()
     prev_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
     _entry(prev_month.isoformat(), "400.00")   # fuera del período económico actual
     _entry(today.isoformat(), "125.00")        # dentro

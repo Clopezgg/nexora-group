@@ -39,3 +39,14 @@ def readyz(db: Session = Depends(get_db)) -> dict[str, str]:
             )
 
     return {"status": "ok"}
+
+
+@router.get("/version")
+@router.get("/api/version", include_in_schema=False)
+def version() -> dict[str, str]:
+    settings = get_settings()
+    return {
+        "gitSha": settings.git_sha,
+        "buildTime": settings.build_time,
+        "environment": settings.app_env,
+    }

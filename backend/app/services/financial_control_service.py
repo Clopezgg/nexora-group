@@ -270,3 +270,44 @@ def ar_metrics(db: Session, *, company_id, as_of: date | None = None) -> dict:
         "dso": str(dso) if dso is not None else None,
         "aging": {k: str(v) for k, v in aging.items()},
     }
+
+
+def ap_metrics(db: Session, *, company_id, as_of: date | None = None) -> dict:
+    """AP Aging (ORDEN MAESTRA DE CIERRE FINAL DE PRODUCTO §19). Mismos
+    buckets que `ar_metrics`, sobre facturas de proveedor abiertas."""
+    as_of = as_of or business_today()
+
+    rows = db.execute(
+        select(
+            SupplierInvoice.due_date,
+            SupplierInvoice.amount,
+            SupplierInvoice.tax_amount,
+            SupplierInvoice.amount_paid,
+        )
+        .where(SupplierInvoice.company_id == company_id)
+        .where(SupplierInvoice.status.in_(_AP_OPEN_STATUSES))
+    ).all()
+    ap_outstanding = Decimal("0")
+    aging = {"current": Decimal("0"), "1_30": Decimal("0"), "31_60": Decimal("0"), "61_90": Decimal("0"), "over_90": Decimal("0")}
+    for due_date, amount, tax_amount, amount_paid in rows:
+        remaining = (amount + tax_amount) - amount_paid
+        if remaining <= 0:
+            continue
+        ap_outstanding += remaining
+        overdue_days = (as_of - due_date).days
+        if overdue_days <= 0:
+            aging["current"] += remaining
+        elif overdue_days <= 30:
+            aging["1_30"] += remaining
+        elif overdue_days <= 60:
+            aging["31_60"] += remaining
+        elif overdue_days <= 90:
+            aging["61_90"] += remaining
+        else:
+            aging["over_90"] += remaining
+
+    return {
+        "asOf": as_of.isoformat(),
+        "apOutstanding": str(ap_outstanding),
+        "aging": {k: str(v) for k, v in aging.items()},
+    }

@@ -43,6 +43,9 @@ param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 @description('Usuario administrador de PostgreSQL. No es secreto (el password sí lo es).')
 param postgresAdminLogin string = 'nexoraadmin'
 
+@description('Timestamp UTC del deploy, para /api/version (ORDEN MAESTRA §21). Se evalúa en el momento del despliegue real.')
+param buildTime string = utcNow()
+
 var resourceGroupName = '${namePrefix}-rg-${environmentName}'
 var uniqueSuffix = uniqueString(subscription().subscriptionId, resourceGroupName)
 var editAccessConfigured = !empty(editAccessTokenSalt) && !empty(editAccessTokenDigest)
@@ -131,6 +134,7 @@ module containerApps 'modules/containerapps.bicep' = {
     keyVaultUri: keyVault.outputs.keyVaultUri
     storageAccountName: storage.outputs.storageAccountName
     backendImage: backendImage
+    buildTime: buildTime
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     frontendUrl: 'https://${staticWebApp.outputs.defaultHostname}'
     bootstrapAdminEmail: bootstrapAdminEmail

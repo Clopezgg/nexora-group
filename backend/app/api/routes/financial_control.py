@@ -253,3 +253,16 @@ def ar_metrics(
         db, user_id=user.id, resource="core.company", action="read", company_id=company_id
     )
     return financial_control_service.ar_metrics(db, company_id=company_id)
+
+
+@router.get("/ap-metrics", response_model=None)
+def ap_metrics(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    db: Session = Depends(get_db),
+    current: tuple = Depends(get_current_user),
+):
+    user, _roles = current
+    assert_company_access(
+        db, user_id=user.id, resource="core.company", action="read", company_id=company_id
+    )
+    return financial_control_service.ap_metrics(db, company_id=company_id)

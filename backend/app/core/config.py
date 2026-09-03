@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     secret_key: str = "dev-secret-key-change-me"
     frontend_url: str = "http://localhost:5173"
 
+    # Metadata de build para certificación (ORDEN MAESTRA §21): el pipeline
+    # de deploy inyecta el SHA/fecha reales vía env vars; en local quedan
+    # "unknown" -- nunca se inventa un valor.
+    git_sha: str = "unknown"
+    build_time: str = "unknown"
+
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: str | None = None
 

@@ -304,7 +304,7 @@ jobs:
           npm ci
           # First-party same-origin API: Static Web Apps proxies /api/* to the
           # linked Container App, keeping the session cookie first-party.
-          VITE_API_BASE_URL="/api" npm run build
+          VITE_API_BASE_URL="/api" VITE_GIT_SHA="${{ github.sha }}" npm run build
 
       - name: Get Static Web Apps deployment token
         id: swa-token

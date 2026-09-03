@@ -88,6 +88,9 @@ describe('SupplierContractsPage', () => {
     // §13: la categoría del contrato es visible en la lista, en español.
     const contractRow = screen.getByText('SC-001').closest('tr') as HTMLElement
     expect(within(contractRow).getByText('Mano de obra')).toBeInTheDocument()
+    // Estado nunca crudo: DRAFT -> Borrador (ORDEN MAESTRA §7).
+    expect(within(contractRow).getByText('Borrador')).toBeInTheDocument()
+    expect(within(contractRow).queryByText('DRAFT')).not.toBeInTheDocument()
   })
 
   it('creates a new supplier contract through the real API', async () => {

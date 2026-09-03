@@ -637,7 +637,14 @@ def inspect(db: Session, f: Filters) -> Report:
             p for p in payments if not p.get("reversed_at")
         ]
         accruals = [i for i in invoices if i["status"] not in ("DRAFT", "REVIEW", "CANCELLED")]
-        if general_expenses and accruals:
+        if _advance_already_reconciled(accounting):
+            report.notes.append(
+                "Anticipo contractual ya reconciliado: existe un asiento de reclasificación "
+                "a ACTIVO (source_type=advance_reclassification) y el accrual duplicado fue "
+                "revertido. El GeneralExpense y la factura históricos se conservan como "
+                "evidencia; no representan doble conteo vivo (§4/§7)."
+            )
+        elif general_expenses and accruals:
             report.notes.append(
                 "POSIBLE DOBLE CONTEO: existe GeneralExpense y SupplierInvoice por un importe "
                 "compatible para el mismo periodo. Verificar si son el mismo hecho económico "
@@ -664,6 +671,18 @@ def inspect(db: Session, f: Filters) -> Report:
     return report
 
 
+def _advance_already_reconciled(accounting: list[dict]) -> bool:
+    """True si hay un asiento POSTED de reclasificación de anticipo a ACTIVO
+    (lo emite ``advance_reconciliation_service.reconcile_duplicated_advance``)."""
+    for doc in accounting:
+        if doc.get("status") not in ("POSTED", "DRAFT"):
+            continue
+        for link in doc.get("source_links", []):
+            if link.get("source_type") == "advance_reclassification":
+                return True
+    return False
+
+
 def _classify(f: Filters, report: Report) -> dict:
     """Clasifica el hecho financiero en una categoría de `FORENSIC_CATEGORIES`
     (§9). Solo intenta clasificar cuando hay un importe objetivo; sin él no
@@ -675,6 +694,22 @@ def _classify(f: Filters, report: Report) -> dict:
     invoices = report.sections.get("supplier_invoices", [])
     payments = [p for p in report.sections.get("supplier_payments", []) if not p.get("reversed_at")]
     contracts = report.sections.get("contracts", [])
+    accounting = report.sections.get("accounting_documents", [])
+
+    if _advance_already_reconciled(accounting):
+        evidence = [
+            f"GeneralExpense {g['id']} · {g['amount']} · {g['expense_account']} (reclasificado a ACTIVO)"
+            for g in ges
+        ] + [
+            f"SupplierInvoice {i['invoice_number']} · {i['amount']} · {i['status']} (accrual revertido)"
+            for i in invoices
+        ]
+        return {
+            "category": "CLEAN",
+            "confidence": "high",
+            "evidence": evidence
+            or ["Asiento de reclasificación de anticipo a ACTIVO presente; sin doble conteo vivo."],
+        }
 
     live_invoices = [i for i in invoices if i["status"] not in ("DRAFT", "REVIEW", "CANCELLED")]
     expense_ges = [

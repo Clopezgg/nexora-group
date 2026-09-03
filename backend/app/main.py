@@ -8,7 +8,6 @@ from app.api.correlation import CorrelationIdMiddleware
 from app.api.csrf import register_csrf_guard
 from app.api.edit_access_guard import register_edit_access_guard
 from app.api.error_handlers import register_error_handlers
-from app.api.security_headers import register_security_headers
 from app.api.routes import (
     access_management,
     accounting,
@@ -18,6 +17,7 @@ from app.api.routes import (
     assets,
     audit,
     auth,
+    closing,
     company_management,
     context,
     contract_payments,
@@ -26,7 +26,6 @@ from app.api.routes import (
     documents,
     edit_access,
     equipment,
-    closing,
     evidence,
     financial_control,
     financial_reversals,
@@ -49,12 +48,13 @@ from app.api.routes import (
     search,
     site_reports,
     submittals,
-    voucher_verification,
     suppliers,
     treasury,
     treasury_advanced,
+    voucher_verification,
     workforce,
 )
+from app.api.security_headers import register_security_headers
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.core.logging import configure_logging
@@ -100,30 +100,11 @@ def create_app() -> FastAPI:
     from app.services import (
         ap_service,
         approval_service,
-        ar_service,
-        asset_service,
-        posting_service,
         submittal_service,
     )
+    from app.services.reversal_hooks import register_default_reversal_hooks
 
-    posting_service.register_reversal_hook(
-        "supplier_invoice",
-        lambda db, source_id, document_type_code: ap_service.apply_accrual_reversal(
-            db, invoice_id=source_id, document_type_code=document_type_code
-        ),
-    )
-    posting_service.register_reversal_hook(
-        "customer_invoice",
-        lambda db, source_id, document_type_code: ar_service.apply_invoice_reversal(
-            db, invoice_id=source_id, document_type_code=document_type_code
-        ),
-    )
-    posting_service.register_reversal_hook(
-        "fixed_asset",
-        lambda db, source_id, document_type_code: asset_service.apply_capitalization_reversal(
-            db, asset_id=source_id, document_type_code=document_type_code
-        ),
-    )
+    register_default_reversal_hooks()
 
     approval_service.register_decision_adapter(
         "ap.supplier_invoice",

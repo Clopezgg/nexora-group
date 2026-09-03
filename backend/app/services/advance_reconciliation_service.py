@@ -44,8 +44,11 @@ from app.models.contract_payment import (
 )
 from app.models.supplier import SupplierContract
 from app.models.treasury import GeneralExpense
-from app.services import audit_service, contract_payment_service as cps, posting_service
-from app.services.financial_validation_service import assert_supplier_advance_account_eligible
+from app.services import audit_service, posting_service
+from app.services import contract_payment_service as cps
+from app.services.financial_validation_service import (
+    assert_supplier_advance_account_eligible,
+)
 from app.services.posting_service import JournalLineInput
 
 _ZERO = Decimal("0.00")
@@ -223,6 +226,16 @@ def reconcile_duplicated_advance(
         ),
         commit=False,
     )
+    # Defensa: el hook de reversión "supplier_invoice" (que pone la factura
+    # CANCELLED) sólo está registrado si el proceso importó `app.main` o
+    # `app.services.reversal_hooks`. Forzamos la transición de forma idempotente
+    # para no dejar la factura APPROVED apuntando a un accrual REVERSED
+    # (pagable de nuevo pese a que el GL ya no refleja el gasto).
+    db.flush()
+    db.refresh(invoice)
+    if invoice.status != "CANCELLED":
+        invoice.status = "CANCELLED"
+
     audit_service.record(
         db,
         actor_user_id=actor_user_id,

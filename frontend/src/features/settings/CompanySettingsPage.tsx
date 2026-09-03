@@ -24,6 +24,7 @@ import type {
   ResourcePostingSource,
 } from '../../types/masterData'
 import { statusLabel } from '../../utils/statusLabels'
+import { BuildInfoCard } from './BuildInfoCard'
 import { ThemeSettingsCard } from './ThemeSettingsCard'
 
 function CompanyProfileForm({ company }: { company: Company }) {
@@ -409,6 +410,8 @@ export function CompanySettingsPage() {
         {periodsQuery.isLoading ? <LoadingState label="Cargando períodos…" /> : periodsQuery.isError ? <ErrorState description="No se pudieron cargar los períodos fiscales." onRetry={() => periodsQuery.refetch()} /> : <Table columns={periodColumns} rows={periods} getRowKey={(row) => row.id} emptyMessage="Todavía no hay períodos fiscales. Crea un año fiscal y genera sus períodos." />}
         {statusMutation.isError ? <p className="nx-field__error">{(statusMutation.error as Error).message}</p> : null}
       </Card>
+
+      <BuildInfoCard />
     </div>
   )
 }

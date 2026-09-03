@@ -203,7 +203,7 @@ def get_summary(
                 period_expense += amount
                 scope_totals[scope] += amount
         expenses_by_scope = [
-            ScopeAmountResponse(scope=scope, amount=float(scope_totals.get(scope, 0)))
+            ScopeAmountResponse(scope=scope, amount=scope_totals.get(scope, Decimal('0')))
             for scope in ("CENTRAL", "GENERAL", "PROJECT")
             if scope_totals.get(scope, 0) != 0
         ]
@@ -245,8 +245,8 @@ def get_summary(
         cash_flow = [
             CashFlowPointResponse(
                 period=start.strftime("%Y-%m"),
-                income=float(monthly[start.strftime("%Y-%m")]["income"]),
-                expense=float(monthly[start.strftime("%Y-%m")]["expense"]),
+                income=monthly[start.strftime("%Y-%m")]["income"],
+                expense=monthly[start.strftime("%Y-%m")]["expense"],
             )
             for start in month_starts
         ]
@@ -315,14 +315,14 @@ def get_summary(
         period_label = f"{year_code} · P{fiscal_period.period_number:02d}"
 
     return DashboardSummaryResponse(
-        treasury_balance=float(treasury_balance),
-        period_income=float(period_income),
-        period_expense=float(period_expense),
+        treasury_balance=treasury_balance,
+        period_income=period_income,
+        period_expense=period_expense,
         active_projects=active_projects,
         pending_approvals=pending_approvals,
         overdue_payables=overdue_payables,
-        overdue_payables_amount=float(overdue_payables_amount),
-        receivables_outstanding=float(receivables_outstanding),
+        overdue_payables_amount=overdue_payables_amount,
+        receivables_outstanding=receivables_outstanding,
         cash_flow=cash_flow,
         expenses_by_scope=expenses_by_scope,
         fiscal_period_label=period_label,

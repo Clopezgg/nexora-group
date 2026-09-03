@@ -268,6 +268,23 @@ certificar el 100%.
   `test_evidence.py::test_evidence_heic_gets_a_derived_jpeg_render` con un HEIC
   decodificable generado en el test. Si la decodificación falla, el upload no
   se rompe: el original queda íntegro y descargable.
+- `DEFERRED-FINAL-020` — **ABIERTO (2026-09-03, ORDEN MAESTRA DE CIERRE
+  FINAL DE PRODUCTO §10/§11).** `Company.logo_evidence_id` /
+  `signature_evidence_id` existen como columnas pero nunca se exponen en
+  `CompanyUpdateRequest`/`CompanyResponse` ni se leen en ningún service —
+  dato muerto, imposible de asignar vía API. El comprobante (`voucher_service.py`)
+  no embebe logo ni firma gráfica; falta snapshot en `VoucherIssuance`
+  (mismo patrón que `company_footer_snapshot`, que sí se corrigió en esta
+  misma orden — ver `voucher_footer_text` ya impreso). Los bancos se
+  imprimen solo como texto (`bank_label`); no existe ningún mecanismo de
+  logo bancario (evidence-based ni ícono neutral de fallback) — §11 no
+  tiene ningún código todavía.
+- `DEFERRED-FINAL-021` — **ABIERTO (2026-09-03, ORDEN MAESTRA DE CIERRE
+  FINAL DE PRODUCTO §19).** No existe endpoint de AP Aging (`ar_metrics`
+  existe en `financial_control_service.py`, su equivalente AP no). Ningún
+  reporte financiero tiene exportación XLSX o PDF reales (`openpyxl`/
+  `xlsxwriter`/`reportlab` no se usan en `reports.py`); solo el ledger de
+  pagos de contrato exporta CSV.
 
 ## Bloqueos externos
 

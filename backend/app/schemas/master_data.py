@@ -19,7 +19,9 @@ class CompanyUpdateRequest(CamelModel):
     """Company profile update.
 
     Code and functional currency are one-time configurable when the historic
-    company row still has NULL. Once assigned, both remain immutable.
+    company row still has NULL. Once assigned, both remain immutable. Logo and
+    signature are private Evidence references validated against the company;
+    clients never provide blob URLs.
     """
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
@@ -28,9 +30,6 @@ class CompanyUpdateRequest(CamelModel):
     functional_currency_code: str | None = Field(default=None, min_length=3, max_length=3)
     country: str | None = Field(default=None, min_length=2, max_length=2)
     fiscal_id: str | None = Field(default=None, max_length=64)
-    # Identidad de comprobantes (orden maestra Phase 2). El pagador se asigna
-    # una sola vez (immutable una vez que la fila deja de tener NULL, mismo
-    # patrón que `code`); el aprobador es siempre editable.
     voucher_payer_name: str | None = Field(default=None, min_length=1, max_length=255)
     voucher_approver_name: str | None = Field(default=None, max_length=255)
     default_theme_id: str | None = Field(default=None, max_length=64)
@@ -44,6 +43,8 @@ class CompanyUpdateRequest(CamelModel):
     email: str | None = Field(default=None, max_length=255)
     website: str | None = Field(default=None, max_length=255)
     voucher_footer_text: str | None = Field(default=None, max_length=500)
+    logo_evidence_id: uuid.UUID | None = None
+    signature_evidence_id: uuid.UUID | None = None
     supplier_advance_account_id: uuid.UUID | None = None
 
 
@@ -68,6 +69,8 @@ class CompanyResponse(CamelModel):
     email: str | None = None
     website: str | None = None
     voucher_footer_text: str | None = None
+    logo_evidence_id: uuid.UUID | None = None
+    signature_evidence_id: uuid.UUID | None = None
     supplier_advance_account_id: uuid.UUID | None = None
 
 

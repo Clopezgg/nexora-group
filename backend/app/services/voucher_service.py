@@ -1,14 +1,9 @@
-"""Comprobante de pago NEXORA — documento empresarial (orden maestra
-correctiva §26-§53).
+"""Comprobante de pago NEXORA — documento empresarial (orden maestra correctiva §26-§53).
 
-Generado con reportlab **Platypus** (Table/Paragraph/Image, no coordenadas
-absolutas): soporta nombres largos, acentos/ñ, conceptos largos, planes de
-pago, evidencia embebida y multipágina sin desbordar la hoja.
-
-Fuente: familia Helvetica (Type-1 estándar de reportlab, WinAnsi cubre el
-español; no es un archivo de fuente propietario). Los importes pasan por
-`app.core.money.format_money`. Nunca se imprimen UUID, blob keys ni URLs
-privadas. El QR codifica `<FRONTEND_URL>/verificar/comprobante/<token>`.
+Generado con reportlab Platypus: soporta nombres largos, acentos, conceptos,
+planes de pago, evidencia, branding privado y multipágina. Nunca se imprimen
+UUID, blob keys ni URLs privadas. Logo y firma provienen de Evidence privado
+y se congelan en VoucherIssuance en la primera emisión.
 """
 
 import hashlib
@@ -22,7 +17,6 @@ from reportlab.graphics.shapes import Drawing
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-
 from reportlab.lib.units import cm
 from reportlab.platypus import (
     Image,
@@ -37,15 +31,12 @@ from reportlab.platypus import (
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.business_time import business_today
 from app.core.config import get_settings
 from app.core.money import format_money
 from app.domain.errors import VoucherNotOutflowError
 from app.models.accounting import AccountingDocument, JournalLine
-from app.models.ap import (
-    SupplierInvoice,
-    SupplierInvoicePaymentPlanItem,
-    SupplierPayment,
-)
+from app.models.ap import SupplierInvoice, SupplierInvoicePaymentPlanItem, SupplierPayment
 from app.models.chart_of_accounts import Account
 from app.models.company import Company
 from app.models.evidence import Evidence
@@ -66,7 +57,6 @@ _INK = colors.HexColor("#1b2733")
 
 _ACCOUNTING_DOCUMENT_EVIDENCE_TYPES = {"ACCOUNTING_DOCUMENT", "PAYMENT_DOCUMENT", "VOUCHER"}
 _EMBEDDABLE_IMAGE_MIME = {"image/jpeg", "image/png", "image/webp"}
-
 _STATUS_LABEL = {
     "posted": "Contabilizado",
     "draft": "Borrador",
@@ -76,13 +66,6 @@ _STATUS_LABEL = {
 
 
 def _styles() -> dict[str, ParagraphStyle]:
-    """Sistema tipográfico DEL DOCUMENTO (ORDEN MAESTRA §27).
-
-    Es una jerarquía de documento corporativo, deliberadamente independiente
-    de los temas de la interfaz: familia Helvetica (Type-1 estándar, WinAnsi
-    cubre el español), escala fija, sin depender de `themes.css` ni de ningún
-    token de UI.
-    """
     base = getSampleStyleSheet()
     body = ParagraphStyle(
         "nx-body", parent=base["BodyText"], fontName="Helvetica", fontSize=9,
@@ -105,7 +88,6 @@ def _styles() -> dict[str, ParagraphStyle]:
             "nx-title", parent=base["Title"], fontName="Helvetica-Bold",
             fontSize=17, leading=19, textColor=_NAVY, spaceAfter=2,
         ),
-        # Encabezado de sección con presencia de documento.
         "section": ParagraphStyle(
             "nx-section", parent=body, fontName="Helvetica-Bold", fontSize=10.5,
             leading=13, textColor=_NAVY, spaceBefore=2, spaceAfter=2,
@@ -140,17 +122,12 @@ def _styles() -> dict[str, ParagraphStyle]:
 
 
 def _section(title: str, styles: dict[str, ParagraphStyle], *, top: float = 12) -> list:
-    """Encabezado de sección del documento: título + regla fina de acento.
-    Uniforma toda la jerarquía del comprobante (§27)."""
     rule = Table([[""]], colWidths=[17 * cm], rowHeights=[2])
     rule.setStyle(TableStyle([("LINEABOVE", (0, 0), (-1, -1), 1.1, _ACCENT)]))
     return [Spacer(1, top), Paragraph(title, styles["section"]), rule, Spacer(1, 4)]
 
 
 def _page_furniture(document_number: str, verification_code: str):
-    """Callback de reportlab para pie de página: identidad + verificación +
-    numeración. Sin IDs técnicos."""
-
     def _draw(canvas, doc):
         canvas.saveState()
         width, _ = letter
@@ -163,8 +140,7 @@ def _page_furniture(document_number: str, verification_code: str):
         canvas.drawString(
             2 * cm,
             y,
-            f"NEXORA GROUP  ·  Comprobante {document_number}  ·  "
-            f"Verificación {verification_code}",
+            f"NEXORA GROUP  ·  Comprobante {document_number}  ·  Verificación {verification_code}",
         )
         canvas.drawRightString(width - 2 * cm, y, f"Página {doc.page}")
         canvas.restoreState()
@@ -185,11 +161,7 @@ def _mask_reference(reference: str | None) -> str | None:
     return f"{'*' * max(len(reference) - 4, 0)}{tail}"
 
 
-def approval_verification_code(
-    *, document_number: str, approved_by: str | None, issued_on: date
-) -> str:
-    """Código legible de integridad. NO es una firma criptográfica con clave;
-    permite re-derivar y contrastar (documento, aprobador, emisión)."""
+def approval_verification_code(*, document_number: str, approved_by: str | None, issued_on: date) -> str:
     raw = f"{document_number}|{(approved_by or '').strip().upper()}|{issued_on.isoformat()}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12].upper()
 
@@ -207,16 +179,12 @@ def _qr_flowable(url: str, size: float = 2.6 * cm) -> Drawing:
 def _resolve_payment_schedule(
     db: Session, document: AccountingDocument
 ) -> tuple[SupplierInvoice, list[SupplierInvoicePaymentPlanItem]] | None:
-    """Best-effort: si el comprobante corresponde a un pago/acumulación de una
-    factura de proveedor con plan de cuotas, se devuelve el plan real."""
     invoice: SupplierInvoice | None = db.execute(
         select(SupplierInvoice).where(SupplierInvoice.accrual_document_id == document.id)
     ).scalar_one_or_none()
     if invoice is None:
         payment = db.execute(
-            select(SupplierPayment).where(
-                SupplierPayment.accounting_document_id == document.id
-            )
+            select(SupplierPayment).where(SupplierPayment.accounting_document_id == document.id)
         ).scalar_one_or_none()
         if payment is not None:
             invoice = db.get(SupplierInvoice, payment.supplier_invoice_id)
@@ -235,9 +203,6 @@ def _resolve_payment_schedule(
 
 
 def _resolve_contract_context(db: Session, document: AccountingDocument) -> dict | None:
-    """Si el comprobante corresponde a un pago contractual (PAY doc ->
-    SupplierPayment -> ContractPaymentAllocation -> schedule), devuelve el
-    contexto para imprimir historial ACUMULATIVO + totales de contrato."""
     from app.models.contract_payment import (
         ContractPaymentAllocation,
         ContractPaymentInstallment,
@@ -247,9 +212,7 @@ def _resolve_contract_context(db: Session, document: AccountingDocument) -> dict
     from app.services import contract_payment_service
 
     payment = db.execute(
-        select(SupplierPayment).where(
-            SupplierPayment.accounting_document_id == document.id
-        )
+        select(SupplierPayment).where(SupplierPayment.accounting_document_id == document.id)
     ).scalar_one_or_none()
     if payment is None:
         return None
@@ -268,7 +231,6 @@ def _resolve_contract_context(db: Session, document: AccountingDocument) -> dict
         return None
     schedule = db.get(ContractPaymentSchedule, installment.schedule_id)
     contract = db.get(SupplierContract, schedule.supplier_contract_id) if schedule else None
-    # El período más reciente que este pago tocó marca el corte del historial.
     periods = []
     for alloc in allocations:
         inst = db.get(ContractPaymentInstallment, alloc.installment_id)
@@ -286,11 +248,8 @@ def _resolve_contract_context(db: Session, document: AccountingDocument) -> dict
         "payment": payment,
         "contract_number": contract.contract_number if contract else "—",
         "contract_category": (
-            SUPPLIER_CONTRACT_CATEGORY_LABELS_ES.get(
-                contract.contract_category, contract.contract_category
-            )
-            if contract
-            else None
+            SUPPLIER_CONTRACT_CATEGORY_LABELS_ES.get(contract.contract_category, contract.contract_category)
+            if contract else None
         ),
         "period_label": contract_payment_service.period_label(cutoff_year, cutoff_month),
         "cutoff": (cutoff_year, cutoff_month),
@@ -319,8 +278,6 @@ def _q_amount(value) -> Decimal:
 def _resolve_beneficiary_details(
     db: Session, document: AccountingDocument, contract_ctx: dict | None
 ) -> tuple[str | None, str | None]:
-    """Dirección e identificación fiscal del beneficiario desde el Supplier
-    real (§32), cuando el pago se puede trazar a una factura de proveedor."""
     from app.models.supplier import Supplier
 
     supplier_id = None
@@ -330,9 +287,7 @@ def _resolve_beneficiary_details(
         supplier_id = invoice.supplier_id if invoice else None
     if supplier_id is None:
         payment = db.execute(
-            select(SupplierPayment).where(
-                SupplierPayment.accounting_document_id == document.id
-            )
+            select(SupplierPayment).where(SupplierPayment.accounting_document_id == document.id)
         ).scalar_one_or_none()
         if payment is not None:
             invoice = db.get(SupplierInvoice, payment.supplier_invoice_id)
@@ -347,11 +302,6 @@ def _resolve_beneficiary_details(
 
 
 def format_supplier_address(supplier) -> str | None:
-    """Dirección del beneficiario para el comprobante (§26).
-
-    Usa la dirección ESTRUCTURADA canónica; si está vacía, recurre al texto
-    libre `address` conservado por compatibilidad.
-    """
     structured = " · ".join(
         str(part).strip()
         for part in (
@@ -378,25 +328,31 @@ def _load_payment_evidence(db: Session, document: AccountingDocument) -> Evidenc
         entity_type="ACCOUNTING_DOCUMENT",
         entity_id=document.id,
     )
-    rows = [
-        row
-        for row in rows
-        if (row.entity_type or "").upper() in _ACCOUNTING_DOCUMENT_EVIDENCE_TYPES
-    ]
+    rows = [row for row in rows if (row.entity_type or "").upper() in _ACCOUNTING_DOCUMENT_EVIDENCE_TYPES]
     if not rows:
         return None
     proofs = [r for r in rows if (r.category or "").upper() == "PAYMENT_PROOF"]
     candidates = proofs or rows
     images = [
-        r
-        for r in candidates
+        r for r in candidates
         if (evidence_service.render_mime_type(r) or "").lower() in _EMBEDDABLE_IMAGE_MIME
     ]
     return (images or candidates)[0]
 
 
+def _branding_evidence(
+    db: Session, evidence_id: uuid.UUID | None, *, company_id: uuid.UUID
+) -> Evidence | None:
+    """Defense-in-depth: branding histórico solo puede leerse de la misma company."""
+    if evidence_id is None:
+        return None
+    evidence = evidence_service.get_evidence(db, evidence_id)
+    if evidence is None or evidence.company_id != company_id:
+        return None
+    return evidence
+
+
 def _evidence_image(evidence: Evidence, *, max_width: float, max_height: float) -> Image | None:
-    # §28: para un HEIC se usa el JPEG derivado; el original nunca es embebible.
     if (evidence_service.render_mime_type(evidence) or "").lower() not in _EMBEDDABLE_IMAGE_MIME:
         return None
     try:
@@ -452,14 +408,11 @@ def generate_voucher_pdf(
     if document is None:
         raise ValueError(f"AccountingDocument {accounting_document_id} no existe")
 
-    # Defense-in-depth (§3/§26): el generador del PDF es la última línea. Un
-    # Payment Voucher solo se emite para un OUTFLOW de tesorería — nunca una
-    # remesa, un cobro, un aporte de capital o una transferencia interna.
     _direction = treasury_direction_service.classify(db, document)
     if not _direction.voucher_eligible:
         raise VoucherNotOutflowError(
-            f"El documento {document.document_number} no es un egreso de "
-            f"tesorería (dirección: {_direction.direction})."
+            f"El documento {document.document_number} no es un egreso de tesorería "
+            f"(dirección: {_direction.direction})."
         )
 
     company = db.get(Company, document.company_id)
@@ -467,27 +420,21 @@ def generate_voucher_pdf(
     settings = get_settings()
     styles = _styles()
 
-    lines = list(
-        db.query(JournalLine).filter(JournalLine.accounting_document_id == document.id)
-    )
+    lines = list(db.query(JournalLine).filter(JournalLine.accounting_document_id == document.id))
     account_ids = {line.account_id for line in lines}
     accounts: dict[uuid.UUID, Account] = {}
     if account_ids:
         for account in db.query(Account).filter(Account.id.in_(account_ids)):
             accounts[account.id] = account
 
-    issued_on = issued_on or date.today()
+    issued_on = issued_on or business_today()
     total = sum((line.debit_amount for line in lines), Decimal("0"))
     currency = document.currency_code
     functional_currency = (company.functional_currency_code if company else None) or currency
-    is_fx_conversion = (
-        Decimal(str(document.fx_rate)) != Decimal("1") and currency != functional_currency
-    )
+    is_fx_conversion = Decimal(str(document.fx_rate)) != Decimal("1") and currency != functional_currency
 
     verification_code = approval_verification_code(
-        document_number=document.document_number,
-        approved_by=approved_by,
-        issued_on=issued_on,
+        document_number=document.document_number, approved_by=approved_by, issued_on=issued_on
     )
     company_name = company.name if company else "NEXORA GROUP"
     token = voucher_verification_service.get_or_create_token(
@@ -505,10 +452,8 @@ def generate_voucher_pdf(
     )
     verify_url = f"{settings.frontend_url.rstrip('/')}/verificar/comprobante/{token}"
 
-    # -- Contexto contractual + snapshot INMUTABLE de emisión (§27/§28) ----
     contract_ctx = _resolve_contract_context(db, document)
     _benef_addr, _benef_tax = _resolve_beneficiary_details(db, document, contract_ctx)
-    _bank_mask = _mask_reference(bank_reference)
     issuance = voucher_issuance_service.get_or_create(
         db,
         accounting_document_id=document.id,
@@ -523,7 +468,7 @@ def generate_voucher_pdf(
         approver_name=approved_by,
         payment_method=payment_method,
         bank_name=bank_label,
-        bank_account_mask=_bank_mask,
+        bank_account_mask=_mask_reference(bank_reference),
         bank_transaction_reference=(contract_ctx or {}).get("bank_transaction_reference"),
         payment_observations=(contract_ctx or {}).get("observations"),
         amount=_q_amount(total),
@@ -537,122 +482,92 @@ def generate_voucher_pdf(
         verification_token=token,
         verification_code=verification_code,
     )
-    # A partir de aquí el PDF lee del snapshot: reimprimir un comprobante viejo
-    # nunca trae master data nueva.
     company_name = issuance.company_name_snapshot
     payer = issuance.payer_name_snapshot
     approved_by = issuance.approver_name_snapshot
 
+    logo_evidence = _branding_evidence(
+        db, issuance.company_logo_evidence_id_snapshot, company_id=issuance.company_id
+    )
+    signature_evidence = _branding_evidence(
+        db, issuance.company_signature_evidence_id_snapshot, company_id=issuance.company_id
+    )
+    logo_image = _evidence_image(logo_evidence, max_width=3.8 * cm, max_height=2.0 * cm) if logo_evidence else None
+    signature_image = _evidence_image(signature_evidence, max_width=3.8 * cm, max_height=1.5 * cm) if signature_evidence else None
+
     status_label = _STATUS_LABEL.get((document.status or "").lower(), document.status or "—")
     posted = document.posted_at.strftime("%d/%m/%Y") if document.posted_at else "Sin postear"
-
     story: list = []
 
-    # -- Membrete corporativo (identidad de la empresa emisora, §27) ---
-    identity: list = [Paragraph("NEXORA GROUP", styles["brand"])]
-    _trade = issuance.company_trade_name_snapshot or issuance.company_name_snapshot
-    if _trade and _trade != "NEXORA GROUP":
-        identity.append(Paragraph(_trade, styles["value"]))
+    identity: list = []
+    if logo_image is not None:
+        identity.extend([logo_image, Spacer(1, 3)])
+    identity.append(Paragraph("NEXORA GROUP", styles["brand"]))
+    trade = issuance.company_trade_name_snapshot or issuance.company_name_snapshot
+    if trade and trade != "NEXORA GROUP":
+        identity.append(Paragraph(trade, styles["value"]))
     if issuance.company_legal_name_snapshot:
         identity.append(Paragraph(issuance.company_legal_name_snapshot, styles["identity"]))
-    _id_bits = []
+    id_bits = []
     if issuance.company_fiscal_id_snapshot:
-        _id_bits.append(f"RTN {issuance.company_fiscal_id_snapshot}")
+        id_bits.append(f"RTN {issuance.company_fiscal_id_snapshot}")
     if issuance.company_address_snapshot:
-        _id_bits.append(issuance.company_address_snapshot)
-    if _id_bits:
-        identity.append(Paragraph(" · ".join(_id_bits), styles["identity"]))
-    _contact = " · ".join(
-        p
-        for p in [
-            issuance.company_phone_snapshot,
-            issuance.company_email_snapshot,
-            issuance.company_website_snapshot,
-        ]
-        if p
+        id_bits.append(issuance.company_address_snapshot)
+    if id_bits:
+        identity.append(Paragraph(" · ".join(id_bits), styles["identity"]))
+    contact = " · ".join(
+        p for p in [issuance.company_phone_snapshot, issuance.company_email_snapshot, issuance.company_website_snapshot] if p
     )
-    if _contact:
-        identity.append(Paragraph(_contact, styles["identity"]))
+    if contact:
+        identity.append(Paragraph(contact, styles["identity"]))
 
     meta_card = Table(
         [
             [Paragraph("COMPROBANTE DE PAGO", styles["docmark"])],
             [Paragraph(f"N.º {document.document_number}", styles["doctype"])],
-            [
-                Paragraph(
-                    f"Emitido {issued_on.strftime('%d/%m/%Y')}<br/>"
-                    f"Contabilizado {posted}<br/>"
-                    f"Estado {status_label}",
-                    styles["identity"],
-                )
-            ],
+            [Paragraph(
+                f"Emitido {issued_on.strftime('%d/%m/%Y')}<br/>Contabilizado {posted}<br/>Estado {status_label}",
+                styles["identity"],
+            )],
         ],
         colWidths=[5.6 * cm],
     )
-    meta_card.setStyle(
-        TableStyle(
-            [
-                ("BOX", (0, 0), (-1, -1), 0.8, _LINE),
-                ("BACKGROUND", (0, 0), (-1, -1), _FAINT),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ]
-        )
-    )
+    meta_card.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.8, _LINE),
+        ("BACKGROUND", (0, 0), (-1, -1), _FAINT),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
     right_col = [meta_card, Spacer(1, 6), _qr_flowable(verify_url, size=2.4 * cm)]
-
     header = Table([[identity, right_col]], colWidths=[10.4 * cm, 6.1 * cm])
-    header.setStyle(
-        TableStyle(
-            [
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LINEBELOW", (0, 0), (-1, -1), 1.6, _NAVY),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-            ]
-        )
-    )
+    header.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, -1), 1.6, _NAVY),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
     story.append(header)
-    story.append(
-        Paragraph(
-            "Escanea el QR para verificar la autenticidad de este comprobante.",
-            styles["small"],
-        )
-    )
+    story.append(Paragraph("Escanea el QR para verificar la autenticidad de este comprobante.", styles["small"]))
 
-    # -- Beneficiario / Pagador (del SNAPSHOT inmutable, §28) ----------
-    benef = [Paragraph("PAGADO A / BENEFICIARIO", styles["label"])]
-    benef.append(Paragraph(issuance.beneficiary_name_snapshot, styles["value"]))
+    benef = [Paragraph("PAGADO A / BENEFICIARIO", styles["label"]), Paragraph(issuance.beneficiary_name_snapshot, styles["value"])]
     if issuance.beneficiary_tax_id_snapshot:
         benef.append(Paragraph(f"ID / RTN {issuance.beneficiary_tax_id_snapshot}", styles["small"]))
     if issuance.beneficiary_address_snapshot:
         benef.append(Paragraph(issuance.beneficiary_address_snapshot, styles["small"]))
-
-    payer = [Paragraph("PAGADO POR", styles["label"])]
-    payer.append(Paragraph(issuance.payer_name_snapshot, styles["value"]))
+    payer_flow = [Paragraph("PAGADO POR", styles["label"]), Paragraph(issuance.payer_name_snapshot, styles["value"])]
     if issuance.project_name_snapshot:
-        payer.append(Paragraph(f"Proyecto: {issuance.project_name_snapshot}", styles["small"]))
-
-    band = Table([[benef, payer]], colWidths=[9.5 * cm, 7.0 * cm])
-    band.setStyle(
-        TableStyle(
-            [
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("TOPPADDING", (0, 0), (-1, -1), 10),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-            ]
-        )
-    )
+        payer_flow.append(Paragraph(f"Proyecto: {issuance.project_name_snapshot}", styles["small"]))
+    band = Table([[benef, payer_flow]], colWidths=[9.5 * cm, 7.0 * cm])
+    band.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
     story.append(band)
 
-    # -- Información del pago ---------------------------------------
     story.extend(_section("Información del pago", styles))
-    scope_label = (
-        project.name
-        if project
-        else ("Operación general" if document.scope in {"CENTRAL", "GENERAL"} else document.scope)
-    )
+    scope_label = project.name if project else ("Operación general" if document.scope in {"CENTRAL", "GENERAL"} else document.scope)
     info_rows: list[tuple[str, str]] = [
         ("Concepto", document.description or "—"),
         ("Ámbito", scope_label if project is None else f"Proyecto · {project.name}"),
@@ -660,27 +575,18 @@ def generate_voucher_pdf(
     ]
     if bank_label:
         masked = _mask_reference(bank_reference)
-        info_rows.append(("Banco / cuenta", f"{bank_label}{f' · {masked}' if masked else ''}"))
+        info_rows.append(("Institución bancaria / cuenta", f"{bank_label}{f' · {masked}' if masked else ''}"))
     if is_fx_conversion:
-        info_rows.append(
-            ("Tipo de cambio", f"1 {currency} = {document.fx_rate} {functional_currency}")
-        )
-
+        info_rows.append(("Tipo de cambio", f"1 {currency} = {document.fx_rate} {functional_currency}"))
     if contract_ctx:
         info_rows.insert(0, ("Contrato", contract_ctx["contract_number"]))
-        _next = 1
+        next_index = 1
         if contract_ctx.get("contract_category"):
-            info_rows.insert(_next, ("Categoría del contrato", contract_ctx["contract_category"]))
-            _next += 1
-        info_rows.insert(_next, ("Período contractual", contract_ctx["period_label"]))
-        _next += 1
-        info_rows.insert(
-            _next,
-            (
-                "Cuota",
-                f"{contract_ctx['installment_seq']} de {contract_ctx['installment_total']}",
-            ),
-        )
+            info_rows.insert(next_index, ("Categoría del contrato", contract_ctx["contract_category"]))
+            next_index += 1
+        info_rows.insert(next_index, ("Período contractual", contract_ctx["period_label"]))
+        next_index += 1
+        info_rows.insert(next_index, ("Cuota", f"{contract_ctx['installment_seq']} de {contract_ctx['installment_total']}"))
         if contract_ctx.get("bank_transaction_reference"):
             info_rows.append(("Referencia bancaria", contract_ctx["bank_transaction_reference"]))
         if contract_ctx.get("observations"):
@@ -688,27 +594,19 @@ def generate_voucher_pdf(
     story.append(_kv_table(info_rows, styles))
     story.append(Spacer(1, 10))
     total_box = Table(
-        [[
-            Paragraph("TOTAL PAGADO", styles["label"]),
-            Paragraph(format_money(total, currency), styles["amount"]),
-        ]],
+        [[Paragraph("TOTAL PAGADO", styles["label"]), Paragraph(format_money(total, currency), styles["amount"])]],
         colWidths=[8 * cm, 8.5 * cm],
     )
-    total_box.setStyle(
-        TableStyle(
-            [
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-                ("LINEABOVE", (0, 0), (-1, -1), 1.6, _NAVY),
-                ("LINEBELOW", (0, 0), (-1, -1), 1.6, _NAVY),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ]
-        )
-    )
+    total_box.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("LINEABOVE", (0, 0), (-1, -1), 1.6, _NAVY),
+        ("LINEBELOW", (0, 0), (-1, -1), 1.6, _NAVY),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
     story.append(total_box)
 
-    # -- Pagos del contrato a la fecha (historial ACUMULATIVO, §38-§39) ----
     if contract_ctx:
         cc = contract_ctx
         ccur = cc["currency"]
@@ -716,91 +614,62 @@ def generate_voucher_pdf(
         rows = [["Período", "Programado", "Pagado", "Saldo", "Estado"]]
         for s in cc["history"]:
             is_current = (s.period_year, s.period_month) == cc["cutoff"]
-            rows.append(
-                [
-                    s.period_label,
-                    format_money(s.scheduled_amount, ccur),
-                    format_money(s.paid, ccur),
-                    format_money(s.remaining, ccur),
-                    "Pago actual" if is_current else s.status,
-                ]
-            )
+            rows.append([
+                s.period_label,
+                format_money(s.scheduled_amount, ccur),
+                format_money(s.paid, ccur),
+                format_money(s.remaining, ccur),
+                "Pago actual" if is_current else s.status,
+            ])
         hist_table = Table(rows, colWidths=[3.6 * cm, 3.3 * cm, 3.3 * cm, 3 * cm, 3.3 * cm])
-        hist_table.setStyle(
-            TableStyle(
-                [
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), _MUTED),
-                    ("ALIGN", (1, 0), (3, -1), "RIGHT"),
-                    ("LINEBELOW", (0, 0), (-1, 0), 0.5, _LINE),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7fb")]),
-                    ("TOPPADDING", (0, 0), (-1, -1), 3),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-                ]
-            )
-        )
+        hist_table.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("TEXTCOLOR", (0, 0), (-1, 0), _MUTED),
+            ("ALIGN", (1, 0), (3, -1), "RIGHT"),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.5, _LINE),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7fb")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
         story.append(hist_table)
         story.append(Spacer(1, 6))
-        story.append(
-            _kv_table(
-                [
-                    ("Valor contractual", format_money(cc["summary"].contract_value, ccur)),
-                    ("Pagado anteriormente", format_money(cc["paid_before"], ccur)),
-                    ("Pago actual", format_money(cc["payment_amount"], ccur)),
-                    ("Pagado acumulado", format_money(cc["summary"].paid_accumulated, ccur)),
-                    ("Saldo contractual", format_money(cc["summary"].contract_balance, ccur)),
-                ],
-                styles,
-            )
-        )
+        story.append(_kv_table([
+            ("Valor contractual", format_money(cc["summary"].contract_value, ccur)),
+            ("Pagado anteriormente", format_money(cc["paid_before"], ccur)),
+            ("Pago actual", format_money(cc["payment_amount"], ccur)),
+            ("Pagado acumulado", format_money(cc["summary"].paid_accumulated, ccur)),
+            ("Saldo contractual", format_money(cc["summary"].contract_balance, ccur)),
+        ], styles))
 
-    # -- Pagos / vencimientos de factura (fallback si no hay contrato) -----
     schedule = None if contract_ctx else _resolve_payment_schedule(db, document)
     if schedule is not None:
         invoice, plan = schedule
         story.extend(_section("Pagos / vencimientos", styles))
-        header_row = ["Período", "Importe", "Estado"]
-        rows = [header_row]
+        rows = [["Período", "Importe", "Estado"]]
         invoice_total = invoice.amount + invoice.tax_amount
         for item in plan:
-            rows.append(
-                [
-                    item.due_date.strftime("%b %Y"),
-                    format_money(item.amount, invoice.currency_code),
-                    item.note or "Programada",
-                ]
-            )
+            rows.append([item.due_date.strftime("%b %Y"), format_money(item.amount, invoice.currency_code), item.note or "Programada"])
         plan_table = Table(rows, colWidths=[5 * cm, 5 * cm, 6.5 * cm])
-        plan_table.setStyle(
-            TableStyle(
-                [
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), _MUTED),
-                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-                    ("LINEBELOW", (0, 0), (-1, 0), 0.5, _LINE),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7fb")]),
-                    ("TOPPADDING", (0, 0), (-1, -1), 3),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-                ]
-            )
-        )
+        plan_table.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+            ("TEXTCOLOR", (0, 0), (-1, 0), _MUTED),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.5, _LINE),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7fb")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
         story.append(plan_table)
         story.append(Spacer(1, 4))
-        story.append(
-            Paragraph(
-                f"Total acordado {format_money(invoice_total, invoice.currency_code)} · "
-                f"Pagado acumulado {format_money(invoice.amount_paid, invoice.currency_code)} · "
-                f"Saldo pendiente "
-                f"{format_money(invoice_total - invoice.amount_paid, invoice.currency_code)}",
-                styles["small"],
-            )
-        )
+        story.append(Paragraph(
+            f"Total acordado {format_money(invoice_total, invoice.currency_code)} · "
+            f"Pagado acumulado {format_money(invoice.amount_paid, invoice.currency_code)} · "
+            f"Saldo pendiente {format_money(invoice_total - invoice.amount_paid, invoice.currency_code)}",
+            styles["small"],
+        ))
 
-    # -- Asiento contable — se difiere a la PÁGINA 2 (ORDEN MAESTRA §13:
-    #    el asiento no debe dominar visualmente la primera página; la
-    #    primera página es el documento de negocio). ------------------
     accounting_flow: list = _section("Asiento contable", styles, top=0)
     acc_rows = [["Código / Cuenta", "Débito", "Crédito"]]
     total_debit = Decimal("0")
@@ -808,67 +677,45 @@ def generate_voucher_pdf(
     for line in lines:
         total_debit += line.debit_amount
         total_credit += line.credit_amount
-        acc_rows.append(
-            [
-                _account_label(accounts.get(line.account_id)),
-                format_money(line.debit_amount, currency) if line.debit_amount else "",
-                format_money(line.credit_amount, currency) if line.credit_amount else "",
-            ]
-        )
-    acc_rows.append(
-        ["Totales", format_money(total_debit, currency), format_money(total_credit, currency)]
-    )
+        acc_rows.append([
+            _account_label(accounts.get(line.account_id)),
+            format_money(line.debit_amount, currency) if line.debit_amount else "",
+            format_money(line.credit_amount, currency) if line.credit_amount else "",
+        ])
+    acc_rows.append(["Totales", format_money(total_debit, currency), format_money(total_credit, currency)])
     acc_table = Table(acc_rows, colWidths=[9.5 * cm, 3.5 * cm, 3.5 * cm])
-    acc_table.setStyle(
-        TableStyle(
-            [
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-                ("TEXTCOLOR", (0, 0), (-1, 0), _MUTED),
-                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
-                ("LINEBELOW", (0, 0), (-1, 0), 0.5, _LINE),
-                ("LINEABOVE", (0, -1), (-1, -1), 0.5, _LINE),
-                ("TOPPADDING", (0, 0), (-1, -1), 3),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ]
-        )
-    )
+    acc_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("TEXTCOLOR", (0, 0), (-1, 0), _MUTED),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.5, _LINE),
+        ("LINEABOVE", (0, -1), (-1, -1), 0.5, _LINE),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
     accounting_flow.append(acc_table)
-    accounting_flow.append(
-        Paragraph(
-            "Doble partida: TOTAL DÉBITO = TOTAL CRÉDITO. El comprobante no puede "
-            "alterar el asiento contabilizado.",
-            styles["small"],
-        )
-    )
+    accounting_flow.append(Paragraph(
+        "Doble partida: TOTAL DÉBITO = TOTAL CRÉDITO. El comprobante no puede alterar el asiento contabilizado.",
+        styles["small"],
+    ))
 
-    # -- Evidencia (página 1) -----------------------------------
     evidence = _load_payment_evidence(db, document)
     story.extend(_section("Evidencia de pago", styles))
     if evidence is None:
-        story.append(
-            Paragraph(
-                "Sin evidencia adjunta (no requerida para este método de pago).",
-                styles["body"],
-            )
-        )
+        story.append(Paragraph("Sin evidencia adjunta (no requerida para este método de pago).", styles["body"]))
     else:
         digest = (evidence.content_hash or "").upper()
         short = f"{digest[:8]}...{digest[-4:]}" if digest else "no registrado"
-        story.append(
-            Paragraph(
-                f"Evidencia adjunta: {evidence.original_filename} - "
-                f"{round(evidence.size_bytes / 1024)} KB · SHA-256 {short}",
-                styles["body"],
-            )
-        )
+        story.append(Paragraph(
+            f"Evidencia adjunta: {evidence.original_filename} - {round(evidence.size_bytes / 1024)} KB · SHA-256 {short}",
+            styles["body"],
+        ))
         thumb = _evidence_image(evidence, max_width=6 * cm, max_height=4.5 * cm)
         if thumb is not None:
-            story.append(Spacer(1, 4))
-            story.append(thumb)
+            story.extend([Spacer(1, 4), thumb])
 
-    # -- Firmas -------------------------------------------------
     story.append(Spacer(1, 14))
     sign_cells = []
     for label, name in [
@@ -876,58 +723,42 @@ def generate_voucher_pdf(
         ("Aprobado por", approved_by or "Pendiente de aprobación"),
         ("Recibí conforme", beneficiary),
     ]:
-        sign_cells.append(
-            [
-                Paragraph("<br/><br/>_____________________________", styles["small"]),
-                Paragraph(label, styles["label"]),
-                Paragraph(name, styles["value"]),
-            ]
-        )
+        flows: list = []
+        if label == "Aprobado por" and signature_image is not None:
+            flows.extend([signature_image, Spacer(1, 2)])
+        else:
+            flows.append(Paragraph("<br/><br/>_____________________________", styles["small"]))
+        flows.extend([Paragraph(label, styles["label"]), Paragraph(name, styles["value"])])
+        sign_cells.append(flows)
     sign_table = Table([sign_cells], colWidths=[5.5 * cm, 5.5 * cm, 5.5 * cm])
-    sign_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    sign_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM")]))
     story.append(KeepTogether(sign_table))
 
     story.append(Spacer(1, 8))
-    story.append(
-        Paragraph(
-            f"Aprobación: {approved_by or 'PENDIENTE'} · emitido "
-            f"{issued_on.strftime('%d/%m/%Y')} · código de verificación {verification_code}. "
-            f"Verificable en {verify_url}",
-            styles["small"],
-        )
-    )
+    story.append(Paragraph(
+        f"Aprobación: {approved_by or 'PENDIENTE'} · emitido {issued_on.strftime('%d/%m/%Y')} · "
+        f"código de verificación {verification_code}. Verificable en {verify_url}",
+        styles["small"],
+    ))
     if issuance.company_footer_snapshot:
-        story.append(Spacer(1, 4))
-        story.append(Paragraph(issuance.company_footer_snapshot, styles["small"]))
+        story.extend([Spacer(1, 4), Paragraph(issuance.company_footer_snapshot, styles["small"])])
 
-    # -- Página 2: respaldo contable + evidencia a tamaño completo ---
     story.append(PageBreak())
     story.extend(accounting_flow)
-
-    full_image = (
-        _evidence_image(evidence, max_width=17 * cm, max_height=20 * cm)
-        if evidence is not None
-        else None
-    )
+    full_image = _evidence_image(evidence, max_width=17 * cm, max_height=20 * cm) if evidence is not None else None
     if full_image is not None:
         story.append(Spacer(1, 14))
         story.extend(_section("Evidencia de pago", styles))
         digest = (evidence.content_hash or "").upper()
-        story.append(
-            _kv_table(
-                [
-                    ("Comprobante", document.document_number),
-                    ("Beneficiario", beneficiary),
-                    ("Banco", bank_label or "—"),
-                    ("Fecha", issued_on.strftime("%d/%m/%Y")),
-                    ("Archivo", evidence.original_filename),
-                    ("SHA-256", digest or "no registrado"),
-                ],
-                styles,
-            )
-        )
-        story.append(Spacer(1, 8))
-        story.append(full_image)
+        story.append(_kv_table([
+            ("Comprobante", document.document_number),
+            ("Beneficiario", beneficiary),
+            ("Banco", bank_label or "—"),
+            ("Fecha", issued_on.strftime("%d/%m/%Y")),
+            ("Archivo", evidence.original_filename),
+            ("SHA-256", digest or "no registrado"),
+        ], styles))
+        story.extend([Spacer(1, 8), full_image])
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -941,9 +772,7 @@ def generate_voucher_pdf(
         author="NEXORA GROUP",
         subject=f"Comprobante de pago {document.document_number}",
     )
-    # Sin compresión de página: un comprobante es un artefacto de auditoría y
-    # su texto debe poder inspeccionarse/extraerse sin herramientas externas.
     doc.pageCompression = 0
-    _furniture = _page_furniture(document.document_number, verification_code)
-    doc.build(story, onFirstPage=_furniture, onLaterPages=_furniture)
+    furniture = _page_furniture(document.document_number, verification_code)
+    doc.build(story, onFirstPage=furniture, onLaterPages=furniture)
     return buffer.getvalue()

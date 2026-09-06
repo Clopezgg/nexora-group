@@ -9,7 +9,8 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.repositories import project_repository
+from app.core.business_time import business_today
+from app.repositories import company_repository, project_repository
 from app.schemas.contract_payment import (
     ContractLedgerEntryResponse,
     ContractPaymentLedgerResponse,
@@ -28,7 +29,11 @@ from app.schemas.reporting import (
     TrialBalanceReportResponse,
     TrialBalanceRowResponse,
 )
-from app.services import contract_payment_service, reporting_service
+from app.services import (
+    contract_payment_service,
+    report_export_service,
+    reporting_service,
+)
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -49,16 +54,34 @@ def _statement_row(row) -> StatementRowResponse:
     )
 
 
-@router.get("/trial-balance", response_model=TrialBalanceReportResponse)
+@router.get("/trial-balance", response_model=None)
 def get_trial_balance(
     company_id: uuid.UUID = Query(alias="companyId"),
+    output_format: str = Query(default="json", alias="format"),
     db: Session = Depends(get_db),
     user=Depends(require_permission("reports.trial_balance", "read")),
-) -> TrialBalanceReportResponse:
+):
     assert_company_access(
         db, user_id=user.id, resource="reports.trial_balance", action="read", company_id=company_id
     )
     report = reporting_service.trial_balance(db, company_id=company_id)
+
+    if output_format.lower() == "xlsx":
+        company = company_repository.get_by_id(db, company_id)
+        content = report_export_service.trial_balance_xlsx(
+            company_name=company.name if company else "",
+            currency_code=(company.functional_currency_code if company else None) or "HNL",
+            as_of=business_today(),
+            rows=report.rows,
+            total_debit=report.total_debit,
+            total_credit=report.total_credit,
+        )
+        return Response(
+            content=content,
+            media_type=report_export_service.XLSX_MEDIA_TYPE,
+            headers={"Content-Disposition": "attachment; filename=balance-de-comprobacion.xlsx"},
+        )
+
     return TrialBalanceReportResponse(
         rows=[
             TrialBalanceRowResponse(

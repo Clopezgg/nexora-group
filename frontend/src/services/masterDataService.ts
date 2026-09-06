@@ -26,6 +26,8 @@ export interface CompanyProfileInput {
   email?: string
   website?: string
   voucherFooterText?: string
+  logoEvidenceId?: string
+  signatureEvidenceId?: string
   defaultThemeId?: string
   defaultDensity?: string
   supplierAdvanceAccountId?: string

@@ -4,6 +4,7 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { reportingService } from '../../services/reportingService'
 import type { StatementRow } from '../../types/reporting'
 import { downloadCsv, toCsv } from '../../utils/csv'
+import { ReportExportButtons } from './ReportExportButtons'
 import { useReportCurrency } from './reportMoney'
 
 const CSV_COLUMNS = [
@@ -12,21 +13,14 @@ const CSV_COLUMNS = [
   { key: 'balance' as const, label: 'Monto' },
 ]
 
-/** NXR-REQ-0016/0093 (Cash Flow, método directo): entradas/salidas de
- * efectivo clasificadas por actividad Operativa/Inversión/Financiamiento
- * vía `Account.cashFlowActivity` (sin pantalla dedicada de catálogo
- * contable todavía -- se clasifica por API, mismo criterio que Tax Codes
- * antes de tener un consumidor de UI). "Sin clasificar" se muestra
- * explícito, nunca oculto -- ver reporting_service.cash_flow_statement. */
 export function CashFlowPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
   const { fmt } = useReportCurrency()
-  const COLUMNS: TableColumn<StatementRow>[] = [
+  const columns: TableColumn<StatementRow>[] = [
     { key: 'accountCode', header: 'Código', render: (row) => row.accountCode },
     { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
     { key: 'balance', header: 'Monto', numeric: true, render: (row) => fmt(row.balance) },
   ]
-
   const reportQuery = useQuery({
     queryKey: ['reports', 'cash-flow', activeCompanyId],
     queryFn: () => reportingService.getCashFlow(activeCompanyId as string),
@@ -34,90 +28,37 @@ export function CashFlowPage() {
   })
 
   if (loadingCompanies) return <LoadingState label="Cargando compañías…" />
-  if (!activeCompanyId) {
-    return (
-      <EmptyState
-        icon="book"
-        title="Configura una compañía primero"
-        description="No hay compañías registradas todavía."
-      />
-    )
-  }
-
+  if (!activeCompanyId) return <EmptyState icon="book" title="Configura una compañía primero" description="No hay compañías registradas todavía." />
   const report = reportQuery.data
-  const allRows = report
-    ? [...report.operating, ...report.investing, ...report.financing, ...report.unclassified]
-    : []
-
-  const handleExport = () => {
-    downloadCsv('flujo-de-efectivo.csv', toCsv(allRows, CSV_COLUMNS))
-  }
+  const allRows = report ? [...report.operating, ...report.investing, ...report.financing, ...report.unclassified] : []
 
   return (
     <div>
       <header className="nx-page__header">
         <h1 className="nx-dashboard__title">Flujo de Efectivo</h1>
-        <Button variant="secondary" disabled={allRows.length === 0} onClick={handleExport}>
-          Exportar CSV
-        </Button>
+        <Button variant="secondary" disabled={allRows.length === 0} onClick={() => downloadCsv('flujo-de-efectivo.csv', toCsv(allRows, CSV_COLUMNS))}>Exportar CSV</Button>
+        <ReportExportButtons
+          disabled={allRows.length === 0}
+          basename="flujo-de-efectivo"
+          exportFile={(format) => reportingService.exportCashFlow(activeCompanyId, format)}
+        />
       </header>
-
-      {reportQuery.isLoading ? (
-        <LoadingState label="Cargando flujo de efectivo…" />
-      ) : reportQuery.isError ? (
+      {reportQuery.isLoading ? <LoadingState label="Cargando flujo de efectivo…" /> : reportQuery.isError ? (
         <ErrorState onRetry={() => reportQuery.refetch()} />
       ) : report ? (
         <>
-          <Card>
-            <h2 className="nx-field__label">Actividades operativas</h2>
-            <Table
-              columns={COLUMNS}
-              rows={report.operating}
-              getRowKey={(row) => row.accountId}
-              emptyMessage="Sin movimiento operativo clasificado en el período."
-            />
-            <p className="nx-field__label">Total operativo: {fmt(report.totalOperating)}</p>
-          </Card>
-          <Card>
-            <h2 className="nx-field__label">Actividades de inversión</h2>
-            <Table
-              columns={COLUMNS}
-              rows={report.investing}
-              getRowKey={(row) => row.accountId}
-              emptyMessage="Sin movimiento de inversión clasificado en el período."
-            />
-            <p className="nx-field__label">Total inversión: {fmt(report.totalInvesting)}</p>
-          </Card>
-          <Card>
-            <h2 className="nx-field__label">Actividades de financiamiento</h2>
-            <Table
-              columns={COLUMNS}
-              rows={report.financing}
-              getRowKey={(row) => row.accountId}
-              emptyMessage="Sin movimiento de financiamiento clasificado en el período."
-            />
-            <p className="nx-field__label">Total financiamiento: {fmt(report.totalFinancing)}</p>
-          </Card>
+          <Card><h2 className="nx-field__label">Actividades operativas</h2><Table columns={columns} rows={report.operating} getRowKey={(row) => row.accountId} emptyMessage="Sin movimiento operativo clasificado en el período." /><p className="nx-field__label">Total operativo: {fmt(report.totalOperating)}</p></Card>
+          <Card><h2 className="nx-field__label">Actividades de inversión</h2><Table columns={columns} rows={report.investing} getRowKey={(row) => row.accountId} emptyMessage="Sin movimiento de inversión clasificado en el período." /><p className="nx-field__label">Total inversión: {fmt(report.totalInvesting)}</p></Card>
+          <Card><h2 className="nx-field__label">Actividades de financiamiento</h2><Table columns={columns} rows={report.financing} getRowKey={(row) => row.accountId} emptyMessage="Sin movimiento de financiamiento clasificado en el período." /><p className="nx-field__label">Total financiamiento: {fmt(report.totalFinancing)}</p></Card>
           {report.unclassified.length > 0 ? (
             <Card>
               <h2 className="nx-field__label">Sin clasificar</h2>
-              <p className="nx-field__hint">
-                Estas cuentas todavía no tienen una actividad de Cash Flow asignada
-                (clasifícalas vía la API de catálogo contable) -- no se ocultan ni se
-                adivinan.
-              </p>
-              <Table
-                columns={COLUMNS}
-                rows={report.unclassified}
-                getRowKey={(row) => row.accountId}
-                emptyMessage="Sin cuentas por clasificar."
-              />
+              <p className="nx-field__hint">Estas cuentas no tienen una actividad de Cash Flow asignada; se muestran explícitamente, nunca se ocultan ni se adivinan.</p>
+              <Table columns={columns} rows={report.unclassified} getRowKey={(row) => row.accountId} emptyMessage="Sin cuentas por clasificar." />
               <p className="nx-field__label">Total sin clasificar: {fmt(report.totalUnclassified)}</p>
             </Card>
           ) : null}
-          <Card>
-            <p className="nx-field__label">Cambio neto en efectivo: {fmt(report.netChangeInCash)}</p>
-          </Card>
+          <Card><p className="nx-field__label">Cambio neto en efectivo: {fmt(report.netChangeInCash)}</p></Card>
         </>
       ) : null}
     </div>

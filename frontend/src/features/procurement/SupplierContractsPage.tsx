@@ -12,6 +12,7 @@ import {
   type SupplierContract,
   type SupplierContractCategory,
 } from '../../types/procurement'
+import { supplierContractStatusLabel } from '../../utils/statusLabels'
 
 /** NXR-REQ-0059/0060. `/abastecimiento/contratos` ya existía como entrada
  * reservada ("Contratos") en navigation.ts -- no se inventó ruta nueva.
@@ -59,7 +60,7 @@ export function SupplierContractsPage() {
     { key: 'value', header: 'Valor', numeric: true, render: (row) => formatMoney(row.value, row.currencyCode) },
     { key: 'advancePercentage', header: 'Anticipo %', numeric: true, render: (row) => `${Number(row.advancePercentage).toFixed(2)}%` },
     { key: 'retentionPercentage', header: 'Retención %', numeric: true, render: (row) => `${Number(row.retentionPercentage).toFixed(2)}%` },
-    { key: 'status', header: 'Estado', render: (row) => <Badge>{row.status}</Badge> },
+    { key: 'status', header: 'Estado', render: (row) => <Badge>{supplierContractStatusLabel(row.status)}</Badge> },
     {
       key: 'plan',
       header: 'Plan de pagos',

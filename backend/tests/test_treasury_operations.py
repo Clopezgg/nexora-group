@@ -306,6 +306,27 @@ def test_voucher_pdf_is_a_premium_corporate_document(client):
     assert str(outflow_doc) not in text       # sin UUID
 
 
+def test_voucher_pdf_prints_the_configured_footer_text(client):
+    """ORDEN MAESTRA §10: `voucher_footer_text` se captura en el snapshot de
+    emisión pero nunca se imprimía en el comprobante -- dato muerto."""
+    login_admin(client)
+    company, cash, _d, _c, _f = _setup(client)
+    resp = client.patch(
+        f"/api/master-data/companies/{company['id']}/profile",
+        json={"voucherFooterText": "Sujeto a retención ISR según Ley del Impuesto Sobre la Renta."},
+    )
+    assert resp.status_code == 200, resp.text
+    outflow_doc = _outflow_document(client, company, cash, amount="1000.00")
+
+    pdf = client.get(
+        f"/api/treasury/vouchers/{outflow_doc}"
+        "?beneficiary=LESTER%20RIVAS&payer=NEXORA&paymentMethod=Efectivo"
+    )
+    assert pdf.status_code == 200, pdf.text
+    text = pdf.content.decode("latin-1")
+    assert "Sujeto a retenci" in text
+
+
 def test_voucher_pdf_uses_company_fixed_payer_and_configured_approver(client):
     """Orden maestra Phase 2: el pagador sale de Company Settings (read-only),
     el aprobador es el configurado; el cliente no puede sobrescribir el

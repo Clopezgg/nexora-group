@@ -26,6 +26,9 @@ param storageAccountName string
 @description('Imagen de contenedor del backend. Placeholder público hasta que CI publique la imagen real en GHCR.')
 param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
+@description('Timestamp UTC del deploy, para /api/version (ORDEN MAESTRA §21).')
+param buildTime string = ''
+
 @description('Connection string de Application Insights')
 param appInsightsConnectionString string
 
@@ -75,9 +78,16 @@ var editAccessSecrets = editAccessConfigured ? [
   }
 ] : []
 
+// La imagen siempre tiene forma ghcr.io/<owner>/nexora-backend:<git-sha> en
+// despliegues reales (ver deploy-azure.yml) -- se deriva de ahí en vez de
+// requerir un parámetro extra que pueda desincronizarse.
+var gitSha = last(split(backendImage, ':'))
+
 var baseEnvironment = [
   { name: 'APP_ENV', value: 'production' }
   { name: 'APP_NAME', value: 'Nexora Group' }
+  { name: 'GIT_SHA', value: gitSha }
+  { name: 'BUILD_TIME', value: buildTime }
   { name: 'DATABASE_URL', secretRef: 'database-url' }
   { name: 'SECRET_KEY', secretRef: 'secret-key' }
   { name: 'BOOTSTRAP_ADMIN_PASSWORD', secretRef: 'bootstrap-admin-password' }

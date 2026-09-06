@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Badge,
   Button,
   Card,
   EmptyState,
@@ -26,6 +27,7 @@ import {
 } from '../../types/procurement'
 import { treasuryService } from '../../services/treasuryService'
 import { apService, type SupplierInvoice } from '../../services/apArService'
+import { apMetricsService } from '../../services/financialControlService'
 import { formatMoney } from '../../utils/currency'
 import type { TreasuryAccount } from '../../types/treasury'
 import {
@@ -167,6 +169,8 @@ export function AccountsPayablePage() {
           ))}
         </Select>
       </header>
+
+      <ApMetricsCard companyId={activeCompanyId} />
 
       <Card title="Acciones">
         <Button
@@ -672,5 +676,31 @@ function PaySupplierInvoiceButton({
         </Modal>
       ) : null}
     </>
+  )
+}
+
+function ApMetricsCard({ companyId }: { companyId: string | null }) {
+  const query = useQuery({
+    queryKey: ['ap-metrics', companyId],
+    queryFn: () => apMetricsService.get(companyId as string),
+    enabled: Boolean(companyId),
+  })
+  if (!companyId) return null
+  const m = query.data
+  return (
+    <Card title="Aging de cuentas por pagar">
+      {query.isLoading ? (
+        <LoadingState label="Calculando aging…" />
+      ) : m?.aging ? (
+        <div className="nx-treasury__actions" style={{ flexWrap: 'wrap' }}>
+          <Badge>Cartera abierta {formatMoney(Number(m.apOutstanding ?? 0))}</Badge>
+          <Badge tone="neutral">Al día {formatMoney(Number(m.aging.current ?? 0))}</Badge>
+          <Badge tone="warning">1–30 {formatMoney(Number(m.aging['1_30'] ?? 0))}</Badge>
+          <Badge tone="warning">31–60 {formatMoney(Number(m.aging['31_60'] ?? 0))}</Badge>
+          <Badge tone="danger">61–90 {formatMoney(Number(m.aging['61_90'] ?? 0))}</Badge>
+          <Badge tone="danger">+90 {formatMoney(Number(m.aging.over_90 ?? 0))}</Badge>
+        </div>
+      ) : null}
+    </Card>
   )
 }

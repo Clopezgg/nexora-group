@@ -4,7 +4,13 @@ from app.core.business_time import business_today
 from app.models.permission import UserCompanyAccess, UserProjectAccess
 from app.models.project import Project
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
-from tests.helpers import create_account, create_company, create_user_with_role, login_as
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_treasury_account,
+    create_user_with_role,
+    login_as,
+)
 
 
 def _login(client):
@@ -24,17 +30,52 @@ def test_dashboard_summary_returns_real_zeroed_values_on_fresh_db(client):
     response = client.get("/api/dashboard/summary")
     assert response.status_code == 200
     body = response.json()
-    assert body["treasuryBalance"] == 0.0
-    assert body["periodIncome"] == 0.0
-    assert body["periodExpense"] == 0.0
+    assert float(body["treasuryBalance"]) == 0.0
+    assert float(body["periodIncome"]) == 0.0
+    assert float(body["periodExpense"]) == 0.0
     assert body["activeProjects"] == 0
     assert body["pendingApprovals"] == 0
     assert body["overduePayables"] == 0
-    assert body["overduePayablesAmount"] == 0.0
-    assert body["receivablesOutstanding"] == 0.0
+    assert float(body["overduePayablesAmount"]) == 0.0
+    assert float(body["receivablesOutstanding"]) == 0.0
     assert len(body["cashFlow"]) == 6
     assert body["expensesByScope"] == []
     assert body["currency"] == "HNL"
+
+
+def test_dashboard_money_fields_serialize_as_decimal_safe_strings_not_float(client):
+    """CLAUDE.md §12/ORDEN MAESTRA: ninguna cifra financiera se serializa como
+    float binario -- el resto del backend (p.ej. /api/treasury/accounts)
+    devuelve Decimal como string JSON exacto. El dashboard debe seguir el
+    mismo contrato, no truncar a float."""
+    _login(client)
+    company = create_company(client)
+    bank_gl = create_account(
+        client, company_id=company["id"], code="1100", name="Bancos", account_type="ASSET"
+    )
+    contributions = create_account(
+        client, company_id=company["id"], code="3100", name="Aportes de socios", account_type="EQUITY"
+    )
+    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+    response = client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank["id"],
+            "counterAccountId": contributions["id"],
+            "sender": "Constructora Matriz",
+            "currencyCode": "HNL",
+            "originalAmount": "50000.00",
+            "remittanceDate": str(business_today()),
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    body = client.get("/api/dashboard/summary").json()
+    assert isinstance(body["treasuryBalance"], str), (
+        f"treasuryBalance debe ser un string Decimal-safe, no float: {body['treasuryBalance']!r}"
+    )
+    assert body["treasuryBalance"] == "50000.00"
 
 
 def test_dashboard_active_projects_never_counts_another_companys_projects(client, db_session):
@@ -127,7 +168,7 @@ def test_dashboard_period_metrics_group_by_effective_date_not_posted_at(client):
     _entry(today.isoformat(), "125.00")        # dentro
 
     body = client.get(f"/api/dashboard/summary?companyId={company['id']}").json()
-    assert body["periodExpense"] == 125.0
+    assert float(body["periodExpense"]) == 125.0
 
 
 def test_dashboard_financial_totals_net_formal_reversals(client):
@@ -162,7 +203,7 @@ def test_dashboard_financial_totals_net_formal_reversals(client):
     assert journal.status_code == 201, journal.text
     before = client.get(f"/api/dashboard/summary?companyId={company['id']}")
     assert before.status_code == 200, before.text
-    assert before.json()["periodExpense"] == 125.0
+    assert float(before.json()["periodExpense"]) == 125.0
 
     reversal = client.post(
         f"/api/accounting/journal-entries/{journal.json()['id']}/reverse",
@@ -172,4 +213,4 @@ def test_dashboard_financial_totals_net_formal_reversals(client):
     after = client.get(f"/api/dashboard/summary?companyId={company['id']}")
 
     assert after.status_code == 200, after.text
-    assert after.json()["periodExpense"] == 0.0
+    assert float(after.json()["periodExpense"]) == 0.0

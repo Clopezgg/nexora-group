@@ -896,6 +896,9 @@ def generate_voucher_pdf(
             styles["small"],
         )
     )
+    if issuance.company_footer_snapshot:
+        story.append(Spacer(1, 4))
+        story.append(Paragraph(issuance.company_footer_snapshot, styles["small"]))
 
     # -- Página 2: respaldo contable + evidencia a tamaño completo ---
     story.append(PageBreak())

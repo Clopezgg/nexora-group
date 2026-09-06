@@ -40,3 +40,16 @@ export const arMetricsService = {
       `/financial-control/ar-metrics?companyId=${encodeURIComponent(companyId)}`,
     ),
 }
+
+export interface ApMetrics {
+  asOf: string
+  apOutstanding: string
+  aging: Record<'current' | '1_30' | '31_60' | '61_90' | 'over_90', string>
+}
+
+export const apMetricsService = {
+  get: (companyId: string) =>
+    apiFetch<ApMetrics>(
+      `/financial-control/ap-metrics?companyId=${encodeURIComponent(companyId)}`,
+    ),
+}

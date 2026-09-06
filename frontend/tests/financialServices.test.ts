@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apService, arService } from '../src/services/apArService'
+import { apMetricsService } from '../src/services/financialControlService'
 import { treasuryService } from '../src/services/treasuryService'
 
 const paymentPayload = {
@@ -93,6 +94,26 @@ describe('financial service idempotency', () => {
       expect(headers.get('Content-Type')).toBe('application/json')
       expect(options.body).toBe(JSON.stringify(payload))
     }
+  })
+
+  it('fetches AP aging metrics from /financial-control/ap-metrics (ORDEN MAESTRA §19)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        asOf: '2026-09-03',
+        apOutstanding: '2100.00',
+        aging: { current: '500.00', '1_30': '700.00', '31_60': '0', '61_90': '900.00', over_90: '0' },
+      }),
+    } as Response)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await apMetricsService.get('company-1')
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain('/financial-control/ap-metrics?companyId=company-1')
+    expect(result.apOutstanding).toBe('2100.00')
+    expect(result.aging['61_90']).toBe('900.00')
   })
 
   it('sends the supplier-invoice payment plan as a PUT with installments', async () => {

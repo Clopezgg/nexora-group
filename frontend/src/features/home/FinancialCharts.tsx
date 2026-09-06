@@ -27,10 +27,18 @@ interface FinancialChartsProps {
  * (L 250K / L 1.2M), tooltip con el monto exacto, barras horizontales para
  * "Gastos por alcance" (no donut), y estados vacíos compactos. */
 export default function FinancialCharts({ cashFlow, expensesByScope, currency }: FinancialChartsProps) {
+  // El backend serializa dinero como Decimal (string JSON exacto), no float
+  // -- normalizamos a number aquí, en el borde de renderizado/gráficas,
+  // donde Recharts y las comparaciones numéricas sí lo requieren.
+  const numericCashFlow = cashFlow.map((item) => ({
+    ...item,
+    income: Number(item.income),
+    expense: Number(item.expense),
+  }))
   const scopeData = expensesByScope
-    .map((item) => ({ ...item, label: scopeLabels[item.scope] ?? item.scope }))
+    .map((item) => ({ ...item, amount: Number(item.amount), label: scopeLabels[item.scope] ?? item.scope }))
     .filter((item) => item.amount !== 0)
-  const hasCashFlow = cashFlow.some((item) => item.income !== 0 || item.expense !== 0)
+  const hasCashFlow = numericCashFlow.some((item) => item.income !== 0 || item.expense !== 0)
   const abbreviate = (value: number | string) => formatMoneyCompact(value, currency)
   const exact = (value: number | string) => formatMoney(Number(value), currency)
 
@@ -43,7 +51,7 @@ export default function FinancialCharts({ cashFlow, expensesByScope, currency }:
         height={220}
         emptyMessage="Sin movimientos en este período."
       >
-        <LineChart data={cashFlow} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+        <LineChart data={numericCashFlow} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--nx-chart-grid, #e6ecf3)" />
           <XAxis dataKey="period" tick={{ fontSize: 11 }} tickMargin={6} />
           <YAxis tick={{ fontSize: 11 }} width={52} tickFormatter={abbreviate} tickCount={4} />

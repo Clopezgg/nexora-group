@@ -72,6 +72,45 @@ def test_ap_payment_proposal_lists_due_and_overdue_invoices(client):
     assert Decimal(body["total"]) == Decimal("600.00")
 
 
+def test_ap_aging_metrics_computes_aging_buckets(client):
+    """ORDEN MAESTRA DE CIERRE FINAL DE PRODUCTO §19: no existía AP Aging
+    (ar_metrics ya existía, su equivalente AP no)."""
+    login_admin(client)
+    company, expense, payable, supplier = _ap_setup(client)
+
+    def _invoice(number, days, amount="1200.00"):
+        inv = client.post(
+            "/api/ap/supplier-invoices",
+            json={
+                "companyId": company["id"],
+                "supplierId": supplier["id"],
+                "invoiceNumber": number,
+                "scope": "GENERAL",
+                "expenseAccountId": expense["id"],
+                "payableAccountId": payable["id"],
+                "currencyCode": "HNL",
+                "amount": amount,
+                "taxAmount": "0.00",
+                "invoiceDate": str(date.today()),
+                "dueDate": str(date.today() + timedelta(days=days)),
+            },
+        ).json()
+        client.post(f"/api/ap/supplier-invoices/{inv['id']}/approve")
+        return inv
+
+    _invoice("AGE-CURRENT", 5, amount="500.00")
+    _invoice("AGE-1-30", -10, amount="700.00")
+    _invoice("AGE-61-90", -75, amount="900.00")
+
+    body = client.get(f"/api/financial-control/ap-metrics?companyId={company['id']}").json()
+    assert Decimal(body["apOutstanding"]) == Decimal("2100.00")
+    assert Decimal(body["aging"]["current"]) == Decimal("500.00")
+    assert Decimal(body["aging"]["1_30"]) == Decimal("700.00")
+    assert Decimal(body["aging"]["61_90"]) == Decimal("900.00")
+    assert Decimal(body["aging"]["31_60"]) == Decimal("0")
+    assert Decimal(body["aging"]["over_90"]) == Decimal("0")
+
+
 def test_ar_dso_metrics_computes_dso_and_aging(client):
     login_admin(client)
     company = create_company(client)

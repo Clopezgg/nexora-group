@@ -8,8 +8,8 @@ from app.api.deps_correlation import get_correlation_id
 from app.domain.errors import InvalidFinancialReferenceError
 from app.repositories import company_repository
 from app.schemas.master_data import (
+    CompanyProfileUpdateRequest,
     CompanyResponse,
-    CompanyUpdateRequest,
     ResourcePostingConfigRequest,
     ResourcePostingConfigResponse,
 )
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/master-data", tags=["master-data"])
 @router.patch("/companies/{company_id}/profile", response_model=CompanyResponse)
 def update_company_profile(
     company_id: uuid.UUID,
-    payload: CompanyUpdateRequest,
+    payload: CompanyProfileUpdateRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission("core.company", "update")),
     correlation_id: str = Depends(get_correlation_id),
@@ -53,9 +53,7 @@ def update_company_profile(
     try:
         if payload.supplier_advance_account_id is not None:
             assert_supplier_advance_account_eligible(
-                db,
-                account_id=payload.supplier_advance_account_id,
-                company_id=company.id,
+                db, account_id=payload.supplier_advance_account_id, company_id=company.id
             )
         if payload.logo_evidence_id is not None:
             assert_evidence_belongs_to_company(
@@ -139,17 +137,9 @@ def upsert_resource_posting_config(
     )
     normalized_source = source_type.upper()
     if payload.source_type != normalized_source:
-        raise HTTPException(
-            status_code=422,
-            detail="sourceType del payload debe coincidir con el origen de la URL",
-        )
-
+        raise HTTPException(status_code=422, detail="sourceType del payload debe coincidir con el origen de la URL")
     existing = next(
-        (
-            row
-            for row in resource_posting_service.list_configs(db, company_id=company_id)
-            if row.source_type == normalized_source
-        ),
+        (row for row in resource_posting_service.list_configs(db, company_id=company_id) if row.source_type == normalized_source),
         None,
     )
     before = None
@@ -160,7 +150,6 @@ def upsert_resource_posting_config(
             "offsetAccountId": str(existing.offset_account_id),
             "active": existing.active,
         }
-
     try:
         row = resource_posting_service.upsert_config(
             db,

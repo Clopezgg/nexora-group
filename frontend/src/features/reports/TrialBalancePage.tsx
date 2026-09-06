@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Button, Card, EmptyState, ErrorState, LoadingState, Table, type TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { reportingService } from '../../services/reportingService'
@@ -60,6 +60,23 @@ export function TrialBalancePage({
     enabled: Boolean(activeCompanyId),
   })
 
+  const exportXlsx = useMutation({
+    mutationFn: () => reportingService.getTrialBalanceXlsx(activeCompanyId as string),
+    onSuccess: ({ blob, filename }) => {
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = filename ?? 'balance-de-comprobacion.xlsx'
+      anchor.rel = 'noopener'
+      document.body.appendChild(anchor)
+      anchor.click()
+      window.setTimeout(() => {
+        anchor.remove()
+        URL.revokeObjectURL(url)
+      }, 60_000)
+    },
+  })
+
   if (loadingCompanies) return <LoadingState label="Cargando compañías…" />
   if (!activeCompanyId) {
     return (
@@ -83,6 +100,14 @@ export function TrialBalancePage({
         <h1 className="nx-dashboard__title">Balance de Comprobación</h1>
         <Button variant="secondary" disabled={rows.length === 0} onClick={handleExport}>
           Exportar CSV
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={rows.length === 0}
+          loading={exportXlsx.isPending}
+          onClick={() => exportXlsx.mutate()}
+        >
+          Exportar XLSX
         </Button>
       </header>
 

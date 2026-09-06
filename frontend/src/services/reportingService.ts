@@ -1,4 +1,4 @@
-import { apiFetch } from './httpClient'
+import { apiFetch, apiFetchBlob } from './httpClient'
 import type {
   BalanceSheetReport,
   BudgetVsActualReport,
@@ -12,6 +12,8 @@ import type {
 export const reportingService = {
   getTrialBalance: (companyId: string) =>
     apiFetch<TrialBalanceReport>(`/reports/trial-balance?companyId=${companyId}`),
+  getTrialBalanceXlsx: (companyId: string) =>
+    apiFetchBlob(`/reports/trial-balance?companyId=${companyId}&format=xlsx`),
   getBudgetVsActual: (projectId: string) =>
     apiFetch<BudgetVsActualReport>(`/reports/budget-vs-actual?projectId=${projectId}`),
   getBalanceSheet: (companyId: string) =>

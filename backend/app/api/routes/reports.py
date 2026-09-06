@@ -29,11 +29,7 @@ from app.schemas.reporting import (
     TrialBalanceReportResponse,
     TrialBalanceRowResponse,
 )
-from app.services import (
-    contract_payment_service,
-    report_export_service,
-    reporting_service,
-)
+from app.services import contract_payment_service, report_export_service, reporting_service
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -54,6 +50,30 @@ def _statement_row(row) -> StatementRowResponse:
     )
 
 
+def _company_export_context(db: Session, company_id: uuid.UUID) -> tuple[str, str]:
+    company = company_repository.get_by_id(db, company_id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Compañía no encontrada")
+    return company.name, company.functional_currency_code or "HNL"
+
+
+def _download(content: bytes, *, fmt: str, basename: str) -> Response:
+    normalized = fmt.lower()
+    if normalized == "xlsx":
+        return Response(
+            content=content,
+            media_type=report_export_service.XLSX_MEDIA_TYPE,
+            headers={"Content-Disposition": f"attachment; filename={basename}.xlsx"},
+        )
+    if normalized == "pdf":
+        return Response(
+            content=content,
+            media_type=report_export_service.PDF_MEDIA_TYPE,
+            headers={"Content-Disposition": f"attachment; filename={basename}.pdf"},
+        )
+    raise HTTPException(status_code=422, detail="format debe ser xlsx o pdf")
+
+
 @router.get("/trial-balance", response_model=None)
 def get_trial_balance(
     company_id: uuid.UUID = Query(alias="companyId"),
@@ -65,23 +85,25 @@ def get_trial_balance(
         db, user_id=user.id, resource="reports.trial_balance", action="read", company_id=company_id
     )
     report = reporting_service.trial_balance(db, company_id=company_id)
-
-    if output_format.lower() == "xlsx":
-        company = company_repository.get_by_id(db, company_id)
-        content = report_export_service.trial_balance_xlsx(
-            company_name=company.name if company else "",
-            currency_code=(company.functional_currency_code if company else None) or "HNL",
+    normalized = output_format.lower()
+    if normalized in {"xlsx", "pdf"}:
+        company_name, currency_code = _company_export_context(db, company_id)
+        exporter = (
+            report_export_service.trial_balance_xlsx
+            if normalized == "xlsx"
+            else report_export_service.trial_balance_pdf
+        )
+        content = exporter(
+            company_name=company_name,
+            currency_code=currency_code,
             as_of=business_today(),
             rows=report.rows,
             total_debit=report.total_debit,
             total_credit=report.total_credit,
         )
-        return Response(
-            content=content,
-            media_type=report_export_service.XLSX_MEDIA_TYPE,
-            headers={"Content-Disposition": "attachment; filename=balance-de-comprobacion.xlsx"},
-        )
-
+        return _download(content, fmt=normalized, basename="balance-de-comprobacion")
+    if normalized != "json":
+        raise HTTPException(status_code=422, detail="format debe ser json, xlsx o pdf")
     return TrialBalanceReportResponse(
         rows=[
             TrialBalanceRowResponse(
@@ -124,6 +146,50 @@ def get_budget_vs_actual(
     )
 
 
+@router.get("/budget-vs-actual/export", response_model=None)
+def export_budget_vs_actual(
+    project_id: uuid.UUID = Query(alias="projectId"),
+    output_format: str = Query(alias="format"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports.budget_vs_actual", "read")),
+):
+    project = project_repository.get_by_id(db, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="reports.budget_vs_actual",
+        action="read",
+        company_id=project.company_id,
+    )
+    company_name, currency_code = _company_export_context(db, project.company_id)
+    report = reporting_service.budget_vs_actual(db, project_id=project_id)
+    rows = [
+        ("Presupuesto autorizado", report.authorized),
+        ("Comprometido", report.committed),
+        ("Devengado / costo reconocido", report.accrued),
+        ("Pagado", report.paid),
+        ("Disponible", report.available),
+    ]
+    kwargs = dict(
+        title=f"Presupuesto vs. Real — {project.name}",
+        company_name=company_name,
+        currency_code=currency_code,
+        as_of=business_today(),
+        headers=["Concepto", "Importe"],
+        rows=rows,
+        total_rows=[],
+    )
+    if output_format.lower() == "xlsx":
+        content = report_export_service.tabular_xlsx(**kwargs, money_columns={1})
+    elif output_format.lower() == "pdf":
+        content = report_export_service.tabular_pdf(**kwargs)
+    else:
+        raise HTTPException(status_code=422, detail="format debe ser xlsx o pdf")
+    return _download(content, fmt=output_format, basename="presupuesto-vs-real")
+
+
 @router.get("/balance-sheet", response_model=BalanceSheetReportResponse)
 def get_balance_sheet(
     company_id: uuid.UUID = Query(alias="companyId"),
@@ -147,6 +213,42 @@ def get_balance_sheet(
         total_liabilities_and_equity=report.total_liabilities_and_equity,
         equation_delta=report.equation_delta,
     )
+
+
+@router.get("/balance-sheet/export", response_model=None)
+def export_balance_sheet(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    output_format: str = Query(alias="format"),
+    as_of: date | None = Query(default=None, alias="asOf"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports.balance_sheet", "read")),
+):
+    assert_company_access(
+        db, user_id=user.id, resource="reports.balance_sheet", action="read", company_id=company_id
+    )
+    report = reporting_service.balance_sheet(db, company_id=company_id, as_of=as_of)
+    company_name, currency_code = _company_export_context(db, company_id)
+    kwargs = dict(
+        title="Balance General",
+        company_name=company_name,
+        currency_code=currency_code,
+        as_of=as_of or business_today(),
+        sections=[("ACTIVOS", report.assets), ("PASIVOS", report.liabilities), ("PATRIMONIO", report.equity)],
+        totals=[
+            ("Total activos", report.total_assets),
+            ("Total pasivos", report.total_liabilities),
+            ("Patrimonio + resultado", report.total_equity_including_earnings),
+            ("Pasivo + patrimonio", report.total_liabilities_and_equity),
+            ("Diferencia de ecuación", report.equation_delta),
+        ],
+    )
+    if output_format.lower() == "xlsx":
+        content = report_export_service.statement_xlsx(**kwargs)
+    elif output_format.lower() == "pdf":
+        content = report_export_service.statement_pdf(**kwargs)
+    else:
+        raise HTTPException(status_code=422, detail="format debe ser xlsx o pdf")
+    return _download(content, fmt=output_format, basename="balance-general")
 
 
 @router.get("/income-statement", response_model=IncomeStatementReportResponse)
@@ -177,6 +279,42 @@ def get_income_statement(
     )
 
 
+@router.get("/income-statement/export", response_model=None)
+def export_income_statement(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    output_format: str = Query(alias="format"),
+    date_from: date | None = Query(default=None, alias="dateFrom"),
+    date_to: date | None = Query(default=None, alias="dateTo"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports.income_statement", "read")),
+):
+    assert_company_access(
+        db, user_id=user.id, resource="reports.income_statement", action="read", company_id=company_id
+    )
+    _assert_date_range(date_from, date_to)
+    report = reporting_service.income_statement(db, company_id=company_id, date_from=date_from, date_to=date_to)
+    company_name, currency_code = _company_export_context(db, company_id)
+    kwargs = dict(
+        title="Estado de Resultados",
+        company_name=company_name,
+        currency_code=currency_code,
+        as_of=date_to or business_today(),
+        sections=[("INGRESOS", report.revenue), ("GASTOS", report.expenses)],
+        totals=[
+            ("Total ingresos", report.total_revenue),
+            ("Total gastos", report.total_expenses),
+            ("Resultado neto", report.net_income),
+        ],
+    )
+    if output_format.lower() == "xlsx":
+        content = report_export_service.statement_xlsx(**kwargs)
+    elif output_format.lower() == "pdf":
+        content = report_export_service.statement_pdf(**kwargs)
+    else:
+        raise HTTPException(status_code=422, detail="format debe ser xlsx o pdf")
+    return _download(content, fmt=output_format, basename="estado-de-resultados")
+
+
 @router.get("/cash-flow", response_model=CashFlowReportResponse)
 def get_cash_flow(
     company_id: uuid.UUID = Query(alias="companyId"),
@@ -205,6 +343,49 @@ def get_cash_flow(
     )
 
 
+@router.get("/cash-flow/export", response_model=None)
+def export_cash_flow(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    output_format: str = Query(alias="format"),
+    date_from: date | None = Query(default=None, alias="dateFrom"),
+    date_to: date | None = Query(default=None, alias="dateTo"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports.cash_flow", "read")),
+):
+    assert_company_access(
+        db, user_id=user.id, resource="reports.cash_flow", action="read", company_id=company_id
+    )
+    _assert_date_range(date_from, date_to)
+    report = reporting_service.cash_flow_statement(db, company_id=company_id, date_from=date_from, date_to=date_to)
+    company_name, currency_code = _company_export_context(db, company_id)
+    kwargs = dict(
+        title="Flujo de Efectivo",
+        company_name=company_name,
+        currency_code=currency_code,
+        as_of=date_to or business_today(),
+        sections=[
+            ("OPERACIÓN", report.operating),
+            ("INVERSIÓN", report.investing),
+            ("FINANCIACIÓN", report.financing),
+            ("SIN CLASIFICAR", report.unclassified),
+        ],
+        totals=[
+            ("Flujo operativo", report.total_operating),
+            ("Flujo de inversión", report.total_investing),
+            ("Flujo de financiación", report.total_financing),
+            ("Sin clasificar", report.total_unclassified),
+            ("Cambio neto en efectivo", report.net_change_in_cash),
+        ],
+    )
+    if output_format.lower() == "xlsx":
+        content = report_export_service.statement_xlsx(**kwargs)
+    elif output_format.lower() == "pdf":
+        content = report_export_service.statement_pdf(**kwargs)
+    else:
+        raise HTTPException(status_code=422, detail="format debe ser xlsx o pdf")
+    return _download(content, fmt=output_format, basename="flujo-de-efectivo")
+
+
 @router.get("/general-ledger", response_model=GeneralLedgerReportResponse)
 def get_general_ledger(
     company_id: uuid.UUID = Query(alias="companyId"),
@@ -221,9 +402,7 @@ def get_general_ledger(
     )
     _assert_date_range(date_from, date_to)
     if account_id is not None:
-        account = reporting_service.resolve_account_for_company(
-            db, account_id=account_id, company_id=company_id
-        )
+        account = reporting_service.resolve_account_for_company(db, account_id=account_id, company_id=company_id)
         if account is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cuenta no encontrada")
     report = reporting_service.general_ledger(
@@ -261,6 +440,61 @@ def get_general_ledger(
         total_debit=report.total_debit,
         total_credit=report.total_credit,
     )
+
+
+@router.get("/general-ledger/export", response_model=None)
+def export_general_ledger(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    output_format: str = Query(alias="format"),
+    date_from: date | None = Query(default=None, alias="dateFrom"),
+    date_to: date | None = Query(default=None, alias="dateTo"),
+    account_id: uuid.UUID | None = Query(default=None, alias="accountId"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports.general_ledger", "read")),
+):
+    assert_company_access(
+        db, user_id=user.id, resource="reports.general_ledger", action="read", company_id=company_id
+    )
+    _assert_date_range(date_from, date_to)
+    if account_id is not None and reporting_service.resolve_account_for_company(db, account_id=account_id, company_id=company_id) is None:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+    first = reporting_service.general_ledger(
+        db, company_id=company_id, date_from=date_from, date_to=date_to,
+        account_id=account_id, offset=0, limit=1,
+    )
+    report = reporting_service.general_ledger(
+        db, company_id=company_id, date_from=date_from, date_to=date_to,
+        account_id=account_id, offset=0, limit=max(first.total, 1),
+    )
+    company_name, currency_code = _company_export_context(db, company_id)
+    rows = [
+        (
+            row.posted_at.date().isoformat() if hasattr(row.posted_at, "date") else str(row.posted_at),
+            row.document_number,
+            f"{row.account_code} — {row.account_name}",
+            row.scope,
+            row.description or "",
+            row.debit_amount,
+            row.credit_amount,
+        )
+        for row in report.rows
+    ]
+    kwargs = dict(
+        title="Libro Mayor",
+        company_name=company_name,
+        currency_code=currency_code,
+        as_of=date_to or business_today(),
+        headers=["Fecha", "Documento", "Cuenta", "Ámbito", "Descripción", "Debe", "Haber"],
+        rows=rows,
+        total_rows=[("", "", "", "", "TOTAL", report.total_debit, report.total_credit)],
+    )
+    if output_format.lower() == "xlsx":
+        content = report_export_service.tabular_xlsx(**kwargs, money_columns={5, 6})
+    elif output_format.lower() == "pdf":
+        content = report_export_service.tabular_pdf(**kwargs)
+    else:
+        raise HTTPException(status_code=422, detail="format debe ser xlsx o pdf")
+    return _download(content, fmt=output_format, basename="libro-mayor")
 
 
 def _ledger_entry_response(entry) -> ContractLedgerEntryResponse:
@@ -317,72 +551,40 @@ def get_contract_payment_ledger(
     db: Session = Depends(get_db),
     user=Depends(require_permission("contract.payment_schedule", "read")),
 ):
-    """Libro contractual de pagos (§54): por contrato, cuotas con estado real
-    y las asignaciones de pago que las liquidaron. `format=csv` para exportar."""
+    """Libro contractual de pagos: cuotas y asignaciones reales. CSV se mantiene
+    por compatibilidad; los estados financieros usan XLSX/PDF nativos."""
     assert_company_access(
-        db,
-        user_id=user.id,
-        resource="contract.payment_schedule",
-        action="read",
-        company_id=company_id,
+        db, user_id=user.id, resource="contract.payment_schedule", action="read", company_id=company_id
     )
-    resolved_as_of = as_of or date.today()
+    resolved_as_of = as_of or business_today()
     entries = contract_payment_service.contract_payment_ledger(
         db, company_id=company_id, supplier_contract_id=contract_id, as_of=resolved_as_of
     )
-
     if output_format.lower() == "csv":
         buffer = io.StringIO()
         writer = csv.writer(buffer)
-        writer.writerow(
-            [
-                "contract_number",
-                "supplier",
-                "currency",
-                "installment_seq",
-                "period",
-                "due_date",
-                "net_due",
-                "paid",
-                "remaining",
-                "status",
-            ]
-        )
+        writer.writerow([
+            "contract_number", "supplier", "currency", "installment_seq", "period",
+            "due_date", "net_due", "paid", "remaining", "status",
+        ])
         for entry in entries:
             for i in entry.installments:
-                writer.writerow(
-                    [
-                        entry.contract_number,
-                        entry.supplier_legal_name or "",
-                        entry.currency_code,
-                        i.sequence,
-                        i.period_label,
-                        i.due_date.isoformat(),
-                        f"{i.net_due:.2f}",
-                        f"{i.paid:.2f}",
-                        f"{i.remaining:.2f}",
-                        i.status,
-                    ]
-                )
+                writer.writerow([
+                    entry.contract_number, entry.supplier_legal_name or "", entry.currency_code,
+                    i.sequence, i.period_label, i.due_date.isoformat(), f"{i.net_due:.2f}",
+                    f"{i.paid:.2f}", f"{i.remaining:.2f}", i.status,
+                ])
         return Response(
-            content=buffer.getvalue(),
-            media_type="text/csv",
-            headers={
-                "Content-Disposition": "attachment; filename=contract-payment-ledger.csv"
-            },
+            content=buffer.getvalue(), media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=contract-payment-ledger.csv"},
         )
-
     return ContractPaymentLedgerResponse(
         company_id=company_id,
         as_of=resolved_as_of,
         entries=[_ledger_entry_response(e) for e in entries],
         total_contract_value=sum((e.contract_value for e in entries), Decimal("0")),
-        total_paid_accumulated=sum(
-            (e.paid_accumulated for e in entries), Decimal("0")
-        ),
-        total_contract_balance=sum(
-            (e.contract_balance for e in entries), Decimal("0")
-        ),
+        total_paid_accumulated=sum((e.paid_accumulated for e in entries), Decimal("0")),
+        total_contract_balance=sum((e.contract_balance for e in entries), Decimal("0")),
     )
 
 
@@ -410,3 +612,43 @@ def get_supplier_performance(
         )
         for row in rows
     ]
+
+
+@router.get("/supplier-performance/export", response_model=None)
+def export_supplier_performance(
+    company_id: uuid.UUID = Query(alias="companyId"),
+    output_format: str = Query(alias="format"),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("reports.supplier_performance", "read")),
+):
+    assert_company_access(
+        db, user_id=user.id, resource="reports.supplier_performance", action="read", company_id=company_id
+    )
+    rows = reporting_service.supplier_performance(db, company_id=company_id)
+    company_name, currency_code = _company_export_context(db, company_id)
+    values = [
+        (
+            row.supplier_legal_name,
+            row.purchase_order_count,
+            row.on_time_delivery_rate,
+            row.three_way_match_clean_rate,
+            row.price_variance_pct,
+        )
+        for row in rows
+    ]
+    kwargs = dict(
+        title="Desempeño de Proveedores",
+        company_name=company_name,
+        currency_code=currency_code,
+        as_of=business_today(),
+        headers=["Proveedor", "OC", "Entrega a tiempo %", "3-way match limpio %", "Variación precio %"],
+        rows=values,
+        total_rows=[],
+    )
+    if output_format.lower() == "xlsx":
+        content = report_export_service.tabular_xlsx(**kwargs)
+    elif output_format.lower() == "pdf":
+        content = report_export_service.tabular_pdf(**kwargs)
+    else:
+        raise HTTPException(status_code=422, detail="format debe ser xlsx o pdf")
+    return _download(content, fmt=output_format, basename="desempeno-proveedores")

@@ -19,6 +19,8 @@ export interface Company {
   email?: string | null
   website?: string | null
   voucherFooterText?: string | null
+  logoEvidenceId?: string | null
+  signatureEvidenceId?: string | null
   supplierAdvanceAccountId?: string | null
 }
 

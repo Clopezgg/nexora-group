@@ -1,15 +1,9 @@
-"""VoucherIssuance — snapshot INMUTABLE de un comprobante emitido (orden
-maestra final §27/§28/§62).
+"""VoucherIssuance — snapshot INMUTABLE de un comprobante emitido.
 
 Al emitir el PDF por primera vez para un AccountingDocument se congela aquí
-todo lo que se imprime: datos de empresa, beneficiario, contrato, banco,
-importes y el corte del período contractual. Si después cambia la dirección
-de NEXORA, el nombre comercial, el aprobador, etc., el comprobante de agosto
-sigue mostrando los datos de agosto — se lee de esta fila, nunca de master
-data en vivo.
-
-Una fila por AccountingDocument (el mismo documento contabilizado nunca
-cambia). Correcciones = void/reissue del pago (reversal), no mutación.
+todo lo que se imprime: datos de empresa, branding, beneficiario, contrato,
+banco, importes y corte contractual. Reimpresiones leen esta fila; correcciones
+se hacen por reversal/void, nunca mutando historia.
 """
 
 import uuid
@@ -50,6 +44,8 @@ class VoucherIssuance(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     company_email_snapshot: Mapped[str | None] = mapped_column(String(255), nullable=True)
     company_website_snapshot: Mapped[str | None] = mapped_column(String(255), nullable=True)
     company_footer_snapshot: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    company_logo_evidence_id_snapshot: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    company_signature_evidence_id_snapshot: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     # --- Snapshots de proyecto / contrato ---
     project_name_snapshot: Mapped[str | None] = mapped_column(String(255), nullable=True)

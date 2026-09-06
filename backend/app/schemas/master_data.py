@@ -16,12 +16,11 @@ class CompanyCreateRequest(CamelModel):
 
 
 class CompanyUpdateRequest(CamelModel):
-    """Company profile update.
+    """Legacy/basic company master update.
 
-    Code and functional currency are one-time configurable when the historic
-    company row still has NULL. Once assigned, both remain immutable. Logo and
-    signature are private Evidence references validated against the company;
-    clients never provide blob URLs.
+    Branding is intentionally not accepted here; the governed profile route
+    uses CompanyProfileUpdateRequest so logo/signature cannot be silently
+    ignored by the older endpoint.
     """
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
@@ -43,9 +42,14 @@ class CompanyUpdateRequest(CamelModel):
     email: str | None = Field(default=None, max_length=255)
     website: str | None = Field(default=None, max_length=255)
     voucher_footer_text: str | None = Field(default=None, max_length=500)
+    supplier_advance_account_id: uuid.UUID | None = None
+
+
+class CompanyProfileUpdateRequest(CompanyUpdateRequest):
+    """Governed company profile update, including private branding Evidence."""
+
     logo_evidence_id: uuid.UUID | None = None
     signature_evidence_id: uuid.UUID | None = None
-    supplier_advance_account_id: uuid.UUID | None = None
 
 
 class CompanyResponse(CamelModel):

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.domain.errors import InvalidFinancialReferenceError
 from app.repositories import company_repository
 from app.schemas.master_data import (
     CompanyResponse,
@@ -13,8 +14,10 @@ from app.schemas.master_data import (
     ResourcePostingConfigResponse,
 )
 from app.services import audit_service, resource_posting_service
-from app.services.financial_validation_service import assert_supplier_advance_account_eligible
-from app.domain.errors import InvalidFinancialReferenceError
+from app.services.financial_validation_service import (
+    assert_evidence_belongs_to_company,
+    assert_supplier_advance_account_eligible,
+)
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/master-data", tags=["master-data"])
@@ -41,6 +44,8 @@ def update_company_profile(
         "functionalCurrencyCode": company.functional_currency_code,
         "country": company.country,
         "fiscalId": company.fiscal_id,
+        "logoEvidenceId": str(company.logo_evidence_id) if company.logo_evidence_id else None,
+        "signatureEvidenceId": str(company.signature_evidence_id) if company.signature_evidence_id else None,
         "supplierAdvanceAccountId": str(company.supplier_advance_account_id)
         if company.supplier_advance_account_id else None,
     }
@@ -51,6 +56,14 @@ def update_company_profile(
                 db,
                 account_id=payload.supplier_advance_account_id,
                 company_id=company.id,
+            )
+        if payload.logo_evidence_id is not None:
+            assert_evidence_belongs_to_company(
+                db, evidence_id=payload.logo_evidence_id, company_id=company.id
+            )
+        if payload.signature_evidence_id is not None:
+            assert_evidence_belongs_to_company(
+                db, evidence_id=payload.signature_evidence_id, company_id=company.id
             )
         company_repository.update_company(db, company=company, **values)
         audit_service.record(
@@ -69,6 +82,8 @@ def update_company_profile(
                 "functionalCurrencyCode": company.functional_currency_code,
                 "country": company.country,
                 "fiscalId": company.fiscal_id,
+                "logoEvidenceId": str(company.logo_evidence_id) if company.logo_evidence_id else None,
+                "signatureEvidenceId": str(company.signature_evidence_id) if company.signature_evidence_id else None,
                 "supplierAdvanceAccountId": str(company.supplier_advance_account_id)
                 if company.supplier_advance_account_id else None,
             },

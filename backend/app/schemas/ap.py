@@ -59,7 +59,10 @@ class SupplierPaymentCreateRequest(CamelModel):
     treasury_account_id: uuid.UUID
     amount: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
     payment_date: date
-    payment_method: Literal["TRANSFER", "DEPOSIT", "CHECK", "CASH", "OTHER"] = "TRANSFER"
+    # Compatibilidad segura con clientes/API legacy: si un caller antiguo no
+    # conocía el nuevo campo, se conserva como OTHER en vez de inventar una
+    # transferencia. La UI productiva siempre envía el método explícito.
+    payment_method: Literal["TRANSFER", "DEPOSIT", "CHECK", "CASH", "OTHER"] = "OTHER"
     # Evidencia subida antes de contabilizar. Para transferencia/depósito/cheque
     # el backend falla cerrado si esta lista no contiene al menos un Evidence
     # válido de la misma compañía y factura.

@@ -575,7 +575,7 @@ def generate_voucher_pdf(
     ]
     if bank_label:
         masked = _mask_reference(bank_reference)
-        info_rows.append(("Institución bancaria / cuenta", f"{bank_label}{f' · {masked}' if masked else ''}"))
+        info_rows.append(("Banco / cuenta", f"{bank_label}{f' · {masked}' if masked else ''}"))
     if is_fx_conversion:
         info_rows.append(("Tipo de cambio", f"1 {currency} = {document.fx_rate} {functional_currency}"))
     if contract_ctx:

@@ -64,8 +64,8 @@ describe('Treasury financial flow corrections', () => {
     expect(screen.queryByRole('option', { name: /Gastos administrativos/i })).not.toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Karen Vannessa Lopez Gonzalez' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Maria del Rosario Lopez Gonzalez' })).toBeInTheDocument()
-  expect(screen.getByRole('option', { name: 'Davie Morales Rodriguez' })).toBeInTheDocument()
-  expect(screen.getByRole('option', { name: 'Mavel Griselda Tejada' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Davie Morales Rodriguez' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Mavel Griselda Tejada' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Remesa' })).toBeInTheDocument()
     await userEvent.selectOptions(screen.getByLabelText(/^Remitente$/i), '__OTHER__')
     expect(screen.getByLabelText(/nombre completo del remitente/i)).toBeInTheDocument()
@@ -108,7 +108,7 @@ describe('Treasury financial flow corrections', () => {
     await waitFor(() => expect(posted).toMatchObject({ scope: 'PROJECT', projectId: 'p1', treasuryAccountId: 't-atl' }))
   })
 
-  it('lets the user choose the actual bank when paying a supplier invoice', async () => {
+  it('lets the user choose the actual bank and explicit method when paying a supplier invoice', async () => {
     let paymentPayload: Record<string, unknown> | null = null
     const invoice = { id: 'ap1', supplierId: 's1', invoiceNumber: 'FAC-P-1', scope: 'PROJECT', projectId: 'p1', currencyCode: 'HNL', amount: 1000, taxAmount: 0, amountPaid: 0, dueDate: '2026-09-01', status: 'APPROVED' }
     vi.stubGlobal('fetch', vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -129,8 +129,9 @@ describe('Treasury financial flow corrections', () => {
     render(renderApp('/finanzas/cuentas-por-pagar'))
     await userEvent.click(await screen.findByRole('button', { name: /pagar saldo/i }))
     await userEvent.selectOptions(screen.getByLabelText(/cuenta pagadora/i), 't-bac')
+    await userEvent.selectOptions(screen.getByLabelText(/método de pago/i), 'CASH')
     await userEvent.click(screen.getByRole('button', { name: /confirmar pago/i }))
-    await waitFor(() => expect(paymentPayload).toMatchObject({ treasuryAccountId: 't-bac', amount: '1000' }))
+    await waitFor(() => expect(paymentPayload).toMatchObject({ treasuryAccountId: 't-bac', amount: '1000', paymentMethod: 'CASH' }))
   })
 
   it('lets the user choose the actual bank when collecting a customer invoice', async () => {

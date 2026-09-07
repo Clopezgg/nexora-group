@@ -16,10 +16,12 @@ const STATUS_LABELS: Record<string, string> = {
   REVERSED: 'Revertido',
   OPEN: 'Abierto',
   SOFT_CLOSED: 'Cierre preliminar',
+  SCHEDULED: 'Programado',
   PARTIALLY_PAID: 'Pagado parcialmente',
   PAID: 'Pagado',
   PARTIALLY_COLLECTED: 'Cobrado parcialmente',
   COLLECTED: 'Cobrado',
+  RECONCILED: 'Conciliado',
   SENT: 'Enviado',
   ACCEPTED: 'Aceptado',
   BILLED: 'Facturado',
@@ -30,53 +32,30 @@ export function statusLabel(status: string | null | undefined): string {
   return STATUS_LABELS[status] ?? status.replaceAll('_', ' ')
 }
 
-// Mapeos por dominio (CORRECTIVA §25) — sin mezclar Project / Supplier /
-// SupplierContract. El usuario nunca ve el enum crudo.
-
 export const PROJECT_STATUS_LABELS: Record<string, string> = {
-  PLANNING: 'Planificación',
-  ACTIVE: 'Activo',
-  ON_HOLD: 'Pausado',
-  COMPLETED: 'Completado',
-  CLOSED: 'Cerrado',
-  CANCELLED: 'Cancelado',
-  ARCHIVED: 'Archivado',
+  PLANNING: 'Planificación', ACTIVE: 'Activo', ON_HOLD: 'Pausado', COMPLETED: 'Completado',
+  CLOSED: 'Cerrado', CANCELLED: 'Cancelado', ARCHIVED: 'Archivado',
 }
 
 export const SUPPLIER_STATUS_LABELS: Record<string, string> = {
-  ACTIVE: 'Activo',
-  INACTIVE: 'Inactivo',
-  BLOCKED: 'Bloqueado',
-  ARCHIVED: 'Archivado',
+  ACTIVE: 'Activo', INACTIVE: 'Inactivo', BLOCKED: 'Bloqueado', ARCHIVED: 'Archivado',
 }
 
 export const SUPPLIER_PARTY_ROLE_LABELS: Record<string, string> = {
-  SUPPLIER: 'Proveedor',
-  CONTRACTOR: 'Contratista',
-  BOTH: 'Proveedor y contratista',
+  SUPPLIER: 'Proveedor', CONTRACTOR: 'Contratista', BOTH: 'Proveedor y contratista',
 }
 
 export const SUPPLIER_CONTRACT_STATUS_LABELS: Record<string, string> = {
-  DRAFT: 'Borrador',
-  ACTIVE: 'Activo',
-  COMPLETED: 'Completado',
-  TERMINATED: 'Terminado anticipadamente',
+  DRAFT: 'Borrador', ACTIVE: 'Activo', COMPLETED: 'Completado', TERMINATED: 'Terminado anticipadamente',
 }
 
-// Estado de una cuota contractual (§43). El usuario nunca ve DUE/UPCOMING/etc.
 export const CONTRACT_INSTALLMENT_STATUS_LABELS: Record<string, string> = {
-  DUE: 'Por pagar',
-  UPCOMING: 'Próxima',
-  PARTIALLY_PAID: 'Parcialmente pagada',
-  PAID: 'Pagada',
-  OVERDUE: 'Vencida',
-  CANCELLED: 'Cancelada',
+  DUE: 'Por pagar', UPCOMING: 'Próxima', PARTIALLY_PAID: 'Parcialmente pagada',
+  PAID: 'Pagada', OVERDUE: 'Vencida', CANCELLED: 'Cancelada',
 }
 
 export const CONTRACT_INSTALLMENT_KIND_LABELS: Record<string, string> = {
-  ADVANCE: 'Anticipo',
-  REGULAR: 'Mensualidad',
-  RETENTION_RELEASE: 'Liberación de retención',
+  ADVANCE: 'Anticipo', REGULAR: 'Mensualidad', RETENTION_RELEASE: 'Liberación de retención',
 }
 
 const _labeler = (map: Record<string, string>) => (v: string | null | undefined) =>

@@ -155,6 +155,7 @@ export function ProjectWizard({ companyId, customers, users, costCenters, suppli
   const managerName = users.find((u) => u.id === form.managerUserId)?.fullName ?? 'Sin asignar'
   const customerName = customers.find((c) => c.id === form.customerId)?.legalName ?? 'Sin cliente'
   const contractorName = suppliers.find((s) => s.id === form.contractSupplierId)?.legalName ?? 'Sin contrato inicial'
+  const canSaveDraft = Boolean(form.name.trim()) && !datesInvalid && !contractInvalid && !create.isPending
 
   return (
     <div className="nx-wizard">
@@ -271,11 +272,23 @@ export function ProjectWizard({ companyId, customers, users, costCenters, suppli
       <div className="nx-wizard__actions">
         <Button variant="ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0 || create.isPending}>Atrás</Button>
         {step < STEPS.length - 1 ? (
-          <Button onClick={() => setStep((s) => s + 1)} disabled={!canContinue || (step === 4 && Boolean(form.wbsCode) !== Boolean(form.wbsName))}>Continuar</Button>
+          <div className="nx-wizard__finish">
+            {step > 0 ? (
+              <Button
+                variant="secondary"
+                loading={create.isPending && create.variables === false}
+                disabled={!canSaveDraft}
+                onClick={() => create.mutate(false)}
+              >
+                Crear como borrador
+              </Button>
+            ) : null}
+            <Button onClick={() => setStep((s) => s + 1)} disabled={!canContinue || (step === 4 && Boolean(form.wbsCode) !== Boolean(form.wbsName)) || create.isPending}>Continuar</Button>
+          </div>
         ) : (
           <div className="nx-wizard__finish">
-            <Button variant="secondary" loading={create.isPending && create.variables === false} disabled={!form.name.trim() || datesInvalid || contractInvalid || create.isPending} onClick={() => create.mutate(false)}>Crear en planificación</Button>
-            <Button loading={create.isPending && create.variables === true} disabled={!form.name.trim() || datesInvalid || contractInvalid || create.isPending} onClick={() => create.mutate(true)}>Crear configuración y activar</Button>
+            <Button variant="secondary" loading={create.isPending && create.variables === false} disabled={!canSaveDraft} onClick={() => create.mutate(false)}>Crear como borrador</Button>
+            <Button loading={create.isPending && create.variables === true} disabled={!canSaveDraft} onClick={() => create.mutate(true)}>Crear configuración y activar</Button>
           </div>
         )}
       </div>

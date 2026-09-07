@@ -301,7 +301,7 @@ def pay_supplier_invoice(
     treasury_account_id: uuid.UUID,
     amount: Decimal,
     payment_date: date,
-    payment_method: str = "TRANSFER",
+    payment_method: str = "OTHER",
     payment_evidence_ids: list[uuid.UUID] | None = None,
     contract_allocations: list[dict] | None = None,
     contract_override_reason: str | None = None,
@@ -314,7 +314,9 @@ def pay_supplier_invoice(
     El método y la evidencia se validan ANTES de postear Treasury/GL. La
     evidencia subida queda staged contra la factura y, tras crear el asiento,
     se religa al AccountingDocument; así Voucher, Auditoría e Inspector ven la
-    misma cadena sin capturar el evento dos veces.
+    misma cadena sin capturar el evento dos veces. Callers legacy que no tenían
+    campo de método se preservan como OTHER; la UI productiva siempre envía el
+    método explícito.
     """
     invoice = db.execute(
         select(SupplierInvoice).where(SupplierInvoice.id == invoice_id).with_for_update()

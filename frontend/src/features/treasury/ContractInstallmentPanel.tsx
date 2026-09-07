@@ -20,25 +20,25 @@ export interface ContractAllocationDraft {
 }
 
 const STATUS_TONE: Record<string, 'neutral' | 'warning' | 'danger' | 'success'> = {
-  PAID: 'success',
-  PARTIALLY_PAID: 'warning',
-  OVERDUE: 'danger',
-  DUE: 'warning',
-  UPCOMING: 'neutral',
-  CANCELLED: 'neutral',
+  PAID: 'success', PARTIALLY_PAID: 'warning', OVERDUE: 'danger', DUE: 'warning', UPCOMING: 'neutral', CANCELLED: 'neutral',
 }
 
-/**
- * Contexto contractual dentro del pago real (CORRECTIVA §30-§37, §43).
- *
- * El pago DEBE asignarse íntegramente a cuotas del plan (§34/§35): si el monto
- * no se puede repartir exactamente, `onChange` reporta `valid=false` y el
- * formulario de pago bloquea "Confirmar". Nunca se registra un pago contractual
- * "sin asignación".
- *
- * `selectedInstallmentId` (cuota desde la que se inició el pago) es la
- * asignación PRIMARIA (§32); FIFO es sólo una ayuda (§33).
- */
+function toCents(value: string | number): bigint {
+  const raw = typeof value === 'number' ? value.toFixed(2) : String(value).trim()
+  const match = raw.match(/^([+-]?)(\d+)(?:\.(\d+))?$/)
+  if (!match) return 0n
+  const fraction = (match[3] ?? '').padEnd(3, '0')
+  let cents = BigInt(match[2]) * 100n + BigInt(fraction.slice(0, 2) || '0')
+  if (Number(fraction[2] ?? '0') >= 5) cents += 1n
+  return match[1] === '-' ? -cents : cents
+}
+
+function fromCents(cents: bigint): string {
+  const negative = cents < 0n
+  const abs = negative ? -cents : cents
+  return `${negative ? '-' : ''}${abs / 100n}.${String(abs % 100n).padStart(2, '0')}`
+}
+
 export function ContractInstallmentPanel({
   companyId,
   supplierContractId,
@@ -65,9 +65,9 @@ export function ContractInstallmentPanel({
   const [manualId, setManualId] = useState<string>('')
 
   const summaryQuery = useQuery({
-    queryKey: ['contract-payments', 'summary', scheduleId],
+    queryKey: ['contract-payments', 'summary', scheduleId, asOf],
     queryFn: () => contractPaymentService.summary(scheduleId as string, asOf),
-    enabled: Boolean(scheduleId),
+    enabled: Boolean(scheduleId && asOf),
   })
   const contractsQuery = useQuery({
     queryKey: ['procurement', 'contracts', companyId],
@@ -88,160 +88,112 @@ export function ContractInstallmentPanel({
     return 'Registrar pago a proveedor'
   }, [party?.partyRole])
 
-  const installments = useMemo(
-    () => scheduleQuery.data?.installments ?? [],
-    [scheduleQuery.data],
-  )
+  const installments = useMemo(() => scheduleQuery.data?.installments ?? [], [scheduleQuery.data])
   const primaryId = manualId || selectedInstallmentId || ''
 
-  // Asignación: cuota primaria primero, luego FIFO sobre el resto (§32/§33).
+  // Primary installment first, then FIFO. All arithmetic is exact integer cents;
+  // no binary float is used to compare scheduled/remaining/payment amounts.
   const allocation = useMemo(() => {
-    if (amount == null || amount <= 0) return { rows: [] as ContractAllocationDraft[], total: 0 }
-    let left = Math.round(amount * 100) / 100
+    const amountCents = amount == null ? 0n : toCents(amount)
+    if (amountCents <= 0n) return { rows: [] as ContractAllocationDraft[], totalCents: 0n }
+    let left = amountCents
     const ordered = [
       ...installments.filter((i) => i.installmentId === primaryId),
       ...installments.filter((i) => i.installmentId !== primaryId),
     ]
     const rows: ContractAllocationDraft[] = []
-    for (const i of ordered) {
-      if (left <= 0.004) break
-      if (i.status === 'CANCELLED') continue
-      const rem = Number(i.remaining)
-      if (rem <= 0) continue
-      const apply = Math.min(left, rem)
-      rows.push({ installmentId: i.installmentId, amountApplied: apply.toFixed(2) })
-      left = Math.round((left - apply) * 100) / 100
+    for (const installment of ordered) {
+      if (left <= 0n) break
+      if (installment.status === 'CANCELLED') continue
+      const remainingCents = toCents(installment.remaining)
+      if (remainingCents <= 0n) continue
+      const applied = left < remainingCents ? left : remainingCents
+      rows.push({ installmentId: installment.installmentId, amountApplied: fromCents(applied) })
+      left -= applied
     }
-    const total = rows.reduce((acc, r) => acc + Number(r.amountApplied), 0)
-    return { rows, total }
+    return { rows, totalCents: amountCents - left }
   }, [amount, installments, primaryId])
 
-  const covers =
-    amount != null && amount > 0 && Math.abs(allocation.total - amount) < 0.005
+  const amountCents = amount == null ? 0n : toCents(amount)
+  const covers = amountCents > 0n && allocation.totalCents === amountCents
   const hasSchedule = Boolean(scheduleId)
-
-  // Firma estable del resultado: sólo notificamos al padre cuando cambia de
-  // verdad (el padre pasa una arrow inline — nueva cada render).
   const emittedRows = covers ? allocation.rows : []
   const sig = JSON.stringify({ rows: emittedRows, covers, hasSchedule })
   useEffect(() => {
     onChange(covers ? allocation.rows : [], covers, hasSchedule)
+    // The signature captures all business output; parent callback identity is intentionally excluded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig])
 
   const notFound = scheduleQuery.error instanceof ApiError && scheduleQuery.error.status === 404
   if (notFound) {
-    return (
-      <p className="nx-field__error" role="alert">
-        Este contrato de ejecución requiere un plan de pagos antes de poder pagar cuotas. Créalo desde
-        la ficha del contrato en el proyecto.
-      </p>
-    )
+    return <p className="nx-field__error" role="alert">Este contrato requiere un plan de pagos antes de pagar cuotas. Créalo desde la ficha del contrato en el proyecto.</p>
   }
   if (scheduleQuery.isLoading) return <LoadingState label="Cargando contexto contractual…" />
 
   const columns: TableColumn<ContractInstallment>[] = [
     {
-      key: 'kind',
-      header: 'Tipo',
-      render: (r) => (
+      key: 'kind', header: 'Tipo', render: (r) => (
         <Badge tone={r.installmentKind === 'ADVANCE' ? 'info' : 'neutral'}>
-          {r.installmentKind === 'REGULAR'
-            ? `Cuota ${r.regularNumber} de ${r.regularCount}`
-            : contractInstallmentKindLabel(r.installmentKind)}
+          {r.installmentKind === 'REGULAR' ? `Cuota ${r.regularNumber} de ${r.regularCount}` : contractInstallmentKindLabel(r.installmentKind)}
         </Badge>
       ),
     },
     { key: 'due', header: 'Vencimiento', render: (r) => r.dueDate },
     { key: 'sched', header: 'Programado', numeric: true, render: (r) => formatMoney(r.scheduledAmount, currency) },
-    { key: 'ret', header: 'Retención', numeric: true, render: (r) => (Number(r.retentionAmount) > 0 ? formatMoney(r.retentionAmount, currency) : '—') },
+    { key: 'ret', header: 'Retención', numeric: true, render: (r) => toCents(r.retentionAmount) > 0n ? formatMoney(r.retentionAmount, currency) : '—' },
     { key: 'net', header: 'Neto', numeric: true, render: (r) => formatMoney(r.netDue, currency) },
     { key: 'paid', header: 'Pagado', numeric: true, render: (r) => formatMoney(r.paid, currency) },
     { key: 'rem', header: 'Pendiente', numeric: true, render: (r) => formatMoney(r.remaining, currency) },
+    { key: 'status', header: 'Estado', render: (r) => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'}>{contractInstallmentStatusLabel(r.status)}</Badge> },
     {
-      key: 'status',
-      header: 'Estado',
-      render: (r) => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'}>{contractInstallmentStatusLabel(r.status)}</Badge>,
-    },
-    {
-      key: 'pick',
-      header: '',
-      render: (r) =>
-        r.status === 'PAID' || r.status === 'CANCELLED' ? null : (
-          <Button
-            variant={r.installmentId === primaryId ? 'secondary' : 'ghost'}
-            onClick={() => setManualId(r.installmentId)}
-          >
-            {r.installmentId === primaryId ? 'Seleccionada' : 'Aplicar a esta'}
-          </Button>
-        ),
+      key: 'pick', header: '', render: (r) => r.status === 'PAID' || r.status === 'CANCELLED' ? null : (
+        <Button variant={r.installmentId === primaryId ? 'secondary' : 'ghost'} onClick={() => setManualId(r.installmentId)}>
+          {r.installmentId === primaryId ? 'Seleccionada' : 'Aplicar a esta'}
+        </Button>
+      ),
     },
   ]
 
-  const s = summaryQuery.data
+  const summary = summaryQuery.data
   return (
     <div className="nx-contract-context">
       <p className="nx-field__label">{beneficiaryVerb}</p>
       <dl className="nx-voucher-preview">
-        {contract ? (
-          <>
-            <div><dt>Contrato</dt><dd>{contract.contractNumber}</dd></div>
-            <div>
-              <dt>Categoría</dt>
-              <dd>
-                {SUPPLIER_CONTRACT_CATEGORY_LABELS[contract.contractCategory] ??
-                  contract.contractCategory}
-              </dd>
-            </div>
-          </>
-        ) : null}
-        {s ? (
-          <>
-            <div><dt>Valor contractual</dt><dd>{formatMoney(s.contractValue, currency)}</dd></div>
-            <div><dt>Anticipo programado</dt><dd>{formatMoney(s.advanceScheduled, currency)}</dd></div>
-            <div><dt>Anticipo pagado</dt><dd>{formatMoney(s.advancePaid, currency)}</dd></div>
-            <div><dt>Pagado acumulado</dt><dd>{formatMoney(s.paidAccumulated, currency)}</dd></div>
-            <div><dt>Saldo contractual</dt><dd>{formatMoney(s.contractBalance, currency)}</dd></div>
-          </>
-        ) : null}
+        {contract ? <>
+          <div><dt>Contrato</dt><dd>{contract.contractNumber}</dd></div>
+          <div><dt>Categoría</dt><dd>{SUPPLIER_CONTRACT_CATEGORY_LABELS[contract.contractCategory] ?? contract.contractCategory}</dd></div>
+        </> : null}
+        {summary ? <>
+          <div><dt>Valor contractual</dt><dd>{formatMoney(summary.contractValue, currency)}</dd></div>
+          <div><dt>Anticipo programado</dt><dd>{formatMoney(summary.advanceScheduled, currency)}</dd></div>
+          <div><dt>Anticipo pagado</dt><dd>{formatMoney(summary.advancePaid, currency)}</dd></div>
+          <div><dt>Pagado acumulado</dt><dd>{formatMoney(summary.paidAccumulated, currency)}</dd></div>
+          <div><dt>Saldo contractual</dt><dd>{formatMoney(summary.contractBalance, currency)}</dd></div>
+        </> : null}
       </dl>
 
-      <p className="nx-field__label">Cuotas del plan</p>
+      <p className="nx-field__label">Cuotas del plan · referencia contractual {asOf}</p>
       <div style={{ overflowX: 'auto' }}>
-        <Table
-          columns={columns}
-          rows={installments}
-          getRowKey={(r) => r.installmentId}
-          emptyMessage="El plan no tiene cuotas."
-        />
+        <Table columns={columns} rows={installments} getRowKey={(r) => r.installmentId} emptyMessage="El plan no tiene cuotas." />
       </div>
 
-      {amount != null && amount > 0 ? (
+      {amountCents > 0n ? (
         <div className="nx-contract-context__fifo" role="status">
-          {covers ? (
-            <>
-              <p className="nx-field__label">Asignación del pago</p>
-              <ul className="nx-contract-context__alloc">
-                {allocation.rows.map((r) => {
-                  const i = installments.find((x) => x.installmentId === r.installmentId)
-                  return (
-                    <li key={r.installmentId}>
-                      {i?.installmentKind === 'REGULAR'
-                        ? `Cuota ${i.regularNumber} de ${i.regularCount}`
-                        : contractInstallmentKindLabel(i?.installmentKind ?? 'REGULAR')}{' '}
-                      ({i?.dueDate}) ← {formatMoney(r.amountApplied, currency)}
-                    </li>
-                  )
-                })}
-              </ul>
-            </>
-          ) : (
-            <p className="nx-field__error" role="alert">
-              No se puede confirmar el pago porque el monto ({formatMoney(amount, currency)}) no
-              puede asignarse íntegramente al plan contractual (asignable{' '}
-              {formatMoney(allocation.total, currency)}). Revisa el plan o el monto.
-            </p>
-          )}
+          {covers ? <>
+            <p className="nx-field__label">Asignación del pago</p>
+            <ul className="nx-contract-context__alloc">
+              {allocation.rows.map((row) => {
+                const installment = installments.find((item) => item.installmentId === row.installmentId)
+                return <li key={row.installmentId}>
+                  {installment?.installmentKind === 'REGULAR' ? `Cuota ${installment.regularNumber} de ${installment.regularCount}` : contractInstallmentKindLabel(installment?.installmentKind ?? 'REGULAR')}{' '}
+                  ({installment?.dueDate}) ← {formatMoney(row.amountApplied, currency)}
+                </li>
+              })}
+            </ul>
+          </> : <p className="nx-field__error" role="alert">
+            No se puede confirmar el pago porque {formatMoney(fromCents(amountCents), currency)} no puede asignarse íntegramente al plan. Asignable: {formatMoney(fromCents(allocation.totalCents), currency)}.
+          </p>}
         </div>
       ) : null}
     </div>

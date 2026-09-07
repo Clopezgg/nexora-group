@@ -4,6 +4,7 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { reportingService } from '../../services/reportingService'
 import type { StatementRow } from '../../types/reporting'
 import { downloadCsv, toCsv } from '../../utils/csv'
+import { ReportExportButtons } from './ReportExportButtons'
 import { useReportCurrency } from './reportMoney'
 
 const CSV_COLUMNS = [
@@ -12,19 +13,14 @@ const CSV_COLUMNS = [
   { key: 'balance' as const, label: 'Saldo' },
 ]
 
-/** NXR-REQ-0093 (financial statements subproject): Balance General armado
- * desde reporting_service.balance_sheet, que agrega directamente sobre el
- * General Ledger y nunca devuelve un resultado desbalanceado -- ver
- * docs/superpowers/specs/2026-08-25-financial-statements-design.md. */
 export function BalanceSheetPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
   const { fmt } = useReportCurrency()
-  const COLUMNS: TableColumn<StatementRow>[] = [
+  const columns: TableColumn<StatementRow>[] = [
     { key: 'accountCode', header: 'Código', render: (row) => row.accountCode },
     { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
     { key: 'balance', header: 'Saldo', numeric: true, render: (row) => fmt(row.balance) },
   ]
-
   const reportQuery = useQuery({
     queryKey: ['reports', 'balance-sheet', activeCompanyId],
     queryFn: () => reportingService.getBalanceSheet(activeCompanyId as string),
@@ -32,76 +28,31 @@ export function BalanceSheetPage() {
   })
 
   if (loadingCompanies) return <LoadingState label="Cargando compañías…" />
-  if (!activeCompanyId) {
-    return (
-      <EmptyState
-        icon="book"
-        title="Configura una compañía primero"
-        description="No hay compañías registradas todavía."
-      />
-    )
-  }
-
+  if (!activeCompanyId) return <EmptyState icon="book" title="Configura una compañía primero" description="No hay compañías registradas todavía." />
   const report = reportQuery.data
   const allRows = report ? [...report.assets, ...report.liabilities, ...report.equity] : []
-
-  const handleExport = () => {
-    downloadCsv('balance-general.csv', toCsv(allRows, CSV_COLUMNS))
-  }
 
   return (
     <div>
       <header className="nx-page__header">
         <h1 className="nx-dashboard__title">Balance General</h1>
-        <Button variant="secondary" disabled={allRows.length === 0} onClick={handleExport}>
+        <Button variant="secondary" disabled={allRows.length === 0} onClick={() => downloadCsv('balance-general.csv', toCsv(allRows, CSV_COLUMNS))}>
           Exportar CSV
         </Button>
+        <ReportExportButtons
+          disabled={allRows.length === 0}
+          basename="balance-general"
+          exportFile={(format) => reportingService.exportBalanceSheet(activeCompanyId, format)}
+        />
       </header>
-
-      {reportQuery.isLoading ? (
-        <LoadingState label="Cargando balance general…" />
-      ) : reportQuery.isError ? (
+      {reportQuery.isLoading ? <LoadingState label="Cargando balance general…" /> : reportQuery.isError ? (
         <ErrorState onRetry={() => reportQuery.refetch()} />
       ) : report ? (
         <>
-          <Card>
-            <h2 className="nx-field__label">Activos</h2>
-            <Table
-              columns={COLUMNS}
-              rows={report.assets}
-              getRowKey={(row) => row.accountId}
-              emptyMessage="Sin cuentas de activo con saldo."
-            />
-            <p className="nx-field__label">Subtotal: {fmt(report.totalAssets)}</p>
-          </Card>
-          <Card>
-            <h2 className="nx-field__label">Pasivos</h2>
-            <Table
-              columns={COLUMNS}
-              rows={report.liabilities}
-              getRowKey={(row) => row.accountId}
-              emptyMessage="Sin cuentas de pasivo con saldo."
-            />
-            <p className="nx-field__label">Subtotal: {fmt(report.totalLiabilities)}</p>
-          </Card>
-          <Card>
-            <h2 className="nx-field__label">Patrimonio</h2>
-            <Table
-              columns={COLUMNS}
-              rows={report.equity}
-              getRowKey={(row) => row.accountId}
-              emptyMessage="Sin cuentas de patrimonio con saldo."
-            />
-            <p className="nx-field__label">
-              Subtotal: {fmt(report.totalEquity)} — Resultado del ejercicio: {fmt(report.currentEarnings)} —
-              Subtotal + resultado: {fmt(report.totalEquityIncludingEarnings)}
-            </p>
-          </Card>
-          <Card>
-            <p className="nx-field__label">Activos: {fmt(report.totalAssets)}</p>
-            <p className="nx-field__label">Pasivo + Patrimonio: {fmt(report.totalLiabilitiesAndEquity)}</p>
-            <p className="nx-field__label">Diferencia: {fmt(report.equationDelta)}</p>
-          </Card>
+          <Card><h2 className="nx-field__label">Activos</h2><Table columns={columns} rows={report.assets} getRowKey={(row) => row.accountId} emptyMessage="Sin cuentas de activo con saldo." /><p className="nx-field__label">Subtotal: {fmt(report.totalAssets)}</p></Card>
+          <Card><h2 className="nx-field__label">Pasivos</h2><Table columns={columns} rows={report.liabilities} getRowKey={(row) => row.accountId} emptyMessage="Sin cuentas de pasivo con saldo." /><p className="nx-field__label">Subtotal: {fmt(report.totalLiabilities)}</p></Card>
+          <Card><h2 className="nx-field__label">Patrimonio</h2><Table columns={columns} rows={report.equity} getRowKey={(row) => row.accountId} emptyMessage="Sin cuentas de patrimonio con saldo." /><p className="nx-field__label">Subtotal: {fmt(report.totalEquity)} — Resultado del ejercicio: {fmt(report.currentEarnings)} — Subtotal + resultado: {fmt(report.totalEquityIncludingEarnings)}</p></Card>
+          <Card><p className="nx-field__label">Activos: {fmt(report.totalAssets)}</p><p className="nx-field__label">Pasivo + Patrimonio: {fmt(report.totalLiabilitiesAndEquity)}</p><p className="nx-field__label">Diferencia: {fmt(report.equationDelta)}</p></Card>
         </>
       ) : null}
     </div>

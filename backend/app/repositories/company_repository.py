@@ -66,6 +66,8 @@ def update_company(
     email: str | None = None,
     website: str | None = None,
     voucher_footer_text: str | None = None,
+    logo_evidence_id: uuid.UUID | None = None,
+    signature_evidence_id: uuid.UUID | None = None,
     supplier_advance_account_id: uuid.UUID | None = None,
 ) -> Company:
     if name is not None:
@@ -77,10 +79,7 @@ def update_company(
         company.code = normalized_code
     if functional_currency_code is not None:
         normalized_currency = functional_currency_code.upper().strip()
-        if (
-            company.functional_currency_code is not None
-            and normalized_currency != company.functional_currency_code
-        ):
+        if company.functional_currency_code is not None and normalized_currency != company.functional_currency_code:
             raise ValueError("La moneda funcional ya fue asignada y es inmutable")
         company.functional_currency_code = normalized_currency
     if legal_name is not None:
@@ -92,9 +91,7 @@ def update_company(
     if voucher_payer_name is not None:
         normalized_payer = voucher_payer_name.strip()
         if company.voucher_payer_name and normalized_payer != company.voucher_payer_name:
-            raise ValueError(
-                "El pagador de comprobantes ya fue asignado y es inmutable"
-            )
+            raise ValueError("El pagador de comprobantes ya fue asignado y es inmutable")
         company.voucher_payer_name = normalized_payer or None
     if voucher_approver_name is not None:
         company.voucher_approver_name = voucher_approver_name.strip() or None
@@ -115,6 +112,10 @@ def update_company(
         company.default_theme_id = default_theme_id.strip() or None
     if default_density is not None:
         company.default_density = default_density.strip() or None
+    if logo_evidence_id is not None:
+        company.logo_evidence_id = logo_evidence_id
+    if signature_evidence_id is not None:
+        company.signature_evidence_id = signature_evidence_id
     if supplier_advance_account_id is not None:
         company.supplier_advance_account_id = supplier_advance_account_id
     db.flush()

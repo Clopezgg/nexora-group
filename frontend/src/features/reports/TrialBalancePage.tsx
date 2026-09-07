@@ -1,9 +1,10 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Button, Card, EmptyState, ErrorState, LoadingState, Table, type TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { reportingService } from '../../services/reportingService'
 import type { TrialBalanceRow } from '../../types/reporting'
 import { downloadCsv, toCsv } from '../../utils/csv'
+import { ReportExportButtons } from './ReportExportButtons'
 import { useReportCurrency } from './reportMoney'
 
 const CSV_COLUMNS = [
@@ -30,9 +31,7 @@ function buildColumns(
           >
             {row.accountCode}
           </button>
-        ) : (
-          row.accountCode
-        ),
+        ) : row.accountCode,
     },
     { key: 'accountName', header: 'Cuenta', render: (row) => row.accountName },
     { key: 'debitBalance', header: 'Débito', numeric: true, render: (row) => fmt(row.debitBalance) },
@@ -40,11 +39,6 @@ function buildColumns(
   ]
 }
 
-/** NXR-REQ-0093 (alcance de esta fase): Balance de Comprobación real,
- * armado a partir de treasury_service.account_balance por cada cuenta del
- * chart of accounts de la company activa -- ver
- * backend/app/services/reporting_service.py. Balance Sheet / P&L / Cash
- * Flow quedan fuera de alcance deliberadamente. */
 export function TrialBalancePage({
   onDrillToLedger,
 }: {
@@ -53,77 +47,37 @@ export function TrialBalancePage({
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
   const { fmt } = useReportCurrency()
   const columns = buildColumns(fmt, onDrillToLedger)
-
   const reportQuery = useQuery({
     queryKey: ['reports', 'trial-balance', activeCompanyId],
     queryFn: () => reportingService.getTrialBalance(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
 
-  const exportXlsx = useMutation({
-    mutationFn: () => reportingService.getTrialBalanceXlsx(activeCompanyId as string),
-    onSuccess: ({ blob, filename }) => {
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = filename ?? 'balance-de-comprobacion.xlsx'
-      anchor.rel = 'noopener'
-      document.body.appendChild(anchor)
-      anchor.click()
-      window.setTimeout(() => {
-        anchor.remove()
-        URL.revokeObjectURL(url)
-      }, 60_000)
-    },
-  })
-
   if (loadingCompanies) return <LoadingState label="Cargando compañías…" />
   if (!activeCompanyId) {
-    return (
-      <EmptyState
-        icon="book"
-        title="Configura una compañía primero"
-        description="No hay compañías registradas todavía."
-      />
-    )
+    return <EmptyState icon="book" title="Configura una compañía primero" description="No hay compañías registradas todavía." />
   }
 
   const rows = reportQuery.data?.rows ?? []
-
-  const handleExport = () => {
-    downloadCsv('balance-de-comprobacion.csv', toCsv(rows, CSV_COLUMNS))
-  }
-
   return (
     <div>
       <header className="nx-page__header">
         <h1 className="nx-dashboard__title">Balance de Comprobación</h1>
-        <Button variant="secondary" disabled={rows.length === 0} onClick={handleExport}>
+        <Button variant="secondary" disabled={rows.length === 0} onClick={() => downloadCsv('balance-de-comprobacion.csv', toCsv(rows, CSV_COLUMNS))}>
           Exportar CSV
         </Button>
-        <Button
-          variant="secondary"
+        <ReportExportButtons
           disabled={rows.length === 0}
-          loading={exportXlsx.isPending}
-          onClick={() => exportXlsx.mutate()}
-        >
-          Exportar XLSX
-        </Button>
+          basename="balance-de-comprobacion"
+          exportFile={(format) => reportingService.exportTrialBalance(activeCompanyId, format)}
+        />
       </header>
-
       <Card>
-        {reportQuery.isLoading ? (
-          <LoadingState label="Cargando balance de comprobación…" />
-        ) : reportQuery.isError ? (
+        {reportQuery.isLoading ? <LoadingState label="Cargando balance de comprobación…" /> : reportQuery.isError ? (
           <ErrorState onRetry={() => reportQuery.refetch()} />
         ) : (
           <>
-            <Table
-              columns={columns}
-              rows={rows}
-              getRowKey={(row) => row.accountId}
-              emptyMessage="No hay movimientos contabilizados todavía."
-            />
+            <Table columns={columns} rows={rows} getRowKey={(row) => row.accountId} emptyMessage="No hay movimientos contabilizados todavía." />
             {reportQuery.data ? (
               <p className="nx-field__label">
                 Total débito: {fmt(reportQuery.data.totalDebit)} — Total crédito: {fmt(reportQuery.data.totalCredit)}

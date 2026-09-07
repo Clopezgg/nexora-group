@@ -1,9 +1,9 @@
-"""Emisión inmutable de comprobantes (orden maestra final §27/§28).
+"""Emisión inmutable de comprobantes.
 
 `get_or_create` congela, en la PRIMERA emisión de un AccountingDocument, todo
-lo que se imprime. Reemisiones posteriores leen de este snapshot — si cambia
-la dirección de NEXORA, el aprobador, el nombre comercial, etc., el
-comprobante de agosto sigue mostrando los datos de agosto.
+lo que se imprime, incluidos logo/firma privados referenciados por Evidence.
+Reemisiones posteriores leen el snapshot; cambios del perfil solo afectan
+comprobantes futuros.
 """
 
 import uuid
@@ -78,6 +78,8 @@ def get_or_create(
         company_email_snapshot=getattr(company, "email", None),
         company_website_snapshot=getattr(company, "website", None),
         company_footer_snapshot=getattr(company, "voucher_footer_text", None),
+        company_logo_evidence_id_snapshot=getattr(company, "logo_evidence_id", None),
+        company_signature_evidence_id_snapshot=getattr(company, "signature_evidence_id", None),
         project_name_snapshot=project.name if project else None,
         project_address_snapshot=_join(
             getattr(project, "address_line_1", None) if project else None,

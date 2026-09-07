@@ -1,106 +1,87 @@
 # Backup / Restore — NXR-REQ-0109
 
-Cierra `NXR-REQ-0109` (`docs/PRODUCTION_READINESS.md`, bloque 4:
-"estrategia, retención, point-in-time recovery si el tier lo permite,
-RPO/RTO documentados, al menos una prueba real de restore en destino no
-productivo"). Este documento describe lo que existe **hoy, probado
-localmente contra PostgreSQL real** — no un plan a futuro.
+Este documento define la estrategia verificable de recuperación de NEXORA. No asume que una aplicación sana equivale a un backup sano: el restore se prueba de forma independiente.
 
-## Estrategia
+## Backup lógico probado
 
-Backup lógico vía `pg_dump --format=custom` (comprimido, restaurable
-selectivamente con `pg_restore` si algún día hace falta). Restore
-siempre a un destino **nuevo y vacío** (`dropdb`/`createdb` antes de
-`pg_restore`) — una restauración de desastre real nunca sobrescribe una
-base de datos con datos existentes.
-
-Scripts reales, ejecutables directamente:
+Los scripts autoritativos son:
 
 ```bash
-# Backup
 ./scripts/db_backup.sh <nombre_db> <archivo_salida.dump>
-
-# Restore (siempre a un destino nuevo)
 ./scripts/db_restore.sh <archivo.dump> <nombre_db_destino>
 ```
 
-Ambos scripts son exactamente lo que ejecuta
-`backend/tests/test_backup_restore.py` — el test es también su único
-ejercicio real, así que una regresión en cualquiera de los dos falla
-ahí primero, no en un desastre real.
+Usan `pg_dump --format=custom` y `pg_restore`. El restore se realiza siempre sobre una base nueva/vacía; nunca se usa como mecanismo para sobrescribir silenciosamente una base productiva viva.
 
-## Prueba real de restore (NXR-REQ-0109, requisito explícito)
+`backend/tests/test_backup_restore.py` ejecuta un ciclo real contra PostgreSQL:
 
-`backend/tests/test_backup_restore.py` ejecuta, contra PostgreSQL real
-(no mockeado, no simulado):
+1. crea una base de origen;
+2. aplica `alembic upgrade head`;
+3. siembra datos mediante repositorios/servicios reales, incluido un asiento de Treasury;
+4. genera el dump;
+5. restaura a una base destino independiente;
+6. comprueba revision Alembic, credenciales/hash, datos críticos e integridad `SUM(debit)==SUM(credit)`.
 
-1. Crea una base `nexora_backup_source_*` vacía, `alembic upgrade head`
-   sobre ella (mismo camino de fresh-install que `NXR-REQ-0106`).
-2. Siembra datos reales a través de la capa de repositorio/servicio real
-   (`company_repository`, `account_repository`, `treasury_service` —
-   nunca un `INSERT` crudo): una company, su chart of accounts, una
-   cuenta de tesorería, una remesa CENTRAL real posteada (`L 75,000.00`,
-   `AccountingDocument`/`JournalLine` reales), y un usuario Administrator
-   real con su hash Argon2id real.
-3. `./scripts/db_backup.sh` sobre esa base.
-4. `./scripts/db_restore.sh` a una base `nexora_backup_target_*`
-   completamente nueva.
-5. Verifica, contra la base restaurada:
-   - **migrations/state**: `alembic current` reporta el mismo head.
-   - **login**: el hash de password restaurado es idéntico byte a byte
-     al original, y `verify_password()` (la misma función que usa
-     `auth_service.login()` en producción) acepta la contraseña en
-     texto plano contra él.
-   - **datos críticos**: la company sembrada existe con el mismo nombre.
-   - **integridad contable**: `SUM(debit_amount) == SUM(credit_amount)`
-     sobre `journal_lines` en la base restaurada, y ese total es
-     exactamente el monto real de la remesa sembrada — no "hay datos",
-     sino "son los mismos datos, con la misma integridad de partida
-     doble".
+Ese test forma parte de la suite backend completa; una regresión del procedimiento lógico de backup/restore falla en CI.
 
-Ejecutar bajo demanda: `pytest tests/test_backup_restore.py -v` (ya
-forma parte de la suite completa, `pytest -q`).
+## Azure Database for PostgreSQL
+
+La infraestructura Bicep despliega PostgreSQL Flexible Server 16. La configuración autoritativa vive en `infra/modules/postgres.bicep` y actualmente establece:
+
+- almacenamiento: 32 GB;
+- backup automático de Azure: **7 días** (`backupRetentionDays: 7`);
+- geo-redundant backup: deshabilitado;
+- high availability: deshabilitado en el entorno económico actual;
+- acceso de Azure Services mediante la regla definida por IaC.
+
+Los cambios de retención, HA, red o SKU deben realizarse por Bicep/PR y validarse con `what-if`; no se documentan valores distintos de los que realmente declara IaC.
 
 ## RPO / RTO
 
-**Contexto actual: solo DEV local, sin Azure desplegado todavía**
-(`NXR-REQ-0116-0118` — Bicep escrito, sin desplegar). Los valores de
-abajo son los que aplican **hoy** a este entorno; se revisan cuando
-exista una Azure Database for PostgreSQL Flexible Server real.
+No se inventa un SLA de negocio. Hay dos niveles distintos:
 
-| Entorno | RPO (pérdida máxima aceptable) | RTO (tiempo máximo de recuperación) | Mecanismo |
-|---|---|---|---|
-| DEV local (hoy) | Desde el último `db_backup.sh` manual | Minutos (restore local es rápido: `< 10s` para el volumen de datos actual, medido por el test) | `pg_dump`/`pg_restore` manual, bajo demanda |
-| Azure DEV (cuando exista, `NXR-REQ-0118`) | Definido por el backup automático de Azure Database for PostgreSQL Flexible Server (point-in-time recovery, retención configurable en el módulo Bicep `infra/modules/postgres.bicep`) | Definido por el tiempo de restore de Azure PITR + re-deploy de Container Apps apuntando a la instancia restaurada | Azure PITR nativo + este mismo procedimiento de verificación (migrations/login/datos/integridad) aplicado contra el restore de Azure |
-| Producción (futuro, tras confirmación puntual de despliegue real) | Igual a Azure DEV, ajustado según el SLA de negocio que se decida | Igual a Azure DEV | Igual, con retención más larga |
+| Mecanismo | RPO/RTO técnico documentado |
+|---|---|
+| `pg_dump` / `pg_restore` | RPO = instante del último dump disponible. En el dataset automatizado de prueba, restore local tarda segundos; no extrapolar ese tiempo a producción. |
+| Azure Flexible Server | RPO/RTO dependen de la capacidad PITR/backup del servicio, el volumen real y el procedimiento de recuperación. La retención configurada por IaC es 7 días. Un SLA empresarial en minutos/horas debe aprobarse y medirse antes de prometerlo contractualmente. |
 
-**No se declara un RPO/RTO de producción específico en minutos/horas
-todavía** porque no hay una Azure Database for PostgreSQL real
-desplegada contra la cual medirlo honestamente — inventar un número
-sin evidencia violaría `CLAUDE.md` (no fabricar datos/certificaciones).
-Cuando `NXR-REQ-0118` se despliegue, este documento se actualiza con el
-RPO/RTO real medido contra esa instancia, siguiendo el mismo
-procedimiento de verificación que ya existe aquí (no un procedimiento
-nuevo — el mismo).
+La ausencia de un SLA comercial explícito no invalida el mecanismo técnico de backup. Si NEXORA GROUP define posteriormente un RPO/RTO empresarial, el tier/HA/retención deberán ajustarse para cumplirlo y medirse mediante un simulacro controlado.
 
-## Retención
+## Procedimiento de recuperación
 
-DEV local: sin política automática todavía (backups manuales bajo
-demanda vía `db_backup.sh`). Azure Database for PostgreSQL Flexible
-Server soporta retención configurable de backups automáticos (7-35
-días) vía el parámetro `backupRetentionDays` — a fijar en
-`infra/modules/postgres.bicep` cuando se decida el SLA real antes del
-primer despliegue a Azure DEV.
+Ante un incidente de base de datos:
 
-## Qué NO cubre este documento todavía
+1. detener o aislar escrituras si continuar escribiendo aumenta el daño;
+2. determinar el punto de recuperación objetivo;
+3. restaurar a un destino nuevo, nunca sobre el origen;
+4. aplicar/verificar Alembic en el destino;
+5. comprobar login y configuración crítica;
+6. reconciliar contabilidad (`debit == credit`), AP/AR/Treasury y conteos esenciales;
+7. validar `/api/readyz` contra el destino restaurado;
+8. ejecutar smoke autenticado;
+9. cambiar la aplicación al destino únicamente después de la verificación;
+10. conservar evidencia/auditoría del incidente y del punto restaurado.
 
-- Point-in-time recovery real (requiere Azure Database for PostgreSQL
-  Flexible Server desplegado — `NXR-REQ-0118`, `BLOCKED_EXTERNAL` por
-  la suscripción UNAH deshabilitada al momento de escribir esto).
-- Backup/restore de Azure Blob Storage (evidencia/documentos) — Azure
-  Storage tiene su propia estrategia de redundancia (`infra/modules/
-  storage.bicep`); no hay evidencia real todavía porque no hay Storage
-  Account desplegado.
-- Disaster recovery multi-región — explícitamente fuera de alcance
-  (`docs/MASTER_PLAN.md`: "sin arquitectura multi-region si no es
-  necesaria").
+## Blob Storage / Evidence
+
+Los documentos y Evidence viven en Azure Blob Storage privado cuando `EVIDENCE_BACKEND` está configurado. El original no se sustituye por previews derivados. La estrategia de continuidad de Storage se gobierna por configuración de Azure y debe tratarse separadamente del dump PostgreSQL: restaurar la DB sin los blobs asociados no constituye recuperación completa de Evidence.
+
+La integridad de cada Evidence puede contrastarse con su `content_hash` SHA-256 persistido. Los enlaces company/project y los permisos siguen siendo autoritativos después de una restauración.
+
+## Seguridad del backup
+
+- Los dumps pueden contener datos sensibles y deben tratarse como secretos operativos.
+- No se suben dumps al repositorio Git.
+- No se imprimen contraseñas/connection strings en logs.
+- Un restore de validación usa un destino aislado y credenciales controladas.
+- El backup no es una vía para saltar auditoría ni para reescribir movimientos financieros históricos.
+
+## Alcance futuro opcional
+
+- geo-redundant backup;
+- HA zonal;
+- réplica/DR multi-región;
+- retención superior a 7 días;
+- simulacros periódicos con RTO medido sobre volumen productivo.
+
+Estas mejoras se activan cuando el SLA/riesgo del negocio lo requiera. La arquitectura actual no debe declarar capacidades multi-región o tiempos de recuperación que no estén configurados y medidos.

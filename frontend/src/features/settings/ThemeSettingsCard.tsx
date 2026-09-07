@@ -14,6 +14,7 @@ import {
   type ThemeFamily,
   type UiScale,
 } from '../../theme/themes'
+import { CompanyBrandingCard } from './CompanyBrandingCard'
 import './ThemeSettingsCard.css'
 
 const FAMILY_LABEL: Record<ThemeFamily, string> = {
@@ -71,7 +72,6 @@ function ThemePreviewApp({ themeId, density, scale }: { themeId: string; density
               <span key={i} style={{ height: `${h}%` }} />
             ))}
           </div>
-          {/* Anatomía de diálogo: cabecera con el tratamiento de la familia. */}
           <div className="nx-theme-preview__dialog" aria-hidden="true">
             <div className="nx-theme-preview__dialog-header">Confirmar pago</div>
             <div className="nx-theme-preview__dialog-body">L 50,000.00 · Julio 2026</div>
@@ -134,105 +134,103 @@ export function ThemeSettingsCard({
   })
 
   return (
-    <Card title="Apariencia (Theme Engine)">
-      <p className="nx-field__hint">
-        El tema es solo presentación: nunca cambia cifras, permisos ni contabilidad. Cambiar de familia
-        (NEXORA / Horizon / Quartz / Belize) cambia radio, densidad, elevación y tratamiento de tablas,
-        no solo el color. Cascada: tu preferencia → predeterminado de la compañía → NEXORA Horizon.
-      </p>
+    <>
+      <Card title="Apariencia (Theme Engine)">
+        <p className="nx-field__hint">
+          El tema es solo presentación: nunca cambia cifras, permisos ni contabilidad. Cambiar de familia
+          (NEXORA / Horizon / Quartz / Belize) cambia radio, densidad, elevación y tratamiento de tablas,
+          no solo el color. Cascada: tu preferencia → predeterminado de la compañía → NEXORA Horizon.
+        </p>
 
-      <div className="nx-theme-settings">
-        <div className="nx-theme-settings__controls">
-          <Select
-            label="Familia"
-            value={draftFamily}
-            onChange={(event) => {
-              const family = event.target.value as ThemeFamily
-              const first = presets.find((p) => p.family === family)
-              if (first) applyPreview(first.id, draftDensity)
-            }}
-          >
-            {families.map((family) => (
-              <option key={family} value={family}>{FAMILY_LABEL[family]}</option>
-            ))}
-          </Select>
+        <div className="nx-theme-settings">
+          <div className="nx-theme-settings__controls">
+            <Select
+              label="Familia"
+              value={draftFamily}
+              onChange={(event) => {
+                const family = event.target.value as ThemeFamily
+                const first = presets.find((p) => p.family === family)
+                if (first) applyPreview(first.id, draftDensity)
+              }}
+            >
+              {families.map((family) => (
+                <option key={family} value={family}>{FAMILY_LABEL[family]}</option>
+              ))}
+            </Select>
 
-          <Select
-            label="Variante"
-            value={draftTheme}
-            onChange={(event) => applyPreview(event.target.value, draftDensity)}
-          >
-            {familyPresets.map((preset) => (
-              <option key={preset.id} value={preset.id}>{preset.name}</option>
-            ))}
-          </Select>
+            <Select
+              label="Variante"
+              value={draftTheme}
+              onChange={(event) => applyPreview(event.target.value, draftDensity)}
+            >
+              {familyPresets.map((preset) => (
+                <option key={preset.id} value={preset.id}>{preset.name}</option>
+              ))}
+            </Select>
 
-          <Select
-            label="Densidad"
-            value={draftDensity}
-            onChange={(event) => applyPreview(draftTheme, event.target.value as Density)}
-          >
-            {DENSITIES.map((density) => (
-              <option key={density} value={density}>{DENSITY_LABEL[density]}</option>
-            ))}
-          </Select>
+            <Select
+              label="Densidad"
+              value={draftDensity}
+              onChange={(event) => applyPreview(draftTheme, event.target.value as Density)}
+            >
+              {DENSITIES.map((density) => (
+                <option key={density} value={density}>{DENSITY_LABEL[density]}</option>
+              ))}
+            </Select>
 
-          <Select
-            label="Escala de la interfaz"
-            value={String(uiScale)}
-            onChange={(event) => setUiScale(Number(event.target.value) as UiScale)}
-          >
-            {UI_SCALES.map((scale) => (
-              <option key={scale} value={scale}>{scale}%</option>
-            ))}
-          </Select>
+            <Select
+              label="Escala de la interfaz"
+              value={String(uiScale)}
+              onChange={(event) => setUiScale(Number(event.target.value) as UiScale)}
+            >
+              {UI_SCALES.map((scale) => (
+                <option key={scale} value={scale}>{scale}%</option>
+              ))}
+            </Select>
 
-          <p className="nx-field__hint">
-            {getThemePreset(draftTheme).description}
-            {getThemePreset(draftTheme).contrast === 'high' ? ' · Alto contraste (WCAG AAA).' : ''}
-          </p>
-          {companyDefaultThemeId === draftTheme ? (
-            <Badge tone="neutral">Predeterminado de la compañía</Badge>
-          ) : null}
-          {companyDefaultDensity ? (
-            <p className="nx-field__hint">Densidad predeterminada de la compañía: {companyDefaultDensity}</p>
-          ) : null}
+            <p className="nx-field__hint">
+              {getThemePreset(draftTheme).description}
+              {getThemePreset(draftTheme).contrast === 'high' ? ' · Alto contraste (WCAG AAA).' : ''}
+            </p>
+            {companyDefaultThemeId === draftTheme ? (
+              <Badge tone="neutral">Predeterminado de la compañía</Badge>
+            ) : null}
+            {companyDefaultDensity ? (
+              <p className="nx-field__hint">Densidad predeterminada de la compañía: {companyDefaultDensity}</p>
+            ) : null}
+          </div>
+
+          <div className="nx-theme-settings__preview">
+            <span className="nx-theme-settings__preview-label">Vista previa</span>
+            <ThemePreviewApp themeId={draftTheme} density={draftDensity} scale={uiScale} />
+          </div>
         </div>
 
-        <div className="nx-theme-settings__preview">
-          <span className="nx-theme-settings__preview-label">Vista previa</span>
-          <ThemePreviewApp themeId={draftTheme} density={draftDensity} scale={uiScale} />
-        </div>
-      </div>
-
-      <div className="nx-treasury__actions">
-        <Button loading={isSaving} onClick={() => save(draftTheme, draftDensity)}>
-          Guardar como mi preferencia
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            void save(null, null)
-          }}
-        >
-          Volver a heredar
-        </Button>
-        <Button variant="secondary" onClick={clearPreview}>
-          Cancelar vista previa
-        </Button>
-        {isAdmin && companyId ? (
-          <Button
-            variant="secondary"
-            loading={setCompanyDefault.isPending}
-            onClick={() => setCompanyDefault.mutate()}
-          >
-            Fijar el tema actual como predeterminado de la compañía
+        <div className="nx-treasury__actions">
+          <Button loading={isSaving} onClick={() => save(draftTheme, draftDensity)}>
+            Guardar como mi preferencia
           </Button>
+          <Button variant="secondary" onClick={() => { void save(null, null) }}>
+            Volver a heredar
+          </Button>
+          <Button variant="secondary" onClick={clearPreview}>
+            Cancelar vista previa
+          </Button>
+          {isAdmin && companyId ? (
+            <Button
+              variant="secondary"
+              loading={setCompanyDefault.isPending}
+              onClick={() => setCompanyDefault.mutate()}
+            >
+              Fijar el tema actual como predeterminado de la compañía
+            </Button>
+          ) : null}
+        </div>
+        {setCompanyDefault.isSuccess ? (
+          <p className="nx-field__hint" role="status">Predeterminado de la compañía actualizado.</p>
         ) : null}
-      </div>
-      {setCompanyDefault.isSuccess ? (
-        <p className="nx-field__hint" role="status">Predeterminado de la compañía actualizado.</p>
-      ) : null}
-    </Card>
+      </Card>
+      {isAdmin && companyId ? <CompanyBrandingCard companyId={companyId} /> : null}
+    </>
   )
 }

@@ -83,6 +83,11 @@ def test_company_branding_rejects_cross_company_evidence(client, db_session):
 
 
 def test_voucher_freezes_and_renders_company_logo_and_signature(client, db_session, monkeypatch):
+    """Branding is verified independently from payment-method evidence rules.
+
+    Transfer/deposit/cheque evidence is covered by treasury tests; using cash
+    here keeps this regression focused on immutable logo/signature snapshots.
+    """
     login_admin(client)
     company = create_company(client, name="Brand Snapshot Co")
     admin = db_session.execute(select(User).where(User.email == BOOTSTRAP_ADMIN_EMAIL)).scalar_one()
@@ -107,7 +112,7 @@ def test_voucher_freezes_and_renders_company_logo_and_signature(client, db_sessi
 
     monkeypatch.setattr("app.services.voucher_service.evidence_service.download_render", _download)
     pdf = client.get(
-        f"/api/treasury/vouchers/{document_id}?beneficiary=Proveedor%20Brand&paymentMethod=TRANSFER"
+        f"/api/treasury/vouchers/{document_id}?beneficiary=Proveedor%20Brand&paymentMethod=Efectivo"
     )
     assert pdf.status_code == 200, pdf.text
     assert pdf.content.startswith(b"%PDF")
@@ -128,7 +133,7 @@ def test_voucher_freezes_and_renders_company_logo_and_signature(client, db_sessi
 
     requested.clear()
     reprint = client.get(
-        f"/api/treasury/vouchers/{document_id}?beneficiary=Proveedor%20Brand&paymentMethod=TRANSFER"
+        f"/api/treasury/vouchers/{document_id}?beneficiary=Proveedor%20Brand&paymentMethod=Efectivo"
     )
     assert reprint.status_code == 200, reprint.text
     assert logo_v1.id in requested

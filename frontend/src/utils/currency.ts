@@ -26,13 +26,16 @@ function currencySymbol(currency: string): string {
  * La representación financiera autoritativa viaja como string; aquí se
  * normaliza a centavos con BigInt y redondeo decimal exacto. Los `number`
  * siguen aceptándose para inputs/UI no autoritativos por compatibilidad.
+ * Se conserva el espacio no separable que utilizaba Intl.NumberFormat para
+ * no romper snapshots/E2E ni permitir saltos de línea entre símbolo y monto.
  */
 export function formatMoney(value: number | string, currency = DEFAULT_CURRENCY): string {
   const raw = typeof value === 'number'
     ? (Number.isFinite(value) ? value.toFixed(2) : '0')
     : String(value).trim()
   const match = raw.match(/^([+-]?)(\d+)(?:\.(\d+))?$/)
-  if (!match) return `${currencySymbol(currency)} 0.00`
+  const separator = '\u00a0'
+  if (!match) return `${currencySymbol(currency)}${separator}0.00`
 
   const negative = match[1] === '-'
   const integer = BigInt(match[2])
@@ -44,7 +47,7 @@ export function formatMoney(value: number | string, currency = DEFAULT_CURRENCY)
   const decimal = String(cents % 100n).padStart(2, '0')
   const grouped = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   const sign = negative && cents !== 0n ? '-' : ''
-  return `${sign}${currencySymbol(currency || DEFAULT_CURRENCY)} ${grouped}.${decimal}`
+  return `${sign}${currencySymbol(currency || DEFAULT_CURRENCY)}${separator}${grouped}.${decimal}`
 }
 
 /** Abbreviated money is deliberately presentational (axes/sparklines), never

@@ -15,6 +15,7 @@ from app.models.evidence import Evidence
 from app.models.procurement import GoodsReceipt, PurchaseOrder, ServiceEntry
 from app.models.progress import ProgressRecord
 from app.models.project import Project
+from app.models.project_setup import ProjectSetupRun
 from app.models.ap import SupplierInvoice
 from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
 from app.models.rfi import RequestForInformation
@@ -78,6 +79,15 @@ def _resolve_evidence_context(
 
     if normalized == "PROJECT":
         return _project_context(db, entity_id, label="Proyecto de evidencia")
+
+    if normalized == "PROJECT_SETUP_STAGED":
+        run = db.get(ProjectSetupRun, entity_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="Configuración de proyecto no encontrada")
+        # This is deliberately not a PROJECT link: the project does not exist
+        # yet.  It is visible only inside the owning company until execution
+        # atomically turns the staged file into a real project document.
+        return run.company_id, None
 
     if normalized in {"WBS", "WBS_NODE"}:
         node = db.get(WBSNode, entity_id)

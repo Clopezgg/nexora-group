@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Button, Input, MoneyInput, Select, Textarea } from '../../design-system'
+import { Button, Input, Select, Textarea } from '../../design-system'
 import { projectService } from '../../services/projectService'
-import { procurementService } from '../../services/procurementService'
-import { contractPaymentService } from '../../services/contractPaymentService'
 import { documentService } from '../../services/documentService'
 import type { Project } from '../../types/project'
 import type { Supplier } from '../../types/procurement'
@@ -37,22 +35,36 @@ const EMPTY = {
   addressLine1: '', addressLine2: '', city: '', stateDepartment: '', country: 'HN', locationReference: '',
   plannedStart: '', plannedEnd: '', costCenterId: '', managerUserId: '',
   wbsCode: '', wbsName: '',
-  baselineAmount: null as number | null,
-  contractSupplierId: '', contractNumber: '', contractCategory: 'LABOR', contractValue: null as number | null,
-  contractStartDate: businessTodayIso(), contractEndDate: '', advanceAmount: null as number | null,
+  baselineAmount: '',
+  contractSupplierId: '', contractNumber: '', contractCategory: 'LABOR', contractValue: '',
+  contractStartDate: businessTodayIso(), contractEndDate: '', advanceAmount: '',
   advanceDueDate: '', retentionPercentage: '0', paymentTermsType: 'MONTHLY', regularMonths: '7', dueDay: '1',
+}
+
+function cents(value: string): bigint | null {
+  const match = value.trim().match(/^(\d+)(?:\.(\d{1,2}))?$/)
+  if (!match) return null
+  return BigInt(match[1]) * 100n + BigInt((match[2] ?? '').padEnd(2, '0'))
+}
+
+function isPositiveMoney(value: string) {
+  const amount = cents(value)
+  return amount !== null && amount > 0n
 }
 
 export function ProjectWizard({ companyId, customers, users, costCenters, suppliers, onCreated }: WizardProps) {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState(EMPTY)
   const [files, setFiles] = useState<File[]>([])
-  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null)
+  const [setupRunId, setSetupRunId] = useState<string | null>(null)
   const set = (patch: Partial<typeof EMPTY>) => setForm((prev) => ({ ...prev, ...patch }))
 
   const datesInvalid = Boolean(form.plannedStart && form.plannedEnd && form.plannedEnd < form.plannedStart)
-  const contractEnabled = Boolean(form.contractNumber.trim() || form.contractSupplierId || form.contractValue)
-  const contractInvalid = contractEnabled && (!form.contractNumber.trim() || !form.contractSupplierId || !form.contractValue || form.contractValue <= 0)
+  const contractEnabled = Boolean(form.contractNumber.trim() || form.contractSupplierId || form.contractValue.trim())
+  const contractValueCents = cents(form.contractValue)
+  const advanceCents = cents(form.advanceAmount)
+  const advanceConfigured = isPositiveMoney(form.advanceAmount)
+  const contractInvalid = contractEnabled && (!form.contractNumber.trim() || !form.contractSupplierId || !isPositiveMoney(form.contractValue) || (advanceCents !== null && contractValueCents !== null && advanceCents > contractValueCents) || (advanceConfigured && !form.advanceDueDate) || (form.contractEndDate && form.contractEndDate < form.contractStartDate) || !/^(0|[1-9]\d?|100)(\.\d+)?$/.test(form.retentionPercentage) || (form.paymentTermsType !== 'LUMP_SUM' && (!/^[1-9]\d*$/.test(form.regularMonths) || !/^(?:[1-9]|[12]\d|3[01])$/.test(form.dueDay))))
   const canContinue = useMemo(() => {
     if (step === 0) return form.name.trim().length > 0
     if (step === 2) return !datesInvalid
@@ -62,92 +74,25 @@ export function ProjectWizard({ companyId, customers, users, costCenters, suppli
 
   const create = useMutation({
     mutationFn: async (activate: boolean) => {
-      const project = await projectService.create({
-        companyId,
-        name: form.name.trim(),
-        code: form.code.trim() || undefined,
-        customerId: form.customerId || undefined,
-        currencyCode: form.currencyCode || undefined,
-        description: form.description.trim() || undefined,
-        addressLine1: form.addressLine1.trim() || undefined,
-        addressLine2: form.addressLine2.trim() || undefined,
-        city: form.city.trim() || undefined,
-        stateDepartment: form.stateDepartment.trim() || undefined,
-        country: form.country.trim() || undefined,
-        locationReference: form.locationReference.trim() || undefined,
-        plannedStart: form.plannedStart || undefined,
-        plannedEnd: form.plannedEnd || undefined,
-        costCenterId: form.costCenterId || undefined,
-        managerUserId: form.managerUserId || undefined,
-      })
-      setCreatedProjectId(project.id)
-
-      let wbsId: string | null = null
-      if (form.wbsCode.trim() && form.wbsName.trim()) {
-        const wbs = await projectService.createWbs(project.id, {
-          code: form.wbsCode.trim(),
-          name: form.wbsName.trim(),
-          plannedStart: form.plannedStart || undefined,
-          plannedFinish: form.plannedEnd || undefined,
-        })
-        wbsId = wbs.id
+      const payload = {
+        project: { companyId, name: form.name.trim(), code: form.code.trim() || undefined, customerId: form.customerId || undefined, currencyCode: form.currencyCode || undefined, description: form.description.trim() || undefined, addressLine1: form.addressLine1.trim() || undefined, addressLine2: form.addressLine2.trim() || undefined, city: form.city.trim() || undefined, stateDepartment: form.stateDepartment.trim() || undefined, country: form.country.trim() || undefined, locationReference: form.locationReference.trim() || undefined, plannedStart: form.plannedStart || undefined, plannedEnd: form.plannedEnd || undefined, costCenterId: form.costCenterId || undefined, managerUserId: form.managerUserId || undefined },
+        wbs: { code: form.wbsCode.trim() || undefined, name: form.wbsName.trim() || undefined },
+        baselineAmount: isPositiveMoney(form.baselineAmount) ? form.baselineAmount : undefined,
+        contract: contractEnabled ? { supplierId: form.contractSupplierId, contractNumber: form.contractNumber.trim(), contractCategory: form.contractCategory, value: form.contractValue, startDate: form.contractStartDate || form.plannedStart || businessTodayIso(), endDate: form.contractEndDate || undefined, advanceAmount: advanceConfigured ? form.advanceAmount : undefined, advanceDueDate: advanceConfigured ? form.advanceDueDate : undefined, retentionPercentage: form.retentionPercentage, paymentTermsType: form.paymentTermsType as 'LUMP_SUM' | 'MONTHLY' | 'CUSTOM', regularMonths: form.paymentTermsType === 'LUMP_SUM' ? undefined : Number(form.regularMonths), dueDay: form.paymentTermsType === 'LUMP_SUM' ? undefined : Number(form.dueDay) } : undefined,
+        activate,
       }
-
-      if (form.baselineAmount != null && form.baselineAmount > 0) {
-        await projectService.createBaseline(project.id, {
-          currencyCode: form.currencyCode,
-          lines: [{
-            authorizedAmount: form.baselineAmount,
-            wbsNodeId: wbsId,
-            costCenterId: form.costCenterId || null,
-          }],
-          notes: 'Presupuesto BASELINE creado desde el asistente inicial del proyecto.',
-        })
-      }
-
-      if (contractEnabled && !contractInvalid) {
-        const contract = await procurementService.createContract({
-          companyId,
-          supplierId: form.contractSupplierId,
-          projectId: project.id,
-          contractNumber: form.contractNumber.trim(),
-          contractCategory: form.contractCategory as 'LABOR' | 'SUBCONTRACT' | 'MATERIALS' | 'EQUIPMENT' | 'PROFESSIONAL_SERVICES' | 'OTHER',
-          value: String(form.contractValue),
-          currencyCode: form.currencyCode,
-          startDate: form.contractStartDate || form.plannedStart || businessTodayIso(),
-          endDate: form.contractEndDate || undefined,
-          advanceAmount: form.advanceAmount && form.advanceAmount > 0 ? String(form.advanceAmount) : undefined,
-          advanceDueDate: form.advanceAmount && form.advanceAmount > 0 ? (form.advanceDueDate || undefined) : undefined,
-          retentionPercentage: form.retentionPercentage || '0',
-          paymentTermsType: form.paymentTermsType as 'LUMP_SUM' | 'MONTHLY' | 'CUSTOM',
-        })
-        if (form.paymentTermsType !== 'LUMP_SUM') {
-          const firstPeriod = `${(form.plannedStart || form.contractStartDate || businessTodayIso()).slice(0, 7)}-01`
-          await contractPaymentService.createContractPlan({
-            supplierContractId: contract.id,
-            regularMonths: Math.max(1, Number(form.regularMonths) || 1),
-            dueDay: Math.min(31, Math.max(1, Number(form.dueDay) || 1)),
-            firstPeriod,
-            advanceAmount: form.advanceAmount && form.advanceAmount > 0 ? String(form.advanceAmount) : undefined,
-            advanceDueDate: form.advanceAmount && form.advanceAmount > 0 ? (form.advanceDueDate || undefined) : undefined,
-          })
-        }
-      }
-
-      for (const file of files) {
-        const evidence = await documentService.uploadEvidence(companyId, file, 'OTHER', 'PROJECT', project.id)
-        await documentService.create({
-          companyId,
-          scope: 'PROJECT',
-          projectId: project.id,
-          category: 'OTHER',
-          title: file.name,
-          description: 'Documento inicial cargado desde el asistente de alta del proyecto.',
-          evidenceId: evidence.id,
-        })
-      }
-
-      return activate ? projectService.transitionStatus(project.id, 'ACTIVE') : project
+      const run = setupRunId ? await projectService.getSetupRun(setupRunId) : await projectService.createSetupRun(payload, crypto.randomUUID())
+      setSetupRunId(run.id)
+      const alreadyStaged = await documentService.listEvidence(companyId, 'PROJECT_SETUP_STAGED', run.id)
+      const stagedFiles = new Set(alreadyStaged.map((evidence) => `${evidence.originalFilename}:${evidence.sizeBytes}`))
+      await Promise.all(
+        files
+          .filter((file) => !stagedFiles.has(`${file.name}:${file.size}`))
+          .map((file) => documentService.uploadEvidence(companyId, file, 'OTHER', 'PROJECT_SETUP_STAGED', run.id)),
+      )
+      const completed = await projectService.executeSetupRun(run.id)
+      if (!completed.projectId) throw new Error('La configuración no devolvió un proyecto creado.')
+      return projectService.get(completed.projectId)
     },
     onSuccess: onCreated,
   })
@@ -213,7 +158,7 @@ export function ProjectWizard({ companyId, customers, users, costCenters, suppli
 
         {step === 5 ? <>
           <p className="nx-field__hint">Opcional. Si ingresas un monto mayor que cero, el sistema crea el presupuesto BASELINE real. Sin monto, el proyecto queda “Sin configurar”, no con disponible negativo.</p>
-          <MoneyInput label={`Presupuesto BASELINE (${form.currencyCode})`} value={form.baselineAmount} onChange={(value) => set({ baselineAmount: value })} />
+          <Input label={`Presupuesto BASELINE (${form.currencyCode})`} inputMode="decimal" value={form.baselineAmount} onChange={(e) => set({ baselineAmount: e.target.value })} />
         </> : null}
 
         {step === 6 ? <>
@@ -226,11 +171,11 @@ export function ProjectWizard({ companyId, customers, users, costCenters, suppli
           <Select label="Categoría" value={form.contractCategory} onChange={(e) => set({ contractCategory: e.target.value })}>
             <option value="LABOR">Mano de obra</option><option value="SUBCONTRACT">Subcontrato</option><option value="MATERIALS">Materiales</option><option value="EQUIPMENT">Equipo</option><option value="PROFESSIONAL_SERVICES">Servicios profesionales</option><option value="OTHER">Otro</option>
           </Select>
-          <MoneyInput label={`Valor contractual (${form.currencyCode})`} value={form.contractValue} onChange={(value) => set({ contractValue: value })} />
+          <Input label={`Valor contractual (${form.currencyCode})`} inputMode="decimal" value={form.contractValue} onChange={(e) => set({ contractValue: e.target.value })} />
           <Input label="Inicio del contrato" type="date" value={form.contractStartDate} onChange={(e) => set({ contractStartDate: e.target.value })} />
           <Input label="Fin del contrato (opcional)" type="date" value={form.contractEndDate} onChange={(e) => set({ contractEndDate: e.target.value })} />
-          <MoneyInput label={`Anticipo pactado (${form.currencyCode}, opcional)`} value={form.advanceAmount} onChange={(value) => set({ advanceAmount: value })} />
-          {form.advanceAmount && form.advanceAmount > 0 ? <Input label="Vencimiento del anticipo" type="date" value={form.advanceDueDate} onChange={(e) => set({ advanceDueDate: e.target.value })} required /> : null}
+          <Input label={`Anticipo pactado (${form.currencyCode}, opcional)`} inputMode="decimal" value={form.advanceAmount} onChange={(e) => set({ advanceAmount: e.target.value })} />
+          {advanceConfigured ? <Input label="Vencimiento del anticipo" type="date" value={form.advanceDueDate} onChange={(e) => set({ advanceDueDate: e.target.value })} required /> : null}
           <Input label="Retención %" type="number" min={0} max={100} value={form.retentionPercentage} onChange={(e) => set({ retentionPercentage: e.target.value })} />
           <Select label="Esquema de pago" value={form.paymentTermsType} onChange={(e) => set({ paymentTermsType: e.target.value })}>
             <option value="MONTHLY">Cuotas mensuales</option><option value="CUSTOM">Cuotas personalizadas (plan inicial mensual editable)</option><option value="LUMP_SUM">Pago único / suma alzada</option>
@@ -257,16 +202,15 @@ export function ProjectWizard({ companyId, customers, users, costCenters, suppli
           <div><dt>Plan</dt><dd>{form.plannedStart && form.plannedEnd ? `${form.plannedStart} → ${form.plannedEnd}` : '—'}</dd></div>
           <div><dt>Responsable</dt><dd>{managerName}</dd></div>
           <div><dt>WBS inicial</dt><dd>{form.wbsCode && form.wbsName ? `${form.wbsCode} · ${form.wbsName}` : 'No configurada'}</dd></div>
-          <div><dt>Presupuesto BASELINE</dt><dd>{form.baselineAmount && form.baselineAmount > 0 ? formatMoney(form.baselineAmount, form.currencyCode) : 'Sin configurar'}</dd></div>
-          <div><dt>Contrato de ejecución</dt><dd>{contractEnabled ? `${form.contractNumber} · ${contractorName} · ${formatMoney(form.contractValue ?? 0, form.currencyCode)}` : 'No configurado'}</dd></div>
+          <div><dt>Presupuesto BASELINE</dt><dd>{isPositiveMoney(form.baselineAmount) ? formatMoney(form.baselineAmount, form.currencyCode) : 'Sin configurar'}</dd></div>
+          <div><dt>Contrato de ejecución</dt><dd>{contractEnabled ? `${form.contractNumber} · ${contractorName} · ${formatMoney(form.contractValue || '0', form.currencyCode)}` : 'No configurado'}</dd></div>
           <div><dt>Documentos iniciales</dt><dd>{files.length ? `${files.length} archivo(s)` : 'Ninguno'}</dd></div>
         </dl> : null}
       </div>
 
       {create.isError ? (
         <p className="nx-field__error" role="alert">
-          {createdProjectId ? `El proyecto quedó creado en planificación (${createdProjectId}), pero una configuración posterior falló. No se activó ni se ocultó el error. ` : ''}
-          {(create.error as Error).message}
+          {(create.error as Error).message} No hay proyecto, WBS, BASELINE, contrato, plan ni documento final parcialmente creados. Los archivos ya subidos permanecen identificados como «en preparación» y puedes continuar esta configuración sin duplicarla.
         </p>
       ) : null}
 
@@ -288,8 +232,8 @@ export function ProjectWizard({ companyId, customers, users, costCenters, suppli
           </div>
         ) : (
           <div className="nx-wizard__finish">
-            <Button variant="secondary" loading={create.isPending && create.variables === false} disabled={!canSaveDraft} onClick={() => create.mutate(false)}>Crear como borrador</Button>
-            <Button loading={create.isPending && create.variables === true} disabled={!canSaveDraft} onClick={() => create.mutate(true)}>Crear configuración y activar</Button>
+            <Button variant="secondary" loading={create.isPending && create.variables === false} disabled={!canSaveDraft} onClick={() => create.mutate(false)}>{setupRunId ? 'Continuar configuración como borrador' : 'Crear como borrador'}</Button>
+            <Button loading={create.isPending && create.variables === true} disabled={!canSaveDraft} onClick={() => create.mutate(true)}>{setupRunId ? 'Continuar configuración y activar' : 'Crear configuración y activar'}</Button>
           </div>
         )}
       </div>

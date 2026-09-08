@@ -60,6 +60,30 @@ export interface WBSInput {
   progressPercent?: number
 }
 
+export interface ProjectSetupRun {
+  id: string
+  companyId: string
+  status: 'DRAFT' | 'FAILED' | 'COMPLETED'
+  activate: boolean
+  projectId: string | null
+  failureStep: string | null
+  failureMessage: string | null
+  stagedDocumentCount: number
+}
+
+export interface ProjectSetupInput {
+  project: ProjectInput
+  wbs: { code?: string; name?: string }
+  baselineAmount?: string
+  contract?: {
+    supplierId: string; contractNumber: string; contractCategory: string; value: string
+    startDate: string; endDate?: string; advanceAmount?: string; advanceDueDate?: string
+    retentionPercentage: string; paymentTermsType: 'LUMP_SUM' | 'MONTHLY' | 'CUSTOM'
+    regularMonths?: number; dueDay?: number
+  }
+  activate: boolean
+}
+
 export const projectService = {
   list: (companyId: string, opts?: { status?: string; includeArchived?: boolean }) => {
     const params = new URLSearchParams({ company_id: companyId })
@@ -69,6 +93,9 @@ export const projectService = {
   },
   getLifecycle: (projectId: string) => apiFetch<ProjectLifecycle>(`/projects/${projectId}/lifecycle`),
   create: (input: ProjectInput) => apiFetch<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }),
+  createSetupRun: (input: ProjectSetupInput, idempotencyKey: string) => apiFetch<ProjectSetupRun>('/projects/setup-runs', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(input) }),
+  getSetupRun: (runId: string) => apiFetch<ProjectSetupRun>(`/projects/setup-runs/${runId}`),
+  executeSetupRun: (runId: string) => apiFetch<ProjectSetupRun>(`/projects/setup-runs/${runId}/execute`, { method: 'POST' }),
   get: (projectId: string) => apiFetch<Project>(`/projects/${projectId}`),
   update: (projectId: string, input: Partial<Omit<ProjectInput, 'companyId'>>) => apiFetch<Project>(`/projects/${projectId}`, { method: 'PATCH', body: JSON.stringify(input) }),
   transitionStatus: (projectId: string, status: ProjectStatus, reason?: string) => apiFetch<Project>(`/projects/${projectId}/status`, { method: 'POST', body: JSON.stringify({ status, reason }) }),

@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { Badge, Button, Card, EmptyState, ErrorState, FilterBar, Input, LoadingState, Modal, Select, Table } from '../../design-system'
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { procurementService } from '../../services/procurementService'
+import { contractPaymentService } from '../../services/contractPaymentService'
+import { ApiError } from '../../services/httpClient'
 import { formatMoney } from '../../utils/currency'
 import { ContractPaymentPlanModal } from './ContractPaymentPlanModal'
 import { ExecutionContractForm } from './ExecutionContractForm'
@@ -12,14 +14,8 @@ import {
   type SupplierContract,
   type SupplierContractCategory,
 } from '../../types/procurement'
-import { supplierContractStatusLabel } from '../../utils/statusLabels'
+import { supplierContractStatusLabel, supplierPartyRoleLabel } from '../../utils/statusLabels'
 
-/** NXR-REQ-0059/0060. `/abastecimiento/contratos` ya existía como entrada
- * reservada ("Contratos") en navigation.ts -- no se inventó ruta nueva.
- * `SupplierContract` cubre tanto Supplier Contracts como Subcontracts
- * (mismo modelo, sin campo distintivo -- ver la fila de trazabilidad).
- * `projectId` es opcional: un contrato general de la compañía no requiere
- * proyecto. */
 export function SupplierContractsPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
   const [modalOpen, setModalOpen] = useState(false)
@@ -37,124 +33,108 @@ export function SupplierContractsPage() {
     queryFn: () => procurementService.listSuppliers(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
-
+  const contracts = contractsQuery.data ?? []
   const suppliers = suppliersQuery.data ?? []
-  const supplierNameById = new Map(suppliers.map((s) => [s.id, s.legalName]))
+  const supplierById = new Map(suppliers.map((s) => [s.id, s]))
+
+  const scheduleQueries = useQueries({
+    queries: contracts.map((contract) => ({
+      queryKey: ['contract-payments', 'by-contract', contract.id],
+      queryFn: () => contractPaymentService.getByContract(contract.id),
+      retry: false,
+    })),
+  })
+  const summaryQueries = useQueries({
+    queries: contracts.map((contract, index) => ({
+      queryKey: ['contract-payments', 'summary', scheduleQueries[index]?.data?.id, contract.id],
+      queryFn: () => contractPaymentService.summary(scheduleQueries[index]!.data!.id),
+      enabled: Boolean(scheduleQueries[index]?.data?.id),
+    })),
+  })
+  const contractIndex = new Map(contracts.map((contract, index) => [contract.id, index]))
 
   const columns: TableColumn<SupplierContract>[] = [
-    { key: 'contractNumber', header: 'Número', render: (row) => row.contractNumber },
-    {
-      key: 'contractCategory',
-      header: 'Categoría',
-      render: (row) => (
-        <Badge tone="neutral">
-          {SUPPLIER_CONTRACT_CATEGORY_LABELS[row.contractCategory] ?? row.contractCategory}
-        </Badge>
-      ),
-    },
+    { key: 'contractNumber', header: 'Contrato', render: (row) => row.contractNumber },
     {
       key: 'supplierId',
-      header: 'Proveedor',
-      render: (row) => supplierNameById.get(row.supplierId) ?? row.supplierId,
+      header: 'Tercero',
+      render: (row) => {
+        const party = supplierById.get(row.supplierId)
+        return party ? `${supplierPartyRoleLabel(party.partyRole)} · ${party.tradeName || party.legalName}` : 'Tercero no disponible'
+      },
     },
-    { key: 'value', header: 'Valor', numeric: true, render: (row) => formatMoney(row.value, row.currencyCode) },
-    { key: 'advancePercentage', header: 'Anticipo %', numeric: true, render: (row) => `${Number(row.advancePercentage).toFixed(2)}%` },
-    { key: 'retentionPercentage', header: 'Retención %', numeric: true, render: (row) => `${Number(row.retentionPercentage).toFixed(2)}%` },
-    { key: 'status', header: 'Estado', render: (row) => <Badge>{supplierContractStatusLabel(row.status)}</Badge> },
     {
-      key: 'plan',
-      header: 'Plan de pagos',
-      render: (row) => (
-        <Button variant="secondary" onClick={() => setPlanContract(row)}>
-          Ver plan
-        </Button>
+      key: 'contractCategory', header: 'Categoría', render: (row) => (
+        <Badge tone="neutral">{SUPPLIER_CONTRACT_CATEGORY_LABELS[row.contractCategory] ?? row.contractCategory}</Badge>
       ),
     },
+    { key: 'value', header: 'Valor contractual', numeric: true, render: (row) => formatMoney(row.value, row.currencyCode) },
+    { key: 'advance', header: 'Anticipo pactado', numeric: true, render: (row) => formatMoney(row.advanceAmount ?? '0', row.currencyCode) },
+    {
+      key: 'paid', header: 'Pagado acumulado', numeric: true, render: (row) => {
+        const index = contractIndex.get(row.id)
+        const summary = index == null ? undefined : summaryQueries[index]?.data
+        return summary ? formatMoney(summary.paidAccumulated, row.currencyCode) : '—'
+      },
+    },
+    {
+      key: 'balance', header: 'Saldo', numeric: true, render: (row) => {
+        const index = contractIndex.get(row.id)
+        const summary = index == null ? undefined : summaryQueries[index]?.data
+        return summary ? formatMoney(summary.contractBalance, row.currencyCode) : '—'
+      },
+    },
+    {
+      key: 'next', header: 'Próximo vencimiento', render: (row) => {
+        const index = contractIndex.get(row.id)
+        const summary = index == null ? undefined : summaryQueries[index]?.data
+        const scheduleError = index == null ? null : scheduleQueries[index]?.error
+        const noSchedule = scheduleError instanceof ApiError && scheduleError.status === 404
+        if (noSchedule) return row.paymentTermsType === 'LUMP_SUM' ? 'Pago único (sin plan)' : 'Sin plan de pagos'
+        return summary?.nextDuePeriod ? `${summary.nextDuePeriod} · ${formatMoney(summary.nextDueAmount ?? '0', row.currencyCode)}` : '—'
+      },
+    },
+    { key: 'status', header: 'Estado', render: (row) => <Badge>{supplierContractStatusLabel(row.status)}</Badge> },
+    { key: 'plan', header: 'Acciones', render: (row) => <Button variant="secondary" onClick={() => setPlanContract(row)}>Plan y obligaciones</Button> },
   ]
 
   if (loadingCompanies) return <LoadingState label="Cargando compañías…" />
-  if (!activeCompanyId) {
-    return (
-      <EmptyState
-        icon="file"
-        title="Configura una compañía primero"
-        description="No hay compañías registradas todavía."
-      />
-    )
-  }
+  if (!activeCompanyId) return <EmptyState title="Configura una compañía primero" description="No hay compañías registradas todavía." />
 
   return (
     <div>
       <header className="nx-page__header">
-        <h1 className="nx-dashboard__title">Contratos y Subcontratos</h1>
-        <Button onClick={() => setModalOpen(true)} disabled={suppliers.length === 0}>
-          Nuevo contrato
-        </Button>
+        <div>
+          <h1 className="nx-dashboard__title">Contratos de ejecución</h1>
+          <p className="nx-field__hint">Valor → anticipo → pagado → saldo → próxima obligación. Los porcentajes técnicos viven en el detalle, no dominan la operación diaria.</p>
+        </div>
+        <Button onClick={() => setModalOpen(true)} disabled={suppliers.length === 0}>Nuevo contrato</Button>
       </header>
-      {suppliers.length === 0 ? (
-        <p className="nx-field__error">Necesitas al menos un proveedor registrado primero.</p>
-      ) : null}
+      {suppliers.length === 0 ? <p className="nx-field__error">Necesitas al menos un proveedor o contratista registrado primero.</p> : null}
 
-      <FilterBar
-        onClear={() => {
-          setFilterCategory('')
-          setFilterNumber('')
-        }}
-      >
-        <Input
-          label="Filtrar por número"
-          value={filterNumber}
-          onChange={(e) => setFilterNumber(e.target.value)}
-          placeholder="Buscar…"
-        />
-        <Select
-          label="Filtrar por categoría"
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-        >
+      <FilterBar onClear={() => { setFilterCategory(''); setFilterNumber('') }}>
+        <Input label="Filtrar por número" value={filterNumber} onChange={(e) => setFilterNumber(e.target.value)} placeholder="Buscar…" />
+        <Select label="Categoría" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
           <option value="">Todas</option>
-          {(Object.keys(SUPPLIER_CONTRACT_CATEGORY_LABELS) as SupplierContractCategory[]).map((c) => (
-            <option key={c} value={c}>
-              {SUPPLIER_CONTRACT_CATEGORY_LABELS[c]}
-            </option>
-          ))}
+          {(Object.keys(SUPPLIER_CONTRACT_CATEGORY_LABELS) as SupplierContractCategory[]).map((c) => <option key={c} value={c}>{SUPPLIER_CONTRACT_CATEGORY_LABELS[c]}</option>)}
         </Select>
       </FilterBar>
 
       <Card>
-        {contractsQuery.isLoading ? (
-          <LoadingState label="Cargando contratos…" />
-        ) : contractsQuery.isError ? (
-          <ErrorState onRetry={() => contractsQuery.refetch()} />
-        ) : (
+        {contractsQuery.isLoading ? <LoadingState label="Cargando contratos…" /> : contractsQuery.isError ? <ErrorState onRetry={() => contractsQuery.refetch()} /> : (
           <Table
             columns={columns}
-            rows={(contractsQuery.data ?? []).filter(
-              (row) =>
-                (!filterCategory || row.contractCategory === filterCategory) &&
-                (!filterNumber ||
-                  row.contractNumber.toLowerCase().includes(filterNumber.toLowerCase())),
-            )}
+            rows={contracts.filter((row) => (!filterCategory || row.contractCategory === filterCategory) && (!filterNumber || row.contractNumber.toLowerCase().includes(filterNumber.toLowerCase())))}
             getRowKey={(row) => row.id}
             emptyMessage="Aún no hay contratos registrados."
           />
         )}
       </Card>
 
-      <Modal open={modalOpen} title="Nuevo contrato" onClose={() => setModalOpen(false)}>
-        <ExecutionContractForm
-          onCancel={() => setModalOpen(false)}
-          onCreated={() => setModalOpen(false)}
-        />
+      <Modal open={modalOpen} title="Nuevo contrato de ejecución" onClose={() => setModalOpen(false)}>
+        <ExecutionContractForm onCancel={() => setModalOpen(false)} onCreated={() => setModalOpen(false)} />
       </Modal>
-
-      {planContract ? (
-        <ContractPaymentPlanModal
-          contract={planContract}
-          currencyCode={planContract.currencyCode ?? 'HNL'}
-          onClose={() => setPlanContract(null)}
-        />
-      ) : null}
+      {planContract ? <ContractPaymentPlanModal contract={planContract} currencyCode={planContract.currencyCode ?? 'HNL'} onClose={() => setPlanContract(null)} /> : null}
     </div>
   )
 }

@@ -20,7 +20,6 @@ from app.services.permission_service import (
     accessible_project_ids,
     assert_company_access,
     require_permission,
-    user_has_permission,
     user_has_any_company_scope,
     user_has_company_access,
     user_has_permission,
@@ -128,10 +127,7 @@ def list_supplier_invoices(
             for invoice in invoices
             if invoice.project_id is None or invoice.project_id in allowed_set
         ]
-    return [
-        SupplierInvoiceResponse.model_validate(invoice, from_attributes=True)
-        for invoice in invoices
-    ]
+    return [SupplierInvoiceResponse.model_validate(invoice, from_attributes=True) for invoice in invoices]
 
 
 @router.post(
@@ -276,16 +272,13 @@ def pay_supplier_invoice(
         action="create",
         company_id=invoice.company_id,
     )
-    if payload.contract_override_reason:
-        # §17 — saltar la asignación contractual es una excepción de negocio con
-        # permiso propio, no un fallback silencioso.
-        if not user_has_permission(
-            db, user_id=user.id, resource="contract.payment", action="override"
-        ):
-            raise HTTPException(
-                status_code=403,
-                detail="No tienes el permiso contract.payment:override para saltar la asignación contractual",
-            )
+    if payload.contract_override_reason and not user_has_permission(
+        db, user_id=user.id, resource="contract.payment", action="override"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes el permiso contract.payment:override para saltar la asignación contractual",
+        )
     outcome = None
     request_payload = {"invoiceId": str(invoice_id), **payload.model_dump(mode="json")}
     try:
@@ -304,6 +297,8 @@ def pay_supplier_invoice(
             treasury_account_id=payload.treasury_account_id,
             amount=payload.amount,
             payment_date=payload.payment_date,
+            payment_method=payload.payment_method,
+            payment_evidence_ids=payload.payment_evidence_ids,
             contract_allocations=(
                 [a.model_dump(mode="json") for a in payload.contract_allocations]
                 if payload.contract_allocations
@@ -323,7 +318,14 @@ def pay_supplier_invoice(
             company_id=invoice.company_id,
             project_id=invoice.project_id,
             before=None,
-            after={"amount": str(payment.amount), "invoiceId": str(invoice.id), "bankTransactionReference": payment.bank_transaction_reference, "paymentObservations": payment.payment_observations},
+            after={
+                "amount": str(payment.amount),
+                "invoiceId": str(invoice.id),
+                "paymentMethod": payment.payment_method,
+                "paymentEvidenceCount": len(payload.payment_evidence_ids or []),
+                "bankTransactionReference": payment.bank_transaction_reference,
+                "paymentObservations": payment.payment_observations,
+            },
             correlation_id=correlation_id,
         )
         response = SupplierPaymentResponse.model_validate(payment, from_attributes=True)

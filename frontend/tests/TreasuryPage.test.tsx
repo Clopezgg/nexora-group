@@ -268,7 +268,8 @@ describe('TreasuryPage', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: /^enviar$/i }))
 
-    expect(await screen.findByText('REVIEW')).toBeInTheDocument()
+    const reviewLabels = await screen.findAllByText('En revisión')
+    expect(reviewLabels.some((element) => element.classList.contains('nx-badge'))).toBe(true)
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/ap/supplier-invoices/ap1/submit-for-approval'),
       expect.objectContaining({ method: 'POST' }),

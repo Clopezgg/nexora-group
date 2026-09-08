@@ -17,6 +17,7 @@ from app.models.ap import (
 )
 from app.models.accounting import AccountingDocument
 from app.models.asset import FixedAsset
+from app.models.evidence import Evidence
 from app.models.supplier import Supplier
 from app.models.treasury import TreasuryAccount
 from app.services import approval_service, posting_service
@@ -31,6 +32,9 @@ from app.services.posting_service import JournalLineInput
 
 """Accounts Payable (orden maestra §34-35). `supplier_id` referencia la
 entidad real `Supplier` (Track C - Suppliers/Contracts)."""
+
+_PAYMENT_METHODS = {"TRANSFER", "DEPOSIT", "CHECK", "CASH", "OTHER"}
+_PAYMENT_METHODS_REQUIRING_EVIDENCE = {"TRANSFER", "DEPOSIT", "CHECK"}
 
 
 def create_supplier_invoice(
@@ -112,8 +116,6 @@ def create_supplier_invoice(
             raise InvalidFinancialReferenceError(
                 "La moneda de la factura no coincide con la de la orden de compra"
             )
-        # Si la PO pertenece a un contrato, la factura hereda ese contrato salvo
-        # que declare otro distinto (incoherencia).
         if po.supplier_contract_id is not None:
             if supplier_contract_id is None:
                 supplier_contract_id = po.supplier_contract_id
@@ -157,12 +159,7 @@ def submit_supplier_invoice_for_approval(
     assigned_to: uuid.UUID,
     priority: str = "NORMAL",
 ) -> SupplierInvoice:
-    """DRAFT -> REVIEW. Crea una ApprovalRequest real (Approval Inbox,
-    Track G) en vez de dejar que la factura mute su propio estado sin
-    pasar por segregación de funciones -- resuelve DEFERRED-FINAL-016.
-    `approval_service.decide()` es quien finalmente llama
-    `apply_approval_decision` (adaptador ya registrado en `main.py`) para
-    aprobar/rechazar de verdad."""
+    """DRAFT -> REVIEW mediante Approval Inbox y SoD."""
     invoice = db.execute(
         select(SupplierInvoice).where(SupplierInvoice.id == invoice_id).with_for_update()
     ).scalar_one_or_none()
@@ -195,11 +192,6 @@ def submit_supplier_invoice_for_approval(
 def approve_supplier_invoice(
     db: Session, *, invoice_id: uuid.UUID, commit: bool = True
 ) -> SupplierInvoice:
-    """DRAFT o REVIEW -> APPROVED. Contabiliza el accrual: Debit gasto,
-    Credit cuentas por pagar (orden maestra §34). DRAFT sigue siendo un
-    estado válido de entrada para permitir la aprobación directa cuando no
-    se pasó por el Approval Inbox (`submit_supplier_invoice_for_approval`);
-    REVIEW es el estado real tras esa submission."""
     invoice = db.execute(
         select(SupplierInvoice).where(SupplierInvoice.id == invoice_id).with_for_update()
     ).scalar_one_or_none()
@@ -212,7 +204,6 @@ def approve_supplier_invoice(
 
     supplier = db.get(Supplier, invoice.supplier_id)
     supplier_name = supplier.legal_name if supplier is not None else str(invoice.supplier_id)
-
     total = invoice.amount + invoice.tax_amount
     document = posting_service.post_manual(
         db,
@@ -241,7 +232,6 @@ def approve_supplier_invoice(
         source_id=invoice.id,
         commit=False,
     )
-
     invoice.status = "APPROVED"
     invoice.accrual_document_id = document.id
     if commit:
@@ -272,6 +262,38 @@ def cancel_supplier_invoice(
     return invoice
 
 
+def _validate_payment_evidence(
+    db: Session,
+    *,
+    invoice: SupplierInvoice,
+    payment_method: str,
+    evidence_ids: list[uuid.UUID] | None,
+) -> list[Evidence]:
+    method = payment_method.upper().strip()
+    if method not in _PAYMENT_METHODS:
+        raise InvalidFinancialReferenceError("Método de pago no soportado")
+    ids = list(dict.fromkeys(evidence_ids or []))
+    if method in _PAYMENT_METHODS_REQUIRING_EVIDENCE and not ids:
+        raise InvalidFinancialReferenceError(
+            "Transferencia, depósito y cheque requieren evidencia del pago antes de contabilizar."
+        )
+    rows: list[Evidence] = []
+    for evidence_id in ids:
+        evidence = db.get(Evidence, evidence_id)
+        if evidence is None:
+            raise InvalidFinancialReferenceError(f"Evidence {evidence_id} no existe")
+        if evidence.company_id != invoice.company_id:
+            raise InvalidFinancialReferenceError("La evidencia pertenece a otra compañía")
+        if evidence.category != "PAYMENT_PROOF":
+            raise InvalidFinancialReferenceError("La evidencia debe tener categoría PAYMENT_PROOF")
+        if evidence.entity_type not in {"SUPPLIER_INVOICE", "SUPPLIER_PAYMENT_STAGED"} or evidence.entity_id != invoice.id:
+            raise InvalidFinancialReferenceError(
+                "La evidencia de pago debe estar preparada para esta factura antes de contabilizar."
+            )
+        rows.append(evidence)
+    return rows
+
+
 def pay_supplier_invoice(
     db: Session,
     *,
@@ -279,23 +301,30 @@ def pay_supplier_invoice(
     treasury_account_id: uuid.UUID,
     amount: Decimal,
     payment_date: date,
+    payment_method: str = "OTHER",
+    payment_evidence_ids: list[uuid.UUID] | None = None,
     contract_allocations: list[dict] | None = None,
     contract_override_reason: str | None = None,
     bank_transaction_reference: str | None = None,
     payment_observations: str | None = None,
     commit: bool = True,
 ) -> SupplierPayment:
-    """Pago simple contra UNA factura (sin allocation multi-factura --
-    deuda intencional, ver docs/TREASURY.md)."""
+    """Paga una factura como un único evento económico atómico.
+
+    El método y la evidencia se validan ANTES de postear Treasury/GL. La
+    evidencia subida queda staged contra la factura y, tras crear el asiento,
+    se religa al AccountingDocument; así Voucher, Auditoría e Inspector ven la
+    misma cadena sin capturar el evento dos veces. Callers legacy que no tenían
+    campo de método se preservan como OTHER; la UI productiva siempre envía el
+    método explícito.
+    """
     invoice = db.execute(
         select(SupplierInvoice).where(SupplierInvoice.id == invoice_id).with_for_update()
     ).scalar_one_or_none()
     if invoice is None:
         raise ValueError(f"SupplierInvoice {invoice_id} no existe")
     if invoice.status not in ("APPROVED", "SCHEDULED", "PARTIALLY_PAID"):
-        raise InvalidInvoiceStateError(
-            f"No se puede pagar una factura en estado {invoice.status}"
-        )
+        raise InvalidInvoiceStateError(f"No se puede pagar una factura en estado {invoice.status}")
 
     total = invoice.amount + invoice.tax_amount
     remaining = total - invoice.amount_paid
@@ -316,13 +345,16 @@ def pay_supplier_invoice(
             "treasury_account_id debe usar la moneda de la factura"
         )
 
-    # Fail-closed contractual (orden maestra §16/§18): si la factura está ligada
-    # a un SupplierContract cuyo modo de pago exige plan (MONTHLY/CUSTOM) o que
-    # ya tiene un ContractPaymentSchedule, el pago DEBE traer asignaciones a
-    # cuotas. Sólo un override auditado con motivo puede saltarlo (§17).
+    method = payment_method.upper().strip()
+    evidence_rows = _validate_payment_evidence(
+        db,
+        invoice=invoice,
+        payment_method=method,
+        evidence_ids=payment_evidence_ids,
+    )
+
     if invoice.supplier_contract_id is not None and not contract_allocations:
         from app.services import contract_payment_service
-
         from app.models.supplier import SupplierContract
 
         contract = db.get(SupplierContract, invoice.supplier_contract_id)
@@ -347,7 +379,6 @@ def pay_supplier_invoice(
 
     supplier = db.get(Supplier, invoice.supplier_id)
     supplier_name = supplier.legal_name if supplier is not None else str(invoice.supplier_id)
-
     document = posting_service.post_manual(
         db,
         company_id=invoice.company_id,
@@ -379,6 +410,7 @@ def pay_supplier_invoice(
         treasury_account_id=treasury_account_id,
         amount=amount,
         payment_date=payment_date,
+        payment_method=method,
         accounting_document_id=document.id,
         bank_transaction_reference=(bank_transaction_reference or None),
         payment_observations=(payment_observations or None),
@@ -386,9 +418,10 @@ def pay_supplier_invoice(
     db.add(payment)
     db.flush()
 
-    # Subledger contractual (orden maestra final §8): si la factura está
-    # ligada a un contrato con plan de pagos, se registran las asignaciones
-    # a las cuotas contractuales. NO reemplaza la contabilidad.
+    for evidence in evidence_rows:
+        evidence.entity_type = "ACCOUNTING_DOCUMENT"
+        evidence.entity_id = document.id
+
     if contract_allocations:
         from app.services import contract_payment_service
 
@@ -409,7 +442,6 @@ def pay_supplier_invoice(
 
     invoice.amount_paid += amount
     invoice.status = "PAID" if invoice.amount_paid == total else "PARTIALLY_PAID"
-
     if commit:
         db.commit()
     else:
@@ -419,10 +451,6 @@ def pay_supplier_invoice(
 
 
 def apply_approval_decision(db: Session, *, invoice_id: uuid.UUID, decision: str) -> None:
-    """Adaptador para Approval Inbox (Track G, `approval_service.decide()`)
-    -- entry point nuevo, no toca la firma ni el comportamiento existente
-    de `approve_supplier_invoice`/`cancel_supplier_invoice`. Delega en
-    ellas: la transición real sigue viviendo únicamente ahí."""
     if decision == "APPROVED":
         approve_supplier_invoice(db, invoice_id=invoice_id, commit=False)
     elif decision == "REJECTED":
@@ -432,8 +460,6 @@ def apply_approval_decision(db: Session, *, invoice_id: uuid.UUID, decision: str
 def get_supplier_invoice(db: Session, *, invoice_id: uuid.UUID) -> SupplierInvoice | None:
     return db.get(SupplierInvoice, invoice_id)
 
-
-# -- Plan de pago / cuotas (orden maestra Phase 2) ----------------------
 
 _PLAN_EDITABLE_STATUSES = {"APPROVED", "SCHEDULED"}
 
@@ -457,16 +483,6 @@ def set_payment_plan(
     installments: list[dict],
     commit: bool = True,
 ) -> list[SupplierInvoicePaymentPlanItem]:
-    """Reemplaza el plan de pago de una factura. `installments` es una lista
-    de `{"due_date": date, "amount": Decimal, "note": str | None}`.
-
-    Invariantes:
-    - la factura debe estar APPROVED o SCHEDULED (no DRAFT/REVIEW/PAID/CANCELLED);
-    - no puede tener pagos aplicados todavía (`amount_paid == 0`);
-    - la suma de las cuotas debe igualar exactamente el total de la factura;
-    - fechas de vencimiento estrictamente crecientes;
-    - al menos una cuota.
-    """
     invoice = db.execute(
         select(SupplierInvoice).where(SupplierInvoice.id == invoice_id).with_for_update()
     ).scalar_one_or_none()
@@ -528,7 +544,6 @@ def set_payment_plan(
 def list_supplier_payments(
     db: Session, *, invoice_id: uuid.UUID
 ) -> list[SupplierPayment]:
-    """Historial de pagos de una factura (orden maestra Phase 2)."""
     return list(
         db.execute(
             select(SupplierPayment)
@@ -549,15 +564,6 @@ def list_supplier_invoices(db: Session, *, company_id: uuid.UUID) -> list[Suppli
 
 
 def apply_accrual_reversal(db: Session, *, invoice_id: uuid.UUID, document_type_code: str) -> None:
-    """Adaptador para posting_service.register_reversal_hook (NXR-REQ-0025,
-    Corrections). Revertir el accrual de una factura (document_type_code
-    "SIN") sin sincronizar su status dejaría la factura APPROVED
-    apuntando a un AccountingDocument ya REVERSED -- pagable de nuevo
-    pese a que el GL ya no refleja el gasto. El source_type
-    "supplier_invoice" también cubre el pago ("PAY"); ese caso todavía no
-    tiene un flujo de reversión propio (reducir amount_paid, reabrir la
-    factura) y se rechaza explícitamente en vez de dejar un estado a
-    medias -- ver docs/DEFERRED.md."""
     if document_type_code == "PAY":
         raise InvalidInvoiceStateError(
             "Revertir el pago de una factura no está soportado todavía; "
@@ -598,9 +604,6 @@ def apply_accrual_reversal(db: Session, *, invoice_id: uuid.UUID, document_type_
 
 
 def build_payment_proposal(db: Session, *, company_id, as_of: date, horizon_days: int = 14) -> dict:
-    """Propuesta de pago: facturas de proveedor abiertas con saldo pendiente
-    cuyo vencimiento (o próxima cuota impaga) cae dentro del horizonte o ya
-    está vencido. Ordenada por urgencia. Orden maestra Phase 7."""
     from app.models.supplier import Supplier
 
     horizon_end = as_of + timedelta(days=horizon_days)

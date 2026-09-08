@@ -9,10 +9,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
-# Accounts Payable (orden maestra §34-35). `supplier_id` es una FK real a
-# `Supplier` (Track C - Suppliers/Contracts, ver app/models/supplier.py);
-# la deuda intencional de texto libre documentada anteriormente en
-# docs/ACCOUNTING.md quedó resuelta al integrar Track C.
+# Accounts Payable. `supplier_id` es una FK real a Supplier; la obligación,
+# el pago, el asiento y la evidencia deben permanecer trazables como un solo
+# evento económico.
 SUPPLIER_INVOICE_STATUSES = (
     "DRAFT",
     "REVIEW",
@@ -23,6 +22,8 @@ SUPPLIER_INVOICE_STATUSES = (
     "RECONCILED",
     "CANCELLED",
 )
+
+SUPPLIER_PAYMENT_METHODS = ("TRANSFER", "DEPOSIT", "CHECK", "CASH", "OTHER")
 
 
 class SupplierInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -72,24 +73,29 @@ class SupplierInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     accrual_document_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounting_documents.id", ondelete="SET NULL"), nullable=True
     )
-    # Enlace explícito con el contrato de origen (orden maestra final §4).
-    # Nullable sólo cuando la obligación realmente no proviene de un contrato.
     supplier_contract_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("supplier_contracts.id", ondelete="RESTRICT"), nullable=True
     )
-    # ORDEN MAESTRA §19/§21 — la factura releva (drawdown) una PurchaseOrder.
     purchase_order_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("purchase_orders.id", ondelete="RESTRICT"), nullable=True
     )
 
 
 class SupplierPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Pago simple contra UNA factura (sin allocation multi-factura todavía
-    -- registrado como deuda intencional; ver docs/TREASURY.md)."""
+    """Pago contra una factura.
+
+    El método se congela en el pago original. TRANSFER/DEPOSIT/CHECK requieren
+    evidencia validada antes de contabilizar; la evidencia queda enlazada al
+    AccountingDocument emitido, que a su vez está unido a este pago.
+    """
 
     __tablename__ = "supplier_payments"
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_supplier_payments_amount_positive"),
+        CheckConstraint(
+            "payment_method IN ('TRANSFER','DEPOSIT','CHECK','CASH','OTHER')",
+            name="ck_supplier_payments_method",
+        ),
     )
 
     supplier_invoice_id: Mapped[uuid.UUID] = mapped_column(
@@ -100,6 +106,7 @@ class SupplierPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)
+    payment_method: Mapped[str] = mapped_column(String(16), nullable=False, default="TRANSFER")
     accounting_document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounting_documents.id", ondelete="RESTRICT"), nullable=False
     )
@@ -111,21 +118,12 @@ class SupplierPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
     )
     reversal_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    # Referencia del MOVIMIENTO bancario (distinta de
-    # TreasuryAccount.account_reference, que es el número de nuestra cuenta).
-    # Orden maestra final §25 — se persiste, se audita, se imprime y la
-    # conciliación puede aprovecharla.
     bank_transaction_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    # Observaciones persistidas del pago (§24) — DB, audit, inspector, voucher.
     payment_observations: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class SupplierInvoicePaymentPlanItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Cuota de un plan de pago de una factura de proveedor (orden maestra
-    Phase 2 -- planes/cuotas de pago). La suma de `amount` de todas las
-    cuotas de una factura debe igualar su total (amount + tax_amount); esto
-    se valida en `ap_service.set_payment_plan`, no en la base, porque el plan
-    se reemplaza atómicamente."""
+    """Cuota de un plan de pago de una factura de proveedor."""
 
     __tablename__ = "supplier_invoice_payment_plan_items"
     __table_args__ = (

@@ -1,11 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.api.deps_correlation import get_correlation_id
 from app.models.project import Project
+from app.models.project_setup import ProjectSetupRun
 from app.repositories import (
     budget_repository,
     project_control_repository,
@@ -30,7 +32,9 @@ from app.schemas.project_control import (
     WBSNodeCreateRequest,
     WBSNodeResponse,
 )
-from app.services import audit_service, budget_service, forecast_service
+from app.schemas.project_setup import ProjectSetupRequest, ProjectSetupRunResponse
+from app.services import audit_service, budget_service, forecast_service, project_setup_service
+from app.services.project_setup_service import ProjectSetupStepError
 from app.services.financial_validation_service import assert_evidence_belongs_to_company
 from app.services.permission_service import (
     accessible_project_ids,
@@ -41,6 +45,104 @@ from app.services.permission_service import (
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+
+def _setup_response(db: Session, run: ProjectSetupRun) -> ProjectSetupRunResponse:
+    return ProjectSetupRunResponse(
+        id=run.id,
+        company_id=run.company_id,
+        status=run.status,
+        activate=run.activate,
+        project_id=run.project_id,
+        failure_step=run.failure_step,
+        failure_message=run.failure_message,
+        staged_document_count=len(project_setup_service.staged_evidence(db, run.id)),
+    )
+
+
+def _setup_payload(payload: ProjectSetupRequest) -> dict:
+    return payload.model_dump(mode="json", exclude={"activate"})
+
+
+@router.post("/setup-runs", response_model=ProjectSetupRunResponse, status_code=201)
+def create_setup_run(
+    payload: ProjectSetupRequest,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=128),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("project", "create")),
+) -> ProjectSetupRunResponse:
+    """Persist an initial project command; it creates no Project rows yet."""
+    assert_company_access(db, user_id=user.id, resource="project", action="create", company_id=payload.project.company_id)
+    body = _setup_payload(payload)
+    existing = project_setup_service.get_by_key(db, company_id=payload.project.company_id, key=idempotency_key)
+    if existing is not None:
+        if existing.payload != body or existing.activate != payload.activate:
+            raise HTTPException(status_code=409, detail="La Idempotency-Key ya corresponde a otra configuración de proyecto")
+        return _setup_response(db, existing)
+    try:
+        run = project_setup_service.create_run(db, company_id=payload.project.company_id, requested_by=user.id, key=idempotency_key, payload=body, activate=payload.activate)
+        db.commit()
+        db.refresh(run)
+        return _setup_response(db, run)
+    except IntegrityError:
+        db.rollback()
+        run = project_setup_service.get_by_key(db, company_id=payload.project.company_id, key=idempotency_key)
+        if run is None:
+            raise
+        if run.payload != body or run.activate != payload.activate:
+            raise HTTPException(status_code=409, detail="La Idempotency-Key ya corresponde a otra configuración de proyecto")
+        return _setup_response(db, run)
+
+
+@router.get("/setup-runs/{run_id}", response_model=ProjectSetupRunResponse)
+def get_setup_run(
+    run_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("project", "read")),
+) -> ProjectSetupRunResponse:
+    run = project_setup_service.get_run(db, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Configuración de proyecto no encontrada")
+    assert_company_access(db, user_id=user.id, resource="project", action="read", company_id=run.company_id)
+    return _setup_response(db, run)
+
+
+@router.post("/setup-runs/{run_id}/execute", response_model=ProjectSetupRunResponse)
+def execute_setup_run(
+    run_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("project", "create")),
+    correlation_id: str = Depends(get_correlation_id),
+) -> ProjectSetupRunResponse:
+    run = project_setup_service.get_run(db, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Configuración de proyecto no encontrada")
+    assert_company_access(db, user_id=user.id, resource="project", action="create", company_id=run.company_id)
+    if run.requested_by != user.id:
+        raise HTTPException(status_code=403, detail="Solo quien inició esta configuración puede reanudarla")
+    if run.status == "COMPLETED":
+        return _setup_response(db, run)
+    try:
+        project_setup_service.execute(db, run=run, correlation_id=correlation_id)
+        db.commit()
+        db.refresh(run)
+        return _setup_response(db, run)
+    except Exception as exc:
+        db.rollback()
+        failed = project_setup_service.get_run(db, run_id)
+        if failed is not None:
+            failed.status = "FAILED"
+            failed.failure_step = getattr(exc, "step", "CORE_TRANSACTION")
+            failed.failure_message = str(exc)[:2000]
+            db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "La configuración no creó ningún proyecto ni hecho financiero. "
+                "Corrige la causa y usa Continuar configuración para reintentar: "
+                f"{exc}"
+            ),
+        ) from exc
 
 
 def _get_project_or_404(db: Session, project_id: uuid.UUID) -> Project:

@@ -59,8 +59,16 @@ class SupplierPaymentCreateRequest(CamelModel):
     treasury_account_id: uuid.UUID
     amount: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
     payment_date: date
-    # Asignación a cuotas contractuales (orden maestra final §8/§17). La suma
-    # debe igualar `amount`. Opcional: sólo aplica a facturas de contrato.
+    # Compatibilidad segura con clientes/API legacy: si un caller antiguo no
+    # conocía el nuevo campo, se conserva como OTHER en vez de inventar una
+    # transferencia. La UI productiva siempre envía el método explícito.
+    payment_method: Literal["TRANSFER", "DEPOSIT", "CHECK", "CASH", "OTHER"] = "OTHER"
+    # Evidencia subida antes de contabilizar. Para transferencia/depósito/cheque
+    # el backend falla cerrado si esta lista no contiene al menos un Evidence
+    # válido de la misma compañía y factura.
+    payment_evidence_ids: list[uuid.UUID] | None = None
+    # Asignación a cuotas contractuales. La suma debe igualar `amount`.
+    # Opcional únicamente cuando la factura no está sujeta a un plan contractual.
     contract_allocations: list[ContractAllocationInput] | None = None
     contract_override_reason: str | None = None
     bank_transaction_reference: str | None = Field(default=None, max_length=120)
@@ -73,6 +81,7 @@ class SupplierPaymentResponse(CamelModel):
     treasury_account_id: uuid.UUID
     amount: Decimal
     payment_date: date
+    payment_method: str
     accounting_document_id: uuid.UUID
     reversal_accounting_document_id: uuid.UUID | None = None
     reversed_at: datetime | None = None

@@ -58,6 +58,17 @@
   animation: nx-spin 0.7s linear infinite;
 }
 
+/* Mobile-first hit area: the visual density may stay compact, but primary
+ * interactive controls preserve a 44px touch target. */
+@media (max-width: 600px) {
+  .nx-button {
+    min-height: 44px;
+    height: auto;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+
 @keyframes nx-spin {
   to {
     transform: rotate(360deg);

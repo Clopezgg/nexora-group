@@ -318,7 +318,7 @@ todavía).
 | NXR-REQ-0119 | Blob Storage | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep + cliente `azure_blob.py`, sin desplegar |
 | NXR-REQ-0120 | Key Vault | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep + cliente `azure_keyvault.py`, sin desplegar |
 | NXR-REQ-0121 | Monitor / Application Insights | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep + wiring opcional en `main.py`, sin desplegar |
-| NXR-REQ-0122 | OIDC deployment (federated credentials) | ➖➖⬜➖➖➖➖⬜⬜ | NOT_STARTED | workflow escrito, falta configurar credenciales federadas en GitHub |
+| NXR-REQ-0122 | OIDC deployment (federated credentials) | ➖➖✅➖➖➖➖✅⬜ | IMPLEMENTED | 2026-09-08: GitHub Actions autenticó por OIDC en el workflow oficial de PR #113; el job Bicep what-if completó PASS (`34265350393`). Esto prueba las credenciales federadas y el acceso de lectura/what-if. El despliegue productivo del SHA final sigue siendo un gate separado y no se marca VERIFIED hasta que corra sobre `main`. |
 | NXR-REQ-0123 | Production smoke | ⬜ | BLOCKED_EXTERNAL | requiere confirmación puntual de despliegue real (`CLAUDE.md` §11.1) |
 | NXR-REQ-0124 | Production E2E | ➖➖✅✅✅✅✅✅✅ | IMPLEMENTED | 2026-08-31: tras corregir el fallo troncal de Safari (API cross-site → first-party via Static Web Apps linked backend, PRs #37–#40), Deploy Azure run `33348100953` (`main@50fde56`) certifica producción a través del origen first-party `$FRONTEND_URL/api`: Container App `nexora-backend-dev--0000043` `Running`/`Healthy`/`latest==ready`, imagen = SHA exacto de `main`, `healthz`/`readyz` 200, login real → cookie `Secure`+`HttpOnly`+`Path=/`, `auth/me` 200, `master-data/companies` 200 (1 visible), `projects` 200, `master-data/accounts` 200, `dashboard` 200 (`HNL`), `fiscal/periods/current` 200, `logout`→401→`relogin`→200; FQDN directo locked (401). Ver `docs/PROGRESS.md` (entrada 2026-08-31). |
 
@@ -341,7 +341,7 @@ histórico):
   pero mover cada fila individual a `VERIFIED` exige mapear su alcance
   exacto contra lo que el recorrido realmente cubre, fila por fila — pasada
   pendiente, no asumida aquí.
-- **IMPLEMENTED:** 111 / 124 (2026-08-30: +`NXR-REQ-0124` Production E2E).
+- **IMPLEMENTED:** 112 / 124 (2026-09-08: +`NXR-REQ-0122` OIDC probado por el workflow oficial de PR #113).
   `NXR-REQ-0016` (Financial statements,
   incluyendo Cash Flow), `NXR-REQ-0106` (Migrations), `NXR-REQ-0105`
   (Accessibility), `NXR-REQ-0108` (Observability), `NXR-REQ-0109`
@@ -354,11 +354,11 @@ histórico):
   no aplica (Deploy Azure ejecuta y certifica producción, ver
   `docs/PROGRESS.md` 2026-08-30); pendiente una pasada de re-mapeo fila por
   fila antes de moverlos a `IMPLEMENTED` — no se infla aquí.
-- **NOT_STARTED:** 1 / 124 — NXR-REQ-0122 (OIDC, BLOCKED por Azure AD tenant).
+- **NOT_STARTED:** 0 / 124 — NXR-REQ-0122 dejó de ser un bloqueo: OIDC fue ejercitado por el workflow oficial de PR #113 el 2026-09-08.
 - **BLOCKED_EXTERNAL:** 1 / 124 — NXR-REQ-0123 (production smoke pipeline;
   re-evaluar contra el gate de `Verify production` del run `33341601256`).
 
-Suma verificada contra las 124 filas reales: 3+111+8+1+1 = 124 (recontar con
+Suma actualizada contra las 124 filas: 3+112+8+0+1 = 124. No usar estos conteos históricos como certificación del HEAD; recontar con
 `grep -oE '\| (NOT_STARTED|IN_PROGRESS|IMPLEMENTED|VERIFIED|BLOCKED_EXTERNAL) \|' docs/REQUIREMENTS_TRACEABILITY.md | sort | uniq -c`
 antes de fiarse de este resumen prosa, que puede desincronizarse de la
 tabla real). El sistema combinado pasó 338 pruebas backend sobre

@@ -6,6 +6,7 @@ import {
   Card,
   CustomerSelector,
   EmptyState,
+  Input,
   LoadingState,
   Modal,
   MoneyInput,
@@ -21,6 +22,8 @@ import { useMutationError } from '../../hooks/useMutationError'
 import { arService, type CustomerInvoice } from '../../services/apArService'
 import { arMetricsService } from '../../services/financialControlService'
 import { formatMoney } from '../../utils/currency'
+import { businessTodayIso } from '../../utils/businessDate'
+import { statusLabel } from '../../utils/statusLabels'
 import type { TreasuryAccount } from '../../types/treasury'
 import './TreasuryPage.css'
 
@@ -30,10 +33,7 @@ export function AccountsReceivablePage() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [openCreate, setOpenCreate] = useState(false)
 
-  const companiesQuery = useQuery({
-    queryKey: ['master-data', 'companies'],
-    queryFn: masterDataService.listCompanies,
-  })
+  const companiesQuery = useQuery({ queryKey: ['master-data', 'companies'], queryFn: masterDataService.listCompanies })
   const companies = companiesQuery.data ?? []
   const activeCompanyId = companyId ?? companies[0]?.id ?? null
 
@@ -60,22 +60,12 @@ export function AccountsReceivablePage() {
 
   const approve = useMutation({
     mutationFn: (id: string) => arService.approveInvoice(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ar', 'customer-invoices', activeCompanyId] })
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ar', 'customer-invoices', activeCompanyId] }),
     onError: (error) => handleMutationError(error, 'Aprobar factura de cliente'),
   })
 
   if (companiesQuery.isLoading) return <LoadingState label="Cargando…" />
-  if (companies.length === 0) {
-    return (
-      <EmptyState
-        icon="receipt"
-        title="Aún no hay compañías configuradas"
-        description="Crea una compañía desde Tesorería antes de registrar facturas de cliente."
-      />
-    )
-  }
+  if (companies.length === 0) return <EmptyState icon="receipt" title="Aún no hay compañías configuradas" description="Crea una compañía antes de registrar facturas de cliente." />
 
   const revenueAccounts = (accountsQuery.data ?? []).filter((a) => a.accountType === 'REVENUE')
   const receivableAccounts = (accountsQuery.data ?? []).filter((a) => a.accountType === 'ASSET')
@@ -86,40 +76,16 @@ export function AccountsReceivablePage() {
 
   const columns: TableColumn<CustomerInvoice>[] = [
     { key: 'invoiceNumber', header: 'Factura', render: (row) => row.invoiceNumber },
+    { key: 'customerId', header: 'Cliente', render: (row) => customerNameById.get(row.customerId) ?? 'Cliente no disponible' },
+    { key: 'amount', header: 'Monto', numeric: true, render: (row) => formatMoney(row.amount, row.currencyCode) },
+    { key: 'amountCollected', header: 'Cobrado', numeric: true, render: (row) => formatMoney(row.amountCollected, row.currencyCode) },
+    { key: 'status', header: 'Estado', render: (row) => <Badge>{statusLabel(row.status)}</Badge> },
     {
-      key: 'customerId',
-      header: 'Cliente',
-      render: (row) => customerNameById.get(row.customerId) ?? row.customerId,
-    },
-    {
-      key: 'amount',
-      header: 'Monto',
-      render: (row) => formatMoney(row.amount, row.currencyCode),
-    },
-    { key: 'amountCollected', header: 'Cobrado', render: (row) => formatMoney(row.amountCollected, row.currencyCode) },
-    { key: 'status', header: 'Estado', render: (row) => row.status },
-    {
-      key: 'actions',
-      header: 'Acciones',
-      render: (row) => (
+      key: 'actions', header: 'Acciones', render: (row) => (
         <div className="nx-treasury__actions">
-          {row.status === 'DRAFT' ? (
-            <Button
-              variant="secondary"
-              onClick={() => approve.mutate(row.id)}
-              loading={approve.isPending}
-            >
-              Aprobar
-            </Button>
-          ) : null}
-          {['APPROVED', 'PARTIALLY_COLLECTED'].includes(row.status) &&
-          treasuryAccounts.length > 0 ? (
-            <CollectButton
-              invoiceId={row.id}
-              treasuryAccounts={treasuryAccounts}
-              currencyCode={row.currencyCode}
-              remaining={row.amount - row.amountCollected}
-            />
+          {row.status === 'DRAFT' ? <Button variant="secondary" onClick={() => approve.mutate(row.id)} loading={approve.isPending}>Aprobar</Button> : null}
+          {['APPROVED', 'PARTIALLY_COLLECTED'].includes(row.status) && treasuryAccounts.length > 0 ? (
+            <CollectButton invoiceId={row.id} treasuryAccounts={treasuryAccounts} currencyCode={row.currencyCode} remaining={row.amount - row.amountCollected} />
           ) : null}
         </div>
       ),
@@ -129,51 +95,22 @@ export function AccountsReceivablePage() {
   return (
     <div className="nx-treasury">
       <header className="nx-treasury__header">
-        <h1 className="nx-dashboard__title">Cuentas por cobrar</h1>
-        <Select
-          value={activeCompanyId ?? ''}
-          onChange={(e) => setCompanyId(e.target.value)}
-          aria-label="Compañía"
-        >
-          {companies.map((company) => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
+        <div>
+          <h1 className="nx-dashboard__title">Cuentas por cobrar</h1>
+          <p className="nx-field__hint">La moneda de una factura de proyecto hereda la moneda del proyecto. Para operaciones generales se selecciona explícitamente; nunca se inventa una conversión.</p>
+        </div>
+        <Select value={activeCompanyId ?? ''} onChange={(e) => setCompanyId(e.target.value)} aria-label="Compañía">
+          {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
         </Select>
       </header>
 
       <ArMetricsCard companyId={activeCompanyId} />
-
       <Card title="Acciones">
-        <Button
-          variant="secondary"
-          onClick={() => setOpenCreate(true)}
-          disabled={
-            revenueAccounts.length === 0 || receivableAccounts.length === 0 || customers.length === 0
-          }
-        >
-          Registrar factura de cliente
-        </Button>
-        {revenueAccounts.length === 0 || receivableAccounts.length === 0 ? (
-          <p className="nx-field__error">
-            Necesitas al menos una cuenta REVENUE y una ASSET (cuentas por cobrar) en el catálogo
-            contable.
-          </p>
-        ) : null}
-        {customers.length === 0 ? (
-          <p className="nx-field__error">
-            Necesitas al menos un cliente registrado (Comercial → Clientes).
-          </p>
-        ) : null}
+        <Button variant="secondary" onClick={() => setOpenCreate(true)} disabled={revenueAccounts.length === 0 || receivableAccounts.length === 0 || customers.length === 0}>Registrar factura de cliente</Button>
+        {revenueAccounts.length === 0 || receivableAccounts.length === 0 ? <p className="nx-field__error">Necesitas una cuenta de ingreso y una cuenta por cobrar.</p> : null}
+        {customers.length === 0 ? <p className="nx-field__error">Necesitas al menos un cliente registrado.</p> : null}
       </Card>
-
-      <Table
-        columns={columns}
-        rows={invoices}
-        getRowKey={(row) => row.id}
-        emptyMessage="Aún no hay facturas de cliente registradas."
-      />
+      <Table columns={columns} rows={invoices} getRowKey={(row) => row.id} emptyMessage="Aún no hay facturas de cliente registradas." />
 
       {openCreate && activeCompanyId ? (
         <CreateCustomerInvoiceModal
@@ -182,25 +119,14 @@ export function AccountsReceivablePage() {
           receivableAccounts={receivableAccounts}
           customers={customers}
           onClose={() => setOpenCreate(false)}
-          onCreated={() =>
-            queryClient.invalidateQueries({
-              queryKey: ['ar', 'customer-invoices', activeCompanyId],
-            })
-          }
+          onCreated={() => queryClient.invalidateQueries({ queryKey: ['ar', 'customer-invoices', activeCompanyId] })}
         />
       ) : null}
     </div>
   )
 }
 
-function CreateCustomerInvoiceModal({
-  companyId,
-  revenueAccounts,
-  receivableAccounts,
-  customers,
-  onClose,
-  onCreated,
-}: {
+function CreateCustomerInvoiceModal({ companyId, revenueAccounts, receivableAccounts, customers, onClose, onCreated }: {
   companyId: string
   revenueAccounts: { id: string; name: string }[]
   receivableAccounts: { id: string; name: string }[]
@@ -213,131 +139,80 @@ function CreateCustomerInvoiceModal({
   const [amount, setAmount] = useState<number | null>(null)
   const [scope, setScope] = useState<'CENTRAL' | 'GENERAL' | 'PROJECT'>('GENERAL')
   const [projectId, setProjectId] = useState('')
+  const [currencyCode, setCurrencyCode] = useState('HNL')
+  const [invoiceDate, setInvoiceDate] = useState(businessTodayIso())
+  const [dueDate, setDueDate] = useState(businessTodayIso())
   const [revenueAccountId, setRevenueAccountId] = useState(revenueAccounts[0]?.id ?? '')
   const [receivableAccountId, setReceivableAccountId] = useState(receivableAccounts[0]?.id ?? '')
   const handleMutationError = useMutationError()
 
-  const projectsQuery = useQuery({
-    queryKey: ['projects', companyId],
-    queryFn: () => projectService.list(companyId),
-  })
+  const projectsQuery = useQuery({ queryKey: ['projects', companyId], queryFn: () => projectService.list(companyId) })
   const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : []
-
+  const selectedProject = projects.find((project) => project.id === projectId) ?? null
+  const resolvedCurrency = scope === 'PROJECT' && selectedProject ? selectedProject.currencyCode : currencyCode
   const customerOptions = customers.map((c) => ({ id: c.id, label: c.legalName }))
 
   const mutation = useMutation({
-    mutationFn: () =>
-      arService.createInvoice({
-        companyId,
-        customerId,
-        invoiceNumber,
-        scope,
-        projectId: scope === 'PROJECT' ? projectId : null,
-        revenueAccountId,
-        receivableAccountId,
-        currencyCode: 'HNL',
-        amount: String(amount ?? 0),
-        invoiceDate: new Date().toISOString().slice(0, 10),
-        dueDate: new Date().toISOString().slice(0, 10),
-      }) as Promise<CustomerInvoice>,
-    onSuccess: (invoice) => {
-      onCreated(invoice)
-      onClose()
-    },
+    mutationFn: () => arService.createInvoice({
+      companyId,
+      customerId,
+      invoiceNumber,
+      scope,
+      projectId: scope === 'PROJECT' ? projectId : null,
+      revenueAccountId,
+      receivableAccountId,
+      currencyCode: resolvedCurrency,
+      amount: String(amount ?? 0),
+      invoiceDate,
+      dueDate,
+    }) as Promise<CustomerInvoice>,
+    onSuccess: (invoice) => { onCreated(invoice); onClose() },
     onError: (error) => handleMutationError(error, 'Registrar factura de cliente'),
   })
 
   return (
     <Modal open title="Registrar factura de cliente" onClose={onClose}>
-      <form
-        className="nx-treasury__form"
-        onSubmit={(event) => {
-          event.preventDefault()
-          mutation.mutate()
-        }}
-      >
-        <Select
-          label="Alcance de la operación"
-          value={scope}
-          onChange={(event) => {
-            const next = event.target.value as 'CENTRAL' | 'GENERAL' | 'PROJECT'
-            setScope(next)
-            if (next !== 'PROJECT') setProjectId('')
-          }}
-        >
-          <option value="CENTRAL">Central — Tesorería corporativa</option>
+      <form className="nx-treasury__form" onSubmit={(event) => { event.preventDefault(); mutation.mutate() }}>
+        <Select label="Alcance de la operación" value={scope} onChange={(event) => {
+          const next = event.target.value as 'CENTRAL' | 'GENERAL' | 'PROJECT'
+          setScope(next)
+          if (next !== 'PROJECT') setProjectId('')
+        }}>
+          <option value="CENTRAL">Central — Operación corporativa</option>
           <option value="GENERAL">General — Sin proyecto</option>
           <option value="PROJECT">Proyecto — Operación atribuible</option>
         </Select>
         {scope === 'PROJECT' ? (
-          <Select
-            label="Proyecto"
-            value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
-            required
-          >
+          <Select label="Proyecto" value={projectId} onChange={(event) => setProjectId(event.target.value)} required>
             <option value="">Selecciona un proyecto…</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.code ? `${project.code} — ` : ''}{project.name}
-              </option>
-            ))}
+            {projects.map((project) => <option key={project.id} value={project.id}>{project.code ? `${project.code} — ` : ''}{project.name} · {project.currencyCode}</option>)}
           </Select>
-        ) : null}
+        ) : (
+          <Select label="Moneda de la factura" value={currencyCode} onChange={(event) => setCurrencyCode(event.target.value)}>
+            <option value="HNL">HNL — Lempira hondureño</option>
+            <option value="USD">USD — Dólar estadounidense</option>
+          </Select>
+        )}
+        {selectedProject ? <p className="nx-field__hint">Moneda heredada del proyecto: {selectedProject.currencyCode}. No se aplica tipo de cambio implícito.</p> : null}
         <CustomerSelector options={customerOptions} value={customerId} onChange={setCustomerId} />
-        <label className="nx-field">
-          <span className="nx-field__label">Número de factura</span>
-          <input
-            className="nx-input"
-            value={invoiceNumber}
-            onChange={(e) => setInvoiceNumber(e.target.value)}
-            required
-          />
-        </label>
-        <Select
-          label="Cuenta de ingreso"
-          value={revenueAccountId}
-          onChange={(e) => setRevenueAccountId(e.target.value)}
-        >
-          {revenueAccounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
+        <Input label="Número de factura" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} required />
+        <Select label="Cuenta de ingreso" value={revenueAccountId} onChange={(e) => setRevenueAccountId(e.target.value)}>
+          {revenueAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </Select>
-        <Select
-          label="Cuenta por cobrar"
-          value={receivableAccountId}
-          onChange={(e) => setReceivableAccountId(e.target.value)}
-        >
-          {receivableAccounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
+        <Select label="Cuenta por cobrar" value={receivableAccountId} onChange={(e) => setReceivableAccountId(e.target.value)}>
+          {receivableAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </Select>
-        <MoneyInput label="Monto" value={amount} onChange={setAmount} />
-        {mutation.isError ? (
-          <p className="nx-field__error">{(mutation.error as Error).message}</p>
-        ) : null}
-        <Button
-          type="submit"
-          loading={mutation.isPending}
-          disabled={!amount || !customerId || !invoiceNumber || (scope === 'PROJECT' && !projectId)}
-        >
-          Registrar
-        </Button>
+        <MoneyInput label={`Monto (${resolvedCurrency})`} value={amount} onChange={setAmount} />
+        <Input label="Fecha económica de factura" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} required />
+        <Input label="Vencimiento" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+        {mutation.isError ? <p className="nx-field__error">{(mutation.error as Error).message}</p> : null}
+        <Button type="submit" loading={mutation.isPending} disabled={!amount || !customerId || !invoiceNumber || !invoiceDate || !dueDate || (scope === 'PROJECT' && !projectId)}>Registrar</Button>
       </form>
     </Modal>
   )
 }
 
-function CollectButton({
-  invoiceId,
-  treasuryAccounts,
-  currencyCode,
-  remaining,
-}: {
+function CollectButton({ invoiceId, treasuryAccounts, currencyCode, remaining }: {
   invoiceId: string
   treasuryAccounts: TreasuryAccount[]
   currencyCode: string
@@ -345,22 +220,14 @@ function CollectButton({
 }) {
   const queryClient = useQueryClient()
   const handleMutationError = useMutationError()
-  const eligibleTreasuryAccounts = treasuryAccounts.filter(
-    (account) => account.status === 'ACTIVE' && account.currencyCode === currencyCode,
-  )
+  const eligibleTreasuryAccounts = treasuryAccounts.filter((account) => account.status === 'ACTIVE' && account.currencyCode === currencyCode)
   const [open, setOpen] = useState(false)
   const [treasuryAccountId, setTreasuryAccountId] = useState(eligibleTreasuryAccounts[0]?.id ?? '')
   const [amount, setAmount] = useState<number | null>(remaining)
-  const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10))
+  const [receiptDate, setReceiptDate] = useState(businessTodayIso())
 
   const mutation = useMutation({
-    mutationFn: async ({
-      payload,
-      idempotencyKey,
-    }: {
-      payload: Record<string, unknown>
-      idempotencyKey: string
-    }) => {
+    mutationFn: async ({ payload, idempotencyKey }: { payload: Record<string, unknown>; idempotencyKey: string }) => {
       await arService.collect(invoiceId, payload, idempotencyKey)
       return arService.getInvoice(invoiceId)
     },
@@ -374,66 +241,21 @@ function CollectButton({
 
   return (
     <>
-      <Button
-        variant="ghost"
-        onClick={() => setOpen(true)}
-        disabled={eligibleTreasuryAccounts.length === 0}
-      >
-        Cobrar saldo ({formatMoney(remaining, currencyCode)})
-      </Button>
+      <Button variant="ghost" onClick={() => setOpen(true)} disabled={eligibleTreasuryAccounts.length === 0}>Cobrar saldo ({formatMoney(remaining, currencyCode)})</Button>
       {open ? (
         <Modal open title="Registrar cobro de cliente" onClose={() => setOpen(false)}>
-          <form
-            className="nx-treasury__form"
-            onSubmit={(event) => {
-              event.preventDefault()
-              mutation.mutate({
-                payload: {
-                  treasuryAccountId,
-                  amount: String(amount ?? 0),
-                  receiptDate,
-                },
-                idempotencyKey: crypto.randomUUID(),
-              })
-            }}
-          >
-            <Select
-              name="collectionTreasuryAccountId"
-              label="Cuenta receptora"
-              value={treasuryAccountId}
-              onChange={(event) => setTreasuryAccountId(event.target.value)}
-              required
-            >
-              {eligibleTreasuryAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name} — {account.currencyCode}
-                </option>
-              ))}
+          <form className="nx-treasury__form" onSubmit={(event) => {
+            event.preventDefault()
+            mutation.mutate({ payload: { treasuryAccountId, amount: String(amount ?? 0), receiptDate }, idempotencyKey: crypto.randomUUID() })
+          }}>
+            <Select name="collectionTreasuryAccountId" label="Cuenta receptora" value={treasuryAccountId} onChange={(event) => setTreasuryAccountId(event.target.value)} required>
+              {eligibleTreasuryAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} — {account.currencyCode}</option>)}
             </Select>
             <MoneyInput label={`Monto a cobrar (${currencyCode})`} value={amount} onChange={setAmount} />
-            <label className="nx-field">
-              <span className="nx-field__label">Fecha de cobro</span>
-              <input
-                className="nx-input"
-                type="date"
-                value={receiptDate}
-                onChange={(event) => setReceiptDate(event.target.value)}
-                required
-              />
-            </label>
-            <p className="nx-field__hint">
-              El alcance/proyecto ya viene de la factura; selecciona el banco o caja donde realmente entró el dinero.
-            </p>
-            {mutation.isError ? (
-              <p className="nx-field__error">{(mutation.error as Error).message}</p>
-            ) : null}
-            <Button
-              type="submit"
-              loading={mutation.isPending}
-              disabled={!treasuryAccountId || !amount || amount <= 0 || amount > remaining || !receiptDate}
-            >
-              Confirmar cobro
-            </Button>
+            <Input label="Fecha efectiva del cobro" type="date" value={receiptDate} onChange={(event) => setReceiptDate(event.target.value)} required />
+            <p className="nx-field__hint">El proyecto y la moneda ya vienen de la factura; selecciona la cuenta donde realmente entró el dinero.</p>
+            {mutation.isError ? <p className="nx-field__error">{(mutation.error as Error).message}</p> : null}
+            <Button type="submit" loading={mutation.isPending} disabled={!treasuryAccountId || !amount || amount <= 0 || amount > remaining || !receiptDate}>Confirmar cobro</Button>
           </form>
         </Modal>
       ) : null}
@@ -442,18 +264,12 @@ function CollectButton({
 }
 
 function ArMetricsCard({ companyId }: { companyId: string | null }) {
-  const query = useQuery({
-    queryKey: ['ar-metrics', companyId],
-    queryFn: () => arMetricsService.get(companyId as string),
-    enabled: Boolean(companyId),
-  })
+  const query = useQuery({ queryKey: ['ar-metrics', companyId], queryFn: () => arMetricsService.get(companyId as string), enabled: Boolean(companyId) })
   if (!companyId) return null
   const m = query.data
   return (
     <Card title="DSO y aging de cartera">
-      {query.isLoading ? (
-        <LoadingState label="Calculando DSO…" />
-      ) : m?.aging ? (
+      {query.isLoading ? <LoadingState label="Calculando DSO…" /> : m?.aging ? (
         <div className="nx-treasury__actions" style={{ flexWrap: 'wrap' }}>
           <Badge>{m.dso == null ? 'DSO — (sin ventas recientes)' : `DSO ${m.dso} días`}</Badge>
           <Badge>Cartera abierta {formatMoney(Number(m.arOutstanding ?? 0))}</Badge>

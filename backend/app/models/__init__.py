@@ -53,6 +53,7 @@ from app.models.procurement import (
 from app.models.planning import Milestone, Task
 from app.models.progress import ProgressRecord
 from app.models.project import Project
+from app.models.project_setup import ProjectSetupRun
 from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
 from app.models.rate_limit import RateLimitBucket
 from app.models.resource_posting import ResourcePostingConfig
@@ -149,6 +150,7 @@ __all__ = [
     "PostingRule",
     "ProgressRecord",
     "Project",
+    "ProjectSetupRun",
     "PurchaseOrder",
     "PurchaseOrderLine",
     "PurchaseRequisition",

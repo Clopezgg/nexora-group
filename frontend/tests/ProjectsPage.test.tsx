@@ -67,9 +67,15 @@ describe('ProjectsPage', () => {
         if (url.includes('/master-data/users')) {
           return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 'mgr1', fullName: 'Ing. Responsable' }] } as Response)
         }
-        if (url.endsWith('/projects') && method === 'POST') {
+        if (url.endsWith('/projects/setup-runs') && method === 'POST') {
           createPayload = JSON.parse(String(init?.body))
-          return Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 'p9', companyId: 'c1', name: createPayload?.name, status: 'PLANNING' }) } as Response)
+          return Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 'setup9', companyId: 'c1', status: 'DRAFT', activate: false, projectId: null, failureStep: null, failureMessage: null, stagedDocumentCount: 0 }) } as Response)
+        }
+        if (url.endsWith('/projects/setup-runs/setup9/execute') && method === 'POST') {
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ id: 'setup9', companyId: 'c1', status: 'COMPLETED', activate: false, projectId: 'p9', failureStep: null, failureMessage: null, stagedDocumentCount: 0 }) } as Response)
+        }
+        if (url.endsWith('/projects/p9')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ id: 'p9', companyId: 'c1', name: 'Puente Río Grande', status: 'PLANNING' }) } as Response)
         }
         return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
       }),
@@ -89,10 +95,32 @@ describe('ProjectsPage', () => {
 
     await waitFor(() =>
       expect(createPayload).toMatchObject({
-        name: 'Puente Río Grande',
-        city: 'Comayagua',
-        stateDepartment: 'Comayagua',
+        project: expect.objectContaining({
+          name: 'Puente Río Grande',
+          city: 'Comayagua',
+          stateDepartment: 'Comayagua',
+        }),
       }),
     )
+  })
+
+  it('does not allow a draft with only one of the required WBS fields', async () => {
+    stubFetch({
+      '/master-data/companies': [{ id: 'c1', name: 'Constructora Nexora', code: null, legalName: null, functionalCurrencyCode: 'HNL' }],
+      '/projects?company_id=c1': [],
+    })
+
+    render(renderApp('/proyectos'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo proyecto' }))
+    await userEvent.type(screen.getByLabelText('Nombre del proyecto'), 'WBS incompleta')
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+
+    await userEvent.type(screen.getByLabelText('Código WBS'), '1.0')
+
+    expect(screen.getByText('Completa código y nombre WBS o deja ambos vacíos.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crear como borrador' })).toBeDisabled()
   })
 })

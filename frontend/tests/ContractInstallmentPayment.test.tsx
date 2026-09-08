@@ -73,19 +73,21 @@ describe('Contract installment payment (§30-§37)', () => {
     await userEvent.click(await screen.findByRole('button', { name: /pagar saldo/i }))
 
     const context = (await screen.findByText('C-LAB-001')).closest('.nx-contract-context') as HTMLElement
-    // Terminología de contratista (§37).
     expect(within(context).getByText(/Registrar pago a contratista/i)).toBeInTheDocument()
-    // NO existe el fallback "se registrará sin asignación" (§34).
     expect(screen.queryByText(/sin asignación a cuotas contractuales/i)).not.toBeInTheDocument()
-    // Asignación del pago visible.
     expect(await within(context).findByText(/Asignación del pago/i)).toBeInTheDocument()
 
     await userEvent.selectOptions(screen.getByLabelText(/cuenta pagadora/i), 't-atl')
-    await userEvent.click(screen.getByRole('button', { name: /confirmar pago/i }))
+    // Este test valida la asignación contractual, no el upload bancario. Elegir
+    // Efectivo hace explícito el método y evita inventar una transferencia sin
+    // evidencia; los tests de evidencia cubren los medios bancarios por separado.
+    await userEvent.selectOptions(screen.getByLabelText(/método de pago/i), 'CASH')
+    await userEvent.click(screen.getByRole('button', { name: /confirmar.*pago/i }))
 
     await waitFor(() =>
       expect(paymentPayload).toMatchObject({
         amount: '50000',
+        paymentMethod: 'CASH',
         contractAllocations: [{ installmentId: 'i1', amountApplied: '50000.00' }],
       }),
     )
@@ -115,9 +117,10 @@ describe('Contract installment payment (§30-§37)', () => {
     await userEvent.click(await screen.findByRole('button', { name: /pagar saldo/i }))
     await screen.findByText('C-LAB-001')
     await userEvent.selectOptions(screen.getByLabelText(/cuenta pagadora/i), 't-atl')
+    await userEvent.selectOptions(screen.getByLabelText(/método de pago/i), 'CASH')
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /confirmar pago/i })).toBeDisabled(),
+      expect(screen.getByRole('button', { name: /confirmar.*pago/i })).toBeDisabled(),
     )
     expect(screen.getAllByText(/no puede asignarse íntegramente al plan/i).length).toBeGreaterThan(0)
   })

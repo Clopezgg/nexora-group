@@ -1,22 +1,5 @@
 export const DEFAULT_CURRENCY = 'HNL'
 
-const formatterCache = new Map<string, Intl.NumberFormat>()
-
-export function formatMoney(value: number | string, currency = DEFAULT_CURRENCY): string {
-  const normalizedCurrency = currency || DEFAULT_CURRENCY
-  let formatter = formatterCache.get(normalizedCurrency)
-  if (!formatter) {
-    formatter = new Intl.NumberFormat('es-HN', {
-      style: 'currency',
-      currency: normalizedCurrency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-    formatterCache.set(normalizedCurrency, formatter)
-  }
-  return formatter.format(Number(value))
-}
-
 const symbolCache = new Map<string, string>()
 
 function currencySymbol(currency: string): string {
@@ -38,9 +21,37 @@ function currencySymbol(currency: string): string {
   return symbol
 }
 
-/** Abbreviated money for dense contexts — chart axes, sparklines, mobile KPIs.
- * "L 1.2M", "L 250K", "L 980". El valor exacto sigue disponible en tooltips y
- * en las tarjetas (§20/§26). */
+/**
+ * Formatea dinero sin convertir strings Decimal del backend a IEEE-754.
+ * La representación financiera autoritativa viaja como string; aquí se
+ * normaliza a centavos con BigInt y redondeo decimal exacto. Los `number`
+ * siguen aceptándose para inputs/UI no autoritativos por compatibilidad.
+ * Se conserva el espacio no separable que utilizaba Intl.NumberFormat para
+ * no romper snapshots/E2E ni permitir saltos de línea entre símbolo y monto.
+ */
+export function formatMoney(value: number | string, currency = DEFAULT_CURRENCY): string {
+  const raw = typeof value === 'number'
+    ? (Number.isFinite(value) ? value.toFixed(2) : '0')
+    : String(value).trim()
+  const match = raw.match(/^([+-]?)(\d+)(?:\.(\d+))?$/)
+  const separator = '\u00a0'
+  if (!match) return `${currencySymbol(currency)}${separator}0.00`
+
+  const negative = match[1] === '-'
+  const integer = BigInt(match[2])
+  const fraction = (match[3] ?? '').padEnd(3, '0')
+  let cents = integer * 100n + BigInt(fraction.slice(0, 2) || '0')
+  if (Number(fraction[2] ?? '0') >= 5) cents += 1n
+
+  const whole = cents / 100n
+  const decimal = String(cents % 100n).padStart(2, '0')
+  const grouped = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const sign = negative && cents !== 0n ? '-' : ''
+  return `${sign}${currencySymbol(currency || DEFAULT_CURRENCY)}${separator}${grouped}.${decimal}`
+}
+
+/** Abbreviated money is deliberately presentational (axes/sparklines), never
+ * used as an accounting value or request payload. */
 export function formatMoneyCompact(value: number | string, currency = DEFAULT_CURRENCY): string {
   const amount = Number(value)
   if (!Number.isFinite(amount)) return formatMoney(0, currency)

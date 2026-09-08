@@ -36,7 +36,7 @@ export function PaymentEvidencePicker({
         companyId,
         file,
         'PAYMENT_PROOF',
-        'SUPPLIER_INVOICE',
+        'SUPPLIER_PAYMENT_STAGED',
         invoiceId,
       )
       const nextIds = evidenceIds.includes(evidence.id) ? evidenceIds : [...evidenceIds, evidence.id]

@@ -286,9 +286,9 @@ def _validate_payment_evidence(
             raise InvalidFinancialReferenceError("La evidencia pertenece a otra compañía")
         if evidence.category != "PAYMENT_PROOF":
             raise InvalidFinancialReferenceError("La evidencia debe tener categoría PAYMENT_PROOF")
-        if evidence.entity_type != "SUPPLIER_INVOICE" or evidence.entity_id != invoice.id:
+        if evidence.entity_type not in {"SUPPLIER_INVOICE", "SUPPLIER_PAYMENT_STAGED"} or evidence.entity_id != invoice.id:
             raise InvalidFinancialReferenceError(
-                "La evidencia de pago debe haberse cargado para esta factura antes de contabilizar."
+                "La evidencia de pago debe estar preparada para esta factura antes de contabilizar."
             )
         rows.append(evidence)
     return rows

@@ -179,6 +179,57 @@ def test_evidence_normalizes_filename_before_blob_and_database(client, db_sessio
     assert row.original_filename == "informe.pdf"
 
 
+def test_staged_supplier_payment_evidence_is_finalized_only_after_payment(client, db_session, monkeypatch):
+    """A proof uploaded before a payment is staged against the invoice, not
+    presented as an accounting-document attachment until the AP event posts."""
+    from tests.test_ap_ar import _setup_ap
+
+    login_admin(client)
+    company, bank, expense, payable, supplier = _setup_ap(client)
+    invoice_response = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"], "supplierId": supplier["id"],
+            "invoiceNumber": "EVID-STAGED-001", "scope": "GENERAL",
+            "expenseAccountId": expense["id"], "payableAccountId": payable["id"],
+            "currencyCode": "HNL", "amount": "100.00", "taxAmount": "0.00",
+            "invoiceDate": "2026-01-10", "dueDate": "2026-01-20",
+        },
+    )
+    assert invoice_response.status_code == 201, invoice_response.text
+    invoice = invoice_response.json()
+    assert client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve").status_code == 200
+
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: FakeContainerClient(),
+    )
+    uploaded = _upload(
+        client,
+        company_id=company["id"],
+        filename="transferencia.pdf",
+        content=b"%PDF-1.7\\ncomprobante",
+        mime="application/pdf",
+        category="PAYMENT_PROOF",
+        entityType="SUPPLIER_PAYMENT_STAGED",
+        entityId=invoice["id"],
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    staged_id = uploaded.json()["id"]
+
+    payment = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/payments",
+        json={
+            "treasuryAccountId": bank["id"], "amount": "100.00", "paymentDate": "2026-01-20",
+            "paymentMethod": "TRANSFER", "paymentEvidenceIds": [staged_id],
+        },
+    )
+    assert payment.status_code == 201, payment.text
+    evidence = db_session.get(Evidence, uuid.UUID(staged_id))
+    assert evidence.entity_type == "ACCOUNTING_DOCUMENT"
+    assert str(evidence.entity_id) == payment.json()["accountingDocumentId"]
+
+
 def test_evidence_deletes_remote_blob_when_audit_fails(client, db_session, monkeypatch):
     login_admin(client)
     company = create_company(client, name="Evidence Compensation Co")

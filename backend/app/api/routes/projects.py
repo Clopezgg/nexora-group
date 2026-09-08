@@ -34,6 +34,7 @@ from app.schemas.project_control import (
 )
 from app.schemas.project_setup import ProjectSetupRequest, ProjectSetupRunResponse
 from app.services import audit_service, budget_service, forecast_service, project_setup_service
+from app.services.project_setup_service import ProjectSetupStepError
 from app.services.financial_validation_service import assert_evidence_belongs_to_company
 from app.services.permission_service import (
     accessible_project_ids,
@@ -131,7 +132,7 @@ def execute_setup_run(
         failed = project_setup_service.get_run(db, run_id)
         if failed is not None:
             failed.status = "FAILED"
-            failed.failure_step = "CORE_TRANSACTION"
+            failed.failure_step = getattr(exc, "step", "CORE_TRANSACTION")
             failed.failure_message = str(exc)[:2000]
             db.commit()
         raise HTTPException(

@@ -71,7 +71,7 @@ def test_project_setup_failure_rolls_back_all_core_rows_and_is_retryable(client,
     assert db_session.execute(select(Project)).scalars().all() == []
     stored = db_session.get(ProjectSetupRun, run["id"])
     assert stored.status == "FAILED"
-    assert stored.failure_step == "CORE_TRANSACTION"
+    assert stored.failure_step == "WBS"
 
     monkeypatch.setattr(project_setup_service.project_control_repository, "create_wbs_node", original)
     retried = client.post(f"/api/projects/setup-runs/{run['id']}/execute")

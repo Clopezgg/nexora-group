@@ -18,6 +18,21 @@ from app.services.permission_service import grant_project_access
 STAGED_DOCUMENT_ENTITY = "PROJECT_SETUP_STAGED"
 
 
+class ProjectSetupStepError(Exception):
+    def __init__(self, step: str, cause: Exception):
+        super().__init__(str(cause))
+        self.step = step
+
+
+def _at_step(step: str, operation):
+    try:
+        return operation()
+    except ProjectSetupStepError:
+        raise
+    except Exception as exc:
+        raise ProjectSetupStepError(step, exc) from exc
+
+
 def get_run(db: Session, run_id: uuid.UUID) -> ProjectSetupRun | None:
     return db.get(ProjectSetupRun, run_id)
 
@@ -48,26 +63,38 @@ def execute(db: Session, *, run: ProjectSetupRun, correlation_id: str) -> Projec
         return run
     p = run.payload
     project_input = {key: value for key, value in p["project"].items() if key != "company_id"}
-    project = project_repository.create_project(db, company_id=run.company_id, **project_input)
+    project = _at_step(
+        "PROJECT",
+        lambda: project_repository.create_project(db, company_id=run.company_id, **project_input),
+    )
     grant_project_access(db, user_id=run.requested_by, project_id=project.id)
     audit_service.record(db, actor_user_id=run.requested_by, action="project.create", entity_type="project", entity_id=project.id, company_id=run.company_id, project_id=project.id, before=None, after={"name": project.name, "code": project.code, "setupRunId": str(run.id)}, correlation_id=correlation_id)
 
     wbs = p.get("wbs") or {}
     wbs_id = None
     if wbs.get("code"):
-        node = project_control_repository.create_wbs_node(db, project_id=project.id, code=wbs["code"], name=wbs["name"], planned_start=project.planned_start, planned_finish=project.planned_end)
+        node = _at_step(
+            "WBS",
+            lambda: project_control_repository.create_wbs_node(
+                db, project_id=project.id, code=wbs["code"], name=wbs["name"],
+                planned_start=project.planned_start, planned_finish=project.planned_end,
+            ),
+        )
         wbs_id = node.id
         audit_service.record(db, actor_user_id=run.requested_by, action="project.wbs.create", entity_type="project.wbs", entity_id=node.id, company_id=run.company_id, project_id=project.id, before=None, after={"code": node.code, "name": node.name, "setupRunId": str(run.id)}, correlation_id=correlation_id)
 
     if p.get("baseline_amount") is not None:
-        budget_service.create_baseline(db, project_id=project.id, currency_code=project.currency_code or "", lines=[budget_service.BudgetLineInput(authorized_amount=Decimal(str(p["baseline_amount"])), wbs_node_id=wbs_id, cost_center_id=project.cost_center_id)], notes="Presupuesto BASELINE creado por configuración inicial reanudable.", commit=False)
+        _at_step(
+            "BASELINE",
+            lambda: budget_service.create_baseline(db, project_id=project.id, currency_code=project.currency_code or "", lines=[budget_service.BudgetLineInput(authorized_amount=Decimal(str(p["baseline_amount"])), wbs_node_id=wbs_id, cost_center_id=project.cost_center_id)], notes="Presupuesto BASELINE creado por configuración inicial reanudable.", commit=False),
+        )
 
     contract_input = p.get("contract")
     if contract_input:
         supplier = db.get(Supplier, uuid.UUID(contract_input["supplier_id"]))
         if supplier is None or supplier.company_id != run.company_id or supplier.status != "ACTIVE":
             raise InvalidFinancialReferenceError("El proveedor/contratista debe existir, pertenecer a la compañía y estar ACTIVE")
-        contract = supplier_repository.create_contract(
+        contract = _at_step("CONTRACT", lambda: supplier_repository.create_contract(
             db, company_id=run.company_id, supplier_id=supplier.id, project_id=project.id,
             contract_number=contract_input["contract_number"], contract_category=contract_input["contract_category"],
             scope_description=None, value=Decimal(str(contract_input["value"])), currency_code=project.currency_code or "",
@@ -78,16 +105,16 @@ def execute(db: Session, *, run: ProjectSetupRun, correlation_id: str) -> Projec
             advance_due_date=date.fromisoformat(contract_input["advance_due_date"]) if contract_input.get("advance_due_date") else None,
             retention_percentage=Decimal(str(contract_input["retention_percentage"])), payment_terms=None,
             payment_terms_type=contract_input["payment_terms_type"],
-        )
+        ))
         audit_service.record(db, actor_user_id=run.requested_by, action="procurement.contract.create", entity_type="procurement.contract", entity_id=contract.id, company_id=run.company_id, project_id=project.id, before=None, after={"contractNumber": contract.contract_number, "setupRunId": str(run.id)}, correlation_id=correlation_id)
         if contract.payment_terms_type != "LUMP_SUM":
             first_period = project.planned_start or contract.start_date
             rows = contract_payment_service.build_contract_plan(contract_value=contract.value, advance_amount=contract.advance_amount or Decimal(0), advance_due_date=contract.advance_due_date, retention_percentage=contract.retention_percentage, regular_months=int(contract_input["regular_months"]), due_day=int(contract_input["due_day"]), first_period=first_period.replace(day=1))
-            schedule = contract_payment_service.create_schedule(db, supplier_contract_id=contract.id, schedule_type="MONTHLY" if contract.payment_terms_type == "MONTHLY" else "CUSTOM", installments=rows, due_day=int(contract_input["due_day"]), commit=False)
+            schedule = _at_step("PLAN", lambda: contract_payment_service.create_schedule(db, supplier_contract_id=contract.id, schedule_type="MONTHLY" if contract.payment_terms_type == "MONTHLY" else "CUSTOM", installments=rows, due_day=int(contract_input["due_day"]), commit=False))
             audit_service.record(db, actor_user_id=run.requested_by, action="contract.payment_schedule.create", entity_type="contract.payment_schedule", entity_id=schedule.id, company_id=run.company_id, project_id=project.id, before=None, after={"contractNumber": contract.contract_number, "setupRunId": str(run.id)}, correlation_id=correlation_id)
 
     for evidence in staged_evidence(db, run.id):
-        document = document_service.create_document(db, company_id=run.company_id, scope="PROJECT", project_id=project.id, category="OTHER", title=evidence.original_filename, description="Documento inicial cargado en la configuración reanudable del proyecto.", evidence_id=evidence.id, uploaded_by=run.requested_by, commit=False)
+        document = _at_step("DOCUMENTS", lambda: document_service.create_document(db, company_id=run.company_id, scope="PROJECT", project_id=project.id, category="OTHER", title=evidence.original_filename, description="Documento inicial cargado en la configuración reanudable del proyecto.", evidence_id=evidence.id, uploaded_by=run.requested_by, commit=False))
         evidence.entity_type = "PROJECT"
         evidence.entity_id = project.id
         audit_service.record(db, actor_user_id=run.requested_by, action="document.document.create", entity_type="document.document", entity_id=document.id, company_id=run.company_id, project_id=project.id, before=None, after={"title": document.title, "setupRunId": str(run.id)}, correlation_id=correlation_id)

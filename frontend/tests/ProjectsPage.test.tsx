@@ -95,4 +95,24 @@ describe('ProjectsPage', () => {
       }),
     )
   })
+
+  it('does not allow a draft with only one of the required WBS fields', async () => {
+    stubFetch({
+      '/master-data/companies': [{ id: 'c1', name: 'Constructora Nexora', code: null, legalName: null, functionalCurrencyCode: 'HNL' }],
+      '/projects?company_id=c1': [],
+    })
+
+    render(renderApp('/proyectos'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo proyecto' }))
+    await userEvent.type(screen.getByLabelText('Nombre del proyecto'), 'WBS incompleta')
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+
+    await userEvent.type(screen.getByLabelText('Código WBS'), '1.0')
+
+    expect(screen.getByText('Completa código y nombre WBS o deja ambos vacíos.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crear como borrador' })).toBeDisabled()
+  })
 })

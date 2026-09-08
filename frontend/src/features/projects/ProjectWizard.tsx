@@ -155,7 +155,8 @@ export function ProjectWizard({ companyId, customers, users, costCenters, suppli
   const managerName = users.find((u) => u.id === form.managerUserId)?.fullName ?? 'Sin asignar'
   const customerName = customers.find((c) => c.id === form.customerId)?.legalName ?? 'Sin cliente'
   const contractorName = suppliers.find((s) => s.id === form.contractSupplierId)?.legalName ?? 'Sin contrato inicial'
-  const canSaveDraft = Boolean(form.name.trim()) && !datesInvalid && !contractInvalid && !create.isPending
+  const wbsIncomplete = Boolean(form.wbsCode.trim()) !== Boolean(form.wbsName.trim())
+  const canSaveDraft = Boolean(form.name.trim()) && !datesInvalid && !wbsIncomplete && !contractInvalid && !create.isPending
 
   return (
     <div className="nx-wizard">

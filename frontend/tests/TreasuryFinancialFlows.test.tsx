@@ -130,7 +130,7 @@ describe('Treasury financial flow corrections', () => {
     await userEvent.click(await screen.findByRole('button', { name: /pagar saldo/i }))
     await userEvent.selectOptions(screen.getByLabelText(/cuenta pagadora/i), 't-bac')
     await userEvent.selectOptions(screen.getByLabelText(/método de pago/i), 'CASH')
-    await userEvent.click(screen.getByRole('button', { name: /confirmar pago/i }))
+    await userEvent.click(screen.getByRole('button', { name: /confirmar.*pago/i }))
     await waitFor(() => expect(paymentPayload).toMatchObject({ treasuryAccountId: 't-bac', amount: '1000', paymentMethod: 'CASH' }))
   })
 

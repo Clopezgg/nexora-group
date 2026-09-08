@@ -1,9 +1,12 @@
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { statusLabel } from '../src/utils/statusLabels'
 
-const AP = readFileSync(new URL('../src/features/treasury/AccountsPayablePage.tsx', import.meta.url), 'utf8')
-const AR = readFileSync(new URL('../src/features/treasury/AccountsReceivablePage.tsx', import.meta.url), 'utf8')
+// Vitest may execute this suite with an http import URL; resolve from the
+// frontend package instead of requiring a file:// import URL.
+const AP = readFileSync(resolve(process.cwd(), 'src/features/treasury/AccountsPayablePage.tsx'), 'utf8')
+const AR = readFileSync(resolve(process.cwd(), 'src/features/treasury/AccountsReceivablePage.tsx'), 'utf8')
 
 describe('financial status humanization', () => {
   it.each([

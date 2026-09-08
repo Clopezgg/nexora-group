@@ -107,6 +107,7 @@
 }
 .nx-theme-preview__table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   background: var(--nx-color-surface, #fff);
   border: 1px solid var(--nx-color-border, #dce5ef);
@@ -125,6 +126,29 @@
   padding: 6px 8px;
   color: var(--nx-color-text, #102844);
   border-top: 1px solid var(--nx-table-divider, #e6ecf3);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .nx-theme-preview__shell {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+  .nx-theme-preview__sidebar {
+    padding: 8px 5px;
+  }
+  .nx-theme-preview__nav {
+    padding: 5px;
+    overflow-wrap: anywhere;
+  }
+  .nx-theme-preview__main {
+    gap: 8px;
+    padding: 8px;
+  }
+  .nx-theme-preview__table th,
+  .nx-theme-preview__table td {
+    padding: 5px;
+    overflow-wrap: anywhere;
+  }
 }
 .nx-theme-preview__form {
   display: flex;

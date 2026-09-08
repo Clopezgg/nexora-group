@@ -82,7 +82,7 @@ describe('Contract installment payment (§30-§37)', () => {
     // Efectivo hace explícito el método y evita inventar una transferencia sin
     // evidencia; los tests de evidencia cubren los medios bancarios por separado.
     await userEvent.selectOptions(screen.getByLabelText(/método de pago/i), 'CASH')
-    await userEvent.click(screen.getByRole('button', { name: /confirmar pago/i }))
+    await userEvent.click(screen.getByRole('button', { name: /confirmar.*pago/i }))
 
     await waitFor(() =>
       expect(paymentPayload).toMatchObject({
@@ -120,7 +120,7 @@ describe('Contract installment payment (§30-§37)', () => {
     await userEvent.selectOptions(screen.getByLabelText(/método de pago/i), 'CASH')
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /confirmar pago/i })).toBeDisabled(),
+      expect(screen.getByRole('button', { name: /confirmar.*pago/i })).toBeDisabled(),
     )
     expect(screen.getAllByText(/no puede asignarse íntegramente al plan/i).length).toBeGreaterThan(0)
   })

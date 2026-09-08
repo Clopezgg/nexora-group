@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Icon } from '../../design-system'
 import { documentService } from '../../services/documentService'
 import { friendlyApiMessage } from '../../services/httpClient'
@@ -25,6 +25,29 @@ export function PaymentEvidencePicker({
   const [filenames, setFilenames] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
+
+  // A staged proof is deliberately reusable across modal close, a method
+  // change, a failed posting and a new browser session.  It is never a
+  // payment: AP finalizes it to ACCOUNTING_DOCUMENT only after the canonical
+  // payment transaction commits.  We do not delete audit evidence merely
+  // because a user abandons a draft payment.
+  useEffect(() => {
+    let active = true
+    void documentService.listEvidence(companyId, 'SUPPLIER_PAYMENT_STAGED', invoiceId)
+      .then((rows) => {
+        if (!active) return
+        const ids = rows.map((row) => row.id)
+        setEvidenceIds(ids)
+        setFilenames(rows.map((row) => row.originalFilename))
+        onChangeRef.current(ids, false)
+      })
+      .catch((cause) => {
+        if (active) setError(friendlyApiMessage(cause))
+      })
+    return () => { active = false }
+  }, [companyId, invoiceId])
 
   async function upload(file: File | undefined | null) {
     if (!file) return
@@ -58,6 +81,9 @@ export function PaymentEvidencePicker({
       <span className="nx-field__label">
         Evidencia del pago {required ? '· obligatoria antes de contabilizar' : '· opcional'}
       </span>
+      <p className="nx-field__hint">
+        Se conserva como evidencia en preparación de esta obligación hasta que el pago se contabilice. Cerrar, cambiar el método, fallar o reintentar no crea un pago ni un comprobante; al reabrir puedes reutilizarla.
+      </p>
       <input
         ref={cameraInputRef}
         type="file"

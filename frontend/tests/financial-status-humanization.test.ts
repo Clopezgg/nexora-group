@@ -5,7 +5,7 @@ import { statusLabel } from '../src/utils/statusLabels'
 
 // Vitest may execute this suite with an http import URL; resolve from the
 // frontend package instead of requiring a file:// import URL.
-const AP = readFileSync(resolve(process.cwd(), 'src/features/treasury/AccountsPayablePage.tsx'), 'utf8')
+const AP = readFileSync(resolve(process.cwd(), 'src/features/treasury/SupplierInvoiceFlows.tsx'), 'utf8')
 const AR = readFileSync(resolve(process.cwd(), 'src/features/treasury/AccountsReceivablePage.tsx'), 'utf8')
 
 describe('financial status humanization', () => {

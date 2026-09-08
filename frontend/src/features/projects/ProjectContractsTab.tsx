@@ -10,7 +10,7 @@ import { treasuryService } from '../../services/treasuryService'
 import { apService } from '../../services/apArService'
 import { ContractPaymentPlanModal } from '../procurement/ContractPaymentPlanModal'
 import { ExecutionContractForm } from '../procurement/ExecutionContractForm'
-import { CreateSupplierInvoiceModal, PaySupplierInvoiceButton } from '../treasury/AccountsPayablePage'
+import { CreateSupplierInvoiceModal, PaySupplierInvoiceButton } from '../treasury/SupplierInvoiceFlows'
 import {
   SUPPLIER_CONTRACT_CATEGORY_LABELS,
   SUPPLIER_CONTRACT_PAYMENT_TERMS_LABELS,

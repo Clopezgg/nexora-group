@@ -1,0 +1,26 @@
+/*
+ * SAP GUI accessibility hardening.
+ *
+ * The Signature preset keeps the historical #668DB5 steel-blue in its
+ * palette, but white text on that swatch is below WCAG AA for normal-size
+ * navigation text.  Use the darker #466DBD from the same JPL-derived SAP
+ * palette for the selected Easy Access row while preserving the visual
+ * language and all other theme tokens.
+ */
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='signature'] body .nx-sidebar__link--active {
+  background: #466dbd;
+  color: #fff;
+}
+
+/* Keep group labels and tree links bound to the shell's accessible text
+ * token rather than generic page text when the workstation sidebar differs
+ * from the content surface (notably the dark workstation variant). */
+:root[data-nx-family='sap-gui'] body .nx-sidebar__group--collapsible > summary,
+:root[data-nx-family='sap-gui'] body .nx-sidebar__link:not(.nx-sidebar__link--active) {
+  color: var(--nx-shell-sidebar-text);
+}
+
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon'] body .nx-sidebar__group--collapsible > summary:hover,
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-sidebar__group--collapsible > summary:hover {
+  color: var(--nx-shell-sidebar-text);
+}

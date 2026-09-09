@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,7 +13,10 @@ FISCAL_PERIOD_STATUSES = ("OPEN", "SOFT_CLOSED", "CLOSED")
 
 class FiscalYear(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "fiscal_years"
-    __table_args__ = (UniqueConstraint("company_id", "code", name="uq_fiscal_years_company_code"),)
+    __table_args__ = (
+        UniqueConstraint("company_id", "code", name="uq_fiscal_years_company_code"),
+        CheckConstraint("start_date <= end_date", name="ck_fiscal_years_valid_date_range"),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
@@ -27,6 +30,12 @@ class FiscalPeriod(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "fiscal_periods"
     __table_args__ = (
         UniqueConstraint("fiscal_year_id", "period_number", name="uq_fiscal_periods_year_number"),
+        CheckConstraint("start_date <= end_date", name="ck_fiscal_periods_valid_date_range"),
+        CheckConstraint("period_number >= 1", name="ck_fiscal_periods_positive_period_number"),
+        CheckConstraint(
+            "status IN ('OPEN', 'SOFT_CLOSED', 'CLOSED')",
+            name="ck_fiscal_periods_valid_status",
+        ),
     )
 
     fiscal_year_id: Mapped[uuid.UUID] = mapped_column(

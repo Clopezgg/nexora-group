@@ -12,7 +12,13 @@ from app.models.evidence import Evidence
 from app.models.project_setup import ProjectSetupRun
 from app.models.supplier import Supplier
 from app.repositories import project_control_repository, project_repository, supplier_repository
-from app.services import audit_service, budget_service, contract_payment_service, document_service
+from app.services import (
+    audit_service,
+    budget_service,
+    contract_payment_service,
+    document_service,
+    project_lifecycle_service,
+)
 from app.services.permission_service import grant_project_access
 
 STAGED_DOCUMENT_ENTITY = "PROJECT_SETUP_STAGED"
@@ -59,8 +65,23 @@ def execute(db: Session, *, run: ProjectSetupRun, correlation_id: str) -> Projec
     fresh transaction.  That separation preserves a useful checkpoint without
     allowing any partially-created financial/configuration object to escape.
     """
+    # The command identity is the concurrency boundary.  A second executor
+    # waits here and then observes COMPLETED instead of creating a duplicate
+    # project tree from a stale DRAFT object.
+    run = db.execute(
+        select(ProjectSetupRun)
+        .where(ProjectSetupRun.id == run.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one()
     if run.status == "COMPLETED":
         return run
+    if run.status == "EXECUTING":
+        raise ProjectSetupStepError("CLAIM", ValueError("La configuración ya está siendo ejecutada"))
+    if run.status not in {"DRAFT", "FAILED"}:
+        raise ProjectSetupStepError("CLAIM", ValueError(f"Estado de configuración inválido: {run.status}"))
+    run.status = "EXECUTING"
+    db.flush()
     p = run.payload
     project_input = {key: value for key, value in p["project"].items() if key != "company_id"}
     project = _at_step(
@@ -120,7 +141,12 @@ def execute(db: Session, *, run: ProjectSetupRun, correlation_id: str) -> Projec
         audit_service.record(db, actor_user_id=run.requested_by, action="document.document.create", entity_type="document.document", entity_id=document.id, company_id=run.company_id, project_id=project.id, before=None, after={"title": document.title, "setupRunId": str(run.id)}, correlation_id=correlation_id)
 
     if run.activate:
-        project.status = "ACTIVE"
+        project_lifecycle_service.apply_transition(
+            project=project,
+            target="ACTIVE",
+            reason=None,
+            has_lifecycle_permission=True,
+        )
         audit_service.record(db, actor_user_id=run.requested_by, action="project.status.transition", entity_type="project", entity_id=project.id, company_id=run.company_id, project_id=project.id, before={"status": "PLANNING"}, after={"status": "ACTIVE", "setupRunId": str(run.id)}, correlation_id=correlation_id)
     run.project_id = project.id
     run.status = "COMPLETED"

@@ -60,18 +60,13 @@ def update_project(
     project_id: uuid.UUID,
     payload: ProjectUpdateRequest,
     db: Session = Depends(get_db),
-    user=Depends(require_permission("project", "create")),
+    user=Depends(require_permission("project", "update")),
     correlation_id: str = Depends(get_correlation_id),
 ) -> ProjectResponse:
-    """Edit project master data.
-
-    The existing RBAC model does not yet define project/update; project/create
-    is deliberately reused as the stronger project-management privilege so we
-    do not invent an unseeded permission that would lock production users out.
-    """
+    """Edit project master data with the semantic project:update permission."""
     project = _get_project_or_404(db, project_id)
     assert_company_access(
-        db, user_id=user.id, resource="project", action="create", company_id=project.company_id
+        db, user_id=user.id, resource="project", action="update", company_id=project.company_id
     )
     values = payload.model_dump(exclude_unset=True)
     _validate_project_references(db, project=project, values=values)
@@ -135,10 +130,16 @@ def transition_project_status(
     user=Depends(require_permission("project", "create")),
     correlation_id: str = Depends(get_correlation_id),
 ) -> ProjectResponse:
+    # Authorization can use an unlocked read. The mutation itself must claim
+    # the row before evaluating the lifecycle graph, so concurrent requests
+    # cannot both validate the same prior state and last-write-win.
     project = _get_project_or_404(db, project_id)
     assert_company_access(
         db, user_id=user.id, resource="project", action="create", company_id=project.company_id
     )
+    project = project_repository.get_by_id_for_update(db, project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
     has_lifecycle = user_has_permission(
         db, user_id=user.id, resource="project.lifecycle", action="manage"
     )

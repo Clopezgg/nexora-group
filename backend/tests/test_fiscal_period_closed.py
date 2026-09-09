@@ -1,5 +1,8 @@
 from datetime import date, timedelta
 
+import pytest
+from sqlalchemy.exc import IntegrityError
+
 from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.services import posting_service
 from tests.helpers import create_account, create_company, login_admin
@@ -183,3 +186,42 @@ def test_fiscal_period_check_uses_business_date_not_utc(client, db_session, monk
     # would have hit the OPEN period and wrongly returned 201.
     assert response.status_code == 409, response.text
     assert response.json()["error"]["code"] == "NXR-ACCOUNTING-003"
+
+
+def test_fiscal_year_rejects_an_inverted_date_range(db_session, client):
+    """Fiscal calendars cannot persist an ambiguous year range."""
+    login_admin(client)
+    company = create_company(client)
+    db_session.add(
+        FiscalYear(
+            company_id=company["id"],
+            code="BAD-2026",
+            start_date=date(2026, 12, 31),
+            end_date=date(2026, 1, 1),
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+
+def test_fiscal_period_rejects_an_inverted_date_range_and_invalid_status(db_session, client):
+    """Hard fiscal period invariants are enforced by PostgreSQL, not the UI."""
+    login_admin(client)
+    company = create_company(client)
+    year = FiscalYear(
+        company_id=company["id"], code="2026", start_date=date(2026, 1, 1), end_date=date(2026, 12, 31)
+    )
+    db_session.add(year)
+    db_session.flush()
+    db_session.add(
+        FiscalPeriod(
+            fiscal_year_id=year.id,
+            company_id=company["id"],
+            period_number=1,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 1, 1),
+            status="INVALID",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()

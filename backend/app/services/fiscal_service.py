@@ -41,6 +41,8 @@ def create_year(
     start_date: date,
     end_date: date,
 ) -> FiscalYear:
+    if start_date > end_date:
+        raise ValueError("La fecha de inicio del año fiscal no puede ser posterior a su fecha final")
     overlap_stmt = select(FiscalYear.id).where(
         FiscalYear.company_id == company_id,
         FiscalYear.start_date <= end_date,
@@ -117,6 +119,8 @@ def transition_period_status(
     period_id: uuid.UUID,
     target_status: str,
 ) -> FiscalPeriod:
+    if target_status not in _ALLOWED_PERIOD_TRANSITIONS:
+        raise ValueError(f"Estado de período fiscal inválido: {target_status}")
     period = db.get(FiscalPeriod, period_id)
     if period is None:
         raise ValueError("Período fiscal no encontrado")

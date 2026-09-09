@@ -9,6 +9,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
+ASSET_DISPOSAL_STATUSES = ("DISPOSED", "RETIRED")
+
 # Fixed Assets (orden maestra §62) + depreciación straight-line (§69). La
 # depreciación es un cálculo real sobre cost/useful_life/salvage -- nunca un
 # número inventado. Contabilización pasa por posting_service (nunca
@@ -82,6 +84,17 @@ class FixedAsset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("accounting_documents.id", ondelete="RESTRICT"),
         nullable=True,
     )
+    disposal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    disposal_proceeds: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    disposal_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=True
+    )
+    disposal_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("accounting_documents.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    accumulated_depreciation: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
 
 
 class DepreciationEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):

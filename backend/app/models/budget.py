@@ -1,24 +1,23 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
-# Budget versioning (orden maestra §41, docs/BUDGET_CONTROLLING.md).
-# BASELINE se crea una sola vez y nunca se sobrescribe (sus BudgetLine no se
-# tocan jamás). Una ChangeOrder aprobada crea un nuevo Budget version=REVISED
-# enlazado a `previous_budget_id`, y el anterior pasa a status=SUPERSEDED
-# (nunca se elimina -- se mantiene el historial completo).
 BUDGET_VERSIONS = ("BASELINE", "REVISED")
 BUDGET_STATUSES = ("ACTIVE", "SUPERSEDED")
 
 
 class Budget(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "budgets"
+    __table_args__ = (
+        CheckConstraint("version IN ('BASELINE','REVISED')", name="ck_budgets_version_valid"),
+        CheckConstraint("status IN ('ACTIVE','SUPERSEDED')", name="ck_budgets_status_valid"),
+    )
 
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
@@ -37,6 +36,9 @@ class Budget(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class BudgetLine(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "budget_lines"
+    __table_args__ = (
+        CheckConstraint("authorized_amount > 0", name="ck_budget_lines_amount_positive"),
+    )
 
     budget_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("budgets.id", ondelete="CASCADE"), nullable=False

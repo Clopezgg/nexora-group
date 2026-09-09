@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,6 +32,12 @@ THREE_WAY_MATCH_STATUSES = ("MATCHED", "EXCEPTION")
 
 class PurchaseRequisition(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "purchase_requisitions"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('DRAFT','SUBMITTED','APPROVED','REJECTED','CONVERTED','CANCELLED')",
+            name="ck_purchase_requisitions_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
@@ -54,6 +60,10 @@ class PurchaseRequisition(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class PurchaseRequisitionLine(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "purchase_requisition_lines"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_pr_lines_quantity_positive"),
+        CheckConstraint("estimated_unit_cost >= 0", name="ck_pr_lines_cost_non_negative"),
+    )
 
     purchase_requisition_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("purchase_requisitions.id", ondelete="CASCADE"), nullable=False
@@ -68,6 +78,12 @@ class PurchaseRequisitionLine(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class RequestForQuotation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "requests_for_quotation"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('DRAFT','SENT','CLOSED','CANCELLED')",
+            name="ck_rfq_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
@@ -96,6 +112,13 @@ class RfqSupplier(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class SupplierQuotation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "supplier_quotations"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('RECEIVED','SELECTED','REJECTED')",
+            name="ck_supplier_quotations_status_valid",
+        ),
+        CheckConstraint("delivery_days >= 0", name="ck_supplier_quotations_delivery_non_negative"),
+    )
 
     request_for_quotation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("requests_for_quotation.id", ondelete="CASCADE"), nullable=False
@@ -113,6 +136,11 @@ class SupplierQuotation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class SupplierQuotationLine(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "supplier_quotation_lines"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_quotation_lines_quantity_positive"),
+        CheckConstraint("unit_price >= 0", name="ck_quotation_lines_price_non_negative"),
+        CheckConstraint("tax_amount >= 0", name="ck_quotation_lines_tax_non_negative"),
+    )
 
     supplier_quotation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("supplier_quotations.id", ondelete="CASCADE"), nullable=False
@@ -128,6 +156,12 @@ class SupplierQuotationLine(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class PurchaseOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "purchase_orders"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('DRAFT','APPROVAL_PENDING','APPROVED','SENT','PARTIALLY_RECEIVED','RECEIVED','CLOSED','CANCELLED')",
+            name="ck_purchase_orders_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
@@ -153,6 +187,12 @@ class PurchaseOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class PurchaseOrderLine(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "purchase_order_lines"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_po_lines_quantity_positive"),
+        CheckConstraint("unit_price >= 0", name="ck_po_lines_price_non_negative"),
+        CheckConstraint("tax_amount >= 0", name="ck_po_lines_tax_non_negative"),
+        CheckConstraint("quantity_received >= 0", name="ck_po_lines_received_non_negative"),
+    )
 
     purchase_order_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("purchase_orders.id", ondelete="CASCADE"), nullable=False
@@ -189,6 +229,9 @@ class GoodsReceipt(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class GoodsReceiptLine(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "goods_receipt_lines"
+    __table_args__ = (
+        CheckConstraint("quantity_received > 0", name="ck_gr_lines_quantity_positive"),
+    )
 
     goods_receipt_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("goods_receipts.id", ondelete="CASCADE"), nullable=False
@@ -204,6 +247,13 @@ class ServiceEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     Goods Receipt pero para avance de servicio, no recepción física."""
 
     __tablename__ = "service_entries"
+    __table_args__ = (
+        CheckConstraint(
+            "progress_percentage >= 0 AND progress_percentage <= 100",
+            name="ck_service_entries_progress_valid",
+        ),
+        CheckConstraint("accepted_value >= 0", name="ck_service_entries_value_non_negative"),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
@@ -230,6 +280,24 @@ class ThreeWayMatchResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     docs/PROCUREMENT.md para el contrato de integración exacto."""
 
     __tablename__ = "three_way_match_results"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('MATCHED','EXCEPTION')",
+            name="ck_three_way_match_results_status_valid",
+        ),
+        CheckConstraint("supplier_invoice_amount >= 0", name="ck_twm_invoice_amount_non_negative"),
+        CheckConstraint("supplier_invoice_quantity >= 0", name="ck_twm_invoice_quantity_non_negative"),
+        CheckConstraint("received_quantity >= 0", name="ck_twm_received_quantity_non_negative"),
+        CheckConstraint("ordered_amount >= 0", name="ck_twm_ordered_amount_non_negative"),
+        CheckConstraint(
+            "quantity_tolerance_pct >= 0 AND quantity_tolerance_pct <= 100",
+            name="ck_twm_quantity_tolerance_valid",
+        ),
+        CheckConstraint(
+            "amount_tolerance_pct >= 0 AND amount_tolerance_pct <= 100",
+            name="ck_twm_amount_tolerance_valid",
+        ),
+    )
 
     purchase_order_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("purchase_orders.id", ondelete="RESTRICT"), nullable=False

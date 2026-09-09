@@ -1,22 +1,29 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, String
+from sqlalchemy import CheckConstraint, Date, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
-# Planificación funcional (orden maestra §39): Task/Milestone con
-# dependencias, owners, planned/actual. No es un motor Gantt completo -- es
-# lo suficiente para una vista de planeación usable.
 TASK_STATUSES = ("PLANNED", "IN_PROGRESS", "DONE", "BLOCKED", "CANCELLED")
 MILESTONE_STATUSES = ("PLANNED", "ACHIEVED", "MISSED", "CANCELLED")
 
 
 class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "tasks"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PLANNED','IN_PROGRESS','DONE','BLOCKED','CANCELLED')",
+            name="ck_tasks_status_valid",
+        ),
+        CheckConstraint(
+            "planned_end IS NULL OR planned_start IS NULL OR planned_end >= planned_start",
+            name="ck_tasks_planned_dates_valid",
+        ),
+    )
 
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
@@ -38,6 +45,12 @@ class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class Milestone(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "milestones"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PLANNED','ACHIEVED','MISSED','CANCELLED')",
+            name="ck_milestones_status_valid",
+        ),
+    )
 
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False

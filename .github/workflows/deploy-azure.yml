@@ -99,7 +99,8 @@ jobs:
               bootstrapAdminPassword="$BOOTSTRAP_ADMIN_PASSWORD" \
               bootstrapAdminEmail="$BOOTSTRAP_ADMIN_EMAIL" \
               editAccessTokenSalt="$EDIT_ACCESS_TOKEN_SALT" \
-              editAccessTokenDigest="$EDIT_ACCESS_TOKEN_DIGEST"
+              editAccessTokenDigest="$EDIT_ACCESS_TOKEN_DIGEST" \
+              backendImage="ghcr.io/nexora/nexora-backend:ci-placeholder"
 
   deploy:
     name: Deploy infra + apps

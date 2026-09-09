@@ -37,8 +37,8 @@ param editAccessTokenSalt string = ''
 @description('Digest PBKDF2 de Protected Edit codificado base64url. Vacío mantiene Protected Edit fail-closed.')
 param editAccessTokenDigest string = ''
 
-@description('Imagen de contenedor del backend. CI siempre sobrescribe este valor con ghcr.io/<owner>/nexora-backend:<git-sha> en despliegues reales.')
-param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+@description('Imagen de contenedor del backend. Debe ser ghcr.io/<owner>/nexora-backend:<sha>. NX-AUD-022.')
+param backendImage string
 
 @description('Usuario administrador de PostgreSQL. No es secreto (el password sí lo es).')
 param postgresAdminLogin string = 'nexoraadmin'

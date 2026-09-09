@@ -33,10 +33,11 @@ docs/BUDGET_CONTROLLING.md.
 Todo BASELINE usa `Company.functional_currency_code`; no se acepta otra
 moneda hasta que exista una política FX fechada y autoritativa.
 
-Métricas AUTHORIZED/COMMITTED/ACCRUED/PAID/AVAILABLE: COMMITTED consume
-Purchase Orders aprobadas de Procurement/Track C. ACCRUED/PAID siguen sin
-fuente AP/Track A y permanecen en 0 real por ausencia de datos, sin
-reinterpretar movimientos de inventario como devengo o efectivo.
+Métricas AUTHORIZED/COMMITED/ACCRUED/PAID/AVAILABLE: COMMITTED consume
+Purchase Orders aprobadas de Procurement/Track C. ACCRUED se deriva de
+SupplierInvoices devengadas (AP/Track A) excluyendo anticipos. PAID se
+deriva de SupplierInvoice.amount_paid. Available = authorized -
+open_commitment - accrued (el pago no re-consume presupuesto).
 """
 
 

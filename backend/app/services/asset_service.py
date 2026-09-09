@@ -2,13 +2,13 @@ import uuid
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.domain.errors import DepreciationAlreadyPostedError, InvalidAssetStateError
 from app.models.accounting import AccountingDocument
 from app.models.ap import SupplierInvoice
-from app.models.asset import ASSET_STATUSES, DepreciationEntry, FixedAsset
+from app.models.asset import ASSET_DISPOSAL_STATUSES, ASSET_STATUSES, DepreciationEntry, FixedAsset
 from app.models.chart_of_accounts import Account
 from app.repositories import asset_repository
 from app.services import posting_service
@@ -283,6 +283,159 @@ def apply_capitalization_reversal(
             "No se puede revertir la capitalización de un activo con depreciaciones registradas"
         )
     asset.status = "RETIRED"
+
+
+def _accumulated_depreciation_total(db: Session, *, asset_id: uuid.UUID) -> Decimal:
+    """Sum of all depreciation entries for the asset (posted or not).
+    The accumulated depreciation on the asset record reflects the total
+    depreciation recognized, regardless of whether the GL posting succeeded."""
+    result = db.execute(
+        select(func.coalesce(func.sum(DepreciationEntry.amount), 0))
+        .where(DepreciationEntry.asset_id == asset_id)
+    ).scalar_one()
+    return Decimal(str(result))
+
+
+def dispose_asset(
+    db: Session,
+    *,
+    asset_id: uuid.UUID,
+    disposal_date: date,
+    proceeds: Decimal = Decimal("0"),
+    proceeds_account_id: uuid.UUID | None = None,
+    commit: bool = True,
+) -> FixedAsset:
+    """INV-AST-005: dispose/retire an asset with proper GL posting.
+
+    The disposal entry:
+      Dr  Accumulated Depreciation  (reverse all depreciation)
+      Dr  Cash/Receivable           (proceeds, if any)
+      Cr  Fixed Asset               (historical cost)
+      Dr/Cr Gain/Loss on Disposal   (plug to balance)
+
+    An asset can only be disposed once (DISPOSED/RETIRED are terminal).
+    Accumulated depreciation is computed from posted DepreciationEntries,
+    not from a mutable column, ensuring the subledger stays consistent.
+    """
+    asset = db.execute(
+        select(FixedAsset)
+        .where(FixedAsset.id == asset_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if asset is None:
+        raise ValueError(f"FixedAsset {asset_id} no existe")
+    if asset.status in ASSET_DISPOSAL_STATUSES:
+        raise InvalidAssetStateError(
+            f"El activo {asset.id} ya está {asset.status}; no se puede disponer nuevamente"
+        )
+
+    accumulated_depr = _accumulated_depreciation_total(db, asset_id=asset_id)
+    book_value = asset.cost - accumulated_depr
+    gain_loss = proceeds - book_value
+
+    lines = []
+
+    # Dr Accumulated Depreciation (reverse all depreciation)
+    if accumulated_depr > 0:
+        lines.append(
+            posting_service.JournalLineInput(
+                account_id=asset.accumulated_depreciation_account_id,
+                debit_amount=accumulated_depr,
+                description=f"Baja depreciación acumulada {asset.name}",
+                project_id=asset.project_id,
+                cost_center_id=asset.cost_center_id,
+            )
+        )
+
+    # Dr Cash/Receivable for proceeds
+    if proceeds > 0:
+        if proceeds_account_id is None:
+            raise InvalidAssetStateError(
+                "Se requiere proceeds_account_id cuando hay ingresos por disposición"
+            )
+        assert_account_belongs_to_company(
+            db, account_id=proceeds_account_id, company_id=asset.company_id,
+            field_name="proceeds_account_id",
+        )
+        lines.append(
+            posting_service.JournalLineInput(
+                account_id=proceeds_account_id,
+                debit_amount=proceeds,
+                description=f"Ingresos por disposición {asset.name}",
+                project_id=asset.project_id,
+                cost_center_id=asset.cost_center_id,
+            )
+        )
+
+    # Cr Fixed Asset (historical cost)
+    asset_account_id = asset.capitalization_account_id
+    if asset_account_id is None:
+        raise InvalidAssetStateError(
+            "El activo no tiene capitalization_account_id configurado para la baja"
+        )
+    lines.append(
+        posting_service.JournalLineInput(
+            account_id=asset_account_id,
+            credit_amount=asset.cost,
+            description=f"Baja activo {asset.name}",
+            project_id=asset.project_id,
+            cost_center_id=asset.cost_center_id,
+        )
+    )
+
+    # Gain/Loss plug (Dr if loss, Cr if gain)
+    if gain_loss < 0:
+        # Loss: debit the loss account (use depreciation_expense_account as loss proxy)
+        lines.append(
+            posting_service.JournalLineInput(
+                account_id=asset.depreciation_expense_account_id,
+                debit_amount=abs(gain_loss),
+                description=f"Pérdida por disposición {asset.name}",
+                project_id=asset.project_id,
+                cost_center_id=asset.cost_center_id,
+            )
+        )
+    elif gain_loss > 0:
+        # Gain: credit the gain account (use accumulated_depreciation_account as gain proxy)
+        lines.append(
+            posting_service.JournalLineInput(
+                account_id=asset.accumulated_depreciation_account_id,
+                credit_amount=gain_loss,
+                description=f"Ganancia por disposición {asset.name}",
+                project_id=asset.project_id,
+                cost_center_id=asset.cost_center_id,
+            )
+        )
+
+    disposal_doc = posting_service.post_manual(
+        db,
+        company_id=asset.company_id,
+        document_type_code="DIS",
+        scope=asset.scope,
+        project_id=asset.project_id,
+        currency_code=asset.currency_code,
+        effective_date=disposal_date,
+        lines=lines,
+        description=f"Disposición activo {asset.name}",
+        source_type="fixed_asset",
+        source_id=asset.id,
+        commit=False,
+    )
+
+    asset.status = "DISPOSED"
+    asset.disposal_date = disposal_date
+    asset.disposal_proceeds = proceeds
+    asset.disposal_account_id = proceeds_account_id
+    asset.disposal_document_id = disposal_doc.id
+    asset.accumulated_depreciation = accumulated_depr
+
+    if commit:
+        db.commit()
+        db.refresh(asset)
+    else:
+        db.flush()
+    return asset
 
 
 def _monthly_depreciation_amount(asset: FixedAsset) -> Decimal:

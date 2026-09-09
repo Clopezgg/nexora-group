@@ -47,6 +47,11 @@ class FixedAssetResponse(CamelModel):
     supplier_invoice_id: uuid.UUID | None
     capitalization_account_id: uuid.UUID | None
     capitalization_document_id: uuid.UUID | None
+    disposal_date: date | None = None
+    disposal_proceeds: Decimal | None = None
+    disposal_account_id: uuid.UUID | None = None
+    disposal_document_id: uuid.UUID | None = None
+    accumulated_depreciation: Decimal | None = None
 
 
 class SupplierInvoiceAssetCreateRequest(CamelModel):
@@ -88,3 +93,15 @@ class DepreciationEntryResponse(CamelModel):
     period_end: date
     amount: Decimal
     accounting_document_id: uuid.UUID | None
+
+
+class AssetDisposalRequest(CamelModel):
+    disposal_date: date
+    proceeds: Decimal = Field(default=Decimal("0"), ge=0, max_digits=18, decimal_places=2)
+    proceeds_account_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def proceeds_needs_account(self) -> "AssetDisposalRequest":
+        if self.proceeds > 0 and self.proceeds_account_id is None:
+            raise ValueError("Se requiere proceedsAccountId cuando hay ingresos por disposición")
+        return self

@@ -22,6 +22,8 @@ DOCUMENT_TYPE_SEEDS = (
     ("SEN", "Entrada de servicio", "SEN"),
     ("DEP", "Depreciación de activo fijo", "DEP"),
     ("CAP", "Capitalización de activo fijo", "CAP"),
+    ("DIS", "Disposición de activo fijo", "DIS"),
+    ("INV", "Movimiento de inventario", "INV"),
     ("FUE", "Costo de combustible", "FUE"),
     ("MNT", "Costo de mantenimiento", "MNT"),
     ("LAB", "Costo de mano de obra aprobada", "LAB"),

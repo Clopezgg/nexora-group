@@ -7,6 +7,7 @@ from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
 from app.domain.errors import NotFoundError
 from app.schemas.asset import (
+    AssetDisposalRequest,
     AssetStatusChangeRequest,
     DepreciationEntryCreateRequest,
     DepreciationEntryResponse,
@@ -297,3 +298,53 @@ def list_depreciation_entries(
         DepreciationEntryResponse.model_validate(entry, from_attributes=True)
         for entry in asset_service.list_depreciation_entries(db, asset_id=asset_id)
     ]
+
+
+@router.post("/{asset_id}/dispose", response_model=FixedAssetResponse)
+def dispose_asset(
+    asset_id: uuid.UUID,
+    payload: AssetDisposalRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("asset.fixed_asset", "update")),
+    correlation_id: str = Depends(get_correlation_id),
+) -> FixedAssetResponse:
+    asset = _resolve_asset(db, asset_id)
+    assert_company_access(
+        db, user_id=user.id, resource="asset.fixed_asset", action="update", company_id=asset.company_id
+    )
+    if asset.project_id is not None:
+        assert_project_access(
+            db,
+            user_id=user.id,
+            resource="asset.fixed_asset",
+            action="update",
+            project_id=asset.project_id,
+        )
+    before_status = asset.status
+    asset = asset_service.dispose_asset(
+        db,
+        asset_id=asset_id,
+        disposal_date=payload.disposal_date,
+        proceeds=payload.proceeds,
+        proceeds_account_id=payload.proceeds_account_id,
+        commit=False,
+    )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="asset.fixed_asset.dispose",
+        entity_type="asset.fixed_asset",
+        entity_id=asset_id,
+        company_id=asset.company_id,
+        project_id=asset.project_id,
+        before={"status": before_status},
+        after={
+            "status": asset.status,
+            "disposalDate": str(asset.disposal_date),
+            "disposalProceeds": str(asset.disposal_proceeds),
+            "disposalDocumentId": str(asset.disposal_document_id),
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    return FixedAssetResponse.model_validate(asset, from_attributes=True)

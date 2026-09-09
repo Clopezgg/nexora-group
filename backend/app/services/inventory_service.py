@@ -163,13 +163,17 @@ def issue_to_project(
     warehouse_id: uuid.UUID,
     project_id: uuid.UUID,
     quantity: Decimal,
+    cost_of_goods_account_id: uuid.UUID | None = None,
+    inventory_account_id: uuid.UUID | None = None,
     commit: bool = True,
 ) -> StockLedgerEntry:
     """INV-INV-002: reduce warehouse stock y reconoce el costo (al costo
-    promedio) sobre el project_id indicado. El posting contable real (débito
-    a costo de proyecto) lo conecta Track B/A cuando integren este track --
-    ver docs/INVENTORY.md contrato de integración; aquí se deja el registro
-    de consumo con project_id explícito, listo para ese posting."""
+    promedio) sobre el project_id indicado. Cuando las cuentas GL se
+    proporcionan, genera el posting contable atómico:
+      Dr  Cost of Goods Sold / WIP   (costo promedio * cantidad)
+      Cr  Inventory                  (costo promedio * cantidad)
+    Si las cuentas no se proporcionan, solo registra el movimiento de
+    stock (compatibilidad con flujos existentes)."""
     entry = _issue(
         db,
         company_id=company_id,
@@ -181,6 +185,45 @@ def issue_to_project(
         source_type="project_issue",
         source_id=project_id,
     )
+
+    if cost_of_goods_account_id is not None and inventory_account_id is not None:
+        from app.services import posting_service
+
+        _, avg_cost = _current_position(
+            db, company_id=company_id, item_id=item_id, warehouse_id=warehouse_id
+        )
+        total_cost = (quantity * avg_cost).quantize(Decimal("0.01"))
+        if total_cost > 0:
+            from app.core.business_time import business_today
+
+            posting_service.post_manual(
+                db,
+                company_id=company_id,
+                document_type_code="INV",
+                scope="PROJECT",
+                project_id=project_id,
+                currency_code="HNL",
+                effective_date=business_today(),
+                lines=[
+                    posting_service.JournalLineInput(
+                        account_id=cost_of_goods_account_id,
+                        debit_amount=total_cost,
+                        description=f"Consumo inventario a proyecto",
+                        project_id=project_id,
+                    ),
+                    posting_service.JournalLineInput(
+                        account_id=inventory_account_id,
+                        credit_amount=total_cost,
+                        description=f"Baja inventario por consumo",
+                        project_id=project_id,
+                    ),
+                ],
+                description=f"Consumo inventario a proyecto",
+                source_type="inventory",
+                source_id=entry.id,
+                commit=False,
+            )
+
     if commit:
         db.commit()
         db.refresh(entry)

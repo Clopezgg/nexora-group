@@ -44,7 +44,20 @@ TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=Fals
 
 @pytest.fixture
 def _clean_schema():
-    Base.metadata.drop_all(bind=engine)
+    from sqlalchemy import text, inspect as sa_inspect
+    from sqlalchemy import MetaData
+    # Reflect the live DB to know what tables actually exist right now
+    reflected = MetaData()
+    try:
+        reflected.reflect(bind=engine)
+    except Exception:
+        pass
+    # Also ensure all Base.metadata tables are accounted for
+    all_table_names = set(reflected.tables.keys()) | set(Base.metadata.tables.keys())
+    with engine.begin() as conn:
+        for tbl_name in all_table_names:
+            conn.execute(text(f"DROP TABLE IF EXISTS public.{tbl_name} CASCADE"))
+            conn.execute(text(f"DROP TYPE IF EXISTS public.{tbl_name} CASCADE"))
     Base.metadata.create_all(bind=engine)
     yield
 

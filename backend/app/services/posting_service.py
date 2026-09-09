@@ -113,7 +113,16 @@ def _assert_fiscal_period_open(db: Session, *, company_id: uuid.UUID, as_of: dat
             FiscalPeriod.end_date >= as_of,
         )
     ).scalar_one_or_none()
-    if period is not None and period.status == "CLOSED":
+    if period is None:
+        calendar_exists = db.execute(
+            select(FiscalPeriod.id).where(FiscalPeriod.company_id == company_id).limit(1)
+        ).scalar_one_or_none()
+        if calendar_exists is not None:
+            raise FiscalPeriodClosedError(
+                f"El calendario fiscal tiene un gap para effective_date={as_of.isoformat()}"
+            )
+        return  # Explicit bootstrap policy: no fiscal calendar configured.
+    if period.status == "CLOSED":
         raise FiscalPeriodClosedError(
             f"El período fiscal {period.id} está CLOSED, no admite nuevos postings"
         )

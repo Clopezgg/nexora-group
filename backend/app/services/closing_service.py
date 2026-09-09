@@ -90,7 +90,7 @@ def build_checklist(db: Session, *, company_id, period_id) -> PreCloseChecklist:
         select(func.count(AccountingDocument.id))
         .where(AccountingDocument.company_id == company_id)
         .where(AccountingDocument.status == "DRAFT")
-        .where(func.date(AccountingDocument.posted_at).between(period.start_date, period.end_date))
+        .where(AccountingDocument.effective_date.between(period.start_date, period.end_date))
     ).scalar_one()
     checks.append(
         ClosingCheck(
@@ -113,7 +113,7 @@ def build_checklist(db: Session, *, company_id, period_id) -> PreCloseChecklist:
             )
             .join(JournalLine, JournalLine.accounting_document_id == AccountingDocument.id)
             .where(AccountingDocument.company_id == company_id)
-            .where(func.date(AccountingDocument.posted_at).between(period.start_date, period.end_date))
+            .where(AccountingDocument.effective_date.between(period.start_date, period.end_date))
             .group_by(AccountingDocument.id)
             .having(
                 func.coalesce(func.sum(JournalLine.debit_amount), Decimal("0"))

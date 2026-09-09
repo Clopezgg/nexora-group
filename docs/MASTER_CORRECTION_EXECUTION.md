@@ -58,3 +58,23 @@ Authoritative advisories: https://github.com/advisories/GHSA-2883-xcg3-v3hh and 
 - Mutation verification removed row locking/refresh temporarily, then restored the exact original files: both tests failed for actual violations (two different project IDs; both incompatible transitions accepted). Log `/tmp/nexora-project-concurrency-mutation.log`.
 - After restoring production locking, both tests passed again; critical Ruff and compile passed. Existing production fixes preserved without additional implementation changes.
 - Prior CI run `34303802147` E2E now reports failure; backend remains running. Inspect job `102316158894` logs and newer run before Phase 1 closure. No CI-green claim.
+
+## Supervisor iteration 4 — economic closing checks and Protected Edit E2E
+
+- Start HEAD `8ee06693dfdf348a2ba92cb4f3276e658b8ed8b5`; successful fetch confirms `origin/main` still `dc58619c9cdfb8e4648eedd8fa4cba2200a9d4c8`. Preserved the existing uncommitted Critical Journey helper changes.
+- Commit `08360a08`: closing checklist draft and double-entry checks now use `AccountingDocument.effective_date`. A real PostgreSQL/API regression first reproduced an undetected draft with `posted_at=NULL`; it now blocks hard close for its economic period. Four new cases cover inside/outside dates for draft and balance checks.
+- Targeted closing/fiscal/posting regression: **31 passed**, no skips, 3 existing Starlette deprecation warnings. Logs `/tmp/nexora-closing-red-iteration4.log` and `/tmp/nexora-closing-green-iteration4.log`. Ruff critical checks, compileall and diff check passed. No schema change or migration in this commit.
+- Frontend typecheck/lint, **65 files / 204 unit tests**, and production build passed. Logs `/tmp/nexora-frontend-unit-iteration4.log` and `/tmp/nexora-frontend-build-iteration4.log`.
+- Full serial backend restarted because the old runner was no longer alive and its truncated log did not prove completion. New log `/tmp/nexora-phase1-full-iteration4.log`, exec session 41658, database `nexora_test_nexora_group`. Do not start a competing schema-resetting runner on that database. This is RUNNING, not a PASS claim.
+- E2E root cause from CI: POST reversal returned 428 because the test helper sent Protected Edit only for PUT/PATCH/DELETE. Local real Chromium/PostgreSQL/Azurite run advanced past that with the preserved helper change and exposed a second omission: the new approver session must unlock through the UI. The test now performs 428 → UI unlock → retry and checks the actual invoice state. Verification of this final E2E change is pending below.
+- Local Chromium initially could not launch under the macOS MachPort sandbox; rerunning with the permitted execution override launched the real browser. No application security setting was disabled.
+- Latest inspected prior-SHA CI `34304457942`: frontend, Bicep and Docker pass; E2E fails; backend still running. PR #114 remains draft and must not merge yet.
+- Core follow-up remains mandatory: SOFT_CLOSED permission/audit policy; fiscal transition/posting serialization; consolidated reversal authority (`posting_service.reverse_document` and `payment_receipt_reversal_service._reverse_posted_document` currently construct reversals separately); posting/source uniqueness and adapters; full regression/CI/integration. Existing Setup/Lifecycle concurrency corrections need no duplicate implementation.
+
+### E2E verification and actual client correction
+
+The explicit approval assertion exposed a production client defect: `apiFetch` still omitted the capability on POST even after UI unlock. Corrected this centrally for POST mutations; the backend still classifies and enforces protected actions. A new unit regression failed specifically for POST before the fix; all 11 HTTP-client tests pass afterward.
+
+Final local Critical Journey: **1 passed (44.6s)** with real Chromium, clean Alembic PostgreSQL database, Azurite, UI unlock, approval and resulting APPROVED invoice checked. Log `/tmp/nexora-critical-green-iteration4.log`. The previous full E2E run had **6 passed / 1 failed** before this client correction; its six accessibility/visual tests passed, but a full same-SHA CI rerun is still required. Do not describe that previous run as fully green.
+
+After the production-client change: frontend typecheck, lint, **65 files / 209 tests**, and build all pass. No permissions, fiscal rules, test thresholds or CI gates were relaxed. Full backend remains pending, so no phase baseline, merge or certification is claimed.

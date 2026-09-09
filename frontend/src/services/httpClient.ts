@@ -152,7 +152,9 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   // browser owns the multipart boundary.
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
   const method = (options.method ?? 'GET').toUpperCase()
-  const editCapability = ['PUT', 'PATCH', 'DELETE'].includes(method) ? getEditCapability() : null
+  // POST can carry protected domain/financial actions. The server owns that
+  // classification; attach the existing capability to mutations uniformly.
+  const editCapability = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ? getEditCapability() : null
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: 'include',
     ...options,

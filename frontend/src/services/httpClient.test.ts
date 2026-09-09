@@ -1,10 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, apiFetch, friendlyApiMessage } from './httpClient'
+import { ApiError, apiFetch, clearEditCapability, friendlyApiMessage, storeEditCapability } from './httpClient'
 
 describe('httpClient', () => {
   afterEach(() => {
+    clearEditCapability()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+  })
+
+  it.each(['POST', 'PUT', 'PATCH', 'DELETE'])('sends the unlocked capability for %s mutations', async (method) => {
+    storeEditCapability('test-capability', Date.now() / 1000 + 60)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 200 })))
+    await apiFetch('/approvals/example/decide', { method })
+    expect(new Headers(vi.mocked(fetch).mock.calls[0]?.[1]?.headers).get('X-Nexora-Edit-Access')).toBe('test-capability')
+  })
+
+  it('does not send an edit capability on reads', async () => {
+    storeEditCapability('test-capability', Date.now() / 1000 + 60)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 200 })))
+    await apiFetch('/approvals')
+    expect(new Headers(vi.mocked(fetch).mock.calls[0]?.[1]?.headers).has('X-Nexora-Edit-Access')).toBe(false)
   })
 
   it('dispatches nexora:session-expired on a 401 from a data endpoint', async () => {

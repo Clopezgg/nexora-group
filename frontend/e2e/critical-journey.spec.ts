@@ -23,14 +23,28 @@ async function api<T = any>(
   path: string,
   data?: unknown,
 ): Promise<T> {
-  const protectedMutation = method === 'put' || method === 'patch' || method === 'delete'
+  const protectedMutation = method !== 'get' && path !== '/edit-access/verify'
   const options = {
     ...(data !== undefined ? { data } : {}),
     ...(protectedMutation && editCapability
       ? { headers: { 'X-Nexora-Edit-Access': editCapability } }
       : {}),
   }
-  const response = await request[method](`/api${path}`, options)
+  let response = await request[method](`/api${path}`, options)
+  // The backend owns mutation classification and finite capability usage.
+  // A 428 means the guard rejected the request before domain execution.
+  if (response.status() === 428 && protectedMutation) {
+    const token = process.env.E2E_EDIT_ACCESS_TOKEN
+    expect(token).toBeTruthy()
+    const unlock = await request.post('/api/edit-access/verify', { data: { token } })
+    expect(unlock.ok(), await unlock.text()).toBeTruthy()
+    editCapability = (await unlock.json()).capability
+    expect(editCapability).toBeTruthy()
+    response = await request[method](`/api${path}`, {
+      ...options,
+      headers: { 'X-Nexora-Edit-Access': editCapability },
+    })
+  }
   expect(response.ok(), `${method.toUpperCase()} ${path} -> ${response.status()}: ${await response.text()}`).toBeTruthy()
   if (response.status() === 204) return undefined as T
   return response.json()
@@ -404,6 +418,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     expect(arReversal.invoiceStatus).toBe('APPROVED')
 
     const duplicate = await page.request.post(`/api/ap/supplier-payments/${apPaymentId}/reverse`, {
+      headers: { 'X-Nexora-Edit-Access': editCapability },
       data: { reason: 'Segundo intento no permitido' },
     })
     expect(duplicate.status()).toBe(409)
@@ -640,6 +655,20 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await page.goto('/inicio/aprobaciones')
     await expect(page.getByRole('button', { name: 'Aprobar' }).first()).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: 'Aprobar' }).first().click()
+    // The approver has a new session and must unlock their own capability.
+    // Exercise the real 428 -> unlock -> retry flow before claiming approval.
+    const editDialog = page.getByRole('dialog', { name: 'Desbloquear edición' })
+    await expect(editDialog).toBeVisible()
+    await editDialog.getByLabel('Token de seguridad').fill(process.env.E2E_EDIT_ACCESS_TOKEN!)
+    await editDialog.getByRole('button', { name: 'Desbloquear', exact: true }).click()
+    await expect(editDialog).not.toBeVisible()
+    const [decision] = await Promise.all([
+      page.waitForResponse((response) => response.url().includes('/decide') && response.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Aprobar' }).first().click(),
+    ])
+    expect(decision.status()).toBe(200)
+    const approvedInvoice = await api<any>(page.request, 'get', `/ap/supplier-invoices/${pendingInvoice.id}`)
+    expect(approvedInvoice.status).toBe('APPROVED')
 
     await page.getByRole('button', { name: /Notificaciones/ }).click()
     await expect(page.getByRole('dialog', { name: 'Notificaciones' })).toBeVisible({ timeout: 10_000 })

@@ -127,3 +127,54 @@ def test_stale_hard_close_cannot_issue_a_second_closure_manifest(db_session):
                 reason="Controlled test closure",
             )
         assert stale.status == "CLOSED"
+
+
+def test_period_generation_serializes_before_checking_existing_periods(db_session):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from sqlalchemy import func, select
+    from app.services.fiscal_service import create_year, generate_monthly_periods
+
+    company = Company(name="Calendar generation concurrency")
+    db_session.add(company)
+    db_session.flush()
+    year = create_year(
+        db_session, company_id=company.id, code="2026",
+        start_date=date(2026, 1, 1), end_date=date(2026, 12, 31),
+    )
+    db_session.commit()
+    year_id = year.id
+    ready = Event()
+    backend_pid = []
+
+    def competing_generation():
+        with Session(db_session.get_bind()) as second:
+            backend_pid.append(second.scalar(text("SELECT pg_backend_pid()")))
+            ready.set()
+            try:
+                generate_monthly_periods(second, fiscal_year_id=year_id)
+                second.commit()
+                return "unexpected duplicate"
+            except ValueError as exc:
+                second.rollback()
+                return str(exc)
+
+    with Session(db_session.get_bind()) as first, ThreadPoolExecutor(max_workers=1) as pool:
+        assert len(generate_monthly_periods(first, fiscal_year_id=year_id)) == 12
+        future = pool.submit(competing_generation)
+        try:
+            assert ready.wait(5)
+            import time
+            deadline = time.monotonic() + 5
+            with db_session.get_bind().connect().execution_options(isolation_level="AUTOCOMMIT") as observer:
+                while time.monotonic() < deadline:
+                    if observer.scalar(text(
+                        "SELECT wait_event_type = 'Lock' FROM pg_stat_activity WHERE pid = :pid"
+                    ), {"pid": backend_pid[0]}):
+                        break
+                else:
+                    pytest.fail("Competing generator never waited for the first transaction")
+        finally:
+            first.commit()
+        assert "ya tiene períodos" in future.result(timeout=5)
+    assert db_session.scalar(select(func.count()).select_from(FiscalPeriod)) == 12

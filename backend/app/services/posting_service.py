@@ -133,6 +133,46 @@ def _assert_fiscal_period_open(db: Session, *, company_id: uuid.UUID, as_of: dat
         )
 
 
+def _assert_fiscal_period_allows_posting(
+    db: Session, *, company_id: uuid.UUID, as_of: date, document_type_code: str
+) -> None:
+    """INV-ACC-003 + F1.6 SOFT_CLOSED policy.
+
+    - OPEN: all postings allowed
+    - SOFT_CLOSED: only COR (correction) and ANU (reversal) allowed
+    - CLOSED: no postings allowed (handled by _assert_fiscal_period_open)
+    """
+    period = db.execute(
+        select(FiscalPeriod)
+        .where(
+            FiscalPeriod.company_id == company_id,
+            FiscalPeriod.start_date <= as_of,
+            FiscalPeriod.end_date >= as_of,
+        )
+        .with_for_update(read=True)
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if period is None:
+        calendar_exists = db.execute(
+            select(FiscalYear.id).where(FiscalYear.company_id == company_id).limit(1)
+        ).scalar_one_or_none()
+        if calendar_exists is not None:
+            raise FiscalPeriodClosedError(
+                f"El calendario fiscal tiene un gap para effective_date={as_of.isoformat()}"
+            )
+        return  # Explicit bootstrap policy: no fiscal calendar configured.
+    if period.status == "CLOSED":
+        raise FiscalPeriodClosedError(
+            f"El período fiscal {period.id} está CLOSED, no admite nuevos postings"
+        )
+    if period.status == "SOFT_CLOSED":
+        allowed_in_soft_close = {"COR", "ANU"}
+        if document_type_code not in allowed_in_soft_close:
+            raise FiscalPeriodClosedError(
+                f"El período fiscal {period.id} está SOFT_CLOSED; solo se permiten correcciones (COR) y anulaciones (ANU)"
+            )
+
+
 def _validate_financial_references(
     db: Session,
     *,
@@ -192,7 +232,9 @@ def post_manual(
     # is technical audit time; it (and server "today") must never choose the
     # accounting period for a source event with an explicit business date.
     posting_date = effective_date or business_today()
-    _assert_fiscal_period_open(db, company_id=company_id, as_of=posting_date)
+    _assert_fiscal_period_allows_posting(
+        db, company_id=company_id, as_of=posting_date, document_type_code=document_type_code
+    )
 
     document_number = numbering_service.next_document_number(
         db, company_id=company_id, document_type_code=document_type_code

@@ -74,7 +74,13 @@ def create_year(
 def generate_monthly_periods(
     db: Session, *, fiscal_year_id: uuid.UUID
 ) -> list[FiscalPeriod]:
-    year = db.get(FiscalYear, fiscal_year_id)
+    # Serialize generation before checking whether the calendar already exists.
+    year = db.execute(
+        select(FiscalYear)
+        .where(FiscalYear.id == fiscal_year_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
     if year is None:
         raise ValueError("Año fiscal no encontrado")
     existing_stmt = (

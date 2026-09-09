@@ -23,11 +23,17 @@ const FAMILY_LABEL: Record<ThemeFamily, string> = {
   nexora: 'NEXORA', horizon: 'Horizon', quartz: 'Quartz', belize: 'Belize', 'sap-gui': 'SAP GUI',
 }
 
-function SapGuiThemePreview() {
+function SapGuiThemePreview({ variant }: { variant: string }) {
+  const dark = variant === 'horizon-dark'
   return (
-    <div className="nx-theme-preview__sap" data-testid="sap-gui-preview">
+    <div
+      className="nx-theme-preview__sap"
+      data-testid="sap-gui-preview"
+      data-sap-preview={variant}
+      data-nx-preview-variant={variant}
+    >
       <div className="nx-theme-preview__sap-title">NEXORA — Gestión empresarial</div>
-      <div className="nx-theme-preview__sap-menu">Sistema&nbsp;&nbsp; Editar&nbsp;&nbsp; Favoritos&nbsp;&nbsp; Extras&nbsp;&nbsp; Ayuda</div>
+      <div className="nx-theme-preview__sap-menu">Sistema&nbsp;&nbsp; Editar&nbsp;&nbsp; Navegar&nbsp;&nbsp; Extras&nbsp;&nbsp; Ayuda</div>
       <div className="nx-theme-preview__sap-toolbar" aria-label="Barra de herramientas SAP GUI">
         <span>✓</span><span>←</span><span>→</span><span className="nx-theme-preview__sap-command">Buscar comando</span><span>⋯</span>
       </div>
@@ -54,7 +60,10 @@ function SapGuiThemePreview() {
           </div>
         </div>
       </div>
-      <div className="nx-theme-preview__sap-status">Activo · Contexto de vista previa</div>
+      <div className="nx-theme-preview__sap-status">
+        <span>Listo</span>
+        <span>{dark ? 'Vista empresa · Período P01 · Abierto' : 'Empresa · Proyecto · Período'}</span>
+      </div>
     </div>
   )
 }
@@ -67,7 +76,7 @@ function ThemePreviewApp({ themeId, density, scale }: { themeId: string; density
   const style = compileTheme(preset, density, scale) as React.CSSProperties
   return (
     <div className="nx-theme-preview" style={style} data-nx-preview-variant={preset.variant} aria-label={`Vista previa estructural de ${preset.name}`}>
-      {preset.family === 'sap-gui' ? <SapGuiThemePreview /> : (
+      {preset.family === 'sap-gui' ? <SapGuiThemePreview variant={preset.variant} /> : (
       <div className="nx-theme-preview__shell">
         <div className="nx-theme-preview__sidebar">
           <span className="nx-theme-preview__brand">NEXORA</span>

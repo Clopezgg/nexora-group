@@ -36,7 +36,7 @@ function stubAuthenticatedFetch(themeId: string | null = null) {
 }
 
 describe('AppLayout shell', () => {
-  it.each(['sap-gui-signature', 'sap-gui-tradeshow'])('renderiza el shell global completo para %s', async (themeId) => {
+  it.each(['sap-gui-signature', 'sap-gui-tradeshow', 'sap-gui-horizon', 'sap-gui-horizon-dark'])('renderiza el shell global completo para %s', async (themeId) => {
     stubAuthenticatedFetch(themeId)
     render(renderApp('/inicio'))
 

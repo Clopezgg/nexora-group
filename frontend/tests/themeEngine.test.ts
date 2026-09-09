@@ -24,11 +24,13 @@ function contrastRatio(hexA: string, hexB: string): number {
 }
 
 describe('Enterprise Theme Architecture (§8-§11, §20)', () => {
-  it('ordena SAP GUI como la quinta familia y publica sus dos IDs estables', () => {
+  it('ordena SAP GUI como la quinta familia y publica sus IDs estables', () => {
     expect(THEME_FAMILY_ORDER).toEqual(['nexora', 'horizon', 'quartz', 'belize', 'sap-gui'])
     expect(THEME_PRESETS.filter((preset) => preset.family === 'sap-gui').map((preset) => preset.id)).toEqual([
       'sap-gui-signature',
       'sap-gui-tradeshow',
+      'sap-gui-horizon',
+      'sap-gui-horizon-dark',
     ])
   })
 

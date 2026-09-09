@@ -55,7 +55,10 @@ def test_user_preferences_accepts_finance_dense_density(client, db_session):
     assert ok.json()["density"] == "finance-dense"
 
 
-@pytest.mark.parametrize("theme_id", ["sap-gui-signature", "sap-gui-tradeshow"])
+@pytest.mark.parametrize(
+    "theme_id",
+    ["sap-gui-signature", "sap-gui-tradeshow", "sap-gui-horizon", "sap-gui-horizon-dark"],
+)
 def test_sap_gui_theme_ids_roundtrip_as_user_and_company_preferences(
     client, db_session, theme_id
 ):

@@ -308,3 +308,50 @@
   .nx-theme-preview__sap-tree { padding: 4px; }
   .nx-theme-preview__sap-command { width: 68px; }
 }
+
+/* SAP GUI Horizon / Horizon Dark: miniaturas workstation modernizadas. */
+.nx-theme-preview[data-nx-preview-variant='horizon'] .nx-theme-preview__sap {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.nx-theme-preview[data-nx-preview-variant='horizon'] .nx-theme-preview__sap-title,
+.nx-theme-preview[data-nx-preview-variant='horizon'] .nx-theme-preview__sap-status,
+.nx-theme-preview[data-nx-preview-variant='horizon'] .nx-theme-preview__sap-screen-title {
+  background: var(--nx-color-surface, #fff);
+  text-shadow: none;
+}
+.nx-theme-preview[data-nx-preview-variant='horizon'] .nx-theme-preview__sap-toolbar,
+.nx-theme-preview[data-nx-preview-variant='horizon'] .nx-theme-preview__sap-screen-title {
+  background: var(--nx-color-surface, #fff);
+}
+.nx-theme-preview[data-nx-preview-variant='horizon'] .nx-theme-preview__sap-tabs > b {
+  border-bottom: 2px solid var(--nx-color-accent);
+}
+.nx-theme-preview[data-nx-preview-variant='horizon'] .nx-theme-preview__sap-panel,
+.nx-theme-preview[data-nx-preview-variant='horizon'] .nx-theme-preview__sap-screen,
+.nx-theme-preview[data-nx-preview-variant='horizon'] .nx-theme-preview__sap-dialog {
+  border-radius: 4px;
+}
+.nx-theme-preview[data-nx-preview-variant='horizon-dark'] .nx-theme-preview__sap {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--nx-color-text);
+  background: var(--nx-color-page-bg);
+}
+.nx-theme-preview[data-nx-preview-variant='horizon-dark'] .nx-theme-preview__sap-title,
+.nx-theme-preview[data-nx-preview-variant='horizon-dark'] .nx-theme-preview__sap-status,
+.nx-theme-preview[data-nx-preview-variant='horizon-dark'] .nx-theme-preview__sap-screen-title {
+  color: var(--nx-color-text);
+  background: var(--nx-color-surface);
+  text-shadow: none;
+}
+.nx-theme-preview[data-nx-preview-variant='horizon-dark'] .nx-theme-preview__sap-tree {
+  background: var(--nx-shell-sidebar-bg);
+}
+.nx-theme-preview[data-nx-preview-variant='horizon-dark'] .nx-theme-preview__sap-screen,
+.nx-theme-preview[data-nx-preview-variant='horizon-dark'] .nx-theme-preview__sap-panel,
+.nx-theme-preview[data-nx-preview-variant='horizon-dark'] .nx-theme-preview__sap-dialog {
+  background: var(--nx-color-surface);
+  border-radius: 4px;
+}
+.nx-theme-preview[data-nx-preview-variant='horizon-dark'] .nx-theme-preview__sap-field {
+  background: var(--nx-color-surface-sunken);
+}

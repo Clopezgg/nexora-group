@@ -31,11 +31,27 @@ function readUiScale(): UiScale {
 function applyToDom(themeId: string, density: Density, scale: UiScale) {
   const preset = getThemePreset(themeId)
   const root = document.documentElement
+  const anatomy = preset.anatomy
   root.dataset.nxTheme = preset.id
   root.dataset.nxFamily = preset.family
-  root.dataset.nxAnatomy = preset.anatomy.id
+  root.dataset.nxAnatomy = anatomy.id
   if (preset.family === 'sap-gui') root.dataset.nxSapVariant = preset.variant
   else delete root.dataset.nxSapVariant
+  // Datasets estructurales: la anatomía tipada es autoridad ejecutable, el
+  // CSS razona por anatomía y no solo por familia/variante.
+  root.dataset.nxShell = anatomy.shellMode
+  root.dataset.nxNavigation = anatomy.navigationMode
+  root.dataset.nxMenubar = anatomy.menuBarMode
+  root.dataset.nxCommandbar = anatomy.commandBarMode
+  root.dataset.nxToolbar = anatomy.toolbarMode
+  root.dataset.nxScreen = anatomy.contentFrameMode
+  root.dataset.nxTabs = anatomy.tabsMode
+  root.dataset.nxPanel = anatomy.panelMode
+  root.dataset.nxField = anatomy.fieldMode
+  root.dataset.nxButton = anatomy.buttonMode
+  root.dataset.nxTable = anatomy.tableMode
+  root.dataset.nxDialog = anatomy.dialogMode
+  root.dataset.nxStatusbar = anatomy.statusBarMode
   root.dataset.nxDensity = density
   root.dataset.nxContrast = preset.contrast
   // El Theme Engine gobierna SIEMPRE la presentación: NEXORA Horizon

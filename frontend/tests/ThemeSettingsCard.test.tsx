@@ -40,7 +40,7 @@ function stubFetch({ themeId = null, density = null, companyThemeId = null }: {
 }
 
 describe('ThemeSettingsCard', () => {
-  it('muestra las cinco familias en el orden canónico y las dos variantes SAP GUI', async () => {
+  it('muestra las cinco familias en el orden canónico y las cuatro variantes SAP GUI', async () => {
     stubFetch()
     const user = userEvent.setup()
     render(renderApp('/control/configuracion'))
@@ -53,7 +53,7 @@ describe('ThemeSettingsCard', () => {
     await user.selectOptions(family, 'sap-gui')
     await user.click(await screen.findByRole('button', { name: 'Cambiar a SAP GUI' }))
     expect([...((await screen.findByLabelText('Variante')) as HTMLSelectElement).options].map((option) => option.text)).toEqual([
-      'SAP GUI Signature', 'SAP GUI Tradeshow',
+      'SAP GUI Signature', 'SAP GUI Tradeshow', 'SAP GUI Horizon', 'SAP GUI Horizon Dark',
     ])
   })
 

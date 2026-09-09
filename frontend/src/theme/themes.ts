@@ -25,26 +25,26 @@ export type ThemeContrast = 'normal' | 'high'
 export const THEME_FAMILY_ORDER: ThemeFamily[] = ['nexora', 'horizon', 'quartz', 'belize', 'sap-gui']
 
 export interface ThemeAnatomy {
-  id: 'nexora-modern' | 'sap-gui-signature' | 'sap-gui-tradeshow'
+  id: 'nexora-modern' | 'sap-gui-signature' | 'sap-gui-tradeshow' | 'sap-gui-horizon' | 'sap-gui-horizon-dark'
   shellMode: 'modern' | 'workstation'
   navigationMode: 'sidebar' | 'tree'
-  menuBarMode: 'none' | 'classic'
+  menuBarMode: 'none' | 'classic' | 'classic-modern'
   commandBarMode: 'integrated' | 'sap-command'
-  toolbarMode: 'modern' | 'signature' | 'tradeshow'
-  contentFrameMode: 'canvas' | 'screen'
-  pageHeaderMode: 'modern' | 'screen-title' | 'title-strip'
-  objectHeaderMode: 'card' | 'header-panel'
+  toolbarMode: 'modern' | 'signature' | 'tradeshow' | 'horizon' | 'horizon-dark'
+  contentFrameMode: 'canvas' | 'screen' | 'work-screen'
+  pageHeaderMode: 'modern' | 'screen-title' | 'title-strip' | 'screen-modern' | 'screen-dark'
+  objectHeaderMode: 'card' | 'header-panel' | 'modern-panel' | 'dark-panel'
   treeMode: 'flat' | 'easy-access'
-  tabsMode: 'modern' | 'folder' | 'raised-folder'
-  panelMode: 'card' | 'titled-box' | 'banded-box'
-  fieldMode: 'modern' | 'classic-blue' | 'tradeshow-blue'
-  selectMode: 'modern' | 'classic'
-  buttonMode: 'modern' | 'beveled' | 'gradient'
-  tableMode: 'modern' | 'grid' | 'banded-grid'
-  dialogMode: 'modern' | 'window' | 'window-banded'
+  tabsMode: 'modern' | 'folder' | 'raised-folder' | 'modern-folder'
+  panelMode: 'card' | 'titled-box' | 'banded-box' | 'modern-titled-box' | 'dark-titled-box'
+  fieldMode: 'modern' | 'classic-blue' | 'tradeshow-blue' | 'horizon-compact' | 'horizon-dark-compact'
+  selectMode: 'modern' | 'classic' | 'modern-compact' | 'dark-compact'
+  buttonMode: 'modern' | 'beveled' | 'gradient' | 'horizon-tool' | 'horizon-dark-tool'
+  tableMode: 'modern' | 'grid' | 'banded-grid' | 'enterprise-grid' | 'enterprise-grid-dark'
+  dialogMode: 'modern' | 'window' | 'window-banded' | 'horizon-window' | 'horizon-window-dark'
   statusBarMode: 'none' | 'context'
   densityTreatment: 'adaptive' | 'compact-enterprise'
-  iconTreatment: 'modern' | 'classic-16'
+  iconTreatment: 'modern' | 'classic-16' | 'line'
 }
 
 const MODERN_ANATOMY: ThemeAnatomy = {
@@ -70,6 +70,25 @@ const SAP_TRADESHOW_ANATOMY: ThemeAnatomy = {
   id: 'sap-gui-tradeshow', toolbarMode: 'tradeshow', pageHeaderMode: 'title-strip',
   tabsMode: 'raised-folder', panelMode: 'banded-box', fieldMode: 'tradeshow-blue',
   buttonMode: 'gradient', tableMode: 'banded-grid', dialogMode: 'window-banded',
+}
+
+/** SAP GUI Horizon: 70% workstation SAP + 30% modernización Horizon. */
+const SAP_HORIZON_ANATOMY: ThemeAnatomy = {
+  ...SAP_SIGNATURE_ANATOMY,
+  id: 'sap-gui-horizon', menuBarMode: 'classic-modern', toolbarMode: 'horizon',
+  contentFrameMode: 'work-screen', pageHeaderMode: 'screen-modern', objectHeaderMode: 'modern-panel',
+  tabsMode: 'modern-folder', panelMode: 'modern-titled-box', fieldMode: 'horizon-compact',
+  selectMode: 'modern-compact', buttonMode: 'horizon-tool', tableMode: 'enterprise-grid',
+  dialogMode: 'horizon-window', iconTreatment: 'line',
+}
+
+/** SAP GUI Horizon Dark: misma workstation, jerarquía tonal oscura real. */
+const SAP_HORIZON_DARK_ANATOMY: ThemeAnatomy = {
+  ...SAP_HORIZON_ANATOMY,
+  id: 'sap-gui-horizon-dark', toolbarMode: 'horizon-dark', pageHeaderMode: 'screen-dark',
+  objectHeaderMode: 'dark-panel', panelMode: 'dark-titled-box', fieldMode: 'horizon-dark-compact',
+  selectMode: 'dark-compact', buttonMode: 'horizon-dark-tool', tableMode: 'enterprise-grid-dark',
+  dialogMode: 'horizon-window-dark',
 }
 
 export interface ThemePalette {
@@ -673,6 +692,53 @@ export const THEME_PRESETS: ThemePreset[] = [
     focusRing: '#466dbd',
   }),
   makePreset({
+    id: 'sap-gui-horizon',
+    name: 'SAP GUI Horizon',
+    description: 'Workstation SAP GUI modernizada con lenguaje Horizon: tree, command field y grids densos con superficies limpias y foco contemporáneo.',
+    family: 'sap-gui',
+    variant: 'horizon',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+    anatomy: SAP_HORIZON_ANATOMY,
+    densityDefault: 'compact',
+    palette: {
+      pageBg: '#e8edf3', surface: '#f7fafd', surfaceRaised: '#ffffff', surfaceSunken: '#e3eaf2',
+      text: '#12263f', textMuted: '#46586e', textSubtle: '#6d7f94', border: '#c4d0de', borderStrong: '#8fa3ba',
+      accent: '#0a6ed1', accentHover: '#085aad', accentContrast: '#ffffff',
+      positive: '#107e3e', negative: '#bb0000', warning: '#b25c09', info: '#0a6ed1',
+    },
+    shell: {
+      style: 'tinted', sidebarBg: '#eef3f8', sidebarText: '#12263f', sidebarActiveBg: '#0a6ed1',
+      sidebarActiveText: '#ffffff', topbarBg: '#dbe4ee', topbarText: '#12263f', topbarBorder: '#8fa3ba',
+    },
+    tables: { headerBg: '#dbe4ee', headerText: '#12263f', rowHover: '#e9f1f9', stripe: '#fbfdff', divider: '#c4d0de' },
+    charts: { grid: '#c4d0de', axis: '#46586e', series: ['#0a6ed1', '#107e3e', '#bb0000', '#b25c09'] },
+    focusRing: '#0a6ed1',
+  }),
+  makePreset({
+    id: 'sap-gui-horizon-dark',
+    name: 'SAP GUI Horizon Dark',
+    description: 'La misma workstation SAP GUI en modo oscuro real: jerarquía tonal, grids densos legibles y contraste AA.',
+    family: 'sap-gui',
+    variant: 'horizon-dark',
+    isDark: true,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+    anatomy: SAP_HORIZON_DARK_ANATOMY,
+    densityDefault: 'compact',
+    palette: {
+      pageBg: '#0d141d', surface: '#16202c', surfaceRaised: '#1e2b3a', surfaceSunken: '#0a1118',
+      text: '#e6edf5', textMuted: '#a3b3c5', textSubtle: '#71819a', border: '#2b3a4d', borderStrong: '#43566e',
+      accent: '#4da3ff', accentHover: '#71b8ff', accentContrast: '#06121f',
+      positive: '#4ade80', negative: '#ff7a7a', warning: '#f7b955', info: '#4da3ff',
+    },
+    shell: {
+      style: 'solid-dark', sidebarBg: '#101922', sidebarText: '#c9d6e4', sidebarActiveBg: '#1f4d80',
+      sidebarActiveText: '#ffffff', topbarBg: '#16202c', topbarText: '#e6edf5', topbarBorder: '#2b3a4d',
+    },
+    tables: { headerBg: '#1e2b3a', headerText: '#a3b3c5', rowHover: '#1b2836', stripe: '#141e29', divider: '#2b3a4d' },
+    charts: { grid: '#2b3a4d', axis: '#71819a', series: ['#4da3ff', '#4ade80', '#ff7a7a', '#f7b955'] },
+    focusRing: '#4da3ff',
+  }),
+  makePreset({
     id: 'high-contrast',
     name: 'Horizon HCB (alto contraste negro)',
     description: 'Fondo negro, texto blanco, bordes definidos. No depende solo del color.',
@@ -874,10 +940,18 @@ export function compileTheme(
     '--nx-anatomy-toolbar-mode': preset.anatomy.toolbarMode,
     '--nx-anatomy-content-frame-mode': preset.anatomy.contentFrameMode,
     '--nx-anatomy-page-header-mode': preset.anatomy.pageHeaderMode,
+    '--nx-anatomy-object-header-mode': preset.anatomy.objectHeaderMode,
+    '--nx-anatomy-tree-mode': preset.anatomy.treeMode,
+    '--nx-anatomy-tabs-mode': preset.anatomy.tabsMode,
     '--nx-anatomy-panel-mode': preset.anatomy.panelMode,
     '--nx-anatomy-field-mode': preset.anatomy.fieldMode,
+    '--nx-anatomy-select-mode': preset.anatomy.selectMode,
+    '--nx-anatomy-button-mode': preset.anatomy.buttonMode,
     '--nx-anatomy-table-mode': preset.anatomy.tableMode,
     '--nx-anatomy-dialog-mode': preset.anatomy.dialogMode,
+    '--nx-anatomy-status-mode': preset.anatomy.statusBarMode,
+    '--nx-anatomy-density-treatment': preset.anatomy.densityTreatment,
+    '--nx-anatomy-icon-treatment': preset.anatomy.iconTreatment,
 
     // --- Densidad / escala ---
     '--nx-density-row-height': `${(38 * densityScale * uiScale).toFixed(1)}px`,

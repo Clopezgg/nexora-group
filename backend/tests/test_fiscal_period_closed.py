@@ -8,6 +8,20 @@ from app.services import posting_service
 from tests.helpers import create_account, create_company, login_admin
 
 
+def test_configured_year_without_periods_is_not_bootstrap(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    db_session.add(FiscalYear(
+        company_id=company["id"], code="2026",
+        start_date=date(2026, 1, 1), end_date=date(2026, 12, 31),
+    ))
+    db_session.commit()
+    with pytest.raises(posting_service.FiscalPeriodClosedError, match="gap"):
+        posting_service._assert_fiscal_period_open(
+            db_session, company_id=company["id"], as_of=date(2026, 6, 1),
+        )
+
+
 def test_closed_fiscal_period_blocks_posting(client, db_session):
     """INV-ACC-003."""
     login_admin(client)

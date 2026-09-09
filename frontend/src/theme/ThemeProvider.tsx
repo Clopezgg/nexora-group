@@ -33,6 +33,9 @@ function applyToDom(themeId: string, density: Density, scale: UiScale) {
   const root = document.documentElement
   root.dataset.nxTheme = preset.id
   root.dataset.nxFamily = preset.family
+  root.dataset.nxAnatomy = preset.anatomy.id
+  if (preset.family === 'sap-gui') root.dataset.nxSapVariant = preset.variant
+  else delete root.dataset.nxSapVariant
   root.dataset.nxDensity = density
   root.dataset.nxContrast = preset.contrast
   // El Theme Engine gobierna SIEMPRE la presentación: NEXORA Horizon

@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, Card, Select } from '../../design-system'
+import { Badge, Button, Card, Modal, Select } from '../../design-system'
 import { useAuth } from '../../features/auth/auth-context'
 import { masterDataService } from '../../services/masterDataService'
 import { useTheme } from '../../theme/theme-context'
 import {
   compileTheme,
+  DEFAULT_THEME_ID,
   DENSITIES,
   DENSITY_LABEL,
   getThemePreset,
+  THEME_FAMILY_ORDER,
   UI_SCALES,
   type Density,
   type ThemeFamily,
@@ -18,7 +20,43 @@ import { CompanyBrandingCard } from './CompanyBrandingCard'
 import './ThemeSettingsCard.css'
 
 const FAMILY_LABEL: Record<ThemeFamily, string> = {
-  nexora: 'NEXORA', horizon: 'Horizon', quartz: 'Quartz', belize: 'Belize',
+  nexora: 'NEXORA', horizon: 'Horizon', quartz: 'Quartz', belize: 'Belize', 'sap-gui': 'SAP GUI',
+}
+
+function SapGuiThemePreview() {
+  return (
+    <div className="nx-theme-preview__sap" data-testid="sap-gui-preview">
+      <div className="nx-theme-preview__sap-title">NEXORA — Gestión empresarial</div>
+      <div className="nx-theme-preview__sap-menu">Sistema&nbsp;&nbsp; Editar&nbsp;&nbsp; Favoritos&nbsp;&nbsp; Extras&nbsp;&nbsp; Ayuda</div>
+      <div className="nx-theme-preview__sap-toolbar" aria-label="Barra de herramientas SAP GUI">
+        <span>✓</span><span>←</span><span>→</span><span className="nx-theme-preview__sap-command">Buscar comando</span><span>⋯</span>
+      </div>
+      <div className="nx-theme-preview__sap-workarea">
+        <div className="nx-theme-preview__sap-tree" role="tree" aria-label="Árbol de navegación de muestra">
+          <strong>SAP Easy Access</strong>
+          <span role="treeitem" aria-expanded="true">▾ Finanzas</span>
+          <span role="treeitem" aria-selected="true">&nbsp;&nbsp;Centro operativo</span>
+          <span role="treeitem">▸ Proyectos</span>
+          <span role="treeitem">▸ Control</span>
+        </div>
+        <div className="nx-theme-preview__sap-screen">
+          <div className="nx-theme-preview__sap-screen-title">Centro operativo</div>
+          <div className="nx-theme-preview__sap-tabs"><b>Resumen</b><span>Detalle</span></div>
+          <div className="nx-theme-preview__sap-panel">
+            <strong>Contrato de ejecución</strong>
+            <label>Categoría <span className="nx-theme-preview__sap-field">Todas</span></label>
+            <table className="nx-theme-preview__table">
+              <thead><tr><th>Proceso</th><th>Estado</th></tr></thead>
+              <tbody><tr><td>Pago contractual</td><td>Pendiente</td></tr></tbody>
+            </table>
+            <button type="button" tabIndex={-1} className="nx-theme-preview__btn">Continuar</button>
+            <div className="nx-theme-preview__sap-dialog">Diálogo · Revisar operación</div>
+          </div>
+        </div>
+      </div>
+      <div className="nx-theme-preview__sap-status">Activo · Contexto de vista previa</div>
+    </div>
+  )
 }
 
 /** Vista previa exclusivamente estructural. Nunca muestra importes ficticios:
@@ -28,7 +66,8 @@ function ThemePreviewApp({ themeId, density, scale }: { themeId: string; density
   const preset = getThemePreset(themeId)
   const style = compileTheme(preset, density, scale) as React.CSSProperties
   return (
-    <div className="nx-theme-preview" style={style} aria-label={`Vista previa estructural de ${preset.name}`}>
+    <div className="nx-theme-preview" style={style} data-nx-preview-variant={preset.variant} aria-label={`Vista previa estructural de ${preset.name}`}>
+      {preset.family === 'sap-gui' ? <SapGuiThemePreview /> : (
       <div className="nx-theme-preview__shell">
         <div className="nx-theme-preview__sidebar">
           <span className="nx-theme-preview__brand">NEXORA</span>
@@ -73,6 +112,7 @@ function ThemePreviewApp({ themeId, density, scale }: { themeId: string; density
           </div>
         </div>
       </div>
+      )}
     </div>
   )
 }
@@ -105,10 +145,10 @@ export function ThemeSettingsCard({
 
   const [draftTheme, setDraftTheme] = useState<string>(userThemeId ?? activeThemeId)
   const [draftDensity, setDraftDensity] = useState<Density>(userDensity ?? activeDensity)
+  const [confirmSapOpen, setConfirmSapOpen] = useState(false)
 
   const families = useMemo(() => {
-    const order: ThemeFamily[] = ['nexora', 'horizon', 'quartz', 'belize']
-    return order.filter((family) => presets.some((preset) => preset.family === family))
+    return THEME_FAMILY_ORDER.filter((family) => presets.some((preset) => preset.family === family))
   }, [presets])
   const draftFamily = getThemePreset(draftTheme).family
   const familyPresets = presets.filter((preset) => preset.family === draftFamily)
@@ -117,6 +157,17 @@ export function ThemeSettingsCard({
     setDraftTheme(themeId)
     setDraftDensity(density)
     preview(themeId, density)
+  }
+
+  const cancelPreview = () => {
+    const inheritedTheme = userThemeId ?? companyDefaultThemeId ?? DEFAULT_THEME_ID
+    const inheritedDensityCandidate = userDensity ?? companyDefaultDensity
+    const inheritedDensity = DENSITIES.includes(inheritedDensityCandidate as Density)
+      ? inheritedDensityCandidate as Density
+      : getThemePreset(inheritedTheme).densityDefault
+    setDraftTheme(inheritedTheme)
+    setDraftDensity(inheritedDensity)
+    clearPreview()
   }
 
   const setCompanyDefault = useMutation({
@@ -141,6 +192,10 @@ export function ThemeSettingsCard({
               value={draftFamily}
               onChange={(event) => {
                 const family = event.target.value as ThemeFamily
+                if (family === 'sap-gui' && draftFamily !== 'sap-gui') {
+                  setConfirmSapOpen(true)
+                  return
+                }
                 const first = presets.find((preset) => preset.family === family)
                 if (first) applyPreview(first.id, draftDensity)
               }}
@@ -177,7 +232,7 @@ export function ThemeSettingsCard({
         <div className="nx-treasury__actions">
           <Button loading={isSaving} onClick={() => save(draftTheme, draftDensity)}>Guardar como mi preferencia</Button>
           <Button variant="secondary" onClick={() => { void save(null, null) }}>Volver a heredar</Button>
-          <Button variant="secondary" onClick={clearPreview}>Cancelar vista previa</Button>
+          <Button variant="secondary" onClick={cancelPreview}>Cancelar vista previa</Button>
           {isAdmin && companyId ? (
             <Button variant="secondary" loading={setCompanyDefault.isPending} onClick={() => setCompanyDefault.mutate()}>
               Fijar el tema actual como predeterminado de la compañía
@@ -186,6 +241,22 @@ export function ThemeSettingsCard({
         </div>
         {setCompanyDefault.isSuccess ? <p className="nx-field__hint" role="status">Predeterminado de la compañía actualizado.</p> : null}
       </Card>
+      <Modal open={confirmSapOpen} title="Cambiar a SAP GUI" onClose={() => setConfirmSapOpen(false)}>
+        <p>SAP GUI transforma completamente la presentación de Nexora.</p>
+        <p>
+          La navegación, formularios, tablas, encabezados, diálogos y densidad cambiarán al sistema visual SAP GUI seleccionado.
+        </p>
+        <p>
+          Tus datos, permisos, procesos, contabilización y configuraciones funcionales no se modificarán.
+        </p>
+        <div className="nx-modal__actions">
+          <Button variant="secondary" onClick={() => setConfirmSapOpen(false)}>Cancelar</Button>
+          <Button onClick={() => {
+            setConfirmSapOpen(false)
+            applyPreview('sap-gui-signature', 'compact')
+          }}>Cambiar a SAP GUI</Button>
+        </div>
+      </Modal>
       {isAdmin && companyId ? <CompanyBrandingCard companyId={companyId} /> : null}
     </>
   )

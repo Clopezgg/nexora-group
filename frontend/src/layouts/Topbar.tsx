@@ -9,6 +9,7 @@ import { NotificationBell } from '../components/NotificationBell'
 import { useActiveCompany } from '../hooks/useActiveCompany'
 import { projectService } from '../services/projectService'
 import { fiscalService } from '../services/fiscalService'
+import { useTheme } from '../theme/theme-context'
 
 interface TopbarProps {
   onOpenNav: () => void
@@ -26,6 +27,7 @@ export function Topbar({ onOpenNav }: TopbarProps) {
   const { companies, activeCompany, activeCompanyId, setActiveCompanyId, isLoading: companyLoading } = useActiveCompany()
   const navigate = useNavigate()
   const primaryRole = user?.roles?.[0]
+  const { activeFamily } = useTheme()
 
   const projectsQuery = useQuery({
     queryKey: ['projects', activeCompanyId],
@@ -56,7 +58,7 @@ export function Topbar({ onOpenNav }: TopbarProps) {
     : 'Período no configurado'
 
   return (
-    <header className="nx-topbar">
+    <header className="nx-topbar" aria-label={activeFamily === 'sap-gui' ? 'Barra de herramientas SAP GUI' : undefined}>
       <div className="nx-topbar__left">
         <IconButton
           label="Abrir navegación"

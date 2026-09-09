@@ -122,6 +122,11 @@
   border-color: rgba(21, 115, 71, 0.35);
   background: rgba(21, 115, 71, 0.1);
 }
+:root[data-nx-themed='on'][data-nx-family='sap-gui'] body .nx-topbar .nx-edit-access--unlocked {
+  color: #075532;
+  border-color: #3f7861;
+  background: #d5e4e5;
+}
 
 /* Surfaces */
 :root[data-nx-themed='on'] body .nx-card,
@@ -462,4 +467,275 @@
 }
 :root[data-nx-family='belize'] body .nx-object-header {
   border-radius: 0;
+}
+
+/* ========================================================================
+ * SAP GUI global component anatomy — Signature + Tradeshow.
+ * These selectors deliberately sit behind the family dataset: no modern
+ * family receives SAP panels, grids, fields, tabs, dialogs or density.
+ * ====================================================================== */
+:root[data-nx-family='sap-gui'] body {
+  background: var(--nx-color-page-bg);
+  color: var(--nx-color-text);
+  font-family: Arial, Helvetica, system-ui, sans-serif;
+  line-height: 1.35;
+}
+:root[data-nx-family='sap-gui'] body .nx-app-shell__content h1,
+:root[data-nx-family='sap-gui'] body .nx-dashboard__title {
+  margin: -10px -12px 10px;
+  padding: 5px 9px;
+  min-height: 29px;
+  color: var(--nx-color-text);
+  background: linear-gradient(180deg, #f8fbfd, var(--nx-color-surface-sunken));
+  border-bottom: 1px solid var(--nx-color-border-strong);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+:root[data-nx-sap-variant='tradeshow'] body .nx-app-shell__content h1,
+:root[data-nx-sap-variant='tradeshow'] body .nx-dashboard__title {
+  color: #fff;
+  background: linear-gradient(180deg, #668db5, #182a53);
+  border-color: #172e50;
+}
+:root[data-nx-family='sap-gui'] body .nx-page__eyebrow,
+:root[data-nx-family='sap-gui'] body .nx-field__hint { font-size: 11px; letter-spacing: 0; }
+:root[data-nx-family='sap-gui'] body .nx-page__header { margin-bottom: 8px; }
+
+/* Titled Box / Box / object panels */
+:root[data-nx-family='sap-gui'] body .nx-card,
+:root[data-nx-family='sap-gui'] body .nx-chart-card,
+:root[data-nx-family='sap-gui'] body .nx-stat-card,
+:root[data-nx-family='sap-gui'] body .nx-fcc-kpi,
+:root[data-nx-family='sap-gui'] body .nx-state,
+:root[data-nx-family='sap-gui'] body .nx-object-header,
+:root[data-nx-family='sap-gui'] body .nx-worktoday,
+:root[data-nx-family='sap-gui'] body .nx-home__quick-link {
+  border: 1px solid var(--nx-color-border-strong);
+  border-radius: 0;
+  background: var(--nx-color-surface);
+  box-shadow: inset 1px 1px rgba(255,255,255,.8);
+}
+:root[data-nx-family='sap-gui'] body .nx-card,
+:root[data-nx-family='sap-gui'] body .nx-chart-card,
+:root[data-nx-family='sap-gui'] body .nx-stat-card,
+:root[data-nx-family='sap-gui'] body .nx-fcc-kpi { padding: 9px; }
+:root[data-nx-family='sap-gui'] body .nx-card__title,
+:root[data-nx-family='sap-gui'] body .nx-chart-card__title,
+:root[data-nx-family='sap-gui'] body .nx-stat-card__label {
+  color: var(--nx-color-text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+:root[data-nx-sap-variant='tradeshow'] body .nx-card,
+:root[data-nx-sap-variant='tradeshow'] body .nx-chart-card,
+:root[data-nx-sap-variant='tradeshow'] body .nx-object-header {
+  border-top: 4px solid var(--nx-color-accent);
+}
+:root[data-nx-family='sap-gui'] body .nx-stat-card__value,
+:root[data-nx-family='sap-gui'] body .nx-card__value { font-size: 20px; }
+
+/* Compact classic fields. Focus recreates the JPL blue field without
+   sacrificing the visible focus ring or mobile touch sizing. */
+:root[data-nx-family='sap-gui'] body .nx-field { gap: 2px; }
+:root[data-nx-family='sap-gui'] body .nx-field__label {
+  color: var(--nx-color-text);
+  font-family: Arial, Helvetica, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+:root[data-nx-family='sap-gui'] body .nx-input,
+:root[data-nx-family='sap-gui'] body .nx-select,
+:root[data-nx-family='sap-gui'] body .nx-textarea,
+:root[data-nx-family='sap-gui'] body .nx-sidebar__search {
+  min-height: 28px;
+  height: 28px;
+  padding: 2px 6px;
+  color: var(--nx-color-text);
+  background: var(--nx-color-surface-raised);
+  border: 1px solid var(--nx-color-border-strong);
+  border-radius: 0;
+  box-shadow: inset 1px 1px 2px rgba(24,42,83,.12);
+  font-family: Arial, Helvetica, system-ui, sans-serif;
+  font-size: 12px;
+}
+:root[data-nx-family='sap-gui'] body .nx-textarea { min-height: 72px; height: auto; }
+:root[data-nx-family='sap-gui'] body .nx-input:focus,
+:root[data-nx-family='sap-gui'] body .nx-select:focus,
+:root[data-nx-family='sap-gui'] body .nx-textarea:focus {
+  color: #172e50;
+  background: #dfeaf3;
+  border-color: #466dbd;
+  box-shadow: inset 0 0 0 1px #87abd6;
+}
+:root[data-nx-sap-variant='tradeshow'] body .nx-input:focus,
+:root[data-nx-sap-variant='tradeshow'] body .nx-select:focus,
+:root[data-nx-sap-variant='tradeshow'] body .nx-textarea:focus { background: #c2d8eb; }
+:root[data-nx-family='sap-gui'] body .nx-input:disabled,
+:root[data-nx-family='sap-gui'] body .nx-select:disabled,
+:root[data-nx-family='sap-gui'] body .nx-textarea:disabled {
+  color: var(--nx-color-text-subtle);
+  background: var(--nx-color-surface-sunken);
+  border-color: var(--nx-color-border);
+}
+:root[data-nx-family='sap-gui'] body .nx-input--error,
+:root[data-nx-family='sap-gui'] body .nx-select--error { border: 2px solid var(--nx-color-negative); }
+
+/* Button / Tool Item */
+:root[data-nx-family='sap-gui'] body .nx-button,
+:root[data-nx-family='sap-gui'] body .nx-segmented__option {
+  min-height: 28px;
+  padding: 3px 11px;
+  color: var(--nx-color-text);
+  background: linear-gradient(180deg, #fff 0%, var(--nx-color-surface-sunken) 100%);
+  border: 1px solid var(--nx-color-border-strong);
+  border-radius: 1px;
+  box-shadow: inset 1px 1px #fff, inset -1px -1px rgba(24,42,83,.12);
+  font-family: Arial, Helvetica, system-ui, sans-serif;
+  font-size: 11px;
+}
+:root[data-nx-family='sap-gui'] body .nx-button:hover,
+:root[data-nx-family='sap-gui'] body .nx-segmented__option:hover { background: #fff; border-color: var(--nx-color-accent); }
+:root[data-nx-family='sap-gui'] body .nx-button:active { transform: translate(1px, 1px); box-shadow: inset 1px 1px rgba(24,42,83,.18); }
+:root[data-nx-family='sap-gui'] body .nx-button--primary,
+:root[data-nx-family='sap-gui'] body .nx-segmented__option--active {
+  color: var(--nx-color-accent-contrast);
+  background: linear-gradient(180deg, #668db5, #265b8f);
+  border-color: #172e50;
+}
+:root[data-nx-sap-variant='tradeshow'] body .nx-button--primary,
+:root[data-nx-sap-variant='tradeshow'] body .nx-segmented__option--active {
+  background: linear-gradient(180deg, #466dbd, #182a53);
+}
+:root[data-nx-family='sap-gui'] body .nx-button--danger { color: #fff; background: var(--nx-color-negative); }
+:root[data-nx-family='sap-gui'] body .nx-button:disabled { filter: grayscale(.6); opacity: .55; }
+
+/* Grid tables */
+:root[data-nx-family='sap-gui'] body .nx-table-scroll { border: 1px solid var(--nx-color-border-strong); }
+:root[data-nx-family='sap-gui'] body .nx-table {
+  border-collapse: collapse;
+  border: 1px solid var(--nx-color-border-strong);
+  background: var(--nx-color-surface-raised);
+  font-size: 11px;
+}
+:root[data-nx-family='sap-gui'] body .nx-table th,
+:root[data-nx-family='sap-gui'] body .nx-table td {
+  height: 25px;
+  padding: 3px 6px;
+  border: 1px solid var(--nx-table-divider);
+}
+:root[data-nx-family='sap-gui'] body .nx-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--nx-table-header-text);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--nx-table-header-bg) 55%, #fff), var(--nx-table-header-bg));
+  font-size: 10px;
+  letter-spacing: .02em;
+  text-transform: none;
+}
+:root[data-nx-sap-variant='tradeshow'] body .nx-table th { background: linear-gradient(180deg, #87abd6, #466dbd); }
+:root[data-nx-family='sap-gui'] body .nx-table tbody tr:nth-child(even) td { background: var(--nx-table-stripe); }
+:root[data-nx-family='sap-gui'] body .nx-table tbody tr:hover td { background: var(--nx-table-row-hover); }
+
+/* Folder tabs */
+:root[data-nx-family='sap-gui'] body .nx-tabs__list {
+  gap: 2px;
+  margin-bottom: 0;
+  padding-left: 4px;
+  border-bottom: 1px solid var(--nx-color-border-strong);
+}
+:root[data-nx-family='sap-gui'] body .nx-tabs__tab {
+  margin: 0 0 -1px;
+  padding: 4px 12px;
+  color: var(--nx-color-text-muted);
+  background: var(--nx-color-surface-sunken);
+  border: 1px solid var(--nx-color-border);
+  border-bottom-color: var(--nx-color-border-strong);
+  border-radius: 2px 2px 0 0;
+  font-size: 11px;
+}
+:root[data-nx-family='sap-gui'] body .nx-tabs__tab--active {
+  color: var(--nx-color-text);
+  background: var(--nx-color-surface);
+  border-color: var(--nx-color-border-strong);
+  border-bottom-color: var(--nx-color-surface);
+  font-weight: 700;
+}
+:root[data-nx-family='sap-gui'] body .nx-tabs__panel {
+  padding: 9px;
+  border: 1px solid var(--nx-color-border-strong);
+  border-top: 0;
+  background: var(--nx-color-surface);
+}
+:root[data-nx-sap-variant='tradeshow'] body .nx-tabs__tab--active { color: #fff; background: #466dbd; border-bottom-color: #466dbd; }
+
+/* Dialog window / drawer / popover */
+:root[data-nx-family='sap-gui'] body .nx-modal,
+:root[data-nx-family='sap-gui'] body .nx-drawer,
+:root[data-nx-family='sap-gui'] body .nx-popover__panel,
+:root[data-nx-family='sap-gui'] body .nx-sheet {
+  padding: 0;
+  color: var(--nx-color-text);
+  background: var(--nx-color-surface);
+  border: 2px solid var(--nx-color-border-strong);
+  border-radius: 1px;
+  box-shadow: var(--nx-elev-overlay);
+}
+:root[data-nx-family='sap-gui'] body .nx-modal__header,
+:root[data-nx-family='sap-gui'] body .nx-drawer__header {
+  min-height: 29px;
+  margin: 0 0 9px;
+  padding: 4px 7px;
+  color: var(--nx-color-text);
+  background: linear-gradient(180deg, #fff, var(--nx-color-surface-sunken));
+  border-bottom: 1px solid var(--nx-color-border-strong);
+}
+:root[data-nx-family='sap-gui'] body .nx-modal > :not(.nx-modal__header) { margin-left: 10px; margin-right: 10px; }
+:root[data-nx-family='sap-gui'] body .nx-modal__title,
+:root[data-nx-family='sap-gui'] body .nx-drawer__title { color: inherit; font-size: 12px; }
+:root[data-nx-family='sap-gui'] body .nx-modal__close { color: inherit; border: 1px solid var(--nx-color-border); background: var(--nx-color-surface-raised); }
+:root[data-nx-family='sap-gui'] body .nx-modal__actions { display: flex; justify-content: flex-end; gap: 6px; padding: 9px 0 10px; border-top: 1px solid var(--nx-color-border); }
+:root[data-nx-sap-variant='tradeshow'] body .nx-modal__header,
+:root[data-nx-sap-variant='tradeshow'] body .nx-drawer__header { color: #fff; background: linear-gradient(180deg, #668db5, #182a53); }
+
+/* Compact semantic status cells — color is reinforced by border/shape. */
+:root[data-nx-family='sap-gui'] body .nx-badge {
+  min-height: 19px;
+  height: auto;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: 1px;
+  font-size: 10px;
+  font-weight: 700;
+}
+:root[data-nx-family='sap-gui'] body .nx-filter-bar {
+  margin-bottom: 7px;
+  padding: 6px;
+  background: var(--nx-filterbar-bg);
+  border: 1px solid var(--nx-color-border-strong);
+  border-radius: 0;
+}
+:root[data-nx-family='sap-gui'] body .recharts-cartesian-grid line { stroke: var(--nx-chart-grid); }
+:root[data-nx-family='sap-gui'] body .recharts-cartesian-axis line,
+:root[data-nx-family='sap-gui'] body .recharts-cartesian-axis tick { stroke: var(--nx-chart-axis); }
+:root[data-nx-family='sap-gui'] body .recharts-default-tooltip { border: 1px solid var(--nx-color-border-strong) !important; border-radius: 0 !important; }
+
+@media (max-width: 760px) {
+  :root[data-nx-family='sap-gui'] body .nx-input,
+  :root[data-nx-family='sap-gui'] body .nx-select,
+  :root[data-nx-family='sap-gui'] body .nx-button { min-height: 40px; }
+  :root[data-nx-family='sap-gui'] body .nx-app-shell__content h1,
+  :root[data-nx-family='sap-gui'] body .nx-dashboard__title { margin: -8px -8px 8px; font-size: 15px; }
+  :root[data-nx-family='sap-gui'] body .nx-table--responsive tbody tr { border-radius: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-nx-family='sap-gui'] body *,
+  :root[data-nx-family='sap-gui'] body *::before,
+  :root[data-nx-family='sap-gui'] body *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }

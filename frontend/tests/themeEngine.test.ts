@@ -5,6 +5,7 @@ import {
   DENSITIES,
   DENSITY_SCALE,
   getThemePreset,
+  THEME_FAMILY_ORDER,
   THEME_PRESETS,
 } from '../src/theme/themes'
 import { formatMoney } from '../src/utils/currency'
@@ -23,6 +24,29 @@ function contrastRatio(hexA: string, hexB: string): number {
 }
 
 describe('Enterprise Theme Architecture (§8-§11, §20)', () => {
+  it('ordena SAP GUI como la quinta familia y publica sus dos IDs estables', () => {
+    expect(THEME_FAMILY_ORDER).toEqual(['nexora', 'horizon', 'quartz', 'belize', 'sap-gui'])
+    expect(THEME_PRESETS.filter((preset) => preset.family === 'sap-gui').map((preset) => preset.id)).toEqual([
+      'sap-gui-signature',
+      'sap-gui-tradeshow',
+    ])
+  })
+
+  it('modela Signature y Tradeshow como anatomías distintas y compactas, no sólo paletas', () => {
+    const signature = getThemePreset('sap-gui-signature')
+    const tradeshow = getThemePreset('sap-gui-tradeshow')
+
+    expect(signature.densityDefault).toBe('compact')
+    expect(tradeshow.densityDefault).toBe('compact')
+    expect(signature.anatomy.id).toBe('sap-gui-signature')
+    expect(tradeshow.anatomy.id).toBe('sap-gui-tradeshow')
+    expect(signature.anatomy).not.toEqual(tradeshow.anatomy)
+    expect(signature.anatomy.navigationMode).toBe('tree')
+    expect(signature.anatomy.statusBarMode).toBe('context')
+    expect(compileTheme(signature)['--nx-anatomy-panel-mode']).toBe('titled-box')
+    expect(compileTheme(tradeshow)['--nx-anatomy-toolbar-mode']).toBe('tradeshow')
+  })
+
   it('un ThemePreset ya NO es únicamente Record<string,string> — tiene dominio tipado', () => {
     for (const preset of THEME_PRESETS) {
       expect(typeof preset.palette).toBe('object')
@@ -32,6 +56,7 @@ describe('Enterprise Theme Architecture (§8-§11, §20)', () => {
       expect(typeof preset.elevation).toBe('object')
       expect(typeof preset.tables).toBe('object')
       expect(typeof preset.charts).toBe('object')
+      expect(typeof preset.anatomy).toBe('object')
       expect(Array.isArray(preset.charts.series)).toBe(true)
       // ya no existe un campo `vars` plano como modelo principal
       expect((preset as unknown as { vars?: unknown }).vars).toBeUndefined()

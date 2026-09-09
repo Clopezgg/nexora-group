@@ -23,8 +23,8 @@ param keyVaultUri string
 @description('Nombre de la storage account de evidencias')
 param storageAccountName string
 
-@description('Imagen de contenedor del backend. Placeholder público hasta que CI publique la imagen real en GHCR.')
-param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+@description('Imagen de contenedor del backend. Debe ser ghcr.io/<owner>/nexora-backend:<sha>. No tiene default intencionalmente — NX-AUD-022.')
+param backendImage string
 
 @description('Timestamp UTC del deploy, para /api/version (ORDEN MAESTRA §21).')
 param buildTime string = ''

@@ -54,7 +54,7 @@
 }
 /* Etiquetas de grupo del sidebar: contraste AA sobre la superficie navy. */
 :root[data-nx-themed='on'] body .nx-sidebar__group-label {
-  color: #a9c0dc;
+  color: var(--nx-theme-sidebar-text);
 }
 
 /* Topbar — LIGHT CLEAN: superficie del tema, texto e iconos oscuros. */
@@ -584,6 +584,13 @@
 }
 :root[data-nx-family='sap-gui'] body .nx-input--error,
 :root[data-nx-family='sap-gui'] body .nx-select--error { border: 2px solid var(--nx-color-negative); }
+:root[data-nx-family='sap-gui'] body .nx-badge--warning {
+  color: #7a4a00;
+}
+:root[data-nx-family='sap-gui'] body .nx-badge--danger,
+:root[data-nx-family='sap-gui'] body .nx-field__error {
+  color: #a22a38;
+}
 
 /* Button / Tool Item */
 :root[data-nx-family='sap-gui'] body .nx-button,

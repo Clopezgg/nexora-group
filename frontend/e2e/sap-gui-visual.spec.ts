@@ -39,15 +39,19 @@ async function ensureCompany(request: APIRequestContext) {
 
 async function setTheme(page: Page, themeId: string) {
   const result = await page.evaluate(async (id) => {
+    const capability = window.sessionStorage.getItem('nexora.edit-access.capability')
     const response = await fetch('/api/me/preferences', {
       method: 'PUT',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(capability ? { 'X-Nexora-Edit-Access': capability } : {}),
+      },
       body: JSON.stringify({ themeId: id, density: 'compact' }),
     })
-    return { ok: response.ok, status: response.status }
+    return { ok: response.ok, status: response.status, body: await response.text() }
   }, themeId)
-  expect(result.ok, `PUT preferencias -> ${result.status}`).toBeTruthy()
+  expect(result.ok, `PUT preferencias -> ${result.status}: ${result.body}`).toBeTruthy()
   await page.reload()
   await expect.poll(() => page.locator('html').getAttribute('data-nx-theme')).toBe(themeId)
 }

@@ -524,3 +524,52 @@ def generate_depreciation_entry(
 
 def list_depreciation_entries(db: Session, *, asset_id: uuid.UUID) -> list[DepreciationEntry]:
     return asset_repository.list_depreciation_entries(db, asset_id=asset_id)
+
+
+def bulk_depreciate_all_assets(
+    db: Session,
+    *,
+    company_id: uuid.UUID,
+    period_start: date,
+    period_end: date,
+    commit: bool = True,
+) -> list[DepreciationEntry]:
+    """Bulk depreciation run for all active assets in a company.
+
+    Generates a DepreciationEntry (with GL posting) for each active asset
+    that doesn't already have an entry for this period. Skips assets that
+    already have a DEP entry for the period (idempotent). Returns the list
+    of entries created.
+    """
+    assets = db.execute(
+        select(FixedAsset).where(
+            FixedAsset.company_id == company_id,
+            FixedAsset.status.in_(["ACTIVE", "UNDER_MAINTENANCE"]),
+        )
+    ).scalars().all()
+
+    created = []
+    for asset in assets:
+        existing = asset_repository.get_depreciation_entry_for_period(
+            db, asset_id=asset.id, period_start=period_start
+        )
+        if existing is not None:
+            continue
+
+        entry = generate_depreciation_entry(
+            db,
+            asset_id=asset.id,
+            period_start=period_start,
+            period_end=period_end,
+            post=True,
+            commit=False,
+        )
+        created.append(entry)
+
+    if commit:
+        db.commit()
+        for entry in created:
+            db.refresh(entry)
+    else:
+        db.flush()
+    return created

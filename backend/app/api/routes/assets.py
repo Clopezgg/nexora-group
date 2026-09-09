@@ -9,6 +9,8 @@ from app.domain.errors import NotFoundError
 from app.schemas.asset import (
     AssetDisposalRequest,
     AssetStatusChangeRequest,
+    BulkDepreciationRequest,
+    BulkDepreciationResponse,
     DepreciationEntryCreateRequest,
     DepreciationEntryResponse,
     FixedAssetCreateRequest,
@@ -348,3 +350,42 @@ def dispose_asset(
     )
     db.commit()
     return FixedAssetResponse.model_validate(asset, from_attributes=True)
+
+
+@router.post("/bulk-depreciate", response_model=BulkDepreciationResponse)
+def bulk_depreciate_all_assets(
+    payload: BulkDepreciationRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("asset.depreciation", "create")),
+    correlation_id: str = Depends(get_correlation_id),
+) -> BulkDepreciationResponse:
+    assert_company_access(
+        db, user_id=user.id, resource="asset.depreciation", action="create", company_id=payload.company_id
+    )
+    entries = asset_service.bulk_depreciate_all_assets(
+        db,
+        company_id=payload.company_id,
+        period_start=payload.period_start,
+        period_end=payload.period_end,
+        commit=False,
+    )
+    if entries:
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="asset.depreciation.bulk",
+            entity_type="asset.depreciation_entry",
+            entity_id=entries[0].id,
+            company_id=payload.company_id,
+            before=None,
+            after={
+                "periodStart": str(payload.period_start),
+                "entriesCreated": len(entries),
+            },
+            correlation_id=correlation_id,
+        )
+    db.commit()
+    return BulkDepreciationResponse(
+        entries_created=len(entries),
+        entries=[DepreciationEntryResponse.model_validate(e, from_attributes=True) for e in entries],
+    )

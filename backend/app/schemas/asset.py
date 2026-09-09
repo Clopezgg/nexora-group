@@ -95,6 +95,23 @@ class DepreciationEntryResponse(CamelModel):
     accounting_document_id: uuid.UUID | None
 
 
+class BulkDepreciationRequest(CamelModel):
+    company_id: uuid.UUID
+    period_start: date
+    period_end: date
+
+    @model_validator(mode="after")
+    def period_end_not_before_period_start(self) -> "BulkDepreciationRequest":
+        if self.period_end < self.period_start:
+            raise ValueError("periodEnd no puede ser anterior a periodStart")
+        return self
+
+
+class BulkDepreciationResponse(CamelModel):
+    entries_created: int
+    entries: list[DepreciationEntryResponse]
+
+
 class AssetDisposalRequest(CamelModel):
     disposal_date: date
     proceeds: Decimal = Field(default=Decimal("0"), ge=0, max_digits=18, decimal_places=2)

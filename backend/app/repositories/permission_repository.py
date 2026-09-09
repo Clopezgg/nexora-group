@@ -64,6 +64,7 @@ _BASE_PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     ("ar.customer_receipt", "read", "Ver cobros de cliente"),
     # Track B -- Project Control (orden maestra §37-43, §72).
     ("project", "create", "Crear proyectos"),
+    ("project", "update", "Actualizar datos maestros de proyectos"),
     ("project", "read", "Ver proyectos"),
     ("project.lifecycle", "manage", "Reabrir / restaurar / archivar proyectos (acción sensible con motivo y auditoría)"),
     ("project.wbs", "create", "Crear nodos de WBS"),
@@ -721,6 +722,31 @@ def ensure_base_permissions(db: Session) -> None:
                 )
             elif existing_grants[key].company_scope != company_scope:
                 existing_grants[key].company_scope = company_scope
+
+    # Before `project:update` existed, the project edit endpoint deliberately
+    # used `project:create`. Preserve those established grants exactly (same
+    # company/project scopes) while moving the endpoint to the semantic
+    # permission. This is idempotent for both upgraded and fresh databases.
+    update_permission = existing_permissions.get(("project", "update"))
+    if update_permission is not None:
+        create_permission = existing_permissions.get(("project", "create"))
+        if create_permission is not None:
+            create_grants = list(
+                db.execute(
+                    select(RolePermission).where(RolePermission.permission_id == create_permission.id)
+                ).scalars()
+            )
+            for create_grant in create_grants:
+                key = (create_grant.role_id, update_permission.id)
+                if key not in existing_grants:
+                    db.add(
+                        RolePermission(
+                            role_id=create_grant.role_id,
+                            permission_id=update_permission.id,
+                            company_scope=create_grant.company_scope,
+                            project_scope=create_grant.project_scope,
+                        )
+                    )
 
     db.flush()
 

@@ -27,6 +27,16 @@ def get_by_id(db: Session, project_id: uuid.UUID) -> Project | None:
     return db.get(Project, project_id)
 
 
+def get_by_id_for_update(db: Session, project_id: uuid.UUID) -> Project | None:
+    """Lock the project row for an authoritative lifecycle transition."""
+    return db.execute(
+        select(Project)
+        .where(Project.id == project_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+
+
 def count_active_projects(db: Session) -> int:
     stmt = select(func.count()).select_from(Project).where(Project.status == "ACTIVE")
     return db.execute(stmt).scalar_one()

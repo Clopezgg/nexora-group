@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,6 +23,11 @@ class ProjectSetupRun(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "project_setup_runs"
     __table_args__ = (
         UniqueConstraint("company_id", "idempotency_key", name="uq_project_setup_runs_company_key"),
+        UniqueConstraint("project_id", name="uq_project_setup_runs_project"),
+        CheckConstraint(
+            "status IN ('DRAFT', 'EXECUTING', 'COMPLETED', 'FAILED')",
+            name="ck_project_setup_runs_valid_status",
+        ),
         Index("ix_project_setup_runs_company_status", "company_id", "status"),
     )
 

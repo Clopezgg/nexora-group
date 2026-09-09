@@ -43,8 +43,16 @@ class ClosingBlockedError(Exception):
     sin pasar y no se forzó explícitamente."""
 
 
-def _period_or_raise(db: Session, period_id) -> FiscalPeriod:
-    period = db.get(FiscalPeriod, period_id)
+def _period_or_raise(db: Session, period_id, *, lock: bool = False) -> FiscalPeriod:
+    if lock:
+        period = db.execute(
+            select(FiscalPeriod)
+            .where(FiscalPeriod.id == period_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).scalar_one_or_none()
+    else:
+        period = db.get(FiscalPeriod, period_id)
     if period is None:
         raise ValueError("Período fiscal no encontrado")
     return period
@@ -90,7 +98,7 @@ def build_checklist(db: Session, *, company_id, period_id) -> PreCloseChecklist:
         select(func.count(AccountingDocument.id))
         .where(AccountingDocument.company_id == company_id)
         .where(AccountingDocument.status == "DRAFT")
-        .where(func.date(AccountingDocument.posted_at).between(period.start_date, period.end_date))
+        .where(AccountingDocument.effective_date.between(period.start_date, period.end_date))
     ).scalar_one()
     checks.append(
         ClosingCheck(
@@ -113,7 +121,7 @@ def build_checklist(db: Session, *, company_id, period_id) -> PreCloseChecklist:
             )
             .join(JournalLine, JournalLine.accounting_document_id == AccountingDocument.id)
             .where(AccountingDocument.company_id == company_id)
-            .where(func.date(AccountingDocument.posted_at).between(period.start_date, period.end_date))
+            .where(AccountingDocument.effective_date.between(period.start_date, period.end_date))
             .group_by(AccountingDocument.id)
             .having(
                 func.coalesce(func.sum(JournalLine.debit_amount), Decimal("0"))
@@ -169,7 +177,8 @@ def hard_close(
     """Ejecuta el cierre duro. Devuelve el manifiesto de cierre. Lanza
     `ClosingBlockedError` si hay checks bloqueantes sin pasar y `force` es
     falso."""
-    period = _period_or_raise(db, period_id)
+    # Freeze eligibility before evaluating the checklist and reading status.
+    period = _period_or_raise(db, period_id, lock=True)
     if period.company_id != company_id:
         raise ValueError("El período no pertenece a esta compañía")
     if period.status == "CLOSED":

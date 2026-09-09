@@ -21,7 +21,7 @@ from app.models.accounting import (
     JournalLine,
     TaxLine,
 )
-from app.models.fiscal import FiscalPeriod
+from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.services import numbering_service
 from app.services.financial_validation_service import (
     assert_account_belongs_to_company,
@@ -103,17 +103,31 @@ def _validate_balance(lines: list[JournalLineInput]) -> None:
 
 
 def _assert_fiscal_period_open(db: Session, *, company_id: uuid.UUID, as_of: date) -> None:
-    """INV-ACC-003. Si no hay ningún FiscalPeriod configurado que cubra la
-    fecha, se permite postear (todavía no se configuró el calendario fiscal
-    de la company) -- pero si existe uno y está CLOSED, se bloquea."""
+    """INV-ACC-003: bootstrap only before a company configures its calendar.
+
+    A configured year without periods is an incomplete calendar, not permission
+    to bypass fiscal eligibility. Economic dates in calendar gaps fail closed.
+    """
     period = db.execute(
-        select(FiscalPeriod).where(
+        select(FiscalPeriod)
+        .where(
             FiscalPeriod.company_id == company_id,
             FiscalPeriod.start_date <= as_of,
             FiscalPeriod.end_date >= as_of,
         )
+        .with_for_update(read=True)
+        .execution_options(populate_existing=True)
     ).scalar_one_or_none()
-    if period is not None and period.status == "CLOSED":
+    if period is None:
+        calendar_exists = db.execute(
+            select(FiscalYear.id).where(FiscalYear.company_id == company_id).limit(1)
+        ).scalar_one_or_none()
+        if calendar_exists is not None:
+            raise FiscalPeriodClosedError(
+                f"El calendario fiscal tiene un gap para effective_date={as_of.isoformat()}"
+            )
+        return  # Explicit bootstrap policy: no fiscal calendar configured.
+    if period.status == "CLOSED":
         raise FiscalPeriodClosedError(
             f"El período fiscal {period.id} está CLOSED, no admite nuevos postings"
         )
@@ -174,10 +188,11 @@ def post_manual(
         document_project_id=project_id,
         lines=lines,
     )
-    # INV-ACC-003: the fiscal period is a business-calendar concept, so it
-    # must be resolved in the Nexora business timezone (America/Tegucigalpa),
-    # not the UTC wall clock the container runs on.
-    _assert_fiscal_period_open(db, company_id=company_id, as_of=business_today())
+    # Resolve the economic date before checking fiscal eligibility.  `posted_at`
+    # is technical audit time; it (and server "today") must never choose the
+    # accounting period for a source event with an explicit business date.
+    posting_date = effective_date or business_today()
+    _assert_fiscal_period_open(db, company_id=company_id, as_of=posting_date)
 
     document_number = numbering_service.next_document_number(
         db, company_id=company_id, document_type_code=document_type_code
@@ -196,7 +211,7 @@ def post_manual(
         # Fecha económica: la del documento fuente de negocio. Si el caller
         # no la da (asiento manual sin fecha explícita), cae en la fecha de
         # negocio de hoy — nunca en el timestamp UTC del contenedor.
-        effective_date=effective_date or business_today(),
+        effective_date=posting_date,
         posted_at=datetime.now(timezone.utc),
     )
     db.add(document)

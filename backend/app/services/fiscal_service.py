@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.company import Company
 from app.models.fiscal import FiscalPeriod, FiscalYear
 
 
@@ -41,6 +42,17 @@ def create_year(
     start_date: date,
     end_date: date,
 ) -> FiscalYear:
+    if start_date > end_date:
+        raise ValueError(
+            "La fecha de inicio del año fiscal no puede ser posterior a su fecha final"
+        )
+    # Serialize calendar creation per company before testing overlap. The DB
+    # exclusion constraint remains the last defense for direct/concurrent writes.
+    company = db.execute(
+        select(Company).where(Company.id == company_id).with_for_update()
+    ).scalar_one_or_none()
+    if company is None:
+        raise ValueError("Compañía no encontrada")
     overlap_stmt = select(FiscalYear.id).where(
         FiscalYear.company_id == company_id,
         FiscalYear.start_date <= end_date,
@@ -59,13 +71,21 @@ def create_year(
     return year
 
 
-def generate_monthly_periods(db: Session, *, fiscal_year_id: uuid.UUID) -> list[FiscalPeriod]:
+def generate_monthly_periods(
+    db: Session, *, fiscal_year_id: uuid.UUID
+) -> list[FiscalPeriod]:
     year = db.get(FiscalYear, fiscal_year_id)
     if year is None:
         raise ValueError("Año fiscal no encontrado")
-    existing_stmt = select(FiscalPeriod.id).where(FiscalPeriod.fiscal_year_id == fiscal_year_id).limit(1)
+    existing_stmt = (
+        select(FiscalPeriod.id)
+        .where(FiscalPeriod.fiscal_year_id == fiscal_year_id)
+        .limit(1)
+    )
     if db.execute(existing_stmt).scalar_one_or_none() is not None:
-        raise ValueError("El año fiscal ya tiene períodos; no se regeneran automáticamente")
+        raise ValueError(
+            "El año fiscal ya tiene períodos; no se regeneran automáticamente"
+        )
 
     periods: list[FiscalPeriod] = []
     cursor = year.start_date
@@ -117,13 +137,22 @@ def transition_period_status(
     period_id: uuid.UUID,
     target_status: str,
 ) -> FiscalPeriod:
-    period = db.get(FiscalPeriod, period_id)
+    if target_status not in _ALLOWED_PERIOD_TRANSITIONS:
+        raise ValueError(f"Estado de período fiscal inválido: {target_status}")
+    period = db.execute(
+        select(FiscalPeriod)
+        .where(FiscalPeriod.id == period_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
     if period is None:
         raise ValueError("Período fiscal no encontrado")
     if target_status == period.status:
         return period
     if target_status not in _ALLOWED_PERIOD_TRANSITIONS.get(period.status, set()):
-        raise ValueError(f"Transición de período no permitida: {period.status} → {target_status}")
+        raise ValueError(
+            f"Transición de período no permitida: {period.status} → {target_status}"
+        )
     period.status = target_status
     db.flush()
     return period

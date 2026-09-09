@@ -89,3 +89,9 @@ After the production-client change: frontend typecheck, lint, **65 files / 209 t
 - Previous full backend iteration-4 log remains truncated at 35%; no connections to its test database remained when inspected. It is NOT a passing full regression.
 - Latest observed prior-SHA CI `34305301720`: frontend/Bicep/Docker success, backend/E2E in progress. PR Deploy Azure success is not production deployment evidence.
 - Still mandatory: SOFT_CLOSED explicit permission/audit policy; lock before hard-close checklist and accurate pre-transition audit snapshots; calendar bootstrap/configuration race review; consolidated reversal authority/source adapters; source uniqueness; full backend/CI and phase integration. This change does not certify all fiscal concurrency paths or close Phase 1.
+
+### Hard-close follow-up
+
+A fourth PostgreSQL independent-session test reproduced duplicate hard-close manifests from a stale OPEN object after another transaction committed CLOSED. `hard_close` now locks and refreshes the period **before** the checklist, so posting eligibility cannot advance while it is evaluated. Regression: **10 passed** (fiscal serialization + closing center), with existing Starlette warnings, `/tmp/nexora-hardclose-green-iteration5.log`; failing reproduction `/tmp/nexora-hardclose-red-iteration5.log`. Ruff critical checks/compileall/diff check passed. Fiscal route audit before-status snapshots still need revalidation.
+
+Full serial regression started against `nexora_test_nexora_group`, log `/tmp/nexora-phase1-full-iteration5.log`, exec session 57521. It started at commit `1b48d1ff` before the hard-close follow-up; do not treat it as full final-SHA evidence and do not run a competing schema-resetting runner on that database. New CI for `1b48d1ff`: `34305568080`, in progress when observed. All certification SHAs remain PENDING.

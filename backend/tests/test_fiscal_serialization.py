@@ -105,3 +105,25 @@ def test_stale_period_cannot_reopen_a_committed_hard_close(db_session):
                 stale_session, period_id=period_id, target_status="SOFT_CLOSED"
             )
         assert stale.status == "CLOSED"
+
+
+def test_stale_hard_close_cannot_issue_a_second_closure_manifest(db_session):
+    from app.services.closing_service import hard_close
+
+    company_id, period_id = _period(db_session)
+    with (
+        Session(db_session.get_bind()) as stale_session,
+        Session(db_session.get_bind()) as closer,
+    ):
+        stale = stale_session.get(FiscalPeriod, period_id)
+        transition_period_status(closer, period_id=period_id, target_status="CLOSED")
+        closer.commit()
+        with pytest.raises(ValueError, match="ya está cerrado"):
+            hard_close(
+                stale_session,
+                company_id=company_id,
+                period_id=period_id,
+                force=True,
+                reason="Controlled test closure",
+            )
+        assert stale.status == "CLOSED"

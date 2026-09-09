@@ -32,3 +32,9 @@ Full serial backend `pytest -q` launched from backend, writing `/tmp/nexora-phas
 - Retain observed warnings for later review: Starlette httpx/422 deprecations; frontend test-environment localStorage, HydrateFallback and zero-size chart warnings. No test was skipped or error suppressed to pass.
 
 No Azure deployment, production verification, audit-item closure or final certification is claimed.
+
+## CI dependency correction
+
+CI run `34303670382` failed frontend dependency audit before typecheck. Local reproduction identified GHSA-2883-xcg3-v3hh in js-yaml 4.3.1. Updated only its lockfile entry to patched 4.3.2 using `npm update js-yaml --cache /tmp/nexora-npm-cache`; npm audit at the unchanged high threshold now passes. Three moderate advisories remain in the Vitest dependency chain (GHSA-82fw-gwwq-j7x9); upstream fixes start at 4.1.11, requiring a deliberate major-version upgrade from the current 3.x, still pending. No audit exclusions or CI gate changes were introduced.
+
+Authoritative advisories: https://github.com/advisories/GHSA-2883-xcg3-v3hh and https://github.com/advisories/GHSA-82fw-gwwq-j7x9 . Inspect latest PR checks rather than treating this initial failed run as current evidence.

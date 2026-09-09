@@ -12,6 +12,22 @@ _PROTECTED_METHODS = {"PUT", "PATCH", "DELETE"}
 _EXEMPT_PATHS = {"/api/context"}
 
 
+def _requires_protected_edit(method: str, path: str) -> bool:
+    """Classify mutation semantics centrally; HTTP POST is not inherently safe.
+
+    Normal resource creation remains governed by RBAC only.  Existing-resource
+    transitions, approvals and financial commands are protected regardless of
+    their transport verb.
+    """
+    if method in _PROTECTED_METHODS:
+        return path not in _EXEMPT_PATHS
+    if method != "POST":
+        return False
+    parts = [part for part in path.split("/") if part]
+    sensitive_suffixes = {"status", "decide", "reverse", "reopen", "close", "post", "pay", "collect"}
+    return bool(parts and parts[-1] in sensitive_suffixes)
+
+
 def register_edit_access_guard(app: FastAPI) -> None:
     """Add finite secondary confirmation to mutations of existing business data."""
 
@@ -20,7 +36,7 @@ def register_edit_access_guard(app: FastAPI) -> None:
         settings = get_settings()
         if (
             settings.edit_access_required
-            and request.method in _PROTECTED_METHODS
+            and _requires_protected_edit(request.method, request.url.path)
             and request.url.path.startswith("/api/")
             and request.url.path not in _EXEMPT_PATHS
         ):

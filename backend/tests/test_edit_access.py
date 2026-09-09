@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from app.core.config import Settings, get_settings
 from app.models.edit_access import EditAccessEvent
 from app.services import edit_access_service
+from app.api.edit_access_guard import _requires_protected_edit
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
 
 
@@ -70,6 +71,15 @@ def test_edit_pin_is_hashed_and_capability_is_signed_tamper_proof_and_session_bo
         settings.edit_access_token_salt = old_salt
         settings.edit_access_token_digest = old_digest
         settings.edit_access_ttl_seconds = old_ttl
+
+
+def test_protected_edit_classifies_sensitive_post_actions_not_login_or_read():
+    assert not _requires_protected_edit("GET", "/api/projects/x")
+    assert not _requires_protected_edit("POST", "/api/auth/login")
+    assert not _requires_protected_edit("POST", "/api/projects")
+    assert _requires_protected_edit("POST", "/api/projects/x/status")
+    assert _requires_protected_edit("POST", "/api/approvals/x/decide")
+    assert _requires_protected_edit("POST", "/api/accounting/x/reverse")
 
 
 def test_edit_pin_verifies_only_against_the_configured_digest():

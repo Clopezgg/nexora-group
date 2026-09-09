@@ -10,17 +10,67 @@
  * `shell`, `navigation`, `shape`, `elevation`, `motion`, `tables`, `forms`,
  * `buttons`, `dialogs`, `charts`, `iconography`, `focus`, `mobile`. El
  * compilador `compileTheme()` deriva las variables CSS de esa estructura —
- * cambiar de familia (Horizon / Quartz / Belize) cambia radio, elevación,
+ * cambiar de familia (Horizon / Quartz / Belize / SAP GUI) cambia radio, elevación,
  * densidad base, tratamiento de tablas y tipografía, no solo el color.
  *
- * Sin CSS ni logos propietarios de SAP. Tipografías del sistema u
- * open-source (Inter).
+ * SAP GUI se recrea con React/CSS desde el JPL aportado por el usuario, sin
+ * runtime, backend, logos ni librerías propietarias de SAP.
  */
 
 export type Density = 'comfortable' | 'compact' | 'finance-dense'
 export type UiScale = 90 | 100 | 110
-export type ThemeFamily = 'horizon' | 'quartz' | 'belize' | 'nexora'
+export type ThemeFamily = 'horizon' | 'quartz' | 'belize' | 'nexora' | 'sap-gui'
 export type ThemeContrast = 'normal' | 'high'
+
+export const THEME_FAMILY_ORDER: ThemeFamily[] = ['nexora', 'horizon', 'quartz', 'belize', 'sap-gui']
+
+export interface ThemeAnatomy {
+  id: 'nexora-modern' | 'sap-gui-signature' | 'sap-gui-tradeshow'
+  shellMode: 'modern' | 'workstation'
+  navigationMode: 'sidebar' | 'tree'
+  menuBarMode: 'none' | 'classic'
+  commandBarMode: 'integrated' | 'sap-command'
+  toolbarMode: 'modern' | 'signature' | 'tradeshow'
+  contentFrameMode: 'canvas' | 'screen'
+  pageHeaderMode: 'modern' | 'screen-title' | 'title-strip'
+  objectHeaderMode: 'card' | 'header-panel'
+  treeMode: 'flat' | 'easy-access'
+  tabsMode: 'modern' | 'folder' | 'raised-folder'
+  panelMode: 'card' | 'titled-box' | 'banded-box'
+  fieldMode: 'modern' | 'classic-blue' | 'tradeshow-blue'
+  selectMode: 'modern' | 'classic'
+  buttonMode: 'modern' | 'beveled' | 'gradient'
+  tableMode: 'modern' | 'grid' | 'banded-grid'
+  dialogMode: 'modern' | 'window' | 'window-banded'
+  statusBarMode: 'none' | 'context'
+  densityTreatment: 'adaptive' | 'compact-enterprise'
+  iconTreatment: 'modern' | 'classic-16'
+}
+
+const MODERN_ANATOMY: ThemeAnatomy = {
+  id: 'nexora-modern', shellMode: 'modern', navigationMode: 'sidebar', menuBarMode: 'none',
+  commandBarMode: 'integrated', toolbarMode: 'modern', contentFrameMode: 'canvas',
+  pageHeaderMode: 'modern', objectHeaderMode: 'card', treeMode: 'flat', tabsMode: 'modern',
+  panelMode: 'card', fieldMode: 'modern', selectMode: 'modern', buttonMode: 'modern',
+  tableMode: 'modern', dialogMode: 'modern', statusBarMode: 'none',
+  densityTreatment: 'adaptive', iconTreatment: 'modern',
+}
+
+const SAP_SIGNATURE_ANATOMY: ThemeAnatomy = {
+  id: 'sap-gui-signature', shellMode: 'workstation', navigationMode: 'tree', menuBarMode: 'classic',
+  commandBarMode: 'sap-command', toolbarMode: 'signature', contentFrameMode: 'screen',
+  pageHeaderMode: 'screen-title', objectHeaderMode: 'header-panel', treeMode: 'easy-access',
+  tabsMode: 'folder', panelMode: 'titled-box', fieldMode: 'classic-blue', selectMode: 'classic',
+  buttonMode: 'beveled', tableMode: 'grid', dialogMode: 'window', statusBarMode: 'context',
+  densityTreatment: 'compact-enterprise', iconTreatment: 'classic-16',
+}
+
+const SAP_TRADESHOW_ANATOMY: ThemeAnatomy = {
+  ...SAP_SIGNATURE_ANATOMY,
+  id: 'sap-gui-tradeshow', toolbarMode: 'tradeshow', pageHeaderMode: 'title-strip',
+  tabsMode: 'raised-folder', panelMode: 'banded-box', fieldMode: 'tradeshow-blue',
+  buttonMode: 'gradient', tableMode: 'banded-grid', dialogMode: 'window-banded',
+}
 
 export interface ThemePalette {
   pageBg: string
@@ -157,6 +207,7 @@ export interface ThemePreset {
   iconography: ThemeIconography
   focus: ThemeFocus
   structure: ThemeStructure
+  anatomy: ThemeAnatomy
 }
 
 const INTER = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
@@ -262,6 +313,34 @@ const FAMILY_TRAITS: Record<ThemeFamily, FamilyTraits> = {
       objectHeaderAccentRail: 'none',
     },
   },
+  // SAP GUI — anatomía de estación empresarial basada en las familias
+  // Signature/Tradeshow del JPL: Arial compacta, cajas rectas y baja elevación.
+  'sap-gui': {
+    shape: { radiusXs: '0px', radiusSm: '1px', radiusMd: '1px', radiusLg: '2px', borderWidth: '1px' },
+    elevation: () => ({
+      card: 'none',
+      raised: '1px 1px 0 rgba(255,255,255,.8), 2px 2px 4px rgba(24,42,83,.22)',
+      overlay: '2px 3px 10px rgba(24,42,83,.38)',
+    }),
+    motion: { durationFast: '60ms', durationBase: '100ms', easing: 'linear' },
+    typographyBase: 13,
+    headingTracking: '0',
+    densityDefault: 'compact',
+    iconography: { style: 'duotone', strokeWidth: '1.4' },
+    structure: {
+      dialogHeaderBorder: '1px solid var(--nx-color-border-strong)',
+      dialogAccentRail: 'none',
+      overlayScrim: 0.46,
+      inputBorderWidth: '1px',
+      inputBg: 'surface',
+      fieldLabelTransform: 'none',
+      fieldLabelSpacing: '0',
+      filterBarBg: 'tinted',
+      filterBarBorder: '1px solid var(--nx-color-border-strong)',
+      objectHeaderBg: 'tinted',
+      objectHeaderAccentRail: 'none',
+    },
+  },
   // NEXORA — identidad propia: híbrido Horizon (radio) + densidad ejecutiva.
   nexora: {
     shape: { radiusXs: '4px', radiusSm: '6px', radiusMd: '9px', radiusLg: '14px', borderWidth: '1px' },
@@ -308,6 +387,7 @@ interface PresetInput {
   shape?: Partial<ThemeShape>
   densityDefault?: Density
   focusRing?: string
+  anatomy?: ThemeAnatomy
 }
 
 function makePreset(input: PresetInput): ThemePreset {
@@ -346,6 +426,7 @@ function makePreset(input: PresetInput): ThemePreset {
       offset: '2px',
     },
     structure: traits.structure,
+    anatomy: input.anatomy ?? MODERN_ANATOMY,
   }
 }
 
@@ -546,6 +627,52 @@ export const THEME_PRESETS: ThemePreset[] = [
     charts: { grid: '#c8cdd2', axis: '#7f868f', series: ['#08519c', '#0b6e37', '#a30000', '#c86200'] },
   }),
   makePreset({
+    id: 'sap-gui-signature',
+    name: 'SAP GUI Signature',
+    description: 'Estación clásica Signature: acero azulado, árbol Easy Access, campos definidos y paneles compactos.',
+    family: 'sap-gui',
+    variant: 'signature',
+    fontFamily: "Arial, Helvetica, system-ui, sans-serif",
+    anatomy: SAP_SIGNATURE_ANATOMY,
+    densityDefault: 'compact',
+    palette: {
+      pageBg: '#cbd4e1', surface: '#eaf1f6', surfaceRaised: '#ffffff', surfaceSunken: '#d6dbe5',
+      text: '#182a53', textMuted: '#33475f', textSubtle: '#59697a', border: '#a8b8c7', borderStrong: '#668db5',
+      accent: '#265b8f', accentHover: '#172e50', accentContrast: '#ffffff',
+      positive: '#216635', negative: '#a12121', warning: '#8a5200', info: '#265b8f',
+    },
+    shell: {
+      style: 'tinted', sidebarBg: '#dfeaf3', sidebarText: '#182a53', sidebarActiveBg: '#668db5',
+      sidebarActiveText: '#ffffff', topbarBg: '#c3ccd7', topbarText: '#182a53', topbarBorder: '#668db5',
+    },
+    tables: { headerBg: '#c3ccd7', headerText: '#182a53', rowHover: '#dfeaf3', stripe: '#f4f7fa', divider: '#a8b8c7' },
+    charts: { grid: '#a8b8c7', axis: '#33475f', series: ['#265b8f', '#668db5', '#216635', '#8a5200'] },
+    focusRing: '#466dbd',
+  }),
+  makePreset({
+    id: 'sap-gui-tradeshow',
+    name: 'SAP GUI Tradeshow',
+    description: 'Estación Tradeshow: bandas azul profundo, barras luminosas y paneles jerárquicos de mayor contraste.',
+    family: 'sap-gui',
+    variant: 'tradeshow',
+    fontFamily: "Arial, Helvetica, system-ui, sans-serif",
+    anatomy: SAP_TRADESHOW_ANATOMY,
+    densityDefault: 'compact',
+    palette: {
+      pageBg: '#b6c1cd', surface: '#dfeaf3', surfaceRaised: '#ffffff', surfaceSunken: '#c3ccd7',
+      text: '#172e50', textMuted: '#2d4563', textSubtle: '#52667d', border: '#8e9eab', borderStrong: '#466dbd',
+      accent: '#182a53', accentHover: '#21386b', accentContrast: '#ffffff',
+      positive: '#1d6033', negative: '#9d1d25', warning: '#815000', info: '#21386b',
+    },
+    shell: {
+      style: 'solid-dark', sidebarBg: '#172e50', sidebarText: '#dfeaf3', sidebarActiveBg: '#466dbd',
+      sidebarActiveText: '#ffffff', topbarBg: '#182a53', topbarText: '#ffffff', topbarBorder: '#466dbd',
+    },
+    tables: { headerBg: '#668db5', headerText: '#ffffff', rowHover: '#d6e3ef', stripe: '#eaf1f6', divider: '#8e9eab' },
+    charts: { grid: '#8e9eab', axis: '#2d4563', series: ['#182a53', '#466dbd', '#216635', '#815000'] },
+    focusRing: '#466dbd',
+  }),
+  makePreset({
     id: 'high-contrast',
     name: 'Horizon HCB (alto contraste negro)',
     description: 'Fondo negro, texto blanco, bordes definidos. No depende solo del color.',
@@ -738,6 +865,19 @@ export function compileTheme(
     '--nx-filterbar-border': preset.structure.filterBarBorder,
     '--nx-objectheader-bg': _SURFACE_VAR[preset.structure.objectHeaderBg],
     '--nx-objectheader-accent-rail': preset.structure.objectHeaderAccentRail,
+
+    // --- Anatomía global: una sola autoridad para shell y componentes ---
+    '--nx-anatomy-shell-mode': preset.anatomy.shellMode,
+    '--nx-anatomy-navigation-mode': preset.anatomy.navigationMode,
+    '--nx-anatomy-menu-mode': preset.anatomy.menuBarMode,
+    '--nx-anatomy-command-mode': preset.anatomy.commandBarMode,
+    '--nx-anatomy-toolbar-mode': preset.anatomy.toolbarMode,
+    '--nx-anatomy-content-frame-mode': preset.anatomy.contentFrameMode,
+    '--nx-anatomy-page-header-mode': preset.anatomy.pageHeaderMode,
+    '--nx-anatomy-panel-mode': preset.anatomy.panelMode,
+    '--nx-anatomy-field-mode': preset.anatomy.fieldMode,
+    '--nx-anatomy-table-mode': preset.anatomy.tableMode,
+    '--nx-anatomy-dialog-mode': preset.anatomy.dialogMode,
 
     // --- Densidad / escala ---
     '--nx-density-row-height': `${(38 * densityScale * uiScale).toFixed(1)}px`,

@@ -1,3 +1,5 @@
+import pytest
+
 from tests.helpers import create_company, login_admin
 
 
@@ -51,3 +53,25 @@ def test_user_preferences_accepts_finance_dense_density(client, db_session):
     )
     assert ok.status_code == 200, ok.text
     assert ok.json()["density"] == "finance-dense"
+
+
+@pytest.mark.parametrize("theme_id", ["sap-gui-signature", "sap-gui-tradeshow"])
+def test_sap_gui_theme_ids_roundtrip_as_user_and_company_preferences(
+    client, db_session, theme_id
+):
+    """Theme IDs remain presentation-only free strings; no migration is required."""
+    login_admin(client)
+    company = create_company(client)
+
+    user_pref = client.put(
+        "/api/me/preferences", json={"themeId": theme_id, "density": "compact"}
+    )
+    assert user_pref.status_code == 200, user_pref.text
+    assert user_pref.json() == {"themeId": theme_id, "density": "compact"}
+
+    company_pref = client.patch(
+        f"/api/master-data/companies/{company['id']}",
+        json={"defaultThemeId": theme_id, "defaultDensity": "compact"},
+    )
+    assert company_pref.status_code == 200, company_pref.text
+    assert company_pref.json()["defaultThemeId"] == theme_id

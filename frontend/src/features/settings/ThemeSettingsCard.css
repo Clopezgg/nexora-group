@@ -256,3 +256,55 @@
   color: var(--nx-color-text-muted, #4f6176);
   background: var(--nx-color-surface, #fff);
 }
+
+/* Dedicated SAP GUI miniature: a workstation, not the modern preview recolored. */
+.nx-theme-preview__sap {
+  display: grid;
+  grid-template-rows: 22px 18px 25px minmax(190px, 1fr) 19px;
+  min-height: 300px;
+  color: var(--nx-color-text);
+  background: var(--nx-color-page-bg);
+  font-family: Arial, Helvetica, system-ui, sans-serif;
+  font-size: 9px;
+}
+.nx-theme-preview__sap-title,
+.nx-theme-preview__sap-status {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  background: linear-gradient(180deg, #f8fbfd, var(--nx-shell-topbar-bg));
+  border-bottom: 1px solid var(--nx-color-border-strong);
+  font-weight: 700;
+}
+.nx-theme-preview__sap-menu { padding: 2px 6px; background: var(--nx-color-surface-sunken); border-bottom: 1px solid var(--nx-color-border); }
+.nx-theme-preview__sap-toolbar { display: flex; align-items: center; gap: 3px; padding: 2px 5px; background: linear-gradient(#fff, var(--nx-color-surface-sunken)); border-bottom: 1px solid var(--nx-color-border-strong); }
+.nx-theme-preview__sap-toolbar > span:not(.nx-theme-preview__sap-command) { display: grid; place-items: center; width: 18px; height: 18px; background: var(--nx-color-surface-raised); border: 1px solid var(--nx-color-border); }
+.nx-theme-preview__sap-command { width: 92px; height: 17px; padding: 1px 4px; color: var(--nx-color-text-muted); background: #fff; border: 1px solid var(--nx-color-border-strong); }
+.nx-theme-preview__sap-workarea { display: grid; grid-template-columns: 104px minmax(0, 1fr); min-height: 0; }
+.nx-theme-preview__sap-tree { display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--nx-shell-sidebar-bg); border-right: 1px solid var(--nx-color-border-strong); }
+.nx-theme-preview__sap-tree [aria-selected='true'] { padding: 2px 3px; color: var(--nx-shell-sidebar-active-text); background: var(--nx-shell-sidebar-active-bg); }
+.nx-theme-preview__sap-screen { min-width: 0; margin: 5px; background: var(--nx-color-surface); border: 1px solid var(--nx-color-border-strong); }
+.nx-theme-preview__sap-screen-title { padding: 3px 5px; font-size: 11px; font-weight: 700; background: linear-gradient(#fff, var(--nx-color-surface-sunken)); border-bottom: 1px solid var(--nx-color-border-strong); }
+.nx-theme-preview__sap-tabs { display: flex; align-items: flex-end; gap: 2px; padding: 5px 5px 0; border-bottom: 1px solid var(--nx-color-border-strong); }
+.nx-theme-preview__sap-tabs > * { padding: 2px 7px; background: var(--nx-color-surface-sunken); border: 1px solid var(--nx-color-border); border-bottom: 0; }
+.nx-theme-preview__sap-tabs > b { background: var(--nx-color-surface); }
+.nx-theme-preview__sap-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 5px; padding: 6px; border: 1px solid var(--nx-color-border-strong); }
+.nx-theme-preview__sap-panel > strong { flex-basis: 100%; padding-bottom: 3px; border-bottom: 1px solid var(--nx-color-border); }
+.nx-theme-preview__sap-field { display: inline-block; min-width: 52px; margin-left: 3px; padding: 2px 4px; background: #dfeaf3; border: 1px solid var(--nx-color-border-strong); }
+.nx-theme-preview__sap-panel .nx-theme-preview__table { flex-basis: 100%; border-radius: 0; }
+.nx-theme-preview__sap-dialog { flex: 1; padding: 4px; background: var(--nx-color-surface-sunken); border: 2px solid var(--nx-color-border-strong); }
+.nx-theme-preview__sap-status { border-top: 1px solid var(--nx-color-border-strong); border-bottom: 0; font-weight: 400; }
+.nx-theme-preview[data-nx-preview-variant='tradeshow'] .nx-theme-preview__sap-title,
+.nx-theme-preview[data-nx-preview-variant='tradeshow'] .nx-theme-preview__sap-status,
+.nx-theme-preview[data-nx-preview-variant='tradeshow'] .nx-theme-preview__sap-screen-title {
+  color: #fff;
+  background: linear-gradient(180deg, #668db5, #182a53);
+}
+.nx-theme-preview[data-nx-preview-variant='tradeshow'] .nx-theme-preview__sap-panel { border-top: 4px solid var(--nx-color-accent); }
+.nx-theme-preview[data-nx-preview-variant='tradeshow'] .nx-theme-preview__sap-tabs > b { color: #fff; background: #466dbd; }
+
+@media (max-width: 480px) {
+  .nx-theme-preview__sap-workarea { grid-template-columns: 76px minmax(0, 1fr); }
+  .nx-theme-preview__sap-tree { padding: 4px; }
+  .nx-theme-preview__sap-command { width: 68px; }
+}

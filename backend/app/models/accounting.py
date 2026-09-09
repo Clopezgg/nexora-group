@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -62,7 +62,7 @@ class AccountingDocument(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # no las concentra "hoy" — cada una conserva su fecha económica real
     # (ORDEN MAESTRA §9). Los reportes de flujo de caja agrupan por
     # `effective_date`; la auditoría usa `posted_at`.
-    effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False, server_default=text("CURRENT_DATE"))
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reversed_document_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounting_documents.id"), nullable=True

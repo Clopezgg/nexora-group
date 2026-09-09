@@ -275,9 +275,8 @@ class ThreeWayMatchResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """INV-PROC-001: las diferencias entre PO / Goods Receipt-Service Entry /
     Supplier Invoice nunca desaparecen silenciosamente -- siempre queda un
     registro, MATCHED o EXCEPTION con el detalle de la discrepancia. El
-    `supplier_invoice_id` es una referencia libre (UUID) porque el
-    SupplierInvoice real lo construye Track A en paralelo -- ver
-    docs/PROCUREMENT.md para el contrato de integración exacto."""
+    `supplier_invoice_id` es FK a SupplierInvoice (NX-AUD-025); ambos
+    tracks están integrados."""
 
     __tablename__ = "three_way_match_results"
     __table_args__ = (
@@ -302,7 +301,9 @@ class ThreeWayMatchResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     purchase_order_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("purchase_orders.id", ondelete="RESTRICT"), nullable=False
     )
-    supplier_invoice_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    supplier_invoice_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("supplier_invoices.id", ondelete="SET NULL"), nullable=True
+    )
     supplier_invoice_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     supplier_invoice_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     received_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)

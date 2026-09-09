@@ -109,11 +109,14 @@ def _assert_fiscal_period_open(db: Session, *, company_id: uuid.UUID, as_of: dat
     to bypass fiscal eligibility. Economic dates in calendar gaps fail closed.
     """
     period = db.execute(
-        select(FiscalPeriod).where(
+        select(FiscalPeriod)
+        .where(
             FiscalPeriod.company_id == company_id,
             FiscalPeriod.start_date <= as_of,
             FiscalPeriod.end_date >= as_of,
         )
+        .with_for_update(read=True)
+        .execution_options(populate_existing=True)
     ).scalar_one_or_none()
     if period is None:
         calendar_exists = db.execute(

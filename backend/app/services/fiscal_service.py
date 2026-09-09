@@ -139,7 +139,12 @@ def transition_period_status(
 ) -> FiscalPeriod:
     if target_status not in _ALLOWED_PERIOD_TRANSITIONS:
         raise ValueError(f"Estado de período fiscal inválido: {target_status}")
-    period = db.get(FiscalPeriod, period_id)
+    period = db.execute(
+        select(FiscalPeriod)
+        .where(FiscalPeriod.id == period_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
     if period is None:
         raise ValueError("Período fiscal no encontrado")
     if target_status == period.status:

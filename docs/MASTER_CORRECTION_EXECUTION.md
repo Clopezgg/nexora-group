@@ -78,3 +78,14 @@ The explicit approval assertion exposed a production client defect: `apiFetch` s
 Final local Critical Journey: **1 passed (44.6s)** with real Chromium, clean Alembic PostgreSQL database, Azurite, UI unlock, approval and resulting APPROVED invoice checked. Log `/tmp/nexora-critical-green-iteration4.log`. The previous full E2E run had **6 passed / 1 failed** before this client correction; its six accessibility/visual tests passed, but a full same-SHA CI rerun is still required. Do not describe that previous run as fully green.
 
 After the production-client change: frontend typecheck, lint, **65 files / 209 tests**, and build all pass. No permissions, fiscal rules, test thresholds or CI gates were relaxed. Full backend remains pending, so no phase baseline, merge or certification is claimed.
+
+## Supervisor iteration 5 — fiscal posting/transition serialization
+
+- Initial HEAD `2b2a1624fff8378e3c1be6fb0019edc0df719a4c`; fetched origin, clean tree, `origin/main` still audited `dc58619c9cdfb8e4648eedd8fa4cba2200a9d4c8`. PR #114 retained.
+- Three new independent PostgreSQL session regressions reproduced missing synchronization: posting passed an uncommitted closure; closure passed an active eligibility transaction; stale OPEN identity allowed overwriting committed CLOSED. All three failed before implementation (`/tmp/nexora-fiscal-red-iteration5.log`).
+- Central fiscal gate now acquires FOR SHARE and refreshes ORM state; period transitions acquire FOR UPDATE and refresh before evaluating the graph. Locks remain until transaction completion. Concurrent postings can share the period lock, while closure must wait.
+- Directed fiscal/posting/closing regression: **40 passed**, 3 existing Starlette deprecation warnings; `/tmp/nexora-fiscal-regression-iteration5.log`. Critical Ruff, compileall and diff check passed. No schema changes or migration required.
+- Tests use isolated `nexora_fiscal_iteration5_nexora_group`, not the previous full-regression database. PostgreSQL lock timeout is asserted via SQLSTATE 55P03; no sleep-based ordering or mocked persistence.
+- Previous full backend iteration-4 log remains truncated at 35%; no connections to its test database remained when inspected. It is NOT a passing full regression.
+- Latest observed prior-SHA CI `34305301720`: frontend/Bicep/Docker success, backend/E2E in progress. PR Deploy Azure success is not production deployment evidence.
+- Still mandatory: SOFT_CLOSED explicit permission/audit policy; lock before hard-close checklist and accurate pre-transition audit snapshots; calendar bootstrap/configuration race review; consolidated reversal authority/source adapters; source uniqueness; full backend/CI and phase integration. This change does not certify all fiscal concurrency paths or close Phase 1.

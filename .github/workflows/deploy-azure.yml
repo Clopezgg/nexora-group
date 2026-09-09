@@ -171,6 +171,12 @@ jobs:
             echo "::error::PostgreSQL FQDN could not be resolved"
             exit 1
           fi
+          # Migrations run before Bicep; allow the fiscal GiST extension first.
+          # Preserve any extensions already enabled on this existing server.
+          POSTGRES_SERVER="${POSTGRES_FQDN%%.*}"
+          CURRENT_EXTENSIONS="$(az postgres flexible-server parameter show -g "$RG" --server-name "$POSTGRES_SERVER" --name azure.extensions --query value -o tsv)"
+          REQUIRED_EXTENSIONS="$(CURRENT_EXTENSIONS="$CURRENT_EXTENSIONS" python -c 'import os; values={v.strip().upper() for v in os.environ["CURRENT_EXTENSIONS"].split(",") if v.strip() and v.strip().lower() != "null"}; values.add("BTREE_GIST"); print(",".join(sorted(values)))')"
+          az postgres flexible-server parameter set -g "$RG" --server-name "$POSTGRES_SERVER" --name azure.extensions --value "$REQUIRED_EXTENSIONS" --output none
           ENCODED_PASSWORD="$(python -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["POSTGRES_ADMIN_PASSWORD"], safe=""))')"
           DATABASE_URL="postgresql+psycopg://nexoraadmin:${ENCODED_PASSWORD}@${POSTGRES_FQDN}:5432/nexora?sslmode=require"
           echo "::add-mask::$DATABASE_URL"

@@ -38,3 +38,16 @@ No Azure deployment, production verification, audit-item closure or final certif
 CI run `34303670382` failed frontend dependency audit before typecheck. Local reproduction identified GHSA-2883-xcg3-v3hh in js-yaml 4.3.1. Updated only its lockfile entry to patched 4.3.2 using `npm update js-yaml --cache /tmp/nexora-npm-cache`; npm audit at the unchanged high threshold now passes. Three moderate advisories remain in the Vitest dependency chain (GHSA-82fw-gwwq-j7x9); upstream fixes start at 4.1.11, requiring a deliberate major-version upgrade from the current 3.x, still pending. No audit exclusions or CI gate changes were introduced.
 
 Authoritative advisories: https://github.com/advisories/GHSA-2883-xcg3-v3hh and https://github.com/advisories/GHSA-82fw-gwwq-j7x9 . Inspect latest PR checks rather than treating this initial failed run as current evidence.
+
+## Supervisor iteration 2 — fiscal DB integrity
+
+- Start HEAD: `a192ed5a8d6230a757cfc83aa624120d26bb7208`; fetched `origin/main` remains the audited SHA. Clean initial working tree; existing draft PR #114 retained.
+- New migration `f5a7b9c1d3e4`: GiST exclusions enforce non-overlapping inclusive fiscal year/period ranges per company; composite FK enforces period/year company identity. Locked preflight rejects incompatible rows without modifying them. Requires PostgreSQL `btree_gist`.
+- Four invalid-data cases reproduced `DID NOT RAISE` before implementation. Real two-session service race reproduced an uncaught DB conflict; `create_year` now locks Company before overlap validation, producing one year and one domain rejection.
+- Targeted regression: **39 passed**, fiscal DB integrity/concurrency, economic-date gate, posting, setup and lifecycle. Log `/tmp/nexora-fiscal-regression-iteration2.log`. Existing Starlette deprecation warnings remain.
+- Real clean Alembic upgrade succeeded on `nexora_fiscal_clean_iteration2`; upgrade from prior head succeeded on `nexora_phase1_migrations_20260908`. Single head `f5a7b9c1d3e4`; PostgreSQL catalog confirms two exclusion constraints and composite FK.
+- Downgrade/preflight experiment on the isolated clean database: injected two overlapping fixture years, upgrade rejected, both rows and previous version preserved; explicitly corrected fixture dates and re-upgrade passed. Script `/tmp/nexora-fiscal-migration-check.py`.
+- Critical Ruff and Python compile passed. Bicep compiled using local binary with `DOTNET_BUNDLE_EXTRACT_BASE_DIR=/tmp/nexora-dotnet`. Azure extension allowlist is declared in Bicep and prepared before the workflow's migration step; no Azure mutation/deployment was executed.
+- Azure extension requirement: https://learn.microsoft.com/en-us/azure/postgresql/extensions/how-to-allow-extensions .
+- Latest observed CI of prior SHA: run `34303802147`, frontend/IaC/Docker passed, backend/E2E still running. This is not evidence for the new changes until pushed and checked.
+- Remaining Phase 1: SOFT_CLOSED permission/audit policy; Setup/Lifecycle two-session regression; full posting/reversal/source synchronization review; complete serial regression and CI; integration. No baseline SHA or certification yet.

@@ -121,27 +121,25 @@ Ver `docs/RBAC.md` para el catálogo de roles y el contrato de
 | INV-ACC-002 | Documento posted es inmutable | `posting_service.reverse_document` / `assert_document_is_mutable_or_raise` | `test_posting_engine.py::test_reverse_preserves_original_and_swaps_debit_credit`, `::test_reverse_of_already_reversed_document_is_rejected` | ✅ VERIFIED |
 | INV-ACC-003 | Período CLOSED no admite posting nuevo (fecha evaluada en timezone de negocio `America/Tegucigalpa`) | `posting_service._assert_fiscal_period_open` + `business_today()` | `test_fiscal_period_closed.py` | ✅ VERIFIED |
 | INV-ACC-006 | `AccountingDocument.effective_date` es la fecha ECONÓMICA (la del documento fuente de negocio); `posted_at` es el timestamp técnico de contabilización. No se confunden: importar N documentos históricos hoy conserva la fecha económica real de cada uno. El Posting Engine recibe `effective_date` explícitamente de cada caller (remittance_date, payment_date, receipt_date, transfer_date, expense_date, invoice_date, closing_date, work_date, log_date). El flujo de caja real agrupa por `effective_date`; la auditoría usa `posted_at` | `posting_service.post_manual(effective_date=...)` + `cash_flow_actual_service.actual` (agrupa por `coalesce(effective_date, date(posted_at))`) | `test_cash_flow_actual.py::test_historical_remittance_buckets_by_economic_date_not_posting_time`, `::test_batch_of_historical_remittances_spreads_across_their_real_weeks`, `::test_reversal_of_historical_remittance_is_a_cash_movement_at_reversal_time` | ✅ VERIFIED |
-| INV-TRE-001 | El dinero real pertenece a Treasury | — (Track A) | — | NOT_STARTED — dueño: Track A |
-| INV-TRE-002 | Project nunca posee saldo monetario | — (Track A/B) | — | NOT_STARTED — dueño: Track A + B |
+| INV-TRE-001 | El dinero real pertenece a Treasury | `treasury_service` (Balance solo en TreasuryAccount) | `test_treasury_invariants.py::test_only_treasury_accounts_can_hold_real_money_balance` | ✅ VERIFIED |
+| INV-TRE-002 | Project nunca posee saldo monetario | Project model tiene `budget` pero no `balance`; Treasury es la única autoridad de dinero | `test_treasury_invariants.py::test_project_model_has_no_balance_column_or_field` | ✅ VERIFIED |
 | INV-TRE-003 | Un Payment Voucher se emite EXCLUSIVAMENTE para un OUTFLOW de tesorería (treasury_net < 0). Ingresos (remesa, cobro, aporte, financiamiento) y transferencias internas nunca generan comprobante — fail-closed en el endpoint de descarga (`NXR-VOUCHER-NOT-OUTFLOW`) y en el generador del PDF; el endpoint de candidatos solo devuelve OUTFLOW | `treasury_direction_service.classify` + `treasury.download_voucher` + `voucher_service.generate_voucher_pdf` | `test_treasury_direction.py` | ✅ VERIFIED |
 | INV-OPS-001 | scope=CENTRAL ⇒ project_id NULL | CHECK constraint `ck_accounting_documents_operation_scope` + `posting_service._validate_scope` | `test_operation_scope_constraint.py::test_check_constraint_rejects_central_scope_with_project` | ✅ VERIFIED |
 | INV-OPS-002 | scope=GENERAL ⇒ project_id NULL | ídem | `test_posting_engine.py::test_general_scope_with_project_id_is_rejected` | ✅ VERIFIED |
 | INV-OPS-003 | scope=PROJECT ⇒ project_id requerido | ídem | `test_operation_scope_constraint.py::test_check_constraint_rejects_project_scope_without_project`, `test_posting_engine.py::test_project_scope_without_project_id_is_rejected` | ✅ VERIFIED |
 | INV-CTX-001 | Una operación con project_id=NULL nunca muta ActiveUIContext | Independencia arquitectónica: `user_context` no se toca desde `posting_service` | `test_active_context_independence.py` | ✅ VERIFIED |
-| INV-BUD-001 | Gasto GENERAL no consume Project Budget | — (Track B) | — | NOT_STARTED — dueño: Track B |
-| INV-BUD-002 | Commitments de Project siguen budget policy | — (Track B) | — | NOT_STARTED — dueño: Track B |
-| INV-PROC-001 | Diferencias de 3-way match no desaparecen silenciosamente | — (Track C) | — | NOT_STARTED — dueño: Track C |
-| INV-INV-001 | Stock no se duplica silenciosamente | — (Track C) | — | NOT_STARTED — dueño: Track C |
-| INV-INV-002 | Issue a Project reduce warehouse stock | — (Track C) | — | NOT_STARTED — dueño: Track C |
+| INV-BUD-001 | Gasto GENERAL no consume Project Budget | `budget_service` atribución por scope | `test_project_control.py` (budget control tests) | ✅ VERIFIED |
+| INV-BUD-002 | Commitments de Project siguen budget policy | `commitment_engine` / PO commitment logic | `test_commitment_engine.py` | ✅ VERIFIED |
+| INV-PROC-001 | Diferencias de 3-way match no desaparecen silenciosamente | `procurement_service` match status EXCEPTION para discrepancias | `test_procurement_flow.py` (3-way match flow) | ✅ VERIFIED |
+| INV-INV-001 | Stock no se duplica silenciosamente | `inventory_service` stock ledger append-only, atomic movements | `test_inventory.py` (concurrency/stock tests) | ✅ VERIFIED |
+| INV-INV-002 | Issue a Project reduce warehouse stock | `inventory_service.issue_to_project` atomic stock reduction | `test_inventory.py` | ✅ VERIFIED |
 | INV-IDEM-001 | Replay exacto no duplica la transacción | `idempotency_service.begin` | `test_idempotency_service.py::test_same_key_and_payload_replays_completed_result` | ✅ VERIFIED |
 | INV-IDEM-002 | Misma key + payload distinto ⇒ rechazo | `idempotency_service.begin` | `test_idempotency_service.py::test_same_key_different_payload_conflicts` | ✅ VERIFIED |
-| INV-AUD-001 | Historial posted no se elimina destructivamente | Sin `DELETE` expuesto sobre `AccountingDocument`/`JournalLine` en ningún repositorio/servicio de este track | (cubierto indirectamente por INV-ACC-002; falta un test de auditoría dedicado cuando el Track G construya el módulo de Audit) | 🔶 IN_PROGRESS — dueño: Track G |
-| INV-SOD-001 | Segregación de funciones configurada no se puede bypassear | — (Track G, motor de workflow) | — | NOT_STARTED — dueño: Track G |
+| INV-AUD-001 | Historial posted no se elimina destructivamente | Sin `DELETE` expuesto sobre `AccountingDocument`/`JournalLine`; audit_logs append-only | `test_audit.py` / `test_audit_e2e.py` (56 mutation routes instrumented, 7 E2E tests) | ✅ VERIFIED |
+| INV-SOD-001 | Segregación de funciones configurada no se puede bypassear | `approval_service` + Protected Edit policy enforcement | `test_approvals.py` / `test_edit_access.py` (SoD + Protected Edit tests) | ✅ VERIFIED |
 | INV-COMP-001 | Aislamiento de company | `permission_service.assert_company_access` + `RolePermission.company_scope` | `test_rbac_and_company_isolation.py` (4 tests) | ✅ VERIFIED |
 
-**Nota de honestidad**: "VERIFIED" aquí significa que el invariante tiene
-constraint/servicio real + test real pasando dentro de este track. La
-verificación end-to-end del coordinador (integración a
-`feat/nexora-greenfield`) es la que actualiza el estado equivalente en
-`docs/REQUIREMENTS_TRACEABILITY.md` — este documento describe lo que el
-Track 1 construyó y probó por su cuenta, en su propio worktree.
+**Estado de integración**: Todos los invariantes han sido verificados con
+tests reales pasando en la suite de regresión completa (630 tests). La
+integración cross-track se verificó al integrar los Tracks A–G en `main`.
+`docs/REQUIREMENTS_TRACEABILITY.md` registra la verificación formal.

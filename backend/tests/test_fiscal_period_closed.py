@@ -99,6 +99,21 @@ def test_open_fiscal_period_allows_posting(client, db_session):
     assert response.status_code == 201, response.text
 
 
+def test_effective_date_in_closed_period_blocks_when_today_is_open(client, db_session):
+    """Fiscal eligibility is determined by the economic date, never server today."""
+    login_admin(client)
+    company = create_company(client)
+    debit = create_account(client, company_id=company["id"], code="1000", name="Caja", account_type="ASSET")
+    credit = create_account(client, company_id=company["id"], code="2000", name="CxP", account_type="LIABILITY")
+    year = FiscalYear(company_id=company["id"], code="2026", start_date=date(2026, 1, 1), end_date=date(2026, 12, 31))
+    db_session.add(year)
+    db_session.flush()
+    db_session.add(FiscalPeriod(fiscal_year_id=year.id, company_id=company["id"], period_number=1, start_date=date(2026, 1, 1), end_date=date(2026, 1, 31), status="CLOSED"))
+    db_session.commit()
+    response = client.post("/api/accounting/journal-entries", json={"companyId": company["id"], "scope": "GENERAL", "currencyCode": "HNL", "effectiveDate": "2026-01-15", "lines": [{"accountId": debit["id"], "debitAmount": "10.00"}, {"accountId": credit["id"], "creditAmount": "10.00"}]})
+    assert response.status_code == 409, response.text
+
+
 def test_fiscal_period_check_uses_business_date_not_utc(client, db_session, monkeypatch):
     """INV-ACC-003 / timezone: at 23:00 in Honduras (05:00 UTC next day) a
     posting must be evaluated against the Honduras calendar day, not the UTC

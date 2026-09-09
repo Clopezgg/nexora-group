@@ -174,10 +174,11 @@ def post_manual(
         document_project_id=project_id,
         lines=lines,
     )
-    # INV-ACC-003: the fiscal period is a business-calendar concept, so it
-    # must be resolved in the Nexora business timezone (America/Tegucigalpa),
-    # not the UTC wall clock the container runs on.
-    _assert_fiscal_period_open(db, company_id=company_id, as_of=business_today())
+    # Resolve the economic date before checking fiscal eligibility.  `posted_at`
+    # is technical audit time; it (and server "today") must never choose the
+    # accounting period for a source event with an explicit business date.
+    posting_date = effective_date or business_today()
+    _assert_fiscal_period_open(db, company_id=company_id, as_of=posting_date)
 
     document_number = numbering_service.next_document_number(
         db, company_id=company_id, document_type_code=document_type_code
@@ -196,7 +197,7 @@ def post_manual(
         # Fecha económica: la del documento fuente de negocio. Si el caller
         # no la da (asiento manual sin fecha explícita), cae en la fecha de
         # negocio de hoy — nunca en el timestamp UTC del contenedor.
-        effective_date=effective_date or business_today(),
+        effective_date=posting_date,
         posted_at=datetime.now(timezone.utc),
     )
     db.add(document)

@@ -51,3 +51,10 @@ Authoritative advisories: https://github.com/advisories/GHSA-2883-xcg3-v3hh and 
 - Azure extension requirement: https://learn.microsoft.com/en-us/azure/postgresql/extensions/how-to-allow-extensions .
 - Latest observed CI of prior SHA: run `34303802147`, frontend/IaC/Docker passed, backend/E2E still running. This is not evidence for the new changes until pushed and checked.
 - Remaining Phase 1: SOFT_CLOSED permission/audit policy; Setup/Lifecycle two-session regression; full posting/reversal/source synchronization review; complete serial regression and CI; integration. No baseline SHA or certification yet.
+
+## Project concurrency verification (iteration 2)
+
+- Added two real independent-session regressions: same stale DRAFT SetupRun creates exactly one Project/WBS/Budget/access grant; competing ACTIVE→ON_HOLD / ACTIVE→COMPLETED transitions yield one winner, one 409, one audit mutation.
+- Mutation verification removed row locking/refresh temporarily, then restored the exact original files: both tests failed for actual violations (two different project IDs; both incompatible transitions accepted). Log `/tmp/nexora-project-concurrency-mutation.log`.
+- After restoring production locking, both tests passed again; critical Ruff and compile passed. Existing production fixes preserved without additional implementation changes.
+- Prior CI run `34303802147` E2E now reports failure; backend remains running. Inspect job `102316158894` logs and newer run before Phase 1 closure. No CI-green claim.

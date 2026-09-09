@@ -239,3 +239,96 @@ def test_fiscal_period_rejects_an_inverted_date_range_and_invalid_status(db_sess
     )
     with pytest.raises(IntegrityError):
         db_session.commit()
+
+
+def test_soft_closed_fiscal_period_blocks_normal_posting(client, db_session):
+    """F1.6 SOFT_CLOSED: normal postings (JRN) are rejected."""
+    login_admin(client)
+    company = create_company(client)
+    debit = create_account(client, company_id=company["id"], code="1000", name="Caja", account_type="ASSET")
+    credit = create_account(client, company_id=company["id"], code="2000", name="CxP", account_type="LIABILITY")
+    year = FiscalYear(company_id=company["id"], code="2026", start_date=date(2026, 1, 1), end_date=date(2026, 12, 31))
+    db_session.add(year)
+    db_session.flush()
+    db_session.add(FiscalPeriod(fiscal_year_id=year.id, company_id=company["id"], period_number=1, start_date=date(2026, 1, 1), end_date=date(2026, 1, 31), status="SOFT_CLOSED"))
+    db_session.commit()
+    response = client.post("/api/accounting/journal-entries", json={"companyId": company["id"], "scope": "GENERAL", "currencyCode": "HNL", "effectiveDate": "2026-01-15", "lines": [{"accountId": debit["id"], "debitAmount": "10.00"}, {"accountId": credit["id"], "creditAmount": "10.00"}]})
+    assert response.status_code == 409, response.text
+    assert "SOFT_CLOSED" in response.text
+    assert "COR" in response.text or "ANU" in response.text
+
+
+def test_soft_closed_fiscal_period_allows_correction_posting(client, db_session):
+    """F1.6 SOFT_CLOSED: correction postings (COR) are allowed."""
+    import uuid
+    login_admin(client)
+    company = create_company(client)
+    debit = create_account(client, company_id=company["id"], code="1000", name="Caja", account_type="ASSET")
+    credit = create_account(client, company_id=company["id"], code="2000", name="CxP", account_type="LIABILITY")
+    year = FiscalYear(company_id=company["id"], code="2026", start_date=date(2026, 1, 1), end_date=date(2026, 12, 31))
+    db_session.add(year)
+    db_session.flush()
+    db_session.add(FiscalPeriod(fiscal_year_id=year.id, company_id=company["id"], period_number=1, start_date=date(2026, 1, 1), end_date=date(2026, 1, 31), status="SOFT_CLOSED"))
+    db_session.commit()
+    # The API for manual journal entries uses document_type_code="JRN" by default.
+    # For correction, we need to test via the service directly with document_type_code="COR".
+    from app.services import posting_service
+    doc = posting_service.post_manual(
+        db_session,
+        company_id=uuid.UUID(company["id"]),
+        document_type_code="COR",
+        scope="GENERAL",
+        project_id=None,
+        currency_code="HNL",
+        lines=[
+            posting_service.JournalLineInput(account_id=uuid.UUID(debit["id"]), debit_amount=10),
+            posting_service.JournalLineInput(account_id=uuid.UUID(credit["id"]), credit_amount=10),
+        ],
+        effective_date=date(2026, 1, 15),
+    )
+    assert doc is not None
+    assert doc.document_type_code == "COR"
+    assert doc.effective_date == date(2026, 1, 15)
+
+
+def test_soft_closed_fiscal_period_allows_reversal(client, db_session, monkeypatch):
+    """F1.6 SOFT_CLOSED: reversal postings (ANU) are allowed."""
+    import uuid
+    login_admin(client)
+    company = create_company(client)
+    debit = create_account(client, company_id=company["id"], code="1000", name="Caja", account_type="ASSET")
+    credit = create_account(client, company_id=company["id"], code="2000", name="CxP", account_type="LIABILITY")
+    year = FiscalYear(company_id=company["id"], code="2026", start_date=date(2026, 1, 1), end_date=date(2026, 12, 31))
+    db_session.add(year)
+    db_session.flush()
+    # First create an OPEN period and post a normal document
+    open_period = FiscalPeriod(fiscal_year_id=year.id, company_id=company["id"], period_number=1, start_date=date(2026, 1, 1), end_date=date(2026, 1, 31), status="OPEN")
+    db_session.add(open_period)
+    db_session.commit()
+    from app.services import posting_service
+    original = posting_service.post_manual(
+        db_session,
+        company_id=uuid.UUID(company["id"]),
+        document_type_code="JRN",
+        scope="GENERAL",
+        project_id=None,
+        currency_code="HNL",
+        lines=[
+            posting_service.JournalLineInput(account_id=uuid.UUID(debit["id"]), debit_amount=100),
+            posting_service.JournalLineInput(account_id=uuid.UUID(credit["id"]), credit_amount=100),
+        ],
+        effective_date=date(2026, 1, 10),
+    )
+    # Now transition to SOFT_CLOSED
+    from app.services.fiscal_service import transition_period_status
+    period_id = open_period.id
+    transition_period_status(db_session, period_id=period_id, target_status="SOFT_CLOSED")
+    db_session.commit()
+    # Reversal should be allowed in SOFT_CLOSED
+    # The reversal uses business_today() for effective_date. Monkeypatch it in the posting_service module.
+    monkeypatch.setattr("app.services.posting_service.business_today", lambda: date(2026, 1, 20))
+    reversal = posting_service.reverse_document(
+        db_session, document_id=original.id, reason="Test reversal in SOFT_CLOSED"
+    )
+    assert reversal is not None
+    assert reversal.document_type_code == "ANU"

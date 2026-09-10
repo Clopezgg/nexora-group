@@ -181,10 +181,15 @@ jobs:
           ENCODED_PASSWORD="$(python -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["POSTGRES_ADMIN_PASSWORD"], safe=""))')"
           DATABASE_URL="postgresql+psycopg://nexoraadmin:${ENCODED_PASSWORD}@${POSTGRES_FQDN}:5432/nexora?sslmode=require"
           echo "::add-mask::$DATABASE_URL"
+          # F3.8 (ORDEN MAESTRA): app.pre_migration_repairs was a one-time
+          # pre-Alembic repair for the authorized project reset (b41e7c9a2f10).
+          # Every supported environment is past that revision now and fresh
+          # databases have no alembic_version table, so it is a permanent
+          # no-op and has been retired from the runtime path.
           docker run --rm \
             --env DATABASE_URL="$DATABASE_URL" \
             "$IMAGE" \
-            sh -ec 'python -u -m app.pre_migration_repairs && alembic upgrade head'
+            sh -ec 'alembic upgrade head'
 
       - name: Deploy infrastructure and backend
         run: |

@@ -38,17 +38,20 @@ async function ensureCompany(request: APIRequestContext) {
 }
 
 async function setTheme(page: Page, themeId: string) {
-  await page.goto('/control/configuracion')
-  await page.getByLabel('Familia').selectOption('sap-gui')
-  const confirmBtn = page.getByRole('button', { name: 'Cambiar a SAP GUI' })
-  if (await confirmBtn.isVisible().catch(() => false)) {
-    await page.getByRole('dialog', { name: 'Cambiar a SAP GUI' }).waitFor()
-    await confirmBtn.click()
-    await expect(page.locator('html')).toHaveAttribute('data-nx-family', 'sap-gui')
-  }
-  await page.getByLabel('Variante').selectOption(themeId)
-  await expect(page.locator('html')).toHaveAttribute('data-nx-theme', themeId)
-  await page.getByRole('button', { name: 'Guardar como mi preferencia' }).click()
+  const result = await page.evaluate(async (id) => {
+    const capability = window.sessionStorage.getItem('nexora.edit-access.capability')
+    const response = await fetch('/api/me/preferences', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(capability ? { 'X-Nexora-Edit-Access': capability } : {}),
+      },
+      body: JSON.stringify({ themeId: id, density: 'compact' }),
+    })
+    return { ok: response.ok, status: response.status, body: await response.text() }
+  }, themeId)
+  expect(result.ok, `PUT preferencias -> ${result.status}: ${result.body}`).toBeTruthy()
   await page.reload()
   await expect.poll(() => page.locator('html').getAttribute('data-nx-theme')).toBe(themeId)
 }

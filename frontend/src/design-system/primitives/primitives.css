@@ -516,7 +516,7 @@
 .nx-filter-bar__clear {
   border: none;
   background: none;
-  color: var(--nx-blue-600);
+  color: #0a58ca;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;

@@ -1088,3 +1088,43 @@
   gap: 8px;
   padding: 12px 0 12px;
 }
+
+/* --- Badges semánticos en SAP GUI: texto AA sobre superficies SAP.
+ * Fondos opacos para garantizar contraste AA (4.5:1) independientemente
+ * de la superficie padre. --- */
+:root[data-nx-family='sap-gui'] body .nx-badge--warning {
+  color: #664d03;
+  background: #fef3cd;
+  border-color: #d4a843;
+}
+:root[data-nx-family='sap-gui'] body .nx-badge--danger {
+  color: #842029;
+  background: #f8d7da;
+  border-color: #d4536a;
+}
+:root[data-nx-family='sap-gui'] body .nx-badge--success {
+  color: #155724;
+  background: #d1e7dd;
+  border-color: #a3cfbb;
+}
+:root[data-nx-family='sap-gui'] body .nx-badge--info {
+  color: #055160;
+  background: #cff4fc;
+  border-color: #9eeaf9;
+}
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-badge--warning {
+  color: #f7b955;
+  background: rgba(247, 185, 85, 0.14);
+}
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-badge--danger {
+  color: #ff9a9a;
+  background: rgba(255, 122, 122, 0.14);
+}
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-badge--success {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.14);
+}
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-badge--info {
+  color: #7ec3ff;
+  background: rgba(77, 163, 255, 0.14);
+}

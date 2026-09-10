@@ -415,6 +415,27 @@
   background: linear-gradient(180deg, var(--nx-color-surface-raised), var(--nx-color-surface-sunken));
   border: 1px solid var(--nx-color-border);
 }
+/* El árbol Easy Access real usa divs (no <summary>): misma presencia con
+   especificidad a prueba de orden y color de texto AA sobre el sidebar. */
+:root[data-nx-family='sap-gui'] body .nx-sap-tree .nx-sidebar__group-label {
+  min-height: 24px;
+  margin: 0;
+  padding: 2px 5px;
+  color: var(--nx-color-text, #172e50);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, var(--nx-color-surface-raised, #ffffff), var(--nx-color-surface-sunken, #dfeaf3));
+  border: 1px solid var(--nx-color-border, #8e9eab);
+  cursor: pointer;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-tree .nx-sidebar__link--active {
+  color: var(--nx-shell-sidebar-active-text, #ffffff);
+  background: var(--nx-shell-sidebar-active-bg, #265b8f);
+  border-color: var(--nx-color-border-strong, #466dbd);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-tree .nx-sidebar__link--active .nx-icon { color: currentColor; }
 :root[data-nx-family='sap-gui'] body .nx-sidebar__group--collapsible > summary::after {
   content: '▸';
   order: -1;
@@ -440,9 +461,9 @@
   border-color: var(--nx-color-border);
 }
 :root[data-nx-family='sap-gui'] body .nx-sidebar__link--active {
-  color: var(--nx-shell-sidebar-active-text);
-  background: var(--nx-shell-sidebar-active-bg);
-  border-color: var(--nx-color-border-strong);
+  color: var(--nx-shell-sidebar-active-text, #ffffff);
+  background: var(--nx-shell-sidebar-active-bg, #265b8f);
+  border-color: var(--nx-color-border-strong, #466dbd);
 }
 :root[data-nx-family='sap-gui'] body .nx-sidebar__link--active::before { display: none; }
 :root[data-nx-family='sap-gui'] body .nx-sidebar__link--active .nx-icon { color: currentColor; }

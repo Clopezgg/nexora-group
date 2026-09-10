@@ -164,7 +164,6 @@ export function AccountsPayablePage() {
               companyId={activeCompanyId as string}
               treasuryAccounts={treasuryAccounts}
               remaining={row.amount + row.taxAmount - row.amountPaid}
-              initialContractReferenceDate={row.dueDate}
             />
           ) : null}
         </div>
@@ -390,7 +389,6 @@ export function PaySupplierInvoiceButton({
   treasuryAccounts,
   remaining,
   selectedInstallmentId,
-  initialContractReferenceDate,
   label,
 }: {
   invoice: SupplierInvoice
@@ -398,7 +396,6 @@ export function PaySupplierInvoiceButton({
   treasuryAccounts: TreasuryAccount[]
   remaining: number
   selectedInstallmentId?: string | null
-  initialContractReferenceDate?: string
   label?: string
 }) {
   const invoiceId = invoice.id
@@ -410,7 +407,6 @@ export function PaySupplierInvoiceButton({
   const [treasuryAccountId, setTreasuryAccountId] = useState(eligibleTreasuryAccounts[0]?.id ?? '')
   const [amount, setAmount] = useState<number | null>(remaining)
   const [paymentDate, setPaymentDate] = useState(businessTodayIso())
-  const [contractReferenceDate, setContractReferenceDate] = useState(initialContractReferenceDate ?? invoice.dueDate)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('TRANSFER')
   const [paymentEvidenceIds, setPaymentEvidenceIds] = useState<string[]>([])
   const [evidenceUploading, setEvidenceUploading] = useState(false)
@@ -466,19 +462,11 @@ export function PaySupplierInvoiceButton({
             <Input label="Fecha efectiva del pago (movimiento bancario)" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} required />
             {invoice.supplierContractId ? (
               <>
-                <Input
-                  label="Fecha de referencia contractual"
-                  type="date"
-                  value={contractReferenceDate}
-                  onChange={(event) => setContractReferenceDate(event.target.value)}
-                  required
-                />
-                <p className="nx-field__hint">La referencia contractual identifica qué obligación/cuota estás pagando. No cambia la fecha bancaria del pago.</p>
                 <ContractInstallmentPanel
                   companyId={companyId}
                   supplierContractId={invoice.supplierContractId}
                   amount={amount}
-                  asOf={contractReferenceDate}
+                  asOf={businessTodayIso()}
                   selectedInstallmentId={selectedInstallmentId}
                   onChange={(rows, valid, hasSchedule) => {
                     setContractAllocations(rows)
@@ -516,7 +504,6 @@ export function PaySupplierInvoiceButton({
               loading={mutation.isPending}
               disabled={
                 !treasuryAccountId || !amount || amount <= 0 || amount > remaining || !paymentDate ||
-                (invoice.supplierContractId ? !contractReferenceDate : false) ||
                 (contractHasSchedule && !allocationValid) || evidenceUploading ||
                 (evidenceRequired && paymentEvidenceIds.length === 0)
               }

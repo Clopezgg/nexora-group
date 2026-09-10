@@ -22,6 +22,7 @@ from app.domain.errors import (
     InvalidFinancialReferenceError,
     OverpaymentError,
 )
+from app.core.business_time import business_today
 from app.models.contract_payment import (
     ContractPaymentAllocation,
     ContractPaymentInstallment,
@@ -416,11 +417,36 @@ def _status_for(
         return "PAID"
     if paid > _ZERO:
         return "PARTIALLY_PAID"
+    installment_period = installment.period_year * 12 + installment.period_month
+    as_of_period = as_of.year * 12 + as_of.month
+    if installment_period > as_of_period:
+        return "UPCOMING"
     if installment.due_date < as_of:
         return "OVERDUE"
-    if installment.due_date <= _add_months(date(as_of.year, as_of.month, 1), 1) - _one_day():
-        return "DUE"
-    return "UPCOMING"
+    return "DUE"
+
+
+def is_installment_payable(
+    installment: ContractPaymentInstallment, *, business_date: date | None = None
+) -> bool:
+    """Return whether the contractual period is open for payment today.
+
+    This is deliberately independent from due day, payment date, and any
+    reporting ``as_of`` date. The business month is the sole authority for
+    payment eligibility.
+    """
+    today = business_date or business_today()
+    return (installment.period_year, installment.period_month) <= (today.year, today.month)
+
+
+def assert_installment_payable(
+    installment: ContractPaymentInstallment, *, business_date: date | None = None
+) -> None:
+    if not is_installment_payable(installment, business_date=business_date):
+        raise InvalidFinancialReferenceError(
+            f"La cuota del período {period_label(installment.period_year, installment.period_month)} "
+            "todavía es futura para la fecha de negocio."
+        )
 
 
 _KIND_ORDER = {"ADVANCE": 0, "REGULAR": 1, "RETENTION_RELEASE": 2}
@@ -662,7 +688,7 @@ def find_contractual_duplicate_candidates(
 def installment_summaries(
     db: Session, *, schedule_id: uuid.UUID, as_of: date | None = None
 ) -> list[InstallmentSummary]:
-    as_of = as_of or date.today()
+    as_of = as_of or business_today()
     rows = list(
         db.execute(
             select(ContractPaymentInstallment)
@@ -727,7 +753,7 @@ def history_through(
 def contract_summary(
     db: Session, *, schedule_id: uuid.UUID, as_of: date | None = None
 ) -> ContractSummary:
-    as_of = as_of or date.today()
+    as_of = as_of or business_today()
     schedule = db.get(ContractPaymentSchedule, schedule_id)
     if schedule is None:
         raise InvalidFinancialReferenceError(f"ContractPaymentSchedule {schedule_id} no existe")
@@ -791,7 +817,7 @@ def contract_payment_ledger(
     Solo lectura; no toca contabilidad."""
     from app.models.ap import SupplierInvoice, SupplierPayment
 
-    as_of = as_of or date.today()
+    as_of = as_of or business_today()
     q = (
         select(ContractPaymentSchedule)
         .where(ContractPaymentSchedule.company_id == company_id)
@@ -875,7 +901,70 @@ def allocate_payment(
     if not allocations:
         raise InvalidFinancialReferenceError("Debes indicar al menos una asignación.")
 
+    from app.models.ap import SupplierInvoice, SupplierPayment
+    from app.models.supplier import SupplierContract
+
+    payment = db.execute(
+        select(SupplierPayment)
+        .where(SupplierPayment.id == supplier_payment_id)
+        .with_for_update()
+    ).scalar_one_or_none()
+    if payment is None:
+        raise InvalidFinancialReferenceError(f"SupplierPayment {supplier_payment_id} no existe")
+    if payment.reversed_at is not None:
+        raise InvalidFinancialReferenceError("No se puede asignar un pago revertido.")
+    invoice = db.get(SupplierInvoice, payment.supplier_invoice_id)
+    if invoice is None or invoice.supplier_contract_id is None:
+        raise InvalidFinancialReferenceError(
+            "Las asignaciones contractuales requieren una factura con contrato."
+        )
+    schedule = resolve_schedule_for_invoice(db, invoice)
+    if schedule is None:
+        raise InvalidFinancialReferenceError(
+            "La factura contractual no tiene un plan de pagos válido."
+        )
+    contract = db.get(SupplierContract, invoice.supplier_contract_id)
+    if (
+        contract is None
+        or contract.supplier_id != invoice.supplier_id
+        or schedule.company_id != invoice.company_id
+    ):
+        raise InvalidFinancialReferenceError("El plan no pertenece a la compañía de la factura.")
+    if schedule.project_id != invoice.project_id or contract.project_id != invoice.project_id:
+        raise InvalidFinancialReferenceError("El plan, contrato y factura no comparten proyecto.")
+    if schedule.currency_code != invoice.currency_code:
+        raise InvalidFinancialReferenceError("El plan no usa la moneda de la factura.")
+
     inst_ids = [uuid.UUID(str(a["installment_id"])) for a in allocations]
+    if len(inst_ids) != len(set(inst_ids)):
+        raise InvalidFinancialReferenceError("No repitas una cuota en las asignaciones.")
+    # Deterministic ordering is required for concurrent payments touching the
+    # same set of installments, preventing check-then-write over-allocation.
+    installments = list(
+        db.execute(
+            select(ContractPaymentInstallment)
+            .where(
+                ContractPaymentInstallment.id.in_(inst_ids),
+                ContractPaymentInstallment.schedule_id == schedule.id,
+            )
+            .order_by(ContractPaymentInstallment.id)
+            .with_for_update()
+        ).scalars()
+    )
+    by_id = {row.id: row for row in installments}
+    if len(by_id) != len(inst_ids):
+        raise InvalidFinancialReferenceError(
+            "Cada cuota debe pertenecer al plan del contrato de la factura."
+        )
+    total = sum((_q(a["amount_applied"]) for a in allocations), _ZERO)
+    if total != _q(payment.amount):
+        if total > _q(payment.amount):
+            raise OverpaymentError(
+                "La suma de las asignaciones supera exactamente el monto del pago."
+            )
+        raise InvalidFinancialReferenceError(
+            "La suma de las asignaciones debe igualar exactamente el pago."
+        )
     paid_map = _paid_by_installment(db, inst_ids)
     created: list[ContractPaymentAllocation] = []
     now = datetime.now(timezone.utc)
@@ -885,11 +974,10 @@ def allocate_payment(
         amount = _q(a["amount_applied"])
         if amount <= _ZERO:
             raise InvalidFinancialReferenceError("El monto a aplicar debe ser mayor que cero.")
-        installment = db.get(ContractPaymentInstallment, inst_id)
-        if installment is None:
-            raise InvalidFinancialReferenceError(f"Cuota {inst_id} no existe")
+        installment = by_id[inst_id]
         if installment.status == "CANCELLED":
             raise InstallmentClosedError("La cuota está cancelada.")
+        assert_installment_payable(installment)
         already = paid_map.get(inst_id, _ZERO)
         remaining = _q(installment.net_due) - already
         if amount > remaining:
@@ -908,6 +996,16 @@ def allocate_payment(
         paid_map[inst_id] = already + amount
 
     db.flush()
+    active_total = db.execute(
+        select(func.coalesce(func.sum(ContractPaymentAllocation.amount_applied), 0)).where(
+            ContractPaymentAllocation.supplier_payment_id == payment.id,
+            ContractPaymentAllocation.reversed_at.is_(None),
+        )
+    ).scalar_one()
+    if _q(active_total) != _q(payment.amount):
+        raise InvalidFinancialReferenceError(
+            "El pago contractual debe quedar asignado por completo."
+        )
     if commit:
         db.commit()
     return created
@@ -973,6 +1071,10 @@ def propose_fifo(
         if remaining <= _ZERO:
             break
         if s.status == "CANCELLED" or s.remaining <= _ZERO:
+            continue
+        if not is_installment_payable(
+            db.get(ContractPaymentInstallment, s.installment_id)
+        ):
             continue
         applied = min(remaining, s.remaining)
         proposal.append(

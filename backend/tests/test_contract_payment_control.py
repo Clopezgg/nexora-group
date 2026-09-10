@@ -115,7 +115,7 @@ def test_accumulative_history_never_shows_future_periods(client, db_session):
     assert "Noviembre 2026" not in [s.period_label for s in oct_]
 
 
-def _real_supplier_payment(client, db, *, company, supplier, amount, tag):
+def _real_supplier_payment(client, db, *, company, supplier, amount, tag, contract_id=None):
     """Crea un SupplierPayment REAL vía la API (contabiliza por el Posting
     Engine) y devuelve la fila. Sin fixtures inventadas."""
     bank_gl = create_account(client, company_id=company["id"], code=f"11{tag}", name="Bancos", account_type="ASSET")
@@ -139,12 +139,16 @@ def _real_supplier_payment(client, db, *, company, supplier, amount, tag):
             "expenseAccountId": expense["id"], "payableAccountId": payable["id"],
             "currencyCode": "HNL", "amount": str(amount), "invoiceDate": "2026-09-01",
             "dueDate": "2026-09-30",
+            **({"supplierContractId": contract_id} if contract_id else {}),
         },
     ).json()
     client.post(f"/api/ap/supplier-invoices/{inv['id']}/approve")
     r = client.post(
         f"/api/ap/supplier-invoices/{inv['id']}/payments",
-        json={"treasuryAccountId": bank["id"], "amount": str(amount), "paymentDate": "2026-09-03"},
+        json={
+            "treasuryAccountId": bank["id"], "amount": str(amount), "paymentDate": "2026-09-03",
+            **({"contractOverrideReason": "Prueba explícita de asignación posterior"} if contract_id else {}),
+        },
     )
     assert r.status_code == 201, r.text
     return db.execute(
@@ -165,7 +169,7 @@ def test_partial_then_full_installment_via_allocations(client, db_session):
         if s.period_label == "Septiembre 2026"
     ][0]
 
-    p1 = _real_supplier_payment(client, db_session, company=company, supplier=supplier, amount="30000.00", tag="09")
+    p1 = _real_supplier_payment(client, db_session, company=company, supplier=supplier, amount="30000.00", tag="09", contract_id=contract["id"])
     cps.allocate_payment(
         db_session,
         supplier_payment_id=p1.id,
@@ -180,7 +184,7 @@ def test_partial_then_full_installment_via_allocations(client, db_session):
     assert after1.status == "PARTIALLY_PAID"
 
     # Sobrepago sobre el saldo -> bloqueado.
-    p2 = _real_supplier_payment(client, db_session, company=company, supplier=supplier, amount="20000.00", tag="19")
+    p2 = _real_supplier_payment(client, db_session, company=company, supplier=supplier, amount="20000.00", tag="19", contract_id=contract["id"])
     with pytest.raises(OverpaymentError):
         cps.allocate_payment(
             db_session,

@@ -159,7 +159,6 @@ export function ProjectContractsTab({ companyId, projectId }: { companyId: strin
                     treasuryAccounts={treasuryAccounts}
                     remaining={remaining}
                     selectedInstallmentId={nextInstallment?.installmentId}
-                    initialContractReferenceDate={nextInstallment?.dueDate ?? payableInvoice.dueDate}
                     label="Pagar próxima cuota"
                   />
                 ) : null}

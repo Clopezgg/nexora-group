@@ -353,6 +353,11 @@ def pay_supplier_invoice(
         evidence_ids=payment_evidence_ids,
     )
 
+    if contract_allocations and invoice.supplier_contract_id is None:
+        raise InvalidFinancialReferenceError(
+            "No se pueden enviar asignaciones contractuales para una factura sin contrato."
+        )
+
     if invoice.supplier_contract_id is not None and not contract_allocations:
         from app.services import contract_payment_service
         from app.models.supplier import SupplierContract
@@ -376,6 +381,13 @@ def pay_supplier_invoice(
                     "El contrato exige un plan de pagos MONTHLY/CUSTOM y todavía no "
                     "tiene ninguno. Crea el plan antes de pagar."
                 )
+
+    if contract_allocations and invoice.supplier_contract_id is not None:
+        from app.services import contract_payment_service
+        if contract_payment_service.resolve_schedule_for_invoice(db, invoice) is None:
+            raise InvalidFinancialReferenceError(
+                "La factura contractual no tiene un plan de pagos válido."
+            )
 
     supplier = db.get(Supplier, invoice.supplier_id)
     supplier_name = supplier.legal_name if supplier is not None else str(invoice.supplier_id)

@@ -292,10 +292,11 @@
  * ====================================================================== */
 :root[data-nx-family='sap-gui'] body .nx-app-shell {
   grid-template-columns: 224px minmax(0, 1fr);
-  grid-template-rows: 28px 25px minmax(0, 1fr) 24px;
+  grid-template-rows: 28px 25px 34px minmax(0, 1fr) 24px;
   grid-template-areas:
     'title title'
     'menu menu'
+    'command command'
     'sidebar main'
     'status status';
   height: 100dvh;
@@ -414,6 +415,27 @@
   background: linear-gradient(180deg, var(--nx-color-surface-raised), var(--nx-color-surface-sunken));
   border: 1px solid var(--nx-color-border);
 }
+/* El árbol Easy Access real usa divs (no <summary>): misma presencia con
+   especificidad a prueba de orden y color de texto AA sobre el sidebar. */
+:root[data-nx-family='sap-gui'] body .nx-sap-tree .nx-sidebar__group-label {
+  min-height: 24px;
+  margin: 0;
+  padding: 2px 5px;
+  color: var(--nx-color-text, #172e50);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, var(--nx-color-surface-raised, #ffffff), var(--nx-color-surface-sunken, #dfeaf3));
+  border: 1px solid var(--nx-color-border, #8e9eab);
+  cursor: pointer;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-tree .nx-sidebar__link--active {
+  color: var(--nx-shell-sidebar-active-text, #ffffff);
+  background: var(--nx-shell-sidebar-active-bg, #265b8f);
+  border-color: var(--nx-color-border-strong, #466dbd);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-tree .nx-sidebar__link--active .nx-icon { color: currentColor; }
 :root[data-nx-family='sap-gui'] body .nx-sidebar__group--collapsible > summary::after {
   content: '▸';
   order: -1;
@@ -439,9 +461,9 @@
   border-color: var(--nx-color-border);
 }
 :root[data-nx-family='sap-gui'] body .nx-sidebar__link--active {
-  color: var(--nx-shell-sidebar-active-text);
-  background: var(--nx-shell-sidebar-active-bg);
-  border-color: var(--nx-color-border-strong);
+  color: var(--nx-shell-sidebar-active-text, #ffffff);
+  background: var(--nx-shell-sidebar-active-bg, #265b8f);
+  border-color: var(--nx-color-border-strong, #466dbd);
 }
 :root[data-nx-family='sap-gui'] body .nx-sidebar__link--active::before { display: none; }
 :root[data-nx-family='sap-gui'] body .nx-sidebar__link--active .nx-icon { color: currentColor; }
@@ -520,7 +542,7 @@
 @media (max-width: 1024px) {
   :root[data-nx-family='sap-gui'] body .nx-app-shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'title' 'menu' 'main' 'status';
+    grid-template-areas: 'title' 'menu' 'command' 'main' 'status';
   }
   :root[data-nx-family='sap-gui'] body .nx-sidebar { display: none; }
   :root[data-nx-family='sap-gui'] body .nx-topbar__nav-toggle { display: inline-flex; }
@@ -698,4 +720,215 @@
 
   /* En móvil el "Salir" vive en el drawer, no permanente en la cabecera. */
   .nx-topbar__user { display: none; }
+}
+
+/* ========================================================================
+ * SAP GUI workstation — Phase 1 componentization.
+ * Menubar desplegable, command field, toolbar, screen frame y status bar
+ * enriquecida. Todo scoping exige data-nx-family='sap-gui': las familias
+ * modernas nunca reciben este chrome.
+ * ====================================================================== */
+:root[data-nx-family='sap-gui'] body .nx-sap-commandrow {
+  grid-area: command;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  background: var(--nx-color-surface-sunken);
+  border-bottom: 1px solid var(--nx-color-border-strong);
+  overflow: hidden;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__ok {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: #216635;
+  background: linear-gradient(180deg, #fff, var(--nx-color-surface-sunken));
+  border: 1px solid var(--nx-color-border-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__nav {
+  appearance: none;
+  width: 26px;
+  height: 24px;
+  color: var(--nx-color-text);
+  background: linear-gradient(180deg, #fff, var(--nx-color-surface-sunken));
+  border: 1px solid var(--nx-color-border);
+  font-size: 12px;
+  cursor: pointer;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__nav:hover {
+  border-color: var(--nx-color-accent);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__field {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__field input {
+  width: 100%;
+  height: 24px;
+  padding: 2px 6px;
+  color: var(--nx-color-text);
+  background: var(--nx-color-surface-raised);
+  border: 1px solid var(--nx-color-border-strong);
+  box-shadow: inset 1px 1px 2px rgba(24,42,83,.12);
+  font-family: Arial, Helvetica, system-ui, sans-serif;
+  font-size: 12px;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__results {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 320px;
+  margin: 0;
+  padding: 2px;
+  overflow: auto;
+  list-style: none;
+  background: var(--nx-color-surface-raised);
+  border: 1px solid var(--nx-color-border-strong);
+  box-shadow: 2px 3px 10px rgba(24,42,83,.38);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__results button {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--nx-color-text);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__option--active button,
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__results button:hover {
+  color: #fff;
+  background: var(--nx-color-accent);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__group {
+  color: var(--nx-color-text-muted);
+  font-size: 10px;
+  min-width: 110px;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__option--active .nx-sap-commandbar__group {
+  color: inherit;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__empty {
+  padding: 6px;
+  color: var(--nx-color-text-muted);
+  font-size: 12px;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 3px 6px;
+  border-left: 1px solid var(--nx-color-border);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-toolbar button {
+  appearance: none;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 6px;
+  color: var(--nx-color-text);
+  background: linear-gradient(180deg, #fff, var(--nx-color-surface-sunken));
+  border: 1px solid var(--nx-color-border);
+  font-size: 12px;
+  cursor: pointer;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-toolbar button:hover {
+  border-color: var(--nx-color-accent);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-toolbar__separator {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--nx-color-border);
+}
+/* Menubar con menús desplegables reales. */
+:root[data-nx-family='sap-gui'] body .nx-sap-menu { position: relative; display: flex; align-items: stretch; }
+:root[data-nx-family='sap-gui'] body .nx-sap-menu__button--open {
+  background: var(--nx-color-surface-raised);
+  border-color: var(--nx-color-border-strong);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-menu__list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 50;
+  min-width: 250px;
+  max-width: 340px;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  background: var(--nx-color-surface-raised);
+  border: 1px solid var(--nx-color-border-strong);
+  box-shadow: 2px 3px 10px rgba(24,42,83,.38);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-menu__list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--nx-color-text);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-menu__list button:hover,
+:root[data-nx-family='sap-gui'] body .nx-sap-menu__list button:focus-visible {
+  color: #fff;
+  background: var(--nx-color-accent);
+  outline: none;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-menu__hint {
+  color: var(--nx-color-text-muted);
+  font-size: 10px;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-menu__list button:hover .nx-sap-menu__hint { color: inherit; }
+/* Screen frame: título de screen + work area. */
+:root[data-nx-family='sap-gui'] body .nx-sap-screen { display: flex; flex-direction: column; min-height: 0; }
+:root[data-nx-family='sap-gui'] body .nx-sap-screen__header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 2px 0;
+  min-height: 0;
+  background: transparent;
+  border-bottom: 1px dotted var(--nx-color-border);
+  font-size: 11px;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-screen__title { font-size: 11px; font-weight: 700; color: var(--nx-color-text); }
+:root[data-nx-family='sap-gui'] body .nx-sap-screen__context { font-size: 11px; color: var(--nx-color-text-muted); }
+:root[data-nx-family='sap-gui'] body .nx-sap-screen__context::before { content: '· '; }
+:root[data-nx-family='sap-gui'] body .nx-sap-screen__workarea { min-width: 0; }
+/* Árbol: etiquetas de grupo interactivas con disclosure real. */
+:root[data-nx-family='sap-gui'] body .nx-sap-tree .nx-sidebar__group-label { cursor: pointer; }
+:root[data-nx-family='sap-gui'] body .nx-sap-tree .nx-sidebar__empty { padding: 6px 8px; font-size: 11px; color: var(--nx-color-text-muted); }
+@media (max-width: 760px) {
+  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar__group { display: none; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-toolbar button { min-width: 40px; min-height: 40px; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar__nav { min-width: 40px; min-height: 40px; }
 }

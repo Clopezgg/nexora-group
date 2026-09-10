@@ -1,28 +1,30 @@
 import { useMemo, useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import { useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { NavList } from './NavList'
 import { BottomNav } from './BottomNav'
 import { QuickCreate } from './QuickCreate'
+import { SapWorkstation } from './sap'
 import { filterNavGroups } from '../app/navigation'
 import { Button, CommandPalette, Drawer, type CommandItem } from '../design-system'
 import { useAuth } from '../features/auth/auth-context'
 import { useActiveCompany } from '../hooks/useActiveCompany'
-import { useActiveContext } from '../features/context/useActiveContext'
 import { useTheme } from '../theme/theme-context'
 import { globalSearch } from '../services/searchService'
 import './AppLayout.css'
 
+/**
+ * AppLayout: shell moderno por defecto; en la familia SAP GUI delega toda la
+ * composición visual a SapWorkstation (presentación), sin duplicar Router,
+ * Outlet, auth, permisos ni datos.
+ */
 export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
-  const { activeCompanyId, activeCompany } = useActiveCompany()
-  const { context } = useActiveContext()
+  const { activeCompanyId } = useActiveCompany()
   const { activeFamily } = useTheme()
   const { user, logout } = useAuth()
-  const navigate = useNavigate()
   const isSapGui = activeFamily === 'sap-gui'
   const visibleGroups = useMemo(() => filterNavGroups(user?.permissions), [user?.permissions])
 
@@ -53,22 +55,12 @@ export function AppLayout() {
     }
   }, [activeCompanyId])
 
+  if (isSapGui) {
+    return <SapWorkstation />
+  }
+
   return (
     <div className="nx-app-shell">
-      {isSapGui ? (
-        <>
-          <div className="nx-sap-titlebar">
-            <strong>NEXORA — Gestión empresarial</strong>
-            <span>{activeCompany?.name ?? 'Empresa no seleccionada'}</span>
-          </div>
-          <nav className="nx-sap-menubar" role="menubar" aria-label="Barra de menús SAP GUI">
-            <button role="menuitem" type="button" onClick={() => navigate('/inicio')}>Sistema</button>
-            <button role="menuitem" type="button" onClick={() => setMobileNavOpen(true)}>Navegar</button>
-            <button role="menuitem" type="button" onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}>Buscar</button>
-            <button role="menuitem" type="button" onClick={logout}>Salir</button>
-          </nav>
-        </>
-      ) : null}
       <Sidebar />
       <div className="nx-app-shell__main">
         <Topbar onOpenNav={() => setMobileNavOpen(true)} />
@@ -107,13 +99,6 @@ export function AppLayout() {
         </div>
       </Drawer>
       <CommandPalette items={commandItems} searchRemote={searchRemote} />
-      {isSapGui ? (
-        <div className="nx-sap-statusbar" role="status" aria-label="Contexto SAP GUI" aria-live="polite">
-          <span>{activeCompany?.name ?? 'Empresa no seleccionada'}</span>
-          <span>{context.activeProjectId ? 'Proyecto activo' : 'Vista empresa · sin proyecto'}</span>
-          <span>{user?.fullName ?? user?.email}</span>
-        </div>
-      ) : null}
     </div>
   )
 }

@@ -120,3 +120,29 @@ Full serial regression started against `nexora_test_nexora_group`, log `/tmp/nex
 > e2e, Compile Azure Bicep y Docker Compose smoke en CI. Ruleset `main protection
 > (ORDEN MAESTRA §42)` ahora exige los 5 gates reales (backend, frontend, e2e,
 > Compile Azure Bicep, Docker Compose smoke). PR #122 cerrado como SUPERSEDIDO.
+>
+> **Iteración 15 (2026-09-10) — verificación independiente sobre `origin/main`.**
+>
+> - HEAD verificado: `c7818a3f` (`origin/main` == HEAD, `git fetch` limpio).
+> - Referencia auditada: `dc58619c9cdfb8e4648eedd8fa4cba2200a9d4c8`; HEAD actual está
+>   +48 commits con integración completa de las tres fases.
+> - CI del SHA actual `c7818a3f`: run `34441305479` — **5/5 gates success**
+>   (backend, frontend, e2e, Compile Azure Bicep, Docker Compose smoke).
+> - Regresión backend local completa: **632 passed** en 12:32, log
+>   `/tmp/nexora-full-pytest-iter15.log`. Frontend local: typecheck + lint +
+>   **239 tests** + `npm run build` (PWA `v1.3.0`) verdes.
+> - Alembic: único head `b8c9d0e1f2a3`; `test_migrations.py` verde.
+> - Bicep: `az bicep build --file infra/main.bicep` verde (local).
+> - Producción Azure actual: despliegue verificado en **`a3cc6136`** (PR #121)
+>   por run `34373224543` (Deploy infra + apps success, smoke de producción
+>   completo: /api/healthz 200, /api/readyz 200, cookie Secure+HttpOnly, login,
+>   companies, projects, accounts, dashboard HNL, logout/relogin). Los SHA
+>   posteriores de `main` (PR #123–#127) son theme/frontend/docs/F3.8 y están
+>   CI-verdes pero no desplegados todavía.
+> - Sin migración nueva entre `a3cc6136` y `c7818a3f` (diff `backend/alembic/versions`
+>   vacío). `pre_migration_repairs` retirado del runtime path (F3.8, PR #125).
+> - Artefacto local preservado sin tocar: `backend/.backup_restore_test_nexora_group.dump`
+>   y el log de terminal `-a` (untracked, fuera de Git).
+> - Pendiente real para Fase 3 cierre: desplegar el SHA final de `main`
+>   (`c7818a3f`) y verificar smoke de producción de ESE SHA. Requiere confirmación
+>   explícita puntual (AGENTS.md §11) antes de ejecutar el deploy.

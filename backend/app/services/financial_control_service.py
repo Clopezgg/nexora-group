@@ -105,7 +105,10 @@ def daily_status(db: Session, *, company_id, as_of: date | None = None) -> Daily
     postings_today = db.execute(
         select(func.count(AccountingDocument.id))
         .where(AccountingDocument.company_id == company_id)
-        .where(func.date(AccountingDocument.posted_at) == as_of)
+        .where(
+            func.coalesce(AccountingDocument.effective_date, func.date(AccountingDocument.posted_at))
+            == as_of
+        )
     ).scalar_one()
 
     ap_due_today, ap_overdue = _ap_open_totals(db, company_id, as_of)

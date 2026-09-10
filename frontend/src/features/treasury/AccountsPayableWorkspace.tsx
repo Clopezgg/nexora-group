@@ -1,27 +1,22 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Badge, Button, Card, EmptyState, LoadingState, Select, Table, type TableColumn } from '../../design-system'
-import { masterDataService } from '../../services/masterDataService'
 import { apService, type PaymentProposalItem, type SupplierInvoice } from '../../services/apArService'
 import { treasuryService } from '../../services/treasuryService'
 import { formatMoney } from '../../utils/currency'
+import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { AccountsPayablePage } from './AccountsPayablePage'
 import { PaymentPlanModal } from './PaymentPlanModal'
 import { SupplierPaymentHistoryModal } from './SupplierPaymentHistoryModal'
 
 export function AccountsPayableWorkspace() {
   const queryClient = useQueryClient()
-  const [companyId, setCompanyId] = useState('')
   const [invoiceId, setInvoiceId] = useState('')
   const [historyInvoice, setHistoryInvoice] = useState<SupplierInvoice | null>(null)
   const [planInvoice, setPlanInvoice] = useState<SupplierInvoice | null>(null)
 
-  const companiesQuery = useQuery({
-    queryKey: ['master-data', 'companies'],
-    queryFn: masterDataService.listCompanies,
-  })
-  const companies = companiesQuery.data ?? []
-  const activeCompanyId = companyId || companies[0]?.id || ''
+  const { companies, activeCompanyId: selectedCompanyId, setActiveCompanyId, isLoading: companiesLoading } = useActiveCompany()
+  const activeCompanyId = selectedCompanyId ?? ''
 
   const invoicesQuery = useQuery({
     queryKey: ['ap', 'supplier-invoices', activeCompanyId],
@@ -53,7 +48,7 @@ export function AccountsPayableWorkspace() {
     },
   ]
 
-  if (companiesQuery.isLoading) return <LoadingState label="Cargando cuentas por pagar…" />
+  if (companiesLoading) return <LoadingState label="Cargando cuentas por pagar…" />
 
   return (
     <div className="nx-treasury">
@@ -98,7 +93,7 @@ export function AccountsPayableWorkspace() {
               label="Compañía"
               value={activeCompanyId}
               onChange={(event) => {
-                setCompanyId(event.target.value)
+                setActiveCompanyId(event.target.value)
                 setInvoiceId('')
               }}
             >

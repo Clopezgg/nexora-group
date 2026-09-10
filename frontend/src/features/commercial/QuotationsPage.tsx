@@ -14,6 +14,7 @@ import {
 } from '../../design-system'
 import type { TableColumn } from '../../design-system'
 import { formatMoney } from '../../utils/currency'
+import { businessTodayIso } from '../../utils/businessDate'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { crmService } from '../../services/crmService'
 import { projectService } from '../../services/projectService'
@@ -49,7 +50,7 @@ export function QuotationsPage() {
     mutationFn: (quotation: Quotation) =>
       crmService.convertQuotation(quotation.id, {
         contractNumber: `SC-${quotation.quotationNumber}`,
-        startDate: new Date().toISOString().slice(0, 10),
+        startDate: businessTodayIso(),
       }),
     onSuccess: invalidate,
   })

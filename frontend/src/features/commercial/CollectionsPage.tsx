@@ -27,6 +27,7 @@ import { projectService } from '../../services/projectService'
 import { treasuryService } from '../../services/treasuryService'
 import { formatMoney } from '../../utils/currency'
 import { statusLabel } from '../../utils/statusLabels'
+import { businessTodayIso } from '../../utils/businessDate'
 import type { TreasuryAccount } from '../../types/treasury'
 import '../treasury/TreasuryPage.css'
 
@@ -169,7 +170,7 @@ function CollectModal({ invoice, treasuryAccounts, onClose, onCollected }: {
   const remaining = invoice.amount - invoice.amountCollected
   const [treasuryAccountId, setTreasuryAccountId] = useState(eligible[0]?.id ?? '')
   const [amount, setAmount] = useState<number | null>(remaining)
-  const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10))
+  const [receiptDate, setReceiptDate] = useState(businessTodayIso())
 
   const collect = useMutation({
     mutationFn: () => arService.collect(

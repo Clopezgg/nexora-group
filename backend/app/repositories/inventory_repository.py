@@ -177,6 +177,12 @@ def get_physical_count(db: Session, physical_count_id: uuid.UUID) -> PhysicalCou
     return db.get(PhysicalCount, physical_count_id)
 
 
+def get_physical_count_for_update(db: Session, physical_count_id: uuid.UUID) -> PhysicalCount | None:
+    return db.execute(
+        select(PhysicalCount).where(PhysicalCount.id == physical_count_id).with_for_update()
+    ).scalar_one_or_none()
+
+
 def list_physical_count_lines(db: Session, physical_count_id: uuid.UUID) -> list[PhysicalCountLine]:
     stmt = select(PhysicalCountLine).where(PhysicalCountLine.physical_count_id == physical_count_id)
     return list(db.execute(stmt).scalars())

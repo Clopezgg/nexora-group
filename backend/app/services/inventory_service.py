@@ -340,9 +340,11 @@ def apply_physical_count(
     """Genera un ADJUSTMENT por cada línea con variance != 0 y marca el
     conteo como APPROVED. No se editan entradas previas del ledger -- una
     corrección siempre es una entrada nueva."""
-    count = inventory_repository.get_physical_count(db, physical_count_id)
+    count = inventory_repository.get_physical_count_for_update(db, physical_count_id)
     if count is None:
         raise ValueError(f"PhysicalCount {physical_count_id} no existe")
+    if count.status != "COUNTED":
+        raise ValueError(f"PhysicalCount {physical_count_id} no está listo para aprobarse")
     lines = inventory_repository.list_physical_count_lines(db, physical_count_id)
     for line in lines:
         variance = line.counted_quantity - line.expected_quantity

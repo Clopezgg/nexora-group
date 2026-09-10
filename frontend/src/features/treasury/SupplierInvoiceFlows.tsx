@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../auth/auth-context'
 import { useCompanyUsers } from '../../hooks/useCompanyUsers'
 import { useMutationError } from '../../hooks/useMutationError'
+import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { masterDataService } from '../../services/masterDataService'
 import { projectService } from '../../services/projectService'
 import { procurementService } from '../../services/procurementService'
@@ -66,18 +67,12 @@ const METHODS_REQUIRING_EVIDENCE = new Set<PaymentMethod>(['TRANSFER', 'DEPOSIT'
 export function AccountsPayablePage() {
   const queryClient = useQueryClient()
   const handleMutationError = useMutationError()
-  const [companyId, setCompanyId] = useState<string | null>(null)
   const [openCreate, setOpenCreate] = useState(false)
   const [submitInvoiceId, setSubmitInvoiceId] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState('')
   const [filterSupplier, setFilterSupplier] = useState('')
 
-  const companiesQuery = useQuery({
-    queryKey: ['master-data', 'companies'],
-    queryFn: masterDataService.listCompanies,
-  })
-  const companies = companiesQuery.data ?? []
-  const activeCompanyId = companyId ?? companies[0]?.id ?? null
+  const { companies, activeCompanyId, setActiveCompanyId, isLoading: companiesLoading } = useActiveCompany()
 
   const accountsQuery = useQuery({
     queryKey: ['master-data', 'accounts', activeCompanyId],
@@ -114,7 +109,7 @@ export function AccountsPayablePage() {
     onError: (error) => handleMutationError(error, 'Aprobar factura de proveedor'),
   })
 
-  if (companiesQuery.isLoading) return <LoadingState label="Cargando…" />
+  if (companiesLoading) return <LoadingState label="Cargando…" />
   if (companies.length === 0) {
     return (
       <EmptyState
@@ -178,7 +173,7 @@ export function AccountsPayablePage() {
           <h1 className="nx-dashboard__title">Cuentas por pagar</h1>
           <p className="nx-field__hint">Obligación → aprobación → pago → Tesorería/GL → evidencia → comprobante, sin duplicar el evento.</p>
         </div>
-        <Select value={activeCompanyId ?? ''} onChange={(e) => setCompanyId(e.target.value)} aria-label="Compañía">
+        <Select value={activeCompanyId ?? ''} onChange={(e) => setActiveCompanyId(e.target.value)} aria-label="Compañía">
           {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
         </Select>
       </header>

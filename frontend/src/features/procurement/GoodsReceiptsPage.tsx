@@ -14,6 +14,7 @@ import {
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { useMutationError } from '../../hooks/useMutationError'
+import { businessTodayIso } from '../../utils/businessDate'
 import { inventoryService } from '../../services/inventoryService'
 import { procurementService } from '../../services/procurementService'
 import type { PurchaseOrder } from '../../types/procurement'
@@ -25,7 +26,7 @@ export function GoodsReceiptsPage() {
   const handleMutationError = useMutationError()
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null)
   const [warehouseId, setWarehouseId] = useState<string | null>(null)
-  const [receivedAt, setReceivedAt] = useState(() => new Date().toISOString().slice(0, 10))
+  const [receivedAt, setReceivedAt] = useState(businessTodayIso)
   const queryClient = useQueryClient()
 
   const ordersQuery = useQuery({

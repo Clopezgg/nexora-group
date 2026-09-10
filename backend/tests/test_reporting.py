@@ -1,6 +1,8 @@
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 
+from app.models.accounting import AccountingDocument
 from app.models.permission import UserCompanyAccess
 from tests.helpers import (
     create_account,
@@ -120,6 +122,39 @@ def test_trial_balance_shows_a_normally_credit_account_in_the_credit_column(clie
     assert Decimal(revenue_row["debitBalance"]) == Decimal("0")
     assert Decimal(revenue_row["creditBalance"]) == Decimal("250.00")
     assert Decimal(body["totalDebit"]) == Decimal(body["totalCredit"]) == Decimal("250.00")
+
+
+def test_reports_use_effective_date_and_exclude_non_effective_documents(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    cash = create_account(client, company_id=company["id"], code="1000", name="Caja", account_type="ASSET")
+    revenue = create_account(client, company_id=company["id"], code="4000", name="Ingresos", account_type="REVENUE")
+    posting = client.post(
+        "/api/accounting/journal-entries",
+        json={
+            "companyId": company["id"], "scope": "GENERAL", "currencyCode": "HNL",
+            "effectiveDate": "2026-08-31",
+            "lines": [{"accountId": cash["id"], "debitAmount": "125.00"}, {"accountId": revenue["id"], "creditAmount": "125.00"}],
+        },
+    )
+    assert posting.status_code == 201, posting.text
+    document = db_session.get(AccountingDocument, posting.json()["id"])
+    document.status = "DRAFT"
+    db_session.commit()
+    # The non-effective document must not contaminate trial balance/account balances.
+    trial = client.get(f"/api/reports/trial-balance?companyId={company['id']}")
+    assert trial.status_code == 200
+    assert trial.json()["rows"] == []
+    from app.services import treasury_service
+    assert treasury_service.account_balance(db_session, gl_account_id=uuid.UUID(cash["id"])) == Decimal("0")
+
+    document.status = "POSTED"
+    document.posted_at = datetime(2026, 9, 2, tzinfo=timezone.utc)
+    db_session.commit()
+    august = client.get(f"/api/reports/income-statement?companyId={company['id']}&dateFrom=2026-08-01&dateTo=2026-08-31")
+    september = client.get(f"/api/reports/income-statement?companyId={company['id']}&dateFrom=2026-09-01&dateTo=2026-09-30")
+    assert Decimal(august.json()["totalRevenue"]) == Decimal("125.00")
+    assert Decimal(september.json()["totalRevenue"]) == Decimal("0")
 
 
 def test_trial_balance_never_returns_another_companys_accounts(client, db_session):

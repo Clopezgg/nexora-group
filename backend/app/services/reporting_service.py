@@ -6,7 +6,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.accounting import AccountingDocument, JournalLine
+from app.models.accounting import AccountingDocument, JournalLine, LEDGER_EFFECTIVE_STATUSES
 from app.models.chart_of_accounts import Account, ChartOfAccount
 from app.models.procurement import (
     GoodsReceipt,
@@ -33,7 +33,12 @@ docs/superpowers/specs/2026-08-25-financial-statements-design.md (Cash
 Flow salió de "fuera de alcance" el 2026-08-25, ver cash_flow_statement
 más abajo)."""
 
-_LEDGER_STATUSES = ("POSTED", "REVERSED")
+_LEDGER_STATUSES = LEDGER_EFFECTIVE_STATUSES
+
+
+def _economic_date_col():
+    """Fecha económica canónica; `posted_at` solo es fallback legacy."""
+    return func.coalesce(AccountingDocument.effective_date, func.date(AccountingDocument.posted_at))
 
 
 @dataclass
@@ -69,7 +74,11 @@ def trial_balance(db: Session, *, company_id: uuid.UUID) -> TrialBalanceReport:
             func.coalesce(func.sum(JournalLine.credit_amount), Decimal("0")).label("total_credit"),
         )
         .join(JournalLine, JournalLine.account_id == Account.id, isouter=True)
-        .where(Account.chart_of_account_id == chart.id)
+        .join(AccountingDocument, AccountingDocument.id == JournalLine.accounting_document_id, isouter=True)
+        .where(
+            Account.chart_of_account_id == chart.id,
+            (AccountingDocument.status.in_(_LEDGER_STATUSES) | AccountingDocument.id.is_(None)),
+        )
         .group_by(Account.id, Account.code, Account.name)
         .order_by(Account.code)
     ).all()
@@ -227,9 +236,9 @@ def _activity_query(
         .order_by(Account.code)
     )
     if date_from is not None:
-        query = query.where(func.date(AccountingDocument.posted_at) >= date_from)
+        query = query.where(_economic_date_col() >= date_from)
     if date_to is not None:
-        query = query.where(func.date(AccountingDocument.posted_at) <= date_to)
+        query = query.where(_economic_date_col() <= date_to)
     if account_id is not None:
         query = query.where(Account.id == account_id)
     return query
@@ -322,9 +331,9 @@ def general_ledger(
         AccountingDocument.status.in_(_LEDGER_STATUSES),
     ]
     if date_from is not None:
-        filters.append(func.date(AccountingDocument.posted_at) >= date_from)
+        filters.append(_economic_date_col() >= date_from)
     if date_to is not None:
-        filters.append(func.date(AccountingDocument.posted_at) <= date_to)
+        filters.append(_economic_date_col() <= date_to)
     if account_id is not None:
         filters.append(Account.id == account_id)
 
@@ -352,7 +361,7 @@ def general_ledger(
 
     detail = db.execute(
         base.order_by(
-            AccountingDocument.posted_at, AccountingDocument.document_number, JournalLine.id
+            _economic_date_col(), AccountingDocument.document_number, JournalLine.id
         )
         .offset(offset)
         .limit(limit)

@@ -7,6 +7,7 @@ import { crmService } from '../../services/crmService'
 import { masterDataService } from '../../services/masterDataService'
 import type { SalesContract } from '../../types/crm'
 import { formatMoney } from '../../utils/currency'
+import { businessTodayIso } from '../../utils/businessDate'
 
 export function SalesContractsPage() {
   const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
@@ -120,8 +121,8 @@ function BillSalesContractModal({
     mutationFn: () =>
       crmService.billSalesContract(contract.id, {
         invoiceNumber,
-        invoiceDate: new Date().toISOString().slice(0, 10),
-        dueDate: new Date().toISOString().slice(0, 10),
+        invoiceDate: businessTodayIso(),
+        dueDate: businessTodayIso(),
         revenueAccountId,
         receivableAccountId,
       }),

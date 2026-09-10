@@ -397,6 +397,7 @@ def record_goods_receipt(
                 unit_cost=po_line.unit_price,
                 source_type="goods_receipt",
                 source_id=receipt.id,
+                commit=False,
             )
 
     all_lines = procurement_repository.list_purchase_order_lines(db, purchase_order_id)

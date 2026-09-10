@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -406,11 +407,23 @@ def create_physical_count(
         db, company_id=payload.company_id, warehouse_id=payload.warehouse_id, count_date=payload.count_date
     )
     for line in payload.lines:
+        inventory_service._lock_stock_position(
+            db,
+            company_id=payload.company_id,
+            item_id=line.item_id,
+            warehouse_id=payload.warehouse_id,
+        )
+        snapshot = inventory_repository.get_last_ledger_entry(
+            db,
+            company_id=payload.company_id,
+            item_id=line.item_id,
+            warehouse_id=payload.warehouse_id,
+        )
         inventory_repository.add_physical_count_line(
             db,
             physical_count_id=count.id,
             item_id=line.item_id,
-            expected_quantity=line.expected_quantity,
+            expected_quantity=snapshot.resulting_qty_on_hand if snapshot is not None else Decimal("0"),
             counted_quantity=line.counted_quantity,
         )
     count.status = "COUNTED"

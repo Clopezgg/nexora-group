@@ -203,6 +203,21 @@ describe('Enterprise Theme Architecture (§8-§11, §20)', () => {
     }
   })
 
+  it('el texto de acción "limpiar filtros" usa el accent-hover del tema y cumple 4.5:1 (regresión Axe CI)', () => {
+    // `.nx-filter-bar__clear` debe leer un azul del tema legible sobre el fondo sunken de la
+    // cinta de filtros en cada variante SAP GUI (el accent de las variantes claras no llega a 4.5:1).
+    for (const id of ['sap-gui-signature', 'sap-gui-tradeshow', 'sap-gui-horizon', 'sap-gui-horizon-dark']) {
+      const preset = getThemePreset(id)
+      const fg = preset.palette.accentHover
+      const bg = preset.palette.surfaceSunken
+      const ratio = contrastRatio(fg, bg)
+      expect(
+        ratio,
+        `${id}: accent-hover (#${fg}) sobre surface-sunken (#${bg}) = ${ratio.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
   it('el default sigue siendo NEXORA Horizon y es el primer preset', () => {
     expect(DEFAULT_THEME_ID).toBe('nexora-horizon-light')
     expect(THEME_PRESETS[0].id).toBe(DEFAULT_THEME_ID)

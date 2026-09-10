@@ -3,10 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderApp } from './testUtils'
 
-function stubFetch({ themeId = null, density = null, companyThemeId = null }: {
+function stubFetch({ themeId = null, density = null, companyThemeId = null, companies }: {
   themeId?: string | null
   density?: string | null
   companyThemeId?: string | null
+  companies?: Array<{ id: string; name: string; defaultThemeId: string | null; defaultDensity: string | null }>
 } = {}) {
   const puts: string[] = []
   vi.stubGlobal(
@@ -28,7 +29,7 @@ function stubFetch({ themeId = null, density = null, companyThemeId = null }: {
         return Promise.resolve({
           ok: true,
           status: 200,
-          json: async () => [
+          json: async () => companies ?? [
             { id: 'c1', name: 'Constructora Nexora', code: 'NX', functionalCurrencyCode: 'HNL', defaultThemeId: companyThemeId, defaultDensity: null },
           ],
         } as Response)
@@ -183,5 +184,20 @@ describe('ThemeSettingsCard', () => {
 
     await waitFor(() => expect(puts.length).toBeGreaterThan(0))
     expect(JSON.parse(puts[0])).toMatchObject({ themeId })
+  })
+
+  it('inherits the active company theme instead of the first company theme', async () => {
+    stubFetch({ companies: [
+      { id: 'c1', name: 'A', defaultThemeId: 'nexora-horizon-light', defaultDensity: null },
+      { id: 'c2', name: 'B', defaultThemeId: 'sap-gui-signature', defaultDensity: 'compact' },
+    ] })
+    const user = userEvent.setup()
+    render(renderApp('/control/configuracion'))
+    await screen.findByText('Apariencia (Theme Engine)')
+
+    const company = await screen.findByLabelText('Empresa activa')
+    await user.selectOptions(company, 'c2')
+    await waitFor(() => expect(document.documentElement.dataset.nxTheme).toBe('sap-gui-signature'))
+    expect(document.documentElement.dataset.nxDensity).toBe('compact')
   })
 })

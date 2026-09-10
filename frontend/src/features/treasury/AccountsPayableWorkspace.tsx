@@ -132,7 +132,7 @@ export function AccountsPayableWorkspace() {
                 disabled={!selectedInvoice}
                 onClick={() => selectedInvoice && setPlanInvoice(selectedInvoice)}
               >
-                Plan de pago / cuotas
+                Calendario previsto (forecast)
               </Button>
             </div>
           </div>

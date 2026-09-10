@@ -122,8 +122,12 @@ class SupplierPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     payment_observations: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
-class SupplierInvoicePaymentPlanItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Cuota de un plan de pago de una factura de proveedor."""
+class SupplierInvoiceCashForecastItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Forecast-only due-date bucket for a non-contract AP invoice.
+
+    This is not an executable contractual installment. Actual contractual
+    payment obligations are owned by ContractPaymentSchedule instead.
+    """
 
     __tablename__ = "supplier_invoice_payment_plan_items"
     __table_args__ = (
@@ -138,3 +142,8 @@ class SupplierInvoicePaymentPlanItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+# Backward-compatible import name for existing integrations. Keeping the alias
+# avoids a schema/API migration while making the runtime semantic explicit.
+SupplierInvoicePaymentPlanItem = SupplierInvoiceCashForecastItem

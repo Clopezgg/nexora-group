@@ -15,10 +15,19 @@ interface DraftRow {
   amount: string
 }
 
+function toCents(value: string | number): bigint {
+  const raw = typeof value === 'number' ? value.toFixed(2) : value.trim()
+  const [whole, fraction = ''] = raw.split('.')
+  return BigInt(whole || '0') * 100n + BigInt(fraction.padEnd(2, '0').slice(0, 2))
+}
+
+function fromCents(value: bigint): string {
+  return `${value / 100n}.${String(value % 100n).padStart(2, '0')}`
+}
+
 /**
- * Plan de pago / cuotas de una factura de proveedor (orden maestra Phase 2).
- * La suma de las cuotas debe igualar el total de la factura; el backend es la
- * autoridad — aquí solo se previsualiza para dar feedback inmediato.
+ * Calendario previsto de flujo de caja de una factura AP no contractual.
+ * No ejecuta pagos ni sustituye ContractPaymentSchedule.
  */
 export function PaymentPlanModal({
   invoice,
@@ -30,7 +39,7 @@ export function PaymentPlanModal({
   onSaved: () => void
 }) {
   const handleMutationError = useMutationError()
-  const total = Number(invoice.amount) + Number(invoice.taxAmount ?? 0)
+  const totalCents = toCents(invoice.amount) + toCents(invoice.taxAmount ?? 0)
 
   const planQuery = useQuery({
     queryKey: ['ap', 'payment-plan', invoice.id],
@@ -46,8 +55,10 @@ export function PaymentPlanModal({
     return [{ dueDate: '', amount: '' }]
   }, [rows, planQuery.data])
 
-  const draftTotal = draft.reduce((acc, row) => acc + (Number(row.amount) || 0), 0)
-  const balanced = Math.abs(draftTotal - total) < 0.005
+  const draftTotalCents = draft.reduce((acc, row) => {
+    try { return acc + toCents(row.amount) } catch { return acc }
+  }, 0n)
+  const balanced = draftTotalCents === totalCents
   const editable = ['APPROVED', 'SCHEDULED'].includes(invoice.status) && Number(invoice.amountPaid ?? 0) === 0
 
   const save = useMutation({
@@ -73,10 +84,10 @@ export function PaymentPlanModal({
   ]
 
   return (
-    <Modal open title={`Plan de pago · ${invoice.invoiceNumber}`} onClose={onClose}>
+    <Modal open title={`Calendario previsto · ${invoice.invoiceNumber}`} onClose={onClose}>
       <p className="nx-field__hint">
-        Total de la factura: <strong>{formatMoney(total, invoice.currencyCode)}</strong>. La suma de
-        las cuotas debe coincidir exactamente.
+        Forecast informativo: total de la factura <strong>{formatMoney(fromCents(totalCents), invoice.currencyCode)}</strong>.
+        Este calendario no autoriza ni asigna pagos.
       </p>
 
       {planQuery.isLoading ? (
@@ -128,15 +139,15 @@ export function PaymentPlanModal({
             Añadir cuota
           </Button>
           <p className={balanced ? 'nx-field__hint' : 'nx-field__error'} role={balanced ? undefined : 'alert'}>
-            Suma de cuotas: {formatMoney(draftTotal, invoice.currencyCode)}{' '}
-            {balanced ? '· coincide' : `· debe ser ${formatMoney(total, invoice.currencyCode)}`}
+            Suma de cuotas: {formatMoney(fromCents(draftTotalCents), invoice.currencyCode)}{' '}
+            {balanced ? '· coincide' : `· debe ser ${formatMoney(fromCents(totalCents), invoice.currencyCode)}`}
           </p>
           <Button
             loading={save.isPending}
             disabled={!balanced || draft.some((row) => !row.dueDate || !row.amount)}
             onClick={() => save.mutate()}
           >
-            Guardar plan de pago
+            Guardar calendario previsto
           </Button>
         </div>
       ) : (

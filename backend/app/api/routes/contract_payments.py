@@ -39,7 +39,9 @@ def _schedule_or_404(db: Session, schedule_id: uuid.UUID) -> ContractPaymentSche
     return schedule
 
 
-def _installments_payload(db: Session, schedule_id: uuid.UUID) -> list[InstallmentResponse]:
+def _installments_payload(
+    db: Session, schedule_id: uuid.UUID, *, as_of: date | None = None
+) -> list[InstallmentResponse]:
     return [
         InstallmentResponse(
             installment_id=s.installment_id,
@@ -58,11 +60,13 @@ def _installments_payload(db: Session, schedule_id: uuid.UUID) -> list[Installme
             regular_number=s.regular_number,
             regular_count=s.regular_count,
         )
-        for s in cps.installment_summaries(db, schedule_id=schedule_id)
+        for s in cps.installment_summaries(db, schedule_id=schedule_id, as_of=as_of)
     ]
 
 
-def _schedule_payload(db: Session, schedule: ContractPaymentSchedule) -> ScheduleResponse:
+def _schedule_payload(
+    db: Session, schedule: ContractPaymentSchedule, *, as_of: date | None = None
+) -> ScheduleResponse:
     return ScheduleResponse(
         id=schedule.id,
         company_id=schedule.company_id,
@@ -73,7 +77,7 @@ def _schedule_payload(db: Session, schedule: ContractPaymentSchedule) -> Schedul
         due_day=schedule.due_day,
         total_scheduled=schedule.total_scheduled,
         status=schedule.status,
-        installments=_installments_payload(db, schedule.id),
+        installments=_installments_payload(db, schedule.id, as_of=as_of),
     )
 
 
@@ -232,6 +236,7 @@ def fifo_preview(
 @router.get("/by-contract/{contract_id}", response_model=ScheduleResponse)
 def get_by_contract(
     contract_id: uuid.UUID,
+    as_of: date | None = Query(default=None, alias="asOf"),
     db: Session = Depends(get_db),
     user=Depends(require_permission("contract.payment_schedule", "read")),
 ) -> ScheduleResponse:
@@ -246,7 +251,7 @@ def get_by_contract(
         db, user_id=user.id, resource="contract.payment_schedule", action="read",
         company_id=schedule.company_id,
     )
-    return _schedule_payload(db, schedule)
+    return _schedule_payload(db, schedule, as_of=as_of)
 
 
 class AdvanceInvoiceRequest(CamelModel):

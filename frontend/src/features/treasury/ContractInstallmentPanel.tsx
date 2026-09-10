@@ -104,7 +104,7 @@ export function ContractInstallmentPanel({
     const rows: ContractAllocationDraft[] = []
     for (const installment of ordered) {
       if (left <= 0n) break
-      if (installment.status === 'CANCELLED') continue
+      if (['CANCELLED', 'PAID', 'UPCOMING'].includes(installment.status)) continue
       const remainingCents = toCents(installment.remaining)
       if (remainingCents <= 0n) continue
       const applied = left < remainingCents ? left : remainingCents
@@ -147,7 +147,9 @@ export function ContractInstallmentPanel({
     { key: 'rem', header: 'Pendiente', numeric: true, render: (r) => formatMoney(r.remaining, currency) },
     { key: 'status', header: 'Estado', render: (r) => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'}>{contractInstallmentStatusLabel(r.status)}</Badge> },
     {
-      key: 'pick', header: '', render: (r) => r.status === 'PAID' || r.status === 'CANCELLED' ? null : (
+      key: 'pick', header: '', render: (r) => ['PAID', 'CANCELLED', 'UPCOMING'].includes(r.status) ? (
+        r.status === 'UPCOMING' ? <span className="nx-field__hint">Disponible para pago en {r.periodLabel}</span> : null
+      ) : (
         <Button variant={r.installmentId === primaryId ? 'secondary' : 'ghost'} onClick={() => setManualId(r.installmentId)}>
           {r.installmentId === primaryId ? 'Seleccionada' : 'Aplicar a esta'}
         </Button>

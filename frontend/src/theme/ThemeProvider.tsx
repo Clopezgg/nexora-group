@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { preferencesService } from '../services/preferencesService'
-import { masterDataService } from '../services/masterDataService'
 import { useAuth } from '../features/auth/auth-context'
+import { useActiveCompany } from '../hooks/useActiveCompany'
 import { ThemeContext, type ThemeContextValue } from './theme-context'
 import {
   compileTheme,
@@ -66,6 +66,7 @@ function applyToDom(themeId: string, density: Density, scale: UiScale) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const { activeCompany } = useActiveCompany()
 
   const prefsQuery = useQuery({
     queryKey: ['me', 'preferences'],
@@ -73,20 +74,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     staleTime: 5 * 60 * 1000,
     enabled: Boolean(user),
   })
-  const companiesQuery = useQuery({
-    queryKey: ['master-data', 'companies'],
-    queryFn: masterDataService.listCompanies,
-    staleTime: 5 * 60 * 1000,
-    enabled: Boolean(user),
-  })
-
   const [preview, setPreviewState] = useState<{ themeId: string | null; density: Density | null } | null>(null)
   const [uiScale, setUiScaleState] = useState<UiScale>(() => readUiScale())
 
   const userThemeId = prefsQuery.data?.themeId ?? null
   const userDensity = (prefsQuery.data?.density as Density | null) ?? null
-  const companyThemeId = companiesQuery.data?.[0]?.defaultThemeId ?? null
-  const companyDensity = (companiesQuery.data?.[0]?.defaultDensity as Density | null) ?? null
+  const companyThemeId = activeCompany?.defaultThemeId ?? null
+  const companyDensity = (activeCompany?.defaultDensity as Density | null) ?? null
 
   const activeThemeId = preview?.themeId ?? userThemeId ?? companyThemeId ?? DEFAULT_THEME_ID
   const activeDensity: Density =

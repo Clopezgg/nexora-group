@@ -93,7 +93,8 @@ class ContractSummary:
 
 @dataclass(frozen=True)
 class LedgerAllocationRow:
-    payment_id: uuid.UUID
+    source_type: str
+    source_id: uuid.UUID
     payment_date: date
     installment_sequence: int
     installment_period_label: str
@@ -815,7 +816,8 @@ def contract_payment_ledger(
     """Libro contractual de pagos (§54): por cada contrato con plan, sus
     cuotas con estado real + las asignaciones de pago que las liquidaron.
     Solo lectura; no toca contabilidad."""
-    from app.models.ap import SupplierInvoice, SupplierPayment
+    from app.models.ap import SupplierPayment
+    from app.models.treasury import GeneralExpense
 
     as_of = as_of or business_today()
     q = (
@@ -839,30 +841,41 @@ def contract_payment_ledger(
 
         alloc_rows = list(
             db.execute(
-                select(ContractPaymentAllocation, SupplierPayment)
-                .join(
+                select(ContractPaymentAllocation, SupplierPayment, GeneralExpense)
+                .outerjoin(
                     SupplierPayment,
                     SupplierPayment.id == ContractPaymentAllocation.supplier_payment_id,
+                )
+                .outerjoin(
+                    GeneralExpense,
+                    GeneralExpense.id == ContractPaymentAllocation.general_expense_id,
                 )
                 .where(
                     ContractPaymentAllocation.installment_id.in_(list(by_installment.keys()))
                 )
-                .order_by(SupplierPayment.payment_date, ContractPaymentAllocation.applied_at)
+                .order_by(ContractPaymentAllocation.applied_at)
             ).all()
         ) if by_installment else []
 
-        allocations = [
-            LedgerAllocationRow(
-                payment_id=payment.id,
-                payment_date=payment.payment_date,
-                installment_sequence=by_installment[alloc.installment_id].sequence,
-                installment_period_label=by_installment[alloc.installment_id].period_label,
-                amount_applied=_q(alloc.amount_applied),
-                bank_transaction_reference=payment.bank_transaction_reference,
-                reversed=alloc.reversed_at is not None,
+        allocations = []
+        for alloc, payment, general_expense in alloc_rows:
+            source = payment or general_expense
+            if source is None:
+                continue
+            allocations.append(
+                LedgerAllocationRow(
+                    source_type="SUPPLIER_PAYMENT" if payment is not None else "GENERAL_EXPENSE",
+                    source_id=source.id,
+                    payment_date=(payment.payment_date if payment is not None else general_expense.expense_date),
+                    installment_sequence=by_installment[alloc.installment_id].sequence,
+                    installment_period_label=by_installment[alloc.installment_id].period_label,
+                    amount_applied=_q(alloc.amount_applied),
+                    bank_transaction_reference=(
+                        payment.bank_transaction_reference if payment is not None else None
+                    ),
+                    reversed=alloc.reversed_at is not None,
+                )
             )
-            for alloc, payment in alloc_rows
-        ]
 
         entries.append(
             ContractLedgerEntry(

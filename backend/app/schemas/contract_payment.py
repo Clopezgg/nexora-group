@@ -94,7 +94,8 @@ class FifoPreviewItem(CamelModel):
 
 
 class LedgerAllocationResponse(CamelModel):
-    payment_id: uuid.UUID
+    source_type: str
+    source_id: uuid.UUID
     payment_date: date
     installment_sequence: int
     installment_period_label: str

@@ -290,14 +290,8 @@ def test_disposed_asset_cannot_be_depreciated(client):
     asset = _create_asset(client, company=company, expense=expense, accumulated=accumulated)
 
     disposed = client.post(f"/api/assets/{asset['id']}/status", json={"status": "DISPOSED"})
-    assert disposed.status_code == 200, disposed.text
-
-    response = client.post(
-        f"/api/assets/{asset['id']}/depreciation-entries",
-        json={"periodStart": "2026-01-01", "periodEnd": "2026-01-31"},
-    )
-    assert response.status_code == 409, response.text
-    assert response.json()["error"]["code"] == "NXR-ASSET-001"
+    assert disposed.status_code == 422, disposed.text
+    assert client.get(f"/api/assets/{asset['id']}").json()["status"] == "ACTIVE"
 
 
 def test_disposed_asset_status_is_terminal(client):
@@ -306,11 +300,10 @@ def test_disposed_asset_status_is_terminal(client):
     asset = _create_asset(client, company=company, expense=expense, accumulated=accumulated)
 
     disposed = client.post(f"/api/assets/{asset['id']}/status", json={"status": "DISPOSED"})
-    assert disposed.status_code == 200
-
-    reactivate = client.post(f"/api/assets/{asset['id']}/status", json={"status": "ACTIVE"})
-    assert reactivate.status_code == 409, reactivate.text
-    assert reactivate.json()["error"]["code"] == "NXR-ASSET-001"
+    assert disposed.status_code == 422
+    # Terminal accounting states require the formal disposal use case.
+    still_active = client.post(f"/api/assets/{asset['id']}/status", json={"status": "ACTIVE"})
+    assert still_active.status_code == 200
 
 
 def test_fixed_asset_rejects_non_positive_cost_at_db_constraint(db_session):

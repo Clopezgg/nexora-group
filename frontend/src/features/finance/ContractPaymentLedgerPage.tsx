@@ -66,7 +66,8 @@ export function ContractPaymentLedgerPage() {
   ]
 
   const allocationColumns: TableColumn<LedgerAllocation>[] = [
-    { key: 'paymentDate', header: 'Fecha de pago', render: (row) => row.paymentDate },
+    { key: 'paymentDate', header: 'Fecha económica', render: (row) => row.paymentDate },
+    { key: 'sourceType', header: 'Origen', render: (row) => row.sourceType === 'GENERAL_EXPENSE' ? 'Gasto general' : 'Pago a proveedor' },
     { key: 'installmentPeriodLabel', header: 'Cuota liquidada', render: (row) => row.installmentPeriodLabel },
     { key: 'amountApplied', header: 'Importe aplicado', render: (row) => formatMoney(row.amountApplied, currency) },
     {
@@ -161,7 +162,7 @@ export function ContractPaymentLedgerPage() {
                 <Table
                   columns={allocationColumns}
                   rows={entry.allocations}
-                  getRowKey={(row) => `${row.paymentId}-${row.installmentSequence}`}
+                  getRowKey={(row) => `${row.sourceType}-${row.sourceId}-${row.installmentSequence}`}
                   emptyMessage="Todavía no se ha aplicado ningún pago a este contrato."
                 />
               </Card>

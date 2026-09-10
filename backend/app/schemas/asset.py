@@ -67,7 +67,9 @@ class SupplierInvoiceAssetCreateRequest(CamelModel):
 
 
 class AssetStatusChangeRequest(CamelModel):
-    status: Literal["ACTIVE", "UNDER_MAINTENANCE", "DISPOSED", "RETIRED"]
+    # Los estados terminales contables solo se alcanzan mediante /dispose,
+    # que genera el asiento DIS y deja evidencia de la disposición.
+    status: Literal["ACTIVE", "UNDER_MAINTENANCE"]
 
 
 class DepreciationEntryCreateRequest(CamelModel):

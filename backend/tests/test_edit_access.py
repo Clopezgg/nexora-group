@@ -82,6 +82,15 @@ def test_protected_edit_classifies_sensitive_post_actions_not_login_or_read():
     assert _requires_protected_edit("POST", "/api/accounting/x/reverse")
 
 
+def test_sensitive_business_commands_are_protected_across_modules():
+    for command in (
+        "approve", "payments", "receipts", "cancel", "send", "reconcile",
+        "dispose", "receive", "issue-to-project", "transfer", "hard-close",
+    ):
+        assert _requires_protected_edit("POST", f"/api/module/x/{command}")
+    assert not _requires_protected_edit("POST", "/api/module")
+
+
 def test_edit_pin_verifies_only_against_the_configured_digest():
     """El PIN se compara SOLO contra el digest PBKDF2 configurado. Acepta
     tanto un PIN corto (p.ej. 6 dígitos) como un secreto largo."""

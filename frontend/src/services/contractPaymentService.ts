@@ -87,7 +87,8 @@ export interface FifoPreviewItem {
 }
 
 export interface LedgerAllocation {
-  paymentId: string
+  sourceType: 'SUPPLIER_PAYMENT' | 'GENERAL_EXPENSE'
+  sourceId: string
   paymentDate: string
   installmentSequence: number
   installmentPeriodLabel: string

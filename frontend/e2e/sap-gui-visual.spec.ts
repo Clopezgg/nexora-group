@@ -38,22 +38,32 @@ async function ensureCompany(request: APIRequestContext) {
 }
 
 async function setTheme(page: Page, themeId: string) {
-  const result = await page.evaluate(async (id) => {
-    const response = await fetch('/api/me/preferences', {
-      method: 'PUT',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ themeId: id, density: 'compact' }),
-    })
-    return { ok: response.ok, status: response.status }
-  }, themeId)
-  expect(result.ok, `PUT preferencias -> ${result.status}`).toBeTruthy()
+  await page.goto('/control/configuracion')
+  await page.getByLabel('Familia').selectOption('sap-gui')
+  const confirmBtn = page.getByRole('button', { name: 'Cambiar a SAP GUI' })
+  if (await confirmBtn.isVisible().catch(() => false)) {
+    await page.getByRole('dialog', { name: 'Cambiar a SAP GUI' }).waitFor()
+    await confirmBtn.click()
+    await expect(page.locator('html')).toHaveAttribute('data-nx-family', 'sap-gui')
+  }
+  await page.getByLabel('Variante').selectOption(themeId)
+  await expect(page.locator('html')).toHaveAttribute('data-nx-theme', themeId)
+  await page.getByRole('button', { name: 'Guardar como mi preferencia' }).click()
   await page.reload()
   await expect.poll(() => page.locator('html').getAttribute('data-nx-theme')).toBe(themeId)
 }
 
+async function unlockProtectedEdit(page: Page) {
+  await page.getByRole('button', { name: 'Edición protegida' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Desbloquear edición' })
+  await dialog.getByLabel('Token de seguridad').fill(process.env.E2E_EDIT_ACCESS_TOKEN!)
+  await dialog.getByRole('button', { name: 'Desbloquear', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+}
+
 test('SAP GUI visual baselines', async ({ page }) => {
   await login(page)
+  await unlockProtectedEdit(page)
   await ensureCompany(page.request)
 
   for (const variant of VARIANTS) {

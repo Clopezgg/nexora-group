@@ -111,8 +111,9 @@ test('SAP GUI confirmation, variants and representative routes use one global sh
   await expect(page.getByRole('tree', { name: 'Navegación principal' })).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect(page.getByRole('button', { name: 'Abrir navegación' })).toBeVisible()
-  await page.getByRole('button', { name: 'Abrir navegación' }).click()
+  const navButton = page.locator('.nx-sap-toolbar button[aria-label="Abrir navegación"]')
+  await expect(navButton).toBeVisible()
+  await navButton.click()
   await expect(page.getByRole('dialog', { name: 'Navegación' })).toBeVisible()
   const viewport = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,

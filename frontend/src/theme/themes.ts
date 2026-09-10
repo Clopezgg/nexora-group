@@ -661,7 +661,8 @@ export const THEME_PRESETS: ThemePreset[] = [
       positive: '#216635', negative: '#a12121', warning: '#8a5200', info: '#265b8f',
     },
     shell: {
-      style: 'tinted', sidebarBg: '#dfeaf3', sidebarText: '#182a53', sidebarActiveBg: '#668db5',
+      // Active AA: blanco sobre #2f537e ≈ 8:1 (el #668db5 clásico daba 3.5:1).
+      style: 'tinted', sidebarBg: '#dfeaf3', sidebarText: '#182a53', sidebarActiveBg: '#2f537e',
       sidebarActiveText: '#ffffff', topbarBg: '#c3ccd7', topbarText: '#182a53', topbarBorder: '#668db5',
     },
     tables: { headerBg: '#c3ccd7', headerText: '#182a53', rowHover: '#dfeaf3', stripe: '#f4f7fa', divider: '#a8b8c7' },
@@ -684,7 +685,7 @@ export const THEME_PRESETS: ThemePreset[] = [
       positive: '#1d6033', negative: '#9d1d25', warning: '#815000', info: '#21386b',
     },
     shell: {
-      style: 'solid-dark', sidebarBg: '#172e50', sidebarText: '#dfeaf3', sidebarActiveBg: '#466dbd',
+      style: 'solid-dark', sidebarBg: '#172e50', sidebarText: '#dfeaf3', sidebarActiveBg: '#34548a',
       sidebarActiveText: '#ffffff', topbarBg: '#182a53', topbarText: '#ffffff', topbarBorder: '#466dbd',
     },
     tables: { headerBg: '#668db5', headerText: '#ffffff', rowHover: '#d6e3ef', stripe: '#eaf1f6', divider: '#8e9eab' },

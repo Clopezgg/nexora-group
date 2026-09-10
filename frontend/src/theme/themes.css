@@ -1130,6 +1130,12 @@
 }
 
 /* --- Field error text: darken for AA contrast on SAP surfaces (12px text needs 4.5:1) --- */
-:root[data-nx-family='sap-gui'] body .nx-field__error {
+:root[data-nx-family='sap-gui']:not([data-nx-sap-variant='horizon-dark']) body .nx-field__error {
   color: #a71d2a;
+}
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-field__error {
+  color: #f5a3aa;
+}
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-state__title {
+  color: #e0e0e0;
 }

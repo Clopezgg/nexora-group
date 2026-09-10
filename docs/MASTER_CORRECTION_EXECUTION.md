@@ -95,3 +95,28 @@ After the production-client change: frontend typecheck, lint, **65 files / 209 t
 A fourth PostgreSQL independent-session test reproduced duplicate hard-close manifests from a stale OPEN object after another transaction committed CLOSED. `hard_close` now locks and refreshes the period **before** the checklist, so posting eligibility cannot advance while it is evaluated. Regression: **10 passed** (fiscal serialization + closing center), with existing Starlette warnings, `/tmp/nexora-hardclose-green-iteration5.log`; failing reproduction `/tmp/nexora-hardclose-red-iteration5.log`. Ruff critical checks/compileall/diff check passed. Fiscal route audit before-status snapshots still need revalidation.
 
 Full serial regression started against `nexora_test_nexora_group`, log `/tmp/nexora-phase1-full-iteration5.log`, exec session 57521. It started at commit `1b48d1ff` before the hard-close follow-up; do not treat it as full final-SHA evidence and do not run a competing schema-resetting runner on that database. New CI for `1b48d1ff`: `34305568080`, in progress when observed. All certification SHAs remain PENDING.
+
+---
+
+> **Corrección de estado (2026-09-10).** Los párrafos anteriores son histórico de las
+> iteraciones 1–5 y quedan superados por la integración real. Las tres fases fueron
+> ejecutadas e integradas a `origin/main`:
+>
+> - PR #114 `fix/nexora-phase1-core-foundations` → merge `964d537c`
+> - PR #115 `fix/phase1-soft-closed-complete` → merge `6fd6f6e3` (cierre Fase 1)
+> - PR #116 `fix/phase2-domain-integration` → merge `c4b0394d`
+> - PR #117 `fix/phase3-qa-certification` → merge `1b389698`
+> - PR #118 subledger↔GL reconciliation → merge `1d28a266`
+> - PR #119 test-schema-reset robustness → merge `1fddcbc7`
+> - PR #120 SAP GUI theme engine → merge `55d368b3`
+> - PR #121 NX-AUD model schema alignment → merge `a3cc6136`
+> - PR #123 iteration-14 invariants+tema → merge `802b621d`
+> - PR #124 regresión contraste SAP → merge `fa3dc1a4`
+> - PR #125 F3.8 retire pre_migration_repairs → merge `e9efbe81`
+>
+> Tags de fase (SHAs reales de `origin/main`): FASE1_CORE_BASELINE `6fd6f6e3`,
+> FASE2_DOMAIN_INTEGRATION `c4b0394d`, FASE3_QA_CERTIFICATION `1b389698`.
+> Suites verdes: backend 632 passed (log `/tmp/pytest_full_run.log`), frontend 238 tests,
+> e2e, Compile Azure Bicep y Docker Compose smoke en CI. Ruleset `main protection
+> (ORDEN MAESTRA §42)` ahora exige los 5 gates reales (backend, frontend, e2e,
+> Compile Azure Bicep, Docker Compose smoke). PR #122 cerrado como SUPERSEDIDO.

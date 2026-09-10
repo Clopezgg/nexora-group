@@ -1128,3 +1128,8 @@
   color: #7ec3ff;
   background: rgba(77, 163, 255, 0.14);
 }
+
+/* --- Field error text: darken for AA contrast on SAP surfaces (12px text needs 4.5:1) --- */
+:root[data-nx-family='sap-gui'] body .nx-field__error {
+  color: #a71d2a;
+}

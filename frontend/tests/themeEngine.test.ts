@@ -188,6 +188,21 @@ describe('Enterprise Theme Architecture (§8-§11, §20)', () => {
     }
   })
 
+  it('el árbol SAP (grupo + link activo) cumple 4.5:1 en las cuatro variantes (regresión Axe CI)', () => {
+    // Grupo: texto sobre fondo de sidebar; link activo: texto activo sobre bg activo.
+    for (const id of ['sap-gui-signature', 'sap-gui-tradeshow', 'sap-gui-horizon', 'sap-gui-horizon-dark']) {
+      const preset = getThemePreset(id)
+      expect(
+        contrastRatio(preset.shell.sidebarText, preset.shell.sidebarBg),
+        `${id}: texto sidebar sobre bg sidebar`,
+      ).toBeGreaterThanOrEqual(4.5)
+      expect(
+        contrastRatio(preset.shell.sidebarActiveText, preset.shell.sidebarActiveBg),
+        `${id}: link activo sobre bg activo`,
+      ).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
   it('el default sigue siendo NEXORA Horizon y es el primer preset', () => {
     expect(DEFAULT_THEME_ID).toBe('nexora-horizon-light')
     expect(THEME_PRESETS[0].id).toBe(DEFAULT_THEME_ID)

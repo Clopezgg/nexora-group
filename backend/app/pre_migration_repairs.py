@@ -1,9 +1,15 @@
 """Narrow pre-Alembic repairs for explicitly authorized legacy data resets.
 
-This module exists because the published ``b41e7c9a2f10`` migration correctly
-refuses to delete a project while a RESTRICT/NO ACTION reference exists.  The
-production DEV dataset contains one legacy nullable supplier-contract link to
-one of the two projects the owner explicitly asked to remove.
+RETIRED from the deploy runtime path (F3.8 ORDEN MAESTRA): every supported
+environment has migrated past ``b41e7c9a2f10`` and fresh databases have no
+``alembic_version`` table, so this module is a permanent no-op during deploys.
+It is kept only as documented history with tests that pin its behavior.
+
+Background: this module exists because the published ``b41e7c9a2f10`` migration
+correctly refuses to delete a project while a RESTRICT/NO ACTION reference
+exists.  The production DEV dataset contains one legacy nullable
+supplier-contract link to one of the two projects the owner explicitly asked
+to remove.
 
 The repair is intentionally conservative:
 - it runs only while the database is exactly at the migration immediately

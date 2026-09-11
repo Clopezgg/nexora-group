@@ -8,8 +8,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models.accounting import AccountingDocument, JournalLine
 from app.models.asset import DepreciationEntry, FixedAsset
-from app.services import asset_service
 from app.models.permission import UserCompanyAccess, UserProjectAccess
+from app.services import asset_service
 from tests.helpers import (
     create_account,
     create_company,
@@ -332,9 +332,9 @@ def test_disposed_asset_status_is_terminal(client):
 
 def test_fixed_asset_rejects_non_positive_cost_at_db_constraint(db_session):
     """A nivel de constraint REAL de PostgreSQL, sin pasar por el service."""
+    from app.models.chart_of_accounts import Account, ChartOfAccount
     from app.models.company import Company
     from app.models.currency import Currency
-    from app.models.chart_of_accounts import Account, ChartOfAccount
 
     db_session.add(Currency(code="HNL", name="Lempira hondureño", symbol="L"))
     company = Company(name="Constraint Test Co")

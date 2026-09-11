@@ -12,7 +12,14 @@ from app.domain.errors import (
     InvalidOperationScopeError,
 )
 from app.models.asset import FixedAsset
-from app.models.equipment import EQUIPMENT_STATUSES, MAINTENANCE_TERMINAL_STATUSES, Equipment, FuelLog, MaintenanceOrder, MaintenancePlan
+from app.models.equipment import (
+    EQUIPMENT_STATUSES,
+    MAINTENANCE_TERMINAL_STATUSES,
+    Equipment,
+    FuelLog,
+    MaintenanceOrder,
+    MaintenancePlan,
+)
 from app.models.supplier import Supplier
 from app.repositories import equipment_repository
 from app.services import resource_posting_service

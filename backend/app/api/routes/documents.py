@@ -12,7 +12,11 @@ from app.schemas.document import (
     DocumentVersionResponse,
 )
 from app.services import audit_service, document_service
-from app.services.permission_service import accessible_project_ids, assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 

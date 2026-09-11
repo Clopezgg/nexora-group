@@ -13,7 +13,11 @@ from app.schemas.ar import (
     CustomerReceiptResponse,
 )
 from app.services import ar_service, audit_service, idempotency_service
-from app.services.permission_service import accessible_project_ids, assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/ar", tags=["accounts-receivable"])
 

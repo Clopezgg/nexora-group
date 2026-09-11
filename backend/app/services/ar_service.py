@@ -1,7 +1,7 @@
+import re
 import uuid
 from datetime import date
 from decimal import Decimal
-import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session

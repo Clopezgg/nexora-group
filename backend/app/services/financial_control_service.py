@@ -6,7 +6,8 @@ hardcodeadas: cada número se deriva de la base de datos.
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta as _timedelta
+from datetime import date
+from datetime import timedelta as _timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -14,8 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.core.business_time import business_today
 from app.models.accounting import AccountingDocument
-from app.models.approval_request import ApprovalRequest
 from app.models.ap import SupplierInvoice
+from app.models.approval_request import ApprovalRequest
 from app.models.ar import CustomerInvoice
 from app.models.company import Company
 from app.models.fiscal import FiscalPeriod, FiscalYear

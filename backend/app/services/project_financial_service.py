@@ -5,18 +5,26 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.accounting import LEDGER_EFFECTIVE_STATUSES, AccountingDocument, JournalLine
+from app.models.accounting import (
+    LEDGER_EFFECTIVE_STATUSES,
+    AccountingDocument,
+    JournalLine,
+)
 from app.models.ar import CustomerInvoice
 from app.models.chart_of_accounts import Account
+from app.models.company import Company
 from app.models.contract_payment import (
     ContractPaymentAllocation,
     ContractPaymentInstallment,
     ContractPaymentSchedule,
 )
 from app.models.crm import SalesContract
-from app.models.company import Company
 from app.models.supplier import SupplierContract
-from app.repositories import budget_repository, project_control_repository, project_repository
+from app.repositories import (
+    budget_repository,
+    project_control_repository,
+    project_repository,
+)
 from app.services import budget_service, commitment_service, forecast_service
 
 

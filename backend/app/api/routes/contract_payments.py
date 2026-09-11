@@ -8,7 +8,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -23,11 +23,12 @@ from app.schemas.contract_payment import (
     FifoPreviewItem,
     FifoPreviewRequest,
     InstallmentResponse,
-    ScheduleCreateRequest,
     RetentionReleaseRequest,
+    ScheduleCreateRequest,
     ScheduleResponse,
 )
-from app.services import audit_service, contract_payment_service as cps
+from app.services import audit_service
+from app.services import contract_payment_service as cps
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/contract-payments", tags=["contract-payments"])

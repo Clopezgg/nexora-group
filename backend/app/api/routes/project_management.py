@@ -16,7 +16,11 @@ from app.schemas.project_control import (
     ProjectStatusTransitionRequest,
     ProjectUpdateRequest,
 )
-from app.services import audit_service, project_financial_service, project_lifecycle_service
+from app.services import (
+    audit_service,
+    project_financial_service,
+    project_lifecycle_service,
+)
 from app.services.permission_service import (
     assert_company_access,
     require_permission,

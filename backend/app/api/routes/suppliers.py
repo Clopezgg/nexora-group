@@ -15,11 +15,11 @@ from app.schemas.supplier import (
     SupplierStatusChangeRequest,
     SupplierUpdateRequest,
 )
+from app.services import audit_service
 from app.services.financial_validation_service import (
     assert_project_belongs_to_company,
     assert_supplier_belongs_to_company,
 )
-from app.services import audit_service
 from app.services.permission_service import (
     accessible_project_ids,
     assert_company_access,

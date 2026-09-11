@@ -13,7 +13,13 @@ from decimal import Decimal
 from app.models.company import Company
 from app.services import advance_reconciliation_service as ars
 from app.services import contract_payment_service as cps
-from tests.helpers import create_account, create_company, create_supplier, create_treasury_account, login_admin
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_supplier,
+    create_treasury_account,
+    login_admin,
+)
 
 
 def _bank_balance(client, company_id, ta_id):
@@ -210,6 +216,7 @@ def test_finalize_reversed_invoice_blocks_when_accrual_still_posted(client, db_s
 def test_reconcile_rejects_amount_mismatch(client, db_session):
     company, project, contract, schedule, bank, gge, invoice, *_ = _setup(client, db_session)
     import pytest
+
     from app.domain.errors import InvalidFinancialReferenceError
 
     with pytest.raises(InvalidFinancialReferenceError):

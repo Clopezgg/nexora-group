@@ -3,7 +3,11 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.domain.errors import AccountLockedError, InvalidCredentialsError, NotAuthenticatedError
+from app.domain.errors import (
+    AccountLockedError,
+    InvalidCredentialsError,
+    NotAuthenticatedError,
+)
 from app.models.user import User
 from app.repositories import role_repository, session_repository, user_repository
 from app.security.passwords import verify_password

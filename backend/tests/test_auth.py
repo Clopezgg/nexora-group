@@ -194,8 +194,8 @@ def test_session_cookie_uses_first_party_samesite_lax_in_production(monkeypatch,
     origen. La cookie de sesión nunca debe emitirse con SameSite=None
     (diseño cross-site que ITP bloquea); sigue siendo Secure + HttpOnly
     con SameSite=Lax en producción."""
-    from app.core.config import Settings
     import app.api.routes.auth as auth_routes
+    from app.core.config import Settings
 
     prod_settings = Settings(
         app_env="production",

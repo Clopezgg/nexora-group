@@ -4,7 +4,12 @@ from datetime import date, datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.domain.errors import InvalidSafetyRecordError, InvalidSafetyStateError
-from app.models.safety import SAFETY_SEVERITIES, SAFETY_SEVERITIES_REQUIRING_RESPONSIBLE, SafetyIncident, SafetyObservation
+from app.models.safety import (
+    SAFETY_SEVERITIES,
+    SAFETY_SEVERITIES_REQUIRING_RESPONSIBLE,
+    SafetyIncident,
+    SafetyObservation,
+)
 from app.repositories import safety_repository
 from app.services.financial_validation_service import (
     assert_evidence_belongs_to_company,

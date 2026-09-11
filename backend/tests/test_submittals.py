@@ -1,5 +1,11 @@
 from app.models.permission import UserCompanyAccess
-from tests.helpers import create_company, create_supplier, create_user_with_role, login_admin, login_as
+from tests.helpers import (
+    create_company,
+    create_supplier,
+    create_user_with_role,
+    login_admin,
+    login_as,
+)
 
 
 def _create_project(client, *, company_id: str, name: str = "Torre Nexora", code: str = "PRJ-SUB-01") -> dict:

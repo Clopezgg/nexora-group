@@ -6,7 +6,11 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.accounting import AccountingDocument, JournalLine, LEDGER_EFFECTIVE_STATUSES
+from app.models.accounting import (
+    LEDGER_EFFECTIVE_STATUSES,
+    AccountingDocument,
+    JournalLine,
+)
 from app.models.chart_of_accounts import Account, ChartOfAccount
 from app.models.procurement import (
     GoodsReceipt,
@@ -17,7 +21,7 @@ from app.models.procurement import (
 )
 from app.models.supplier import Supplier
 from app.models.treasury import TreasuryAccount
-from app.services import budget_service, treasury_service
+from app.services import budget_service
 
 """Reporting (orden maestra, NXR-REQ-0093/0094). Este servicio SOLO arma
 reportes de lectura reusando cálculos ya existentes y confiables

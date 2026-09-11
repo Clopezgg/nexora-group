@@ -9,7 +9,6 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-
 from sqlalchemy import select
 
 from app.domain.errors import OverpaymentError

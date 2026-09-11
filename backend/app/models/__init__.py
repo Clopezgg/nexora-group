@@ -8,14 +8,19 @@ from app.models.accounting import (
 from app.models.ap import SupplierInvoice, SupplierPayment
 from app.models.approval_policy import ApprovalPolicy
 from app.models.approval_request import ApprovalRequest
-from app.models.audit import AuditLog
 from app.models.ar import CustomerInvoice, CustomerReceipt
 from app.models.asset import DepreciationEntry, FixedAsset
+from app.models.audit import AuditLog
 from app.models.budget import Budget, BudgetLine
 from app.models.business_unit import BusinessUnit
 from app.models.change_order import ChangeOrder
 from app.models.chart_of_accounts import Account, ChartOfAccount
 from app.models.company import Company
+from app.models.contract_payment import (
+    ContractPaymentAllocation,
+    ContractPaymentInstallment,
+    ContractPaymentSchedule,
+)
 from app.models.cost_center import CostCenter, EconomicCategory
 from app.models.crm import Customer, Lead, Opportunity, Quotation, SalesContract
 from app.models.currency import Currency, ExchangeRate
@@ -23,11 +28,6 @@ from app.models.document import Document, DocumentVersion
 from app.models.document_type import DocumentType
 from app.models.edit_access import EditAccessCapability, EditAccessEvent
 from app.models.equipment import Equipment, FuelLog, MaintenanceOrder, MaintenancePlan
-from app.models.contract_payment import (
-    ContractPaymentAllocation,
-    ContractPaymentInstallment,
-    ContractPaymentSchedule,
-)
 from app.models.evidence import Evidence
 from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.models.idempotency import IdempotencyRecord
@@ -35,7 +35,13 @@ from app.models.inventory import PhysicalCount, PhysicalCountLine, StockLedgerEn
 from app.models.item import Item
 from app.models.notification import Notification
 from app.models.number_sequence import NumberSequence
-from app.models.permission import Permission, RolePermission, UserCompanyAccess, UserProjectAccess
+from app.models.permission import (
+    Permission,
+    RolePermission,
+    UserCompanyAccess,
+    UserProjectAccess,
+)
+from app.models.planning import Milestone, Task
 from app.models.procurement import (
     GoodsReceipt,
     GoodsReceiptLine,
@@ -50,12 +56,11 @@ from app.models.procurement import (
     SupplierQuotationLine,
     ThreeWayMatchResult,
 )
-from app.models.planning import Milestone, Task
 from app.models.progress import ProgressRecord
 from app.models.project import Project
 from app.models.project_setup import ProjectSetupRun
 from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
-from app.models.rate_limit import RateLimitBucket
+from app.models.rate_limit import RateLimitBucket as RateLimitBucket
 from app.models.resource_posting import ResourcePostingConfig
 from app.models.rfi import RequestForInformation
 from app.models.role import Role
@@ -78,8 +83,8 @@ from app.models.treasury import (
 )
 from app.models.user import User
 from app.models.user_context import UserContext
-from app.models.user_role import UserRole
 from app.models.user_preference import UserPreference
+from app.models.user_role import UserRole
 from app.models.voucher_issuance import VoucherIssuance
 from app.models.voucher_verification import VoucherVerification
 from app.models.warehouse import Warehouse

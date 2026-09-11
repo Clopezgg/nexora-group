@@ -15,7 +15,13 @@ from decimal import Decimal
 
 from app.models.company import Company
 from app.services import contract_payment_service as cps
-from tests.helpers import create_account, create_company, create_supplier, create_treasury_account, login_admin
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_supplier,
+    create_treasury_account,
+    login_admin,
+)
 
 
 def _bank_balance(client, company_id, treasury_account_id):

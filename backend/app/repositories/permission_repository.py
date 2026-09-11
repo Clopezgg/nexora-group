@@ -3,7 +3,13 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.permission import SCOPE_ANY, SCOPE_OWN, Permission, RolePermission, UserCompanyAccess
+from app.models.permission import (
+    SCOPE_ANY,
+    SCOPE_OWN,
+    Permission,
+    RolePermission,
+    UserCompanyAccess,
+)
 from app.models.role import Role
 
 # Matriz de permisos (docs/RBAC.md). Cubre los recursos que YA existen:

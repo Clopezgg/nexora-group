@@ -17,7 +17,6 @@ from app.services import evidence_service
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL
 from tests.helpers import create_company, create_user_with_role, login_admin, login_as
 
-
 VALID_JPEG = b"\xff\xd8\xff\xe0JFIF\x00contenido-real"
 
 

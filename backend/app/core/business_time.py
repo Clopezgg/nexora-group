@@ -1,7 +1,6 @@
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
-
 BUSINESS_TZ = ZoneInfo("America/Tegucigalpa")
 
 

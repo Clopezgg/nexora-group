@@ -8,7 +8,12 @@ from sqlalchemy.orm import Session
 from app.domain.errors import DepreciationAlreadyPostedError, InvalidAssetStateError
 from app.models.accounting import AccountingDocument
 from app.models.ap import SupplierInvoice
-from app.models.asset import ASSET_DISPOSAL_STATUSES, ASSET_STATUSES, DepreciationEntry, FixedAsset
+from app.models.asset import (
+    ASSET_DISPOSAL_STATUSES,
+    ASSET_STATUSES,
+    DepreciationEntry,
+    FixedAsset,
+)
 from app.models.chart_of_accounts import Account
 from app.models.company import Company
 from app.repositories import asset_repository

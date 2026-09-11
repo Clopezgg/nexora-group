@@ -4,7 +4,11 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.models.budget import Budget, BudgetLine
-from app.repositories import budget_repository, project_control_repository, project_repository
+from app.repositories import (
+    budget_repository,
+    project_control_repository,
+    project_repository,
+)
 from app.services import budget_service, forecast_service
 
 

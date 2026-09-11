@@ -13,18 +13,18 @@ from app.models.company import Company
 from app.models.crm import Customer
 from app.models.evidence import Evidence
 from app.models.supplier import Supplier
-from app.models.workforce import Worker
 from app.models.treasury import (
     BankStatementLine,
     FundRestriction,
     Remittance,
     TreasuryAccount,
 )
+from app.models.workforce import Worker
 from app.schemas.treasury import (
     BankStatementCreateRequest,
-    BeneficiaryOption,
     BankStatementLineCreateRequest,
     BankStatementLineResponse,
+    BeneficiaryOption,
     CashClosingApproveRequest,
     CashClosingCreateRequest,
     CashClosingResponse,

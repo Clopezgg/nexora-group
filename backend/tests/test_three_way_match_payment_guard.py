@@ -1,10 +1,10 @@
 import uuid
 from decimal import Decimal
 
-from app.models.audit import AuditLog
-from app.models.permission import UserCompanyAccess
 from sqlalchemy import select
 
+from app.models.audit import AuditLog
+from app.models.permission import UserCompanyAccess
 from tests.helpers import (
     create_account,
     create_company,

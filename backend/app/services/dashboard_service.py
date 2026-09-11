@@ -7,7 +7,11 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import case, extract, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.accounting import LEDGER_EFFECTIVE_STATUSES, AccountingDocument, JournalLine
+from app.models.accounting import (
+    LEDGER_EFFECTIVE_STATUSES,
+    AccountingDocument,
+    JournalLine,
+)
 from app.models.ap import SupplierInvoice
 from app.models.approval_request import ApprovalRequest
 from app.models.ar import CustomerInvoice
@@ -15,7 +19,11 @@ from app.models.chart_of_accounts import Account
 from app.models.company import Company
 from app.models.project import Project
 from app.models.treasury import TreasuryAccount
-from app.schemas.dashboard import CashFlowPointResponse, DashboardSummaryResponse, ScopeAmountResponse
+from app.schemas.dashboard import (
+    CashFlowPointResponse,
+    DashboardSummaryResponse,
+    ScopeAmountResponse,
+)
 from app.services import fiscal_service, permission_service
 
 BUSINESS_TZ = ZoneInfo("America/Tegucigalpa")
@@ -74,11 +82,15 @@ def get_summary(
     month_start = date(today.year, today.month, 1)
     month_starts = _month_starts(today)
 
-    currency_code = "HNL"
     if company_id is not None:
         company = db.get(Company, company_id)
-        if company is not None and company.functional_currency_code:
-            currency_code = company.functional_currency_code
+    else:
+        # Fallback to the first available company for central views
+        company = db.execute(select(Company).limit(1)).scalar_one_or_none()
+
+    currency_code = "HNL" # Temporary fallback if absolutely empty DB
+    if company is not None and company.functional_currency_code:
+        currency_code = company.functional_currency_code
 
     fiscal_year = None
     fiscal_period = None

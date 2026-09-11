@@ -8,7 +8,7 @@ correcto" no basta — el checklist valida el estado real de la base.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, select

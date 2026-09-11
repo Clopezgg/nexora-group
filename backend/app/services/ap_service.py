@@ -1,7 +1,7 @@
+import re
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
-import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,12 +11,12 @@ from app.domain.errors import (
     InvalidInvoiceStateError,
     OverpaymentError,
 )
+from app.models.accounting import AccountingDocument
 from app.models.ap import (
     SupplierInvoice,
     SupplierInvoicePaymentPlanItem,
     SupplierPayment,
 )
-from app.models.accounting import AccountingDocument
 from app.models.approval_request import ApprovalRequest
 from app.models.asset import FixedAsset
 from app.models.evidence import Evidence
@@ -425,8 +425,8 @@ def pay_supplier_invoice(
         )
 
     if invoice.supplier_contract_id is not None and not contract_allocations:
-        from app.services import contract_payment_service
         from app.models.supplier import SupplierContract
+        from app.services import contract_payment_service
 
         contract = db.get(SupplierContract, invoice.supplier_contract_id)
         schedule = contract_payment_service.resolve_schedule_for_invoice(db, invoice)

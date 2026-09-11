@@ -11,8 +11,8 @@ from app.core.business_time import business_today
 from app.domain.errors import (
     FiscalPeriodClosedError,
     ImmutableDocumentError,
-    InvalidOperationScopeError,
     InvalidFinancialReferenceError,
+    InvalidOperationScopeError,
     UnbalancedJournalEntryError,
 )
 from app.models.accounting import (
@@ -22,8 +22,8 @@ from app.models.accounting import (
     JournalLine,
     TaxLine,
 )
-from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.models.company import Company
+from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.services import numbering_service
 from app.services.financial_validation_service import (
     assert_account_belongs_to_company,

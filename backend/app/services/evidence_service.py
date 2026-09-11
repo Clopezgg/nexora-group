@@ -16,7 +16,10 @@ from app.domain.errors import (
     EvidenceTooLargeError,
     UnsupportedEvidenceMimeTypeError,
 )
-from app.integrations.azure_blob import delete_blob_if_exists, get_evidence_container_client
+from app.integrations.azure_blob import (
+    delete_blob_if_exists,
+    get_evidence_container_client,
+)
 from app.models.evidence import EVIDENCE_ALLOWED_MIME_TYPES, Evidence
 from app.repositories import evidence_repository
 

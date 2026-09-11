@@ -3,7 +3,12 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.permission import SCOPE_ANY, Permission, RolePermission, UserCompanyAccess
+from app.models.permission import (
+    SCOPE_ANY,
+    Permission,
+    RolePermission,
+    UserCompanyAccess,
+)
 from app.models.role import Role
 from app.models.user import User
 from app.models.user_role import UserRole

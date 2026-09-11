@@ -44,8 +44,7 @@ TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=Fals
 
 @pytest.fixture
 def _clean_schema():
-    from sqlalchemy import text, inspect as sa_inspect
-    from sqlalchemy import MetaData
+    from sqlalchemy import MetaData, text
     # Reflect the live DB to know what tables actually exist right now
     reflected = MetaData()
     try:

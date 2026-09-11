@@ -12,7 +12,10 @@ from app.models.evidence import Evidence
 from app.models.project import Project
 from app.models.supplier import Supplier, SupplierContract
 from app.models.user import User
-from app.services.permission_service import user_has_any_company_scope, user_has_company_access
+from app.services.permission_service import (
+    user_has_any_company_scope,
+    user_has_company_access,
+)
 
 
 def assert_operation_scope(scope: str, project_id: uuid.UUID | None) -> None:

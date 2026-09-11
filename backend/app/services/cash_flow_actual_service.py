@@ -31,8 +31,8 @@ from sqlalchemy.orm import Session
 from app.core.business_time import business_today
 from app.models.accounting import AccountingDocument, JournalLine
 from app.models.chart_of_accounts import Account
-from app.models.treasury import TreasuryAccount
 from app.models.company import Company
+from app.models.treasury import TreasuryAccount
 from app.services import treasury_service
 from app.services.transaction_inspector_service import _resolve_source_event
 

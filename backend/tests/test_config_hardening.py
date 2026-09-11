@@ -2,7 +2,6 @@ import pytest
 
 from app.core.config import Settings
 
-
 _BASE_PRODUCTION = {
     "app_env": "production",
     "secret_key": "s" * 32,

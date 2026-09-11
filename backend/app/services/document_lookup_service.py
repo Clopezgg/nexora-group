@@ -8,7 +8,6 @@ las acciones permitidas por estado.
 
 import uuid
 from dataclasses import dataclass, field
-from decimal import Decimal
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session

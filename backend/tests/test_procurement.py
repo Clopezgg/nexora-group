@@ -2,8 +2,8 @@ import uuid
 from decimal import Decimal
 
 from app.models.permission import UserCompanyAccess
-from app.models.project import Project
 from app.models.procurement import PurchaseOrder
+from app.models.project import Project
 from app.repositories import procurement_repository
 from tests.helpers import create_company, create_user_with_role, login_admin, login_as
 

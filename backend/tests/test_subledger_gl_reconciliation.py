@@ -354,7 +354,7 @@ def test_reversal_gl_mirrors_original(client, db_session):
     )
 
     assert len(orig_lines) == len(rev_lines)
-    for orig, rev in zip(orig_lines, rev_lines):
+    for orig, rev in zip(orig_lines, rev_lines, strict=True):
         assert orig.account_id == rev.account_id
         assert orig.debit_amount == rev.credit_amount
         assert orig.credit_amount == rev.debit_amount

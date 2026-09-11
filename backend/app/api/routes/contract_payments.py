@@ -337,6 +337,7 @@ def prepare_advance_invoice(
             due_date=advance.due_date,
             description=f"Anticipo contractual {contract.contract_number}",
             supplier_contract_id=contract.id,
+            contract_installment_id=advance.id,
             commit=False,
         )
         audit_service.record(

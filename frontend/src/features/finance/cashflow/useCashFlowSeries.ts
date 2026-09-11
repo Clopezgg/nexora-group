@@ -7,7 +7,7 @@ import {
   type CashFlowPeriod,
 } from '../../../services/cashFlowActualService'
 import { formatPeriodLabel } from './periodLabel'
-import { businessTodayIso } from '../../../utils/businessDate'
+import { businessDateDaysAgoIso, businessTodayIso } from '../../../utils/businessDate'
 
 export type CashFlowMode = 'REALIZADO' | 'PROYECTADO'
 export type CashFlowRange = '1M' | '3M' | '6M' | '12M'
@@ -21,9 +21,7 @@ export const RANGE_DAYS: Record<CashFlowRange, number> = {
 }
 
 function isoDaysAgo(days: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return d.toISOString().slice(0, 10)
+  return businessDateDaysAgoIso(days)
 }
 const today = businessTodayIso
 

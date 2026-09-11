@@ -30,6 +30,12 @@ class SupplierInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "supplier_invoices"
     __table_args__ = (
         Index("uq_supplier_invoice_business_number", "company_id", "supplier_id", "invoice_number_normalized", unique=True, postgresql_where=text("status <> 'CANCELLED'")),
+        Index(
+            "uq_supplier_invoice_contract_installment",
+            "contract_installment_id",
+            unique=True,
+            postgresql_where=text("contract_installment_id IS NOT NULL AND status <> 'CANCELLED'"),
+        ),
         CheckConstraint("amount > 0", name="ck_supplier_invoices_amount_positive"),
         CheckConstraint("tax_amount >= 0", name="ck_supplier_invoices_tax_non_negative"),
         CheckConstraint(
@@ -77,6 +83,11 @@ class SupplierInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     supplier_contract_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("supplier_contracts.id", ondelete="RESTRICT"), nullable=True
+    )
+    contract_installment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contract_payment_installments.id", ondelete="RESTRICT"),
+        nullable=True,
     )
     purchase_order_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("purchase_orders.id", ondelete="RESTRICT"), nullable=True

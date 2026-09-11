@@ -29,6 +29,12 @@ def _setup_asset_company(client):
 
 
 def _create_asset(client, *, company, expense, accumulated, cost="12000.00", useful_life=12, salvage="0.00"):
+    asset_account = create_account(
+        client, company_id=company["id"], code="1500", name="Activos fijos", account_type="ASSET"
+    )
+    acquisition_offset = create_account(
+        client, company_id=company["id"], code="2200", name="Contrapartida adquisición", account_type="LIABILITY"
+    )
     response = client.post(
         "/api/assets",
         json={
@@ -43,10 +49,25 @@ def _create_asset(client, *, company, expense, accumulated, cost="12000.00", use
             "scope": "GENERAL",
             "depreciationExpenseAccountId": expense["id"],
             "accumulatedDepreciationAccountId": accumulated["id"],
+            "assetAccountId": asset_account["id"],
+            "acquisitionOffsetAccountId": acquisition_offset["id"],
         },
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def test_manual_asset_creation_posts_its_accounting_origin(client, db_session):
+    login_admin(client)
+    company, expense, accumulated = _setup_asset_company(client)
+    asset = _create_asset(client, company=company, expense=expense, accumulated=accumulated)
+
+    assert asset["capitalizationAccountId"] is not None
+    assert asset["capitalizationDocumentId"] is not None
+    document = db_session.get(AccountingDocument, asset["capitalizationDocumentId"])
+    assert document is not None
+    assert document.status == "POSTED"
+    assert document.document_type_code == "CAP"
 
 
 def test_generate_depreciation_entry_posts_balanced_dep_document(client):

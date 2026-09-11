@@ -15,6 +15,7 @@ from app.schemas.master_data import (
 )
 from app.services import audit_service, resource_posting_service
 from app.services.financial_validation_service import (
+    assert_account_has_type,
     assert_evidence_belongs_to_company,
     assert_supplier_advance_account_eligible,
 )
@@ -48,6 +49,16 @@ def update_company_profile(
         "signatureEvidenceId": str(company.signature_evidence_id) if company.signature_evidence_id else None,
         "supplierAdvanceAccountId": str(company.supplier_advance_account_id)
         if company.supplier_advance_account_id else None,
+        "assetDisposalGainAccountId": str(company.asset_disposal_gain_account_id)
+        if company.asset_disposal_gain_account_id else None,
+        "assetDisposalLossAccountId": str(company.asset_disposal_loss_account_id)
+        if company.asset_disposal_loss_account_id else None,
+        "inventoryAccountId": str(company.inventory_account_id)
+        if company.inventory_account_id else None,
+        "inventoryAdjustmentGainAccountId": str(company.inventory_adjustment_gain_account_id)
+        if company.inventory_adjustment_gain_account_id else None,
+        "inventoryAdjustmentLossAccountId": str(company.inventory_adjustment_loss_account_id)
+        if company.inventory_adjustment_loss_account_id else None,
     }
     values = payload.model_dump(exclude_unset=True)
     try:
@@ -55,6 +66,43 @@ def update_company_profile(
             assert_supplier_advance_account_eligible(
                 db, account_id=payload.supplier_advance_account_id, company_id=company.id
             )
+        if payload.asset_disposal_gain_account_id is not None:
+            assert_account_has_type(
+                db,
+                account_id=payload.asset_disposal_gain_account_id,
+                company_id=company.id,
+                field_name="asset_disposal_gain_account_id",
+                expected_type="REVENUE",
+            )
+        if payload.asset_disposal_loss_account_id is not None:
+            assert_account_has_type(
+                db,
+                account_id=payload.asset_disposal_loss_account_id,
+                company_id=company.id,
+                field_name="asset_disposal_loss_account_id",
+                expected_type="EXPENSE",
+            )
+        for account_id, field_name, expected_type in (
+            (payload.inventory_account_id, "inventory_account_id", "ASSET"),
+            (
+                payload.inventory_adjustment_gain_account_id,
+                "inventory_adjustment_gain_account_id",
+                "REVENUE",
+            ),
+            (
+                payload.inventory_adjustment_loss_account_id,
+                "inventory_adjustment_loss_account_id",
+                "EXPENSE",
+            ),
+        ):
+            if account_id is not None:
+                assert_account_has_type(
+                    db,
+                    account_id=account_id,
+                    company_id=company.id,
+                    field_name=field_name,
+                    expected_type=expected_type,
+                )
         if payload.logo_evidence_id is not None:
             assert_evidence_belongs_to_company(
                 db, evidence_id=payload.logo_evidence_id, company_id=company.id
@@ -84,6 +132,16 @@ def update_company_profile(
                 "signatureEvidenceId": str(company.signature_evidence_id) if company.signature_evidence_id else None,
                 "supplierAdvanceAccountId": str(company.supplier_advance_account_id)
                 if company.supplier_advance_account_id else None,
+                "assetDisposalGainAccountId": str(company.asset_disposal_gain_account_id)
+                if company.asset_disposal_gain_account_id else None,
+                "assetDisposalLossAccountId": str(company.asset_disposal_loss_account_id)
+                if company.asset_disposal_loss_account_id else None,
+                "inventoryAccountId": str(company.inventory_account_id)
+                if company.inventory_account_id else None,
+                "inventoryAdjustmentGainAccountId": str(company.inventory_adjustment_gain_account_id)
+                if company.inventory_adjustment_gain_account_id else None,
+                "inventoryAdjustmentLossAccountId": str(company.inventory_adjustment_loss_account_id)
+                if company.inventory_adjustment_loss_account_id else None,
             },
             correlation_id=correlation_id,
         )

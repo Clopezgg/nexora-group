@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderApp } from './testUtils'
@@ -153,7 +153,7 @@ describe('CompanySettingsPage', () => {
     render(renderApp('/control/configuracion'))
 
     const advanceAccount = await screen.findByLabelText(/cuenta de anticipos a proveedores/i)
-    await screen.findByRole('option', { name: /1610.*anticipos a proveedores/i })
+    expect(await within(advanceAccount).findByRole('option', { name: /1610.*anticipos a proveedores/i })).toBeInTheDocument()
     await user.selectOptions(advanceAccount, 'asset-advance')
     await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
 

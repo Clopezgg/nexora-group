@@ -24,6 +24,8 @@ class FixedAssetCreateRequest(CamelModel):
     cost_center_id: uuid.UUID | None = None
     depreciation_expense_account_id: uuid.UUID
     accumulated_depreciation_account_id: uuid.UUID
+    asset_account_id: uuid.UUID | None = None
+    acquisition_offset_account_id: uuid.UUID | None = None
 
 
 class FixedAssetResponse(CamelModel):

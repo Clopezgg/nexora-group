@@ -1,6 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Badge,
+  Button,
   Card,
   CompanySelector,
   EmptyState,
@@ -18,6 +20,11 @@ import {
   type LedgerAllocation,
 } from '../../services/contractPaymentService'
 import { formatMoney } from '../../utils/currency'
+import { apService } from '../../services/apArService'
+import { masterDataService } from '../../services/masterDataService'
+import { procurementService } from '../../services/procurementService'
+import { treasuryService } from '../../services/treasuryService'
+import { CreateSupplierInvoiceModal, PaySupplierInvoiceButton } from '../treasury/SupplierInvoiceFlows'
 
 const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
   PAID: 'success',
@@ -29,6 +36,11 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> 
 }
 
 export function ContractPaymentLedgerPage() {
+  const queryClient = useQueryClient()
+  const [prepare, setPrepare] = useState<{
+    entry: ContractLedgerEntry
+    installment: ContractInstallment
+  } | null>(null)
   const { companies, activeCompanyId, activeCompany, setActiveCompanyId, isLoading, isError, refetch } =
     useActiveCompany()
   const currency = activeCompany?.functionalCurrencyCode ?? undefined
@@ -36,6 +48,31 @@ export function ContractPaymentLedgerPage() {
   const query = useQuery({
     queryKey: ['contract-payment-ledger', activeCompanyId],
     queryFn: () => contractPaymentService.ledger(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const invoicesQuery = useQuery({
+    queryKey: ['ap', 'supplier-invoices', activeCompanyId],
+    queryFn: () => apService.listInvoices(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const accountsQuery = useQuery({
+    queryKey: ['master-data', 'accounts', activeCompanyId],
+    queryFn: () => masterDataService.listAccounts(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const treasuryAccountsQuery = useQuery({
+    queryKey: ['treasury', 'accounts', activeCompanyId],
+    queryFn: () => treasuryService.listAccounts(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const contractsQuery = useQuery({
+    queryKey: ['procurement', 'contracts', activeCompanyId],
+    queryFn: () => procurementService.listContracts(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const suppliersQuery = useQuery({
+    queryKey: ['procurement', 'suppliers', activeCompanyId],
+    queryFn: () => procurementService.listSuppliers(activeCompanyId as string),
     enabled: Boolean(activeCompanyId),
   })
 
@@ -51,7 +88,13 @@ export function ContractPaymentLedgerPage() {
     )
   }
 
-  const installmentColumns = (): TableColumn<ContractInstallment>[] => [
+  const invoiceByInstallment = new Map(
+    (invoicesQuery.data ?? [])
+      .filter((invoice) => invoice.contractInstallmentId && invoice.status !== 'CANCELLED')
+      .map((invoice) => [invoice.contractInstallmentId as string, invoice]),
+  )
+
+  const installmentColumns = (entry: ContractLedgerEntry): TableColumn<ContractInstallment>[] => [
     { key: 'sequence', header: '#', render: (row) => row.sequence },
     { key: 'periodLabel', header: 'Período contractual', render: (row) => row.periodLabel },
     { key: 'dueDate', header: 'Vence', render: (row) => row.dueDate },
@@ -63,6 +106,50 @@ export function ContractPaymentLedgerPage() {
       key: 'status',
       header: 'Estado',
       render: (row) => <Badge tone={STATUS_TONE[row.status] ?? 'neutral'}>{statusLabel(row.status)}</Badge>,
+    },
+    {
+      key: 'actions',
+      header: 'Acción',
+      render: (row) => {
+        if (!row.payableNow) {
+          return <span title={row.paymentBlockedReason ?? undefined}>Bloqueada</span>
+        }
+        const invoice = invoiceByInstallment.get(row.installmentId)
+        if (invoice && ['APPROVED', 'SCHEDULED', 'PARTIALLY_PAID'].includes(invoice.status)) {
+          const invoiceRemaining = invoice.amount + invoice.taxAmount - invoice.amountPaid
+          return (
+            <div className="nx-treasury__actions">
+              <PaySupplierInvoiceButton
+                invoice={invoice}
+                companyId={activeCompanyId as string}
+                treasuryAccounts={treasuryAccountsQuery.data ?? []}
+                remaining={invoiceRemaining}
+                selectedInstallmentId={row.installmentId}
+                label={`Pagar ${row.periodLabel}`}
+              />
+              <PaySupplierInvoiceButton
+                invoice={invoice}
+                companyId={activeCompanyId as string}
+                treasuryAccounts={treasuryAccountsQuery.data ?? []}
+                remaining={invoiceRemaining}
+                selectedInstallmentId={row.installmentId}
+                label={`Liquidar ${row.periodLabel}`}
+                lockAmount
+              />
+            </div>
+          )
+        }
+        return (
+          <div className="nx-treasury__actions">
+            <Button variant="ghost" onClick={() => setPrepare({ entry, installment: row })}>
+              Pagar {row.periodLabel}
+            </Button>
+            <Button variant="secondary" onClick={() => setPrepare({ entry, installment: row })}>
+              Liquidar {row.periodLabel}
+            </Button>
+          </div>
+        )
+      },
     },
   ]
 
@@ -153,7 +240,7 @@ export function ContractPaymentLedgerPage() {
 
                 <h3 className="nx-field__label">Cuotas</h3>
                 <Table
-                  columns={installmentColumns()}
+                  columns={installmentColumns(entry)}
                   rows={entry.installments}
                   getRowKey={(row) => row.installmentId}
                   emptyMessage="Sin cuotas."
@@ -170,6 +257,33 @@ export function ContractPaymentLedgerPage() {
             ))}
           </>
         )
+      ) : null}
+
+      {prepare && activeCompanyId ? (
+        <CreateSupplierInvoiceModal
+          companyId={activeCompanyId}
+          expenseAccounts={(accountsQuery.data ?? []).filter(
+            (account) => account.accountType === 'EXPENSE' || account.accountType === 'ASSET',
+          )}
+          payableAccounts={(accountsQuery.data ?? []).filter(
+            (account) => account.accountType === 'LIABILITY',
+          )}
+          suppliers={suppliersQuery.data ?? []}
+          contracts={contractsQuery.data ?? []}
+          initialContractId={prepare.entry.supplierContractId}
+          lockedProjectId={prepare.entry.projectId ?? undefined}
+          initialInstallment={{
+            installmentId: prepare.installment.installmentId,
+            remaining: prepare.installment.remaining,
+            dueDate: prepare.installment.dueDate,
+            periodLabel: prepare.installment.periodLabel,
+          }}
+          onClose={() => setPrepare(null)}
+          onCreated={() => {
+            setPrepare(null)
+            queryClient.invalidateQueries({ queryKey: ['ap', 'supplier-invoices', activeCompanyId] })
+          }}
+        />
       ) : null}
     </div>
   )

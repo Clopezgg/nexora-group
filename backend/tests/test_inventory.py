@@ -8,7 +8,14 @@ from app.models.inventory import StockLedgerEntry
 from app.models.permission import UserCompanyAccess
 from app.repositories import inventory_repository
 from app.services import inventory_service
-from tests.helpers import create_company, create_supplier, create_user_with_role, login_admin, login_as
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_supplier,
+    create_user_with_role,
+    login_admin,
+    login_as,
+)
 
 
 def _setup(client):
@@ -340,9 +347,31 @@ def test_transfer_moves_stock_between_warehouses(client):
     assert float(incoming["unitCost"]) == 8.0
 
 
-def test_physical_count_creates_adjustment_for_variance(client):
+@pytest.mark.parametrize(
+    ("counted_quantity", "expected_quantity", "adjustment_side"),
+    [("47.0000", "47.0", "loss"), ("53.0000", "53.0", "gain")],
+)
+def test_physical_count_creates_adjustment_for_variance(
+    client, db_session, counted_quantity, expected_quantity, adjustment_side
+):
     login_admin(client)
     company, item, warehouse = _setup(client)
+    inventory_account = create_account(
+        client, company_id=company["id"], code="1400", name="Inventario", account_type="ASSET"
+    )
+    adjustment_gain = create_account(
+        client, company_id=company["id"], code="4700", name="Ganancia de inventario", account_type="REVENUE"
+    )
+    adjustment_loss = create_account(
+        client, company_id=company["id"], code="6700", name="Pérdida de inventario", account_type="EXPENSE"
+    )
+    from app.models.company import Company
+
+    company_row = db_session.get(Company, company["id"])
+    company_row.inventory_account_id = inventory_account["id"]
+    company_row.inventory_adjustment_gain_account_id = adjustment_gain["id"]
+    company_row.inventory_adjustment_loss_account_id = adjustment_loss["id"]
+    db_session.commit()
     client.post(
         "/api/inventory/stock/receive",
         json={"companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
@@ -355,7 +384,7 @@ def test_physical_count_creates_adjustment_for_variance(client):
             "companyId": company["id"],
             "warehouseId": warehouse["id"],
             "countDate": "2026-08-24",
-            "lines": [{"itemId": item["id"], "expectedQuantity": "50.0000", "countedQuantity": "47.0000"}],
+            "lines": [{"itemId": item["id"], "expectedQuantity": "50.0000", "countedQuantity": counted_quantity}],
         },
     ).json()
     assert count["status"] == "COUNTED"
@@ -366,7 +395,26 @@ def test_physical_count_creates_adjustment_for_variance(client):
     position = client.get(
         "/api/inventory/stock/position", params={"item_id": item["id"], "warehouse_id": warehouse["id"]}
     ).json()
-    assert float(position["quantityOnHand"]) == 47.0
+    assert float(position["quantityOnHand"]) == float(expected_quantity)
+
+    from app.models.accounting import AccountingDocument, AccountingSourceLink, JournalLine
+
+    link = db_session.execute(
+        select(AccountingSourceLink).where(
+            AccountingSourceLink.source_type == "physical_count",
+            AccountingSourceLink.source_id == count["id"],
+        )
+    ).scalar_one()
+    document = db_session.get(AccountingDocument, link.accounting_document_id)
+    lines = db_session.execute(
+        select(JournalLine).where(JournalLine.accounting_document_id == document.id)
+    ).scalars().all()
+    if adjustment_side == "loss":
+        assert next(line for line in lines if str(line.account_id) == adjustment_loss["id"]).debit_amount == Decimal("12.00")
+        assert next(line for line in lines if str(line.account_id) == inventory_account["id"]).credit_amount == Decimal("12.00")
+    else:
+        assert next(line for line in lines if str(line.account_id) == inventory_account["id"]).debit_amount == Decimal("12.00")
+        assert next(line for line in lines if str(line.account_id) == adjustment_gain["id"]).credit_amount == Decimal("12.00")
 
 
 def test_return_to_supplier_reduces_stock_and_tags_the_supplier(client):

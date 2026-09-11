@@ -62,6 +62,7 @@ def create_supplier_invoice(
         due_date=payload.due_date,
         description=payload.description,
         supplier_contract_id=payload.supplier_contract_id,
+        contract_installment_id=payload.contract_installment_id,
         purchase_order_id=payload.purchase_order_id,
         commit=False,
     )

@@ -43,6 +43,8 @@ def _create_test_setup(db):
         ("1510", "Accumulated Depreciation", "ASSET"),
         ("6100", "Depreciation Expense", "EXPENSE"),
         ("1200", "Cash", "ASSET"),
+        ("4700", "Asset Disposal Gain", "REVENUE"),
+        ("6700", "Asset Disposal Loss", "EXPENSE"),
     ]:
         acct = Account(
             chart_of_account_id=chart.id,
@@ -54,6 +56,8 @@ def _create_test_setup(db):
         db.add(acct)
         accounts[code] = acct
     db.flush()
+    company.asset_disposal_gain_account_id = accounts["4700"].id
+    company.asset_disposal_loss_account_id = accounts["6700"].id
     return company, accounts
 
 
@@ -119,6 +123,12 @@ def test_dispose_asset_posts_correct_gl(db_session):
     total_debit = sum(l.debit_amount for l in lines)
     total_credit = sum(l.credit_amount for l in lines)
     assert total_debit == total_credit
+    loss_line = next(line for line in lines if line.account_id == accounts["6700"].id)
+    assert loss_line.debit_amount == Decimal("4100.00")
+    assert not any(
+        line.account_id == accounts["6100"].id and line.description.startswith("Pérdida")
+        for line in lines
+    )
 
 
 def test_dispose_asset_zero_proceeds(db_session):
@@ -169,6 +179,21 @@ def test_dispose_proceeds_without_account_raises(db_session):
             disposal_date=date(2025, 7, 1),
             proceeds=Decimal("5000"),
             proceeds_account_id=None,
+            commit=False,
+        )
+
+
+def test_dispose_fails_closed_without_configured_gain_loss_account(db_session):
+    company, accounts = _create_test_setup(db_session)
+    company.asset_disposal_loss_account_id = None
+    asset = _create_test_asset(db_session, company, accounts)
+
+    with pytest.raises(InvalidAssetStateError, match="pérdida por disposición"):
+        asset_service.dispose_asset(
+            db_session,
+            asset_id=asset.id,
+            disposal_date=date(2025, 7, 1),
+            proceeds=Decimal("0"),
             commit=False,
         )
 

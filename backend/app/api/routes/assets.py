@@ -70,6 +70,8 @@ def create_fixed_asset(
         cost_center_id=payload.cost_center_id,
         depreciation_expense_account_id=payload.depreciation_expense_account_id,
         accumulated_depreciation_account_id=payload.accumulated_depreciation_account_id,
+        asset_account_id=payload.asset_account_id,
+        acquisition_offset_account_id=payload.acquisition_offset_account_id,
         commit=False,
     )
     audit_service.record(
@@ -81,7 +83,12 @@ def create_fixed_asset(
         company_id=payload.company_id,
         project_id=payload.project_id,
         before=None,
-        after={"name": asset.name, "cost": str(asset.cost), "category": asset.category},
+        after={
+            "name": asset.name,
+            "cost": str(asset.cost),
+            "category": asset.category,
+            "capitalizationDocumentId": str(asset.capitalization_document_id),
+        },
         correlation_id=correlation_id,
     )
     db.commit()

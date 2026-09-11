@@ -63,6 +63,24 @@ def assert_supplier_advance_account_eligible(
     return account
 
 
+def assert_account_has_type(
+    db: Session,
+    *,
+    account_id: uuid.UUID,
+    company_id: uuid.UUID,
+    field_name: str,
+    expected_type: str,
+) -> Account:
+    account = assert_account_belongs_to_company(
+        db, account_id=account_id, company_id=company_id, field_name=field_name
+    )
+    if account.account_type != expected_type:
+        raise InvalidFinancialReferenceError(
+            f"{field_name} debe ser una cuenta {expected_type} postable"
+        )
+    return account
+
+
 def assert_project_belongs_to_company(
     db: Session, *, project_id: uuid.UUID | None, company_id: uuid.UUID
 ) -> Project | None:

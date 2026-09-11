@@ -990,6 +990,11 @@ def allocate_payment(
         raise InvalidFinancialReferenceError(
             "Cada cuota debe pertenecer al plan del contrato de la factura."
         )
+    invoice_installment_id = getattr(invoice, "contract_installment_id", None)
+    if invoice_installment_id is not None and set(inst_ids) != {invoice_installment_id}:
+        raise InvalidFinancialReferenceError(
+            "El pago sólo puede aplicarse a la cuota vinculada a esta factura."
+        )
     total = sum((_q(a["amount_applied"]) for a in allocations), _ZERO)
     if total != _q(payment.amount):
         if total > _q(payment.amount):

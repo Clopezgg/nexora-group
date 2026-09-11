@@ -293,3 +293,8 @@ def test_prepare_advance_invoice_does_not_autoapprove_creator(client, db_session
     invoice = db_session.get(SupplierInvoice, response.json()["invoiceId"])
     assert invoice.status == "DRAFT"
     assert invoice.accrual_document_id is None
+    assert response.json()["advanceInstallmentId"] == str(invoice.contract_installment_id)
+
+    persisted = client.get(f"/api/ap/supplier-invoices/{invoice.id}")
+    assert persisted.status_code == 200, persisted.text
+    assert persisted.json()["contractInstallmentId"] == response.json()["advanceInstallmentId"]

@@ -8,6 +8,7 @@ from app.domain.errors import InsufficientStockError
 from app.models.company import Company
 from app.models.inventory import PhysicalCount, StockLedgerEntry
 from app.repositories import inventory_repository
+from app.services import posting_service
 from app.services.financial_validation_service import assert_account_belongs_to_company
 
 """Stock Ledger append-only (orden maestra §54, docs/INVENTORY.md). Todo
@@ -367,7 +368,46 @@ def apply_physical_count(
         raise ValueError(f"PhysicalCount {physical_count_id} no existe")
     if count.status != "COUNTED":
         raise ValueError(f"PhysicalCount {physical_count_id} no está listo para aprobarse")
+    from app.models.company import Company
+
+    company = db.get(Company, count.company_id)
+    if company is None or not company.functional_currency_code:
+        raise ValueError("La compañía del conteo no tiene moneda funcional configurada")
+    configured_accounts = (
+        company.inventory_account_id,
+        company.inventory_adjustment_gain_account_id,
+        company.inventory_adjustment_loss_account_id,
+    )
+    if any(account_id is None for account_id in configured_accounts):
+        raise ValueError(
+            "Configura inventario, ganancia y pérdida de ajuste antes de aprobar el conteo físico"
+        )
+    inventory_account = assert_account_belongs_to_company(
+        db,
+        account_id=company.inventory_account_id,
+        company_id=count.company_id,
+        field_name="inventory_account_id",
+    )
+    gain_account = assert_account_belongs_to_company(
+        db,
+        account_id=company.inventory_adjustment_gain_account_id,
+        company_id=count.company_id,
+        field_name="inventory_adjustment_gain_account_id",
+    )
+    loss_account = assert_account_belongs_to_company(
+        db,
+        account_id=company.inventory_adjustment_loss_account_id,
+        company_id=count.company_id,
+        field_name="inventory_adjustment_loss_account_id",
+    )
+    if inventory_account.account_type != "ASSET":
+        raise ValueError("inventory_account_id debe ser una cuenta ASSET")
+    if gain_account.account_type != "REVENUE":
+        raise ValueError("inventory_adjustment_gain_account_id debe ser REVENUE")
+    if loss_account.account_type != "EXPENSE":
+        raise ValueError("inventory_adjustment_loss_account_id debe ser EXPENSE")
     lines = inventory_repository.list_physical_count_lines(db, physical_count_id)
+    journal_lines: list[posting_service.JournalLineInput] = []
     for line in lines:
         variance = line.counted_quantity - line.expected_quantity
         if variance == 0:
@@ -376,6 +416,37 @@ def apply_physical_count(
             db, company_id=count.company_id, item_id=line.item_id, warehouse_id=count.warehouse_id
         )
         new_qty = qty_before + variance
+        value = (abs(variance) * avg_cost).quantize(Decimal("0.01"))
+        if value > 0 and variance > 0:
+            journal_lines.extend(
+                [
+                    posting_service.JournalLineInput(
+                        account_id=inventory_account.id,
+                        debit_amount=value,
+                        description="Incremento por conteo físico",
+                    ),
+                    posting_service.JournalLineInput(
+                        account_id=gain_account.id,
+                        credit_amount=value,
+                        description="Ganancia por ajuste de inventario",
+                    ),
+                ]
+            )
+        elif value > 0:
+            journal_lines.extend(
+                [
+                    posting_service.JournalLineInput(
+                        account_id=loss_account.id,
+                        debit_amount=value,
+                        description="Pérdida por ajuste de inventario",
+                    ),
+                    posting_service.JournalLineInput(
+                        account_id=inventory_account.id,
+                        credit_amount=value,
+                        description="Disminución por conteo físico",
+                    ),
+                ]
+            )
         inventory_repository.append_ledger_entry(
             db,
             company_id=count.company_id,
@@ -389,6 +460,21 @@ def apply_physical_count(
             source_type="physical_count",
             source_id=physical_count_id,
             notes=f"Ajuste por conteo físico: esperado={line.expected_quantity}, contado={line.counted_quantity}",
+        )
+    if journal_lines:
+        posting_service.post_manual(
+            db,
+            company_id=count.company_id,
+            document_type_code="INV",
+            scope="GENERAL",
+            project_id=None,
+            currency_code=company.functional_currency_code,
+            effective_date=count.count_date,
+            lines=journal_lines,
+            description=f"Ajuste por conteo físico {count.id}",
+            source_type="physical_count",
+            source_id=count.id,
+            commit=False,
         )
     count.status = "APPROVED"
     count.approved_by_id = approved_by_id

@@ -43,6 +43,11 @@ class CompanyUpdateRequest(CamelModel):
     website: str | None = Field(default=None, max_length=255)
     voucher_footer_text: str | None = Field(default=None, max_length=500)
     supplier_advance_account_id: uuid.UUID | None = None
+    asset_disposal_gain_account_id: uuid.UUID | None = None
+    asset_disposal_loss_account_id: uuid.UUID | None = None
+    inventory_account_id: uuid.UUID | None = None
+    inventory_adjustment_gain_account_id: uuid.UUID | None = None
+    inventory_adjustment_loss_account_id: uuid.UUID | None = None
 
 
 class CompanyProfileUpdateRequest(CompanyUpdateRequest):
@@ -76,6 +81,11 @@ class CompanyResponse(CamelModel):
     logo_evidence_id: uuid.UUID | None = None
     signature_evidence_id: uuid.UUID | None = None
     supplier_advance_account_id: uuid.UUID | None = None
+    asset_disposal_gain_account_id: uuid.UUID | None = None
+    asset_disposal_loss_account_id: uuid.UUID | None = None
+    inventory_account_id: uuid.UUID | None = None
+    inventory_adjustment_gain_account_id: uuid.UUID | None = None
+    inventory_adjustment_loss_account_id: uuid.UUID | None = None
 
 
 class AccountCreateRequest(CamelModel):

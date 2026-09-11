@@ -13,6 +13,7 @@ export interface SupplierInvoice {
   dueDate: string
   status: string
   supplierContractId: string | null
+  contractInstallmentId: string | null
 }
 
 export interface SupplierPayment {

@@ -16,6 +16,8 @@ export const assetService = {
     projectId?: string
     depreciationExpenseAccountId: string
     accumulatedDepreciationAccountId: string
+    assetAccountId: string
+    acquisitionOffsetAccountId: string
   }) => apiFetch<FixedAsset>('/assets', { method: 'POST', body: JSON.stringify(payload) }),
   createFromSupplierInvoice: (
     supplierInvoiceId: string,
@@ -35,6 +37,13 @@ export const assetService = {
     }),
   changeStatus: (assetId: string, status: FixedAsset['status']) =>
     apiFetch<FixedAsset>(`/assets/${assetId}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+  dispose: (
+    assetId: string,
+    payload: { disposalDate: string; proceeds: string; proceedsAccountId?: string },
+  ) => apiFetch<FixedAsset>(`/assets/${assetId}/dispose`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
 
   listDepreciationEntries: (assetId: string) =>
     apiFetch<DepreciationEntry[]>(`/assets/${assetId}/depreciation-entries`),

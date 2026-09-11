@@ -20,14 +20,20 @@ def _quantize(value: Decimal | int | float | str) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def format_money(value: Decimal | int | float | str, currency_code: str = "HNL") -> str:
+def format_money(value: Decimal | int | float | str, currency_code: str) -> str:
     """`format_money("150000", "HNL")` -> `"L 150,000.00"`.
 
-    Negativos con signo menos delante del símbolo: `"-L 1,250.00"`.
+    La moneda es obligatoria: los artefactos financieros del backend nunca
+    deben inventar HNL (ni ninguna otra divisa) cuando el dominio no entregó
+    una autoridad monetaria explícita.
     """
+    currency = currency_code.strip().upper()
+    if len(currency) != 3 or not currency.isalpha():
+        raise ValueError("Se requiere un código de moneda ISO explícito")
+
     amount = _quantize(value)
     negative = amount < 0
     digits = f"{abs(amount):,.2f}"
-    symbol = _CURRENCY_SYMBOL.get(currency_code.upper(), currency_code.upper())
+    symbol = _CURRENCY_SYMBOL.get(currency, currency)
     prefix = "-" if negative else ""
     return f"{prefix}{symbol} {digits}"

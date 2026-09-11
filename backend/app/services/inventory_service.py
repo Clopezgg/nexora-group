@@ -383,6 +383,26 @@ def apply_physical_count(
         )
         if inventory_account.account_type != "ASSET":
             raise ValueError("inventory_account_id debe ser una cuenta ASSET")
+        adjustment_ids = {
+            "gain": count.adjustment_gain_account_id
+            if any(line.counted_quantity > line.expected_quantity for line in lines)
+            else None,
+            "loss": count.adjustment_loss_account_id
+            if any(line.counted_quantity < line.expected_quantity for line in lines)
+            else None,
+        }
+        adjustment_accounts: dict[str, uuid.UUID] = {}
+        for kind, account_id in adjustment_ids.items():
+            if account_id is None:
+                continue
+            account = assert_account_belongs_to_company(
+                db, account_id=account_id, company_id=count.company_id,
+                field_name=f"adjustment_{kind}_account_id",
+            )
+            expected_type = "INCOME" if kind == "gain" else "EXPENSE"
+            if account.account_type != expected_type:
+                raise ValueError(f"La cuenta de ajuste ({kind}) debe ser {expected_type}")
+            adjustment_accounts[kind] = account_id
     for line in lines:
         variance = line.counted_quantity - line.expected_quantity
         if variance == 0:
@@ -405,18 +425,7 @@ def apply_physical_count(
             source_id=physical_count_id,
             notes=f"Ajuste por conteo físico: esperado={line.expected_quantity}, contado={line.counted_quantity}",
         )
-        adjustment_account_id = (
-            count.adjustment_gain_account_id if variance > 0 else count.adjustment_loss_account_id
-        )
-        if adjustment_account_id is None:
-            raise ValueError("Falta la cuenta de ajuste de inventario para la variación")
-        adjustment_account = assert_account_belongs_to_company(
-            db, account_id=adjustment_account_id, company_id=count.company_id,
-            field_name="adjustment_account_id",
-        )
-        expected_type = "INCOME" if variance > 0 else "EXPENSE"
-        if adjustment_account.account_type != expected_type:
-            raise ValueError(f"La cuenta de ajuste debe ser {expected_type}")
+        adjustment_account_id = adjustment_accounts["gain" if variance > 0 else "loss"]
         value = (abs(variance) * avg_cost).quantize(Decimal("0.01"))
         if value > 0:
             lines_to_post = [

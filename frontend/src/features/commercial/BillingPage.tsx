@@ -30,7 +30,7 @@ import '../treasury/TreasuryPage.css'
 export function BillingPage() {
   const queryClient = useQueryClient()
   const handleMutationError = useMutationError()
-  const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
+  const { companies, activeCompanyId, activeCompany, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
   const [createOpen, setCreateOpen] = useState(false)
 
   const invoicesQuery = useQuery({
@@ -110,8 +110,8 @@ export function BillingPage() {
       </header>
 
       <div className="nx-dashboard__kpi-grid">
-        <Card title="Facturado"><strong>{formatMoney(totalBilled, 'HNL')}</strong></Card>
-        <Card title="Saldo por cobrar"><strong>{formatMoney(outstanding, 'HNL')}</strong></Card>
+        <Card title="Facturado"><strong>{formatMoney(totalBilled, activeCompany?.functionalCurrencyCode ?? '')}</strong></Card>
+        <Card title="Saldo por cobrar"><strong>{formatMoney(outstanding, activeCompany?.functionalCurrencyCode ?? '')}</strong></Card>
         <Card title="Documentos"><strong>{invoices.length}</strong></Card>
       </div>
 
@@ -128,6 +128,7 @@ export function BillingPage() {
       {createOpen && activeCompanyId ? (
         <BillingCreateModal
           companyId={activeCompanyId}
+          currencyCode={activeCompany?.functionalCurrencyCode ?? ''}
           customers={customers}
           projects={projects}
           revenueAccounts={accounts.filter((account) => account.accountType === 'REVENUE' && account.isPostable)}
@@ -140,8 +141,9 @@ export function BillingPage() {
   )
 }
 
-function BillingCreateModal({ companyId, customers, projects, revenueAccounts, receivableAccounts, onClose, onCreated }: {
+function BillingCreateModal({ companyId, currencyCode, customers, projects, revenueAccounts, receivableAccounts, onClose, onCreated }: {
   companyId: string
+  currencyCode: string
   customers: { id: string; legalName: string }[]
   projects: { id: string; name: string; code?: string | null }[]
   revenueAccounts: { id: string; name: string }[]
@@ -169,7 +171,7 @@ function BillingCreateModal({ companyId, customers, projects, revenueAccounts, r
       projectId: scope === 'PROJECT' ? projectId : null,
       revenueAccountId,
       receivableAccountId,
-      currencyCode: 'HNL',
+      currencyCode,
       amount: String(amount ?? 0),
       invoiceDate,
       dueDate,

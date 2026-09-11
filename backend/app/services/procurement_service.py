@@ -13,6 +13,7 @@ from app.domain.errors import (
 from app.models.company import Company
 from app.models.ap import SupplierInvoice
 from app.models.evidence import Evidence
+from app.models.item import Item
 from app.models.procurement import (
     GoodsReceipt,
     PurchaseOrder,
@@ -22,9 +23,13 @@ from app.models.procurement import (
     SupplierQuotation,
     ThreeWayMatchResult,
 )
+from app.models.warehouse import Warehouse
 from app.repositories import procurement_repository
 from app.services import inventory_service, numbering_service
-from app.services.financial_validation_service import assert_supplier_belongs_to_company
+from app.services.financial_validation_service import (
+    assert_project_belongs_to_company,
+    assert_supplier_belongs_to_company,
+)
 
 """Procurement end-to-end (orden maestra §44-51, docs/PROCUREMENT.md).
 Cada función numera su propio documento vía `numbering_service` (nunca
@@ -44,6 +49,17 @@ def create_requisition(
     lines: list[dict],
     commit: bool = True,
 ) -> PurchaseRequisition:
+    if db.get(Company, company_id) is None:
+        raise InvalidFinancialReferenceError("La compañía de la requisición no existe")
+    assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
+    for line in lines:
+        item_id = line.get("item_id")
+        if item_id is not None:
+            item = db.get(Item, item_id)
+            if item is None or item.company_id != company_id:
+                raise InvalidFinancialReferenceError(
+                    "Cada item de la requisición debe pertenecer a su compañía"
+                )
     number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="PR")
     requisition = procurement_repository.create_requisition(
         db,
@@ -103,6 +119,16 @@ def create_rfq(
 ) -> RequestForQuotation:
     if not supplier_ids:
         raise InvalidProcurementStateError("Una RFQ debe enviarse a al menos un supplier")
+    if len(set(supplier_ids)) != len(supplier_ids):
+        raise InvalidFinancialReferenceError("Una RFQ no puede invitar dos veces al mismo proveedor")
+    if purchase_requisition_id is not None:
+        requisition = procurement_repository.get_requisition(db, purchase_requisition_id)
+        if requisition is None or requisition.company_id != company_id:
+            raise InvalidFinancialReferenceError(
+                "La requisición debe pertenecer a la compañía de la RFQ"
+            )
+        if requisition.status != "APPROVED":
+            raise InvalidProcurementStateError("Solo una requisición aprobada puede originar una RFQ")
     for supplier_id in supplier_ids:
         assert_supplier_belongs_to_company(db, supplier_id=supplier_id, company_id=company_id)
     number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="RFQ")
@@ -140,6 +166,10 @@ def submit_quotation(
     if rfq is None:
         raise ValueError(f"RequestForQuotation {request_for_quotation_id} no existe")
     assert_supplier_belongs_to_company(db, supplier_id=supplier_id, company_id=rfq.company_id)
+    if not procurement_repository.supplier_is_invited(
+        db, rfq_id=request_for_quotation_id, supplier_id=supplier_id
+    ):
+        raise InvalidFinancialReferenceError("El proveedor no fue invitado a esta RFQ")
     quotation = procurement_repository.create_quotation(
         db,
         request_for_quotation_id=request_for_quotation_id,
@@ -176,7 +206,11 @@ def create_purchase_order_from_quotation(
 ) -> PurchaseOrder:
     """El usuario ya decidió el ganador (Bid Comparison manual); esto solo
     convierte la cotización seleccionada en una PO real con sus líneas."""
-    quotation = procurement_repository.get_quotation(db, supplier_quotation_id)
+    quotation = db.execute(
+        select(SupplierQuotation)
+        .where(SupplierQuotation.id == supplier_quotation_id)
+        .with_for_update()
+    ).scalar_one_or_none()
     if quotation is None:
         raise ValueError(f"SupplierQuotation {supplier_quotation_id} no existe")
     rfq = procurement_repository.get_rfq(db, quotation.request_for_quotation_id)
@@ -184,6 +218,9 @@ def create_purchase_order_from_quotation(
         raise InvalidFinancialReferenceError(
             "supplier_quotation_id debe pertenecer a una RFQ de la compañía indicada"
         )
+    if quotation.status != "RECEIVED":
+        raise InvalidProcurementStateError("La cotización ya fue decidida y no puede reutilizarse")
+    assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
     lines = procurement_repository.list_quotation_lines(db, supplier_quotation_id)
     number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="PO")
     order = procurement_repository.create_purchase_order(
@@ -194,6 +231,7 @@ def create_purchase_order_from_quotation(
         project_id=project_id,
         supplier_quotation_id=quotation.id,
         currency_code=quotation.currency_code,
+        fulfillment_type="GOODS",
         lines=[
             {
                 "description": line.description,
@@ -221,6 +259,7 @@ def _assert_contract_coherent_with_po(
     supplier_id: uuid.UUID,
     project_id: uuid.UUID | None,
     currency_code: str,
+    fulfillment_type: str = "GOODS",
 ) -> None:
     """ORDEN MAESTRA §19 — una PO ligada a un contrato debe coincidir en
     compañía, proveedor, proyecto y moneda con ese contrato."""
@@ -257,10 +296,25 @@ def create_purchase_order(
     project_id: uuid.UUID | None,
     currency_code: str,
     lines: list[dict],
+    fulfillment_type: str = "GOODS",
     supplier_contract_id: uuid.UUID | None = None,
     commit: bool = True,
 ) -> PurchaseOrder:
     """PO directa sin pasar por RFQ/cotización (compras menores)."""
+    if fulfillment_type not in {"GOODS", "SERVICE"}:
+        raise InvalidFinancialReferenceError("El tipo de cumplimiento de la orden es inválido")
+    if db.get(Company, company_id) is None:
+        raise InvalidFinancialReferenceError("La compañía de la orden no existe")
+    assert_supplier_belongs_to_company(db, supplier_id=supplier_id, company_id=company_id)
+    assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
+    for line in lines:
+        item_id = line.get("item_id")
+        if item_id is not None:
+            item = db.get(Item, item_id)
+            if item is None or item.company_id != company_id or not item.active:
+                raise InvalidFinancialReferenceError(
+                    "Cada item de la orden debe estar activo y pertenecer a su compañía"
+                )
     _assert_contract_coherent_with_po(
         db,
         supplier_contract_id=supplier_contract_id,
@@ -278,6 +332,7 @@ def create_purchase_order(
         project_id=project_id,
         supplier_quotation_id=None,
         currency_code=currency_code,
+        fulfillment_type=fulfillment_type,
         lines=lines,
         supplier_contract_id=supplier_contract_id,
     )
@@ -356,10 +411,23 @@ def record_goods_receipt(
     order = procurement_repository.get_purchase_order(db, purchase_order_id)
     if order is None:
         raise ValueError(f"PurchaseOrder {purchase_order_id} no existe")
+    if order.company_id != company_id:
+        raise InvalidFinancialReferenceError("La recepción y la orden pertenecen a compañías distintas")
     if order.status not in ("SENT", "APPROVED", "PARTIALLY_RECEIVED"):
         raise InvalidProcurementStateError(
             f"No se puede recibir mercadería para una PO en estado {order.status}"
         )
+    if order.fulfillment_type != "GOODS":
+        raise InvalidFinancialReferenceError(
+            "Una orden de servicios se acepta mediante entrada de servicio, no recepción física"
+        )
+    warehouse = db.get(Warehouse, warehouse_id)
+    if warehouse is None or warehouse.company_id != company_id or warehouse.status != "ACTIVE":
+        raise InvalidFinancialReferenceError(
+            "El almacén debe estar activo y pertenecer a la compañía de la orden"
+        )
+    if not lines:
+        raise InvalidFinancialReferenceError("La recepción debe contener al menos una línea")
 
     number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="GR")
     receipt = procurement_repository.create_goods_receipt(
@@ -385,6 +453,8 @@ def record_goods_receipt(
         )
         if po_line is None:
             raise ValueError(f"PurchaseOrderLine {line['purchase_order_line_id']} no existe")
+        if po_line.purchase_order_id != order.id:
+            raise InvalidFinancialReferenceError("La línea recibida no pertenece a esta orden")
         remaining = po_line.quantity - po_line.quantity_received
         if line["quantity_received"] > remaining:
             raise InvalidProcurementStateError(
@@ -441,6 +511,10 @@ def record_service_entry(
     if order.status not in ("SENT", "APPROVED", "PARTIALLY_RECEIVED"):
         raise InvalidFinancialReferenceError(
             f"No se puede aceptar servicio para una PO en estado {order.status}"
+        )
+    if order.fulfillment_type != "SERVICE":
+        raise InvalidFinancialReferenceError(
+            "Una orden de bienes se recibe físicamente, no mediante entrada de servicio"
         )
     if period_start > period_end:
         raise InvalidFinancialReferenceError("El período de servicio es inválido")

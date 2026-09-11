@@ -113,6 +113,7 @@ class PurchaseOrderCreateRequest(CamelModel):
     project_id: uuid.UUID | None = None
     supplier_contract_id: uuid.UUID | None = None
     currency_code: str
+    fulfillment_type: str = "GOODS"
     lines: list[PurchaseOrderLineRequest]
 
 
@@ -141,6 +142,7 @@ class PurchaseOrderResponse(CamelModel):
     supplier_quotation_id: uuid.UUID | None
     supplier_contract_id: uuid.UUID | None = None
     currency_code: str
+    fulfillment_type: str
     status: str
     lines: list[PurchaseOrderLineResponse] = []
 

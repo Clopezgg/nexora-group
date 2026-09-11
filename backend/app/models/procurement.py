@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, text
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,6 +27,7 @@ PO_STATUSES = (
     "CLOSED",
     "CANCELLED",
 )
+PO_FULFILLMENT_TYPES = ("GOODS", "SERVICE")
 THREE_WAY_MATCH_STATUSES = ("MATCHED", "EXCEPTION")
 
 
@@ -101,6 +102,11 @@ class RfqSupplier(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """RFQ enviado a un supplier específico (una RFQ puede ir a varios)."""
 
     __tablename__ = "rfq_suppliers"
+    __table_args__ = (
+        UniqueConstraint(
+            "request_for_quotation_id", "supplier_id", name="uq_rfq_suppliers_invitation"
+        ),
+    )
 
     request_for_quotation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("requests_for_quotation.id", ondelete="CASCADE"), nullable=False
@@ -161,6 +167,11 @@ class PurchaseOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "status IN ('DRAFT','APPROVAL_PENDING','APPROVED','SENT','PARTIALLY_RECEIVED','RECEIVED','CLOSED','CANCELLED')",
             name="ck_purchase_orders_status_valid",
         ),
+        CheckConstraint(
+            "fulfillment_type IN ('GOODS','SERVICE')",
+            name="ck_purchase_orders_fulfillment_type_valid",
+        ),
+        UniqueConstraint("supplier_quotation_id", name="uq_purchase_orders_supplier_quotation"),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -182,6 +193,7 @@ class PurchaseOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("supplier_contracts.id", ondelete="RESTRICT"), nullable=True
     )
     currency_code: Mapped[str] = mapped_column(String(3), ForeignKey("currencies.code"), nullable=False)
+    fulfillment_type: Mapped[str] = mapped_column(String(16), nullable=False, default="GOODS")
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="DRAFT")
 
 

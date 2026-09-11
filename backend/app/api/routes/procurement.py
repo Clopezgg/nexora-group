@@ -317,7 +317,9 @@ def _purchase_order_response(db: Session, order) -> PurchaseOrderResponse:
         supplier_id=order.supplier_id,
         project_id=order.project_id,
         supplier_quotation_id=order.supplier_quotation_id,
+        supplier_contract_id=order.supplier_contract_id,
         currency_code=order.currency_code,
+        fulfillment_type=order.fulfillment_type,
         status=order.status,
         lines=[PurchaseOrderLineResponse.model_validate(line, from_attributes=True) for line in lines],
     )
@@ -383,6 +385,7 @@ def create_purchase_order(
         project_id=payload.project_id,
         supplier_contract_id=payload.supplier_contract_id,
         currency_code=payload.currency_code,
+        fulfillment_type=payload.fulfillment_type,
         lines=[line.model_dump() for line in payload.lines],
         commit=False,
     )

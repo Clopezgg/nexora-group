@@ -29,6 +29,7 @@ export function PurchaseOrdersPage() {
   const [description, setDescription] = useState('')
   const [quantity, setQuantity] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
+  const [fulfillmentType, setFulfillmentType] = useState<'GOODS' | 'SERVICE'>('GOODS')
   const [matchOrder, setMatchOrder] = useState<PurchaseOrder | null>(null)
   const [matchInvoiceId, setMatchInvoiceId] = useState('')
   const [invoiceQuantity, setInvoiceQuantity] = useState('')
@@ -66,6 +67,7 @@ export function PurchaseOrdersPage() {
         companyId: activeCompanyId as string,
         supplierId: supplierId as string,
         currencyCode: activeCompany?.functionalCurrencyCode ?? 'HNL',
+        fulfillmentType,
         lines: [{ description, quantity, unitPrice }],
       }),
     onSuccess: () => {
@@ -75,6 +77,7 @@ export function PurchaseOrdersPage() {
       setDescription('')
       setQuantity('')
       setUnitPrice('')
+      setFulfillmentType('GOODS')
     },
     onError: (error) => handleMutationError(error, 'Crear orden de compra'),
   })
@@ -208,6 +211,14 @@ export function PurchaseOrdersPage() {
           }}
         >
           <SupplierSelector options={supplierOptions} value={supplierId} onChange={setSupplierId} />
+          <Select
+            label="Tipo de recepción"
+            value={fulfillmentType}
+            onChange={(event) => setFulfillmentType(event.target.value as 'GOODS' | 'SERVICE')}
+          >
+            <option value="GOODS">Bienes · recepción de mercadería</option>
+            <option value="SERVICE">Servicios · aceptación por período</option>
+          </Select>
           <Input label="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} required />
           <Input label="Cantidad" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
           <Input label="Precio unitario" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} required />

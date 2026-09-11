@@ -118,6 +118,15 @@ def get_rfq(db: Session, rfq_id: uuid.UUID) -> RequestForQuotation | None:
     return db.get(RequestForQuotation, rfq_id)
 
 
+def supplier_is_invited(db: Session, *, rfq_id: uuid.UUID, supplier_id: uuid.UUID) -> bool:
+    return db.execute(
+        select(RfqSupplier.id).where(
+            RfqSupplier.request_for_quotation_id == rfq_id,
+            RfqSupplier.supplier_id == supplier_id,
+        )
+    ).scalar_one_or_none() is not None
+
+
 def list_rfqs(db: Session, *, company_id: uuid.UUID) -> list[RequestForQuotation]:
     stmt = (
         select(RequestForQuotation)
@@ -188,6 +197,7 @@ def create_purchase_order(
     project_id: uuid.UUID | None,
     supplier_quotation_id: uuid.UUID | None,
     currency_code: str,
+    fulfillment_type: str,
     lines: list[dict],
     supplier_contract_id: uuid.UUID | None = None,
 ) -> PurchaseOrder:
@@ -199,6 +209,7 @@ def create_purchase_order(
         supplier_quotation_id=supplier_quotation_id,
         supplier_contract_id=supplier_contract_id,
         currency_code=currency_code,
+        fulfillment_type=fulfillment_type,
         status="DRAFT",
     )
     db.add(order)

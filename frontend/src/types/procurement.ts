@@ -107,6 +107,7 @@ export interface PurchaseOrder {
   supplierId: string
   projectId: string | null
   currencyCode: string
+  fulfillmentType: 'GOODS' | 'SERVICE'
   status: string
   lines: PurchaseOrderLine[]
 }

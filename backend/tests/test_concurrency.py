@@ -358,6 +358,7 @@ def test_concurrent_service_entries_never_over_accept_purchase_order(client, db_
             "companyId": company["id"],
             "supplierId": supplier["id"],
             "currencyCode": "HNL",
+            "fulfillmentType": "SERVICE",
             "lines": [{"description": "Servicio", "quantity": "1", "unitPrice": "1000"}],
         },
     )

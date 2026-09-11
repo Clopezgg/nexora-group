@@ -65,7 +65,9 @@ export function ServiceEntriesPage() {
     onError: (error) => handleMutationError(error, 'Registrar entrada de servicio'),
   })
 
-  const orders = (ordersQuery.data ?? []).filter((order) => ACCEPTABLE_STATUSES.includes(order.status))
+  const orders = (ordersQuery.data ?? []).filter(
+    (order) => order.fulfillmentType === 'SERVICE' && ACCEPTABLE_STATUSES.includes(order.status),
+  )
   const orderNumbers = new Map((ordersQuery.data ?? []).map((order) => [order.id, order.poNumber]))
   const currency = activeCompany?.functionalCurrencyCode ?? undefined
   const columns: TableColumn<ServiceEntry>[] = [

@@ -19,7 +19,7 @@ describe('ServiceEntriesPage', () => {
       if (url.includes('/procurement/purchase-orders?')) {
         body = [{
           id: 'po1', companyId: 'c1', poNumber: 'PO-001', supplierId: 's1', projectId: null,
-          currencyCode: 'HNL', status: 'SENT', lines: [],
+          currencyCode: 'HNL', fulfillmentType: 'SERVICE', status: 'SENT', lines: [],
         }]
       } else if (url.includes('/procurement/service-entries?')) {
         body = [{

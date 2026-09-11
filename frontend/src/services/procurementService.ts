@@ -101,6 +101,7 @@ export const procurementService = {
     companyId: string
     supplierId: string
     currencyCode: string
+    fulfillmentType?: 'GOODS' | 'SERVICE'
     lines: { description: string; quantity: string; unitPrice: string }[]
   }) => apiFetch<PurchaseOrder>('/procurement/purchase-orders', { method: 'POST', body: JSON.stringify(payload) }),
   approvePurchaseOrder: (id: string) =>

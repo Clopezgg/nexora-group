@@ -162,15 +162,18 @@ def list_exceptions(db: Session, *, company_id, as_of: date | None = None) -> li
         )
 
     # 7. Números de factura de proveedor duplicados.
+    #    La unicidad preventiva cubre nuevas escrituras; este detector se
+    #    conserva para legacy/importaciones y cualquier dato histórico que
+    #    exista antes de la restricción.
     dup_rows = db.execute(
         select(
             SupplierInvoice.supplier_id,
-            SupplierInvoice.invoice_number,
+            SupplierInvoice.invoice_number_normalized,
             func.count(SupplierInvoice.id).label("n"),
         )
         .where(SupplierInvoice.company_id == company_id)
         .where(SupplierInvoice.status != "CANCELLED")
-        .group_by(SupplierInvoice.supplier_id, SupplierInvoice.invoice_number)
+        .group_by(SupplierInvoice.supplier_id, SupplierInvoice.invoice_number_normalized)
         .having(func.count(SupplierInvoice.id) > 1)
     ).all()
     if dup_rows:

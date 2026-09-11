@@ -137,6 +137,13 @@ def decide(
     request.comment = comment
     request.decided_at = datetime.now(timezone.utc)
 
+    # The session runs with autoflush=False; the decision must reach the
+    # database before the domain adapter re-reads the entity, otherwise a
+    # guard that checks "invoice in REVIEW has a PENDING ApprovalRequest"
+    # (ap_service.approve_supplier_invoice) would still see this request as
+    # PENDING and block the very decision that resolves it.
+    db.flush()
+
     adapter = _DECISION_ADAPTERS.get(request.entity_type)
     if adapter is not None:
         adapter(db, request.entity_id, decision, decided_by)

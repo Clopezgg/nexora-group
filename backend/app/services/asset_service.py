@@ -286,13 +286,20 @@ def apply_capitalization_reversal(
 
 
 def _accumulated_depreciation_total(db: Session, *, asset_id: uuid.UUID) -> Decimal:
-    """Only effective DEP documents contribute to the asset subledger."""
+    """Only effective DEP documents contribute to the asset subledger.
+
+    `POSTED` only, never `REVERSED`: reversing a DEP document nets its effect
+    to zero in GL (original REVERSED + its POSTED ANU reversal), but no
+    compensating DepreciationEntry exists (no reversal hook for this source
+    type), so counting a REVERSED entry would keep a subledger event that GL
+    already canceled -- the forbidden GL-REVERSED/subledger-active divergence.
+    """
     result = db.execute(
         select(func.coalesce(func.sum(DepreciationEntry.amount), 0))
         .outerjoin(AccountingDocument, AccountingDocument.id == DepreciationEntry.accounting_document_id)
         .where(
             DepreciationEntry.asset_id == asset_id,
-            AccountingDocument.status.in_(("POSTED", "REVERSED")),
+            AccountingDocument.status == "POSTED",
         )
     ).scalar_one()
     return Decimal(str(result))

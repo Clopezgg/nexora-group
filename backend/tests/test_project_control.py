@@ -534,6 +534,12 @@ def test_forecast_uses_project_inventory_issues_as_actual_cost_without_relabelin
         "/api/inventory/warehouses",
         json={"companyId": company["id"], "code": "ALM-PC", "name": "Almacén de obra"},
     ).json()
+    cost_account = create_account(
+        client, company_id=company["id"], code="5200", name="Costo de materiales", account_type="EXPENSE"
+    )
+    inventory_account = create_account(
+        client, company_id=company["id"], code="1400", name="Inventario de materiales", account_type="ASSET"
+    )
     received = client.post(
         "/api/inventory/stock/receive",
         json={
@@ -553,6 +559,8 @@ def test_forecast_uses_project_inventory_issues_as_actual_cost_without_relabelin
             "warehouseId": warehouse["id"],
             "projectId": project["id"],
             "quantity": "3.0000",
+            "costOfGoodsAccountId": cost_account["id"],
+            "inventoryAccountId": inventory_account["id"],
         },
     )
     assert issued.status_code == 201, issued.text

@@ -9,7 +9,6 @@ from app.models.accounting import LEDGER_EFFECTIVE_STATUSES, AccountingDocument,
 from app.models.chart_of_accounts import Account
 from app.repositories import (
     budget_repository,
-    inventory_repository,
     project_control_repository,
     project_repository,
 )
@@ -17,8 +16,9 @@ from app.repositories import (
 """Forecast / Earned Value.
 
 BAC is the active project COST budget. PV/EV use the latest progress record
-against BAC. AC combines authoritative posted General Ledger expense with
-posted project inventory consumption, which is not yet mirrored into the GL.
+against BAC. AC combines authoritative posted General Ledger expense. Inventory
+consumption is posted to that same GL by the canonical inventory service, so it
+must not be added a second time from the Stock Ledger.
 It never treats cash paid or accrued invoice amounts as cost. When progress or
 a cost budget is missing, dependent metrics remain None so the UI can show an
 honest em dash instead of a fabricated zero.
@@ -64,12 +64,7 @@ def compute_forecast(db: Session, *, project_id: uuid.UUID) -> ForecastSnapshot:
     project = project_repository.get_by_id(db, project_id)
     if project is None:
         raise ValueError(f"Project {project_id} no existe")
-    inventory_actuals = inventory_repository.project_actuals_by_project(
-        db, company_id=project.company_id
-    )
-    ac = _project_gl_actual_cost(db, project_id=project_id) + inventory_actuals.get(
-        project_id, Decimal("0")
-    )
+    ac = _project_gl_actual_cost(db, project_id=project_id)
 
     latest_progress = project_control_repository.latest_progress(db, project_id)
     if latest_progress is None or active_budget is None:

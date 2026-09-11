@@ -28,6 +28,7 @@ from app.domain.errors import (
     InvalidDocumentStateError,
     InvalidEquipmentStatusError,
     InvalidFinancialReferenceError,
+    FinancialContextRequiredError,
     InvalidInvoiceStateError,
     InvalidOperationScopeError,
     InvalidProcurementStateError,

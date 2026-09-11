@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import case, extract, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.domain.errors import FinancialContextRequiredError
 from app.models.accounting import (
     LEDGER_EFFECTIVE_STATUSES,
     AccountingDocument,
@@ -77,27 +78,26 @@ def get_summary(
     *,
     user_id: uuid.UUID,
     company_id: uuid.UUID | None = None,
+    financial_project_ids: list[uuid.UUID] | None = None,
 ) -> DashboardSummaryResponse:
     today = datetime.now(BUSINESS_TZ).date()
     month_start = date(today.year, today.month, 1)
     month_starts = _month_starts(today)
 
-    if company_id is not None:
-        company = db.get(Company, company_id)
-    else:
-        # Fallback to the first available company for central views
-        company = db.execute(select(Company).limit(1)).scalar_one_or_none()
-
-    currency_code = "HNL" # Temporary fallback if absolutely empty DB
-    if company is not None and company.functional_currency_code:
-        currency_code = company.functional_currency_code
+    if company_id is None:
+        raise FinancialContextRequiredError("Se requiere una compañía activa para visualizar datos financieros.")
+        
+    company = db.get(Company, company_id)
+    if not company:
+        raise ValueError("La compañía solicitada no existe.")
+        
+    currency_code = company.functional_currency_code or "USD"
 
     fiscal_year = None
     fiscal_period = None
-    if company_id is not None:
-        fiscal_year, fiscal_period = fiscal_service.get_current_period(
-            db, company_id=company_id, on_date=today
-        )
+    fiscal_year, fiscal_period = fiscal_service.get_current_period(
+        db, company_id=company_id, on_date=today
+    )
     # Ventana económica del período: fechas de negocio (no timestamps UTC). El
     # reporting agrupa por `effective_date` (ver `econ_date` abajo).
     metric_start = fiscal_period.start_date if fiscal_period else month_start

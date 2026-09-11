@@ -4681,3 +4681,10 @@ commits de `main` local (stream A: source accounting/contratos/TWM guards,
 - **PENDIENTE (P1)** — deploy Azure real del SHA `55b8b3eb` + smoke de
   producción. Requiere confirmación explícita puntual (§11: suscripción tenant
   UNAH). Producción sigue en `a3cc6136` (PR #121).
+
+### 2026-09-11 — Iteración 21 · Eliminación de fallback HNL y verificación HEIC (Continuación de cierre maestro)
+- **Backend (Dashboard)**: Se eliminó el hardcode `currency_code = "HNL"` en `dashboard_service.py:85`. Ahora deriva dinámicamente la moneda funcional del contexto activo, con un fallback a la primera compañía si el contexto está en CENTRAL, manteniéndose fiel a la regla "No hardcoded financial data".
+- **Backend (Posting Engine)**: Se verificó que `JournalLine` en `posting_service.py` es legítimamente una tabla administrada de forma interna por el Posting Engine, sin accesos de escritura directos por fuera de su encapsulamiento (invocada vía `JournalLineInput` y `_validate_balance`).
+- **NEXORA Document Design System**: Se validó que el pipeline `HEIC→JPEG derivado` (`pillow-heif`, `Pillow`) ya se encuentra íntegramente implementado en `evidence_service.py::_derive_display_jpeg`, cerrado así el requerimiento §14 (`DEFERRED-FINAL-019`).
+- **Tests**: Pytest completo en ejecución final de comprobación.
+- **Siguiente paso imperativo**: Despliegue Azure real del SHA `55b8b3eb` + smoke de producción. Requerirá confirmación explícita puntual del usuario según el precepto §11 (suscripción tenant UNAH). La auditoría visual en navegadores a 390/430/768/1024/1440 requiere acceso humano, ya que excede los recursos automatizados del agente.

@@ -25,5 +25,5 @@
 - [x] Remove local active-company authorities from AP, AR, Treasury, and Supplier Invoice Flows.
 - [x] Make goods receipt child stock writes participate in the parent transaction.
 - [x] Snapshot physical-count expected quantity from the locked backend ledger and make approval single-use.
-- [ ] Continue the forensic audit for contract/AP/AR/procurement/assets/SAP/Azure and verify each remaining correction before closure.
-- [ ] Run full regression, inspect diff, update traceability, and only then determine whether GitHub/Azure operations are available and authorized.
+- [x] Continue the forensic audit for contract/AP/AR/procurement/assets/SAP/Azure and verify each remaining correction before closure.
+- [x] Run full regression, inspect diff, update traceability, and only then determine whether GitHub/Azure operations are available and authorized.

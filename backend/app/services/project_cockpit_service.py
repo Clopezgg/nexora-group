@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.models.accounting import JournalLine
 from app.models.chart_of_accounts import Account
 from app.models.crm import SalesContract
+from app.models.company import Company
 from app.models.progress import ProgressRecord
 from app.models.project import Project
 from app.services import budget_service
@@ -92,6 +93,12 @@ def build(db: Session, *, project_id) -> ProjectCockpit | None:
     project = db.get(Project, project_id)
     if project is None:
         return None
+    company = db.get(Company, project.company_id)
+    currency_code = project.currency_code or (
+        company.functional_currency_code if company is not None else None
+    )
+    if not currency_code:
+        raise ValueError("El proyecto y su compañía no tienen moneda configurada")
 
     summary = budget_service.compute_summary(db, project_id=project_id)
     bac = summary.authorized
@@ -127,7 +134,7 @@ def build(db: Session, *, project_id) -> ProjectCockpit | None:
     return ProjectCockpit(
         project_id=str(project.id),
         project_name=project.name,
-        currency_code=project.currency_code or "HNL",
+        currency_code=currency_code,
         budget_at_completion=bac,
         committed=committed,
         actual_cost=ac,

@@ -54,7 +54,9 @@ def _company_export_context(db: Session, company_id: uuid.UUID) -> tuple[str, st
     company = company_repository.get_by_id(db, company_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Compañía no encontrada")
-    return company.name, company.functional_currency_code or "HNL"
+    if not company.functional_currency_code:
+        raise HTTPException(status_code=409, detail="La compañía no tiene moneda funcional configurada")
+    return company.name, company.functional_currency_code
 
 
 def _download(content: bytes, *, fmt: str, basename: str) -> Response:

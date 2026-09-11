@@ -101,7 +101,7 @@ export function FixedAssetsPage() {
         name: form.name,
         acquisitionDate: form.acquisitionDate,
         cost: form.cost,
-        currencyCode: activeCompany?.functionalCurrencyCode ?? 'HNL',
+        currencyCode: activeCompany?.functionalCurrencyCode as string,
         usefulLifeMonths: Number(form.usefulLifeMonths),
         salvageValue: form.salvageValue,
         scope: form.scope,

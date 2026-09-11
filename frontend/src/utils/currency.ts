@@ -1,15 +1,13 @@
 const symbolCache = new Map<string, string>()
 
-function normalizeCurrency(currency: string): string {
-  const key = currency.trim().toUpperCase()
-  if (!/^[A-Z]{3}$/.test(key)) {
-    throw new Error('Se requiere un código de moneda ISO explícito para formatear importes.')
-  }
-  return key
+function normalizeCurrency(currency?: string | null): string | null {
+  const key = currency?.trim().toUpperCase() ?? ''
+  return /^[A-Z]{3}$/.test(key) ? key : null
 }
 
-function currencySymbol(currency: string): string {
+function currencySymbol(currency?: string | null): string | null {
   const key = normalizeCurrency(currency)
+  if (!key) return null
   let symbol = symbolCache.get(key)
   if (!symbol) {
     try {
@@ -32,16 +30,24 @@ function currencySymbol(currency: string): string {
  * La representación financiera autoritativa viaja como string; aquí se
  * normaliza a centavos con BigInt y redondeo decimal exacto. Los `number`
  * siguen aceptándose para inputs/UI no autoritativos por compatibilidad.
- * La moneda es obligatoria: ningún flujo financiero puede caer silenciosamente
- * a una divisa predeterminada.
+ *
+ * No existe moneda implícita: si el llamador no aporta un código ISO válido,
+ * el formatter falla cerrado visualmente con `—` en vez de inventar HNL u
+ * otra divisa. Los flujos de creación/posting deben además bloquear antes de
+ * llegar a esta capa de presentación.
  */
-export function formatMoney(value: number | string, currency: string): string {
-  const raw = typeof value === 'number'
-    ? (Number.isFinite(value) ? value.toFixed(2) : '0')
-    : String(value).trim()
+export function formatMoney(value: number | string, currency?: string | null): string {
+  const symbol = currencySymbol(currency)
+  if (!symbol) return '—'
+
+  const raw =
+    typeof value === 'number'
+      ? Number.isFinite(value)
+        ? value.toFixed(2)
+        : '0'
+      : String(value).trim()
   const match = raw.match(/^([+-]?)(\d+)(?:\.(\d+))?$/)
   const separator = '\u00a0'
-  const symbol = currencySymbol(currency)
   if (!match) return `${symbol}${separator}0.00`
 
   const negative = match[1] === '-'
@@ -59,13 +65,21 @@ export function formatMoney(value: number | string, currency: string): string {
 
 /** Abbreviated money is deliberately presentational (axes/sparklines), never
  * used as an accounting value or request payload. */
-export function formatMoneyCompact(value: number | string, currency: string): string {
+export function formatMoneyCompact(
+  value: number | string,
+  currency?: string | null,
+): string {
+  const symbol = currencySymbol(currency)
+  if (!symbol) return '—'
   const amount = Number(value)
   if (!Number.isFinite(amount)) return formatMoney(0, currency)
-  const symbol = currencySymbol(currency)
   const sign = amount < 0 ? '-' : ''
   const abs = Math.abs(amount)
-  if (abs >= 1_000_000) return `${sign}${symbol} ${(abs / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}M`
-  if (abs >= 1_000) return `${sign}${symbol} ${(abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1)}K`
+  if (abs >= 1_000_000) {
+    return `${sign}${symbol} ${(abs / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}M`
+  }
+  if (abs >= 1_000) {
+    return `${sign}${symbol} ${(abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1)}K`
+  }
   return `${sign}${symbol} ${abs.toFixed(0)}`
 }

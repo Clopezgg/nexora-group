@@ -76,7 +76,8 @@ function BudgetLineEditor({
 
 function BudgetAndForecast({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient()
-  const { activeCompanyId } = useActiveCompany()
+  const { activeCompanyId, activeCompany } = useActiveCompany()
+  const functionalCurrencyCode = activeCompany?.functionalCurrencyCode ?? 'HNL'
   const [baselineLines, setBaselineLines] = useState<DraftLine[]>([makeLine()])
   const [redistributionLines, setRedistributionLines] = useState<DraftLine[]>([makeLine()])
   const [notes, setNotes] = useState('')
@@ -99,7 +100,7 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
 
   const createBaseline = useMutation({
     mutationFn: () => projectService.createBaseline(projectId, {
-      currencyCode: 'HNL',
+      currencyCode: functionalCurrencyCode,
       lines: baselineLines.map(({ key: _key, ...line }) => line),
       notes: notes.trim() || undefined,
     }),

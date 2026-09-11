@@ -28,7 +28,7 @@ const STATUS_TONE: Record<FixedAsset['status'], 'success' | 'warning' | 'neutral
 }
 
 export function FixedAssetsPage() {
-  const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const { activeCompanyId, activeCompany, isLoading: loadingCompanies } = useActiveCompany()
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [depreciationAsset, setDepreciationAsset] = useState<FixedAsset | null>(null)
@@ -97,7 +97,7 @@ export function FixedAssetsPage() {
         name: form.name,
         acquisitionDate: form.acquisitionDate,
         cost: form.cost,
-        currencyCode: 'HNL',
+        currencyCode: activeCompany?.functionalCurrencyCode ?? 'HNL',
         usefulLifeMonths: Number(form.usefulLifeMonths),
         salvageValue: form.salvageValue,
         scope: form.scope,

@@ -377,6 +377,12 @@ def test_concurrent_stock_issues_never_over_issue_beyond_on_hand_quantity(client
     item_id = uuid.UUID(item["id"])
     warehouse_id = uuid.UUID(warehouse["id"])
     project_id = uuid.UUID(project["id"])
+    cost_account = create_account(
+        client, company_id=company["id"], code="5200", name="Costo de inventario", account_type="EXPENSE"
+    )
+    inventory_account = create_account(
+        client, company_id=company["id"], code="1400", name="Inventario", account_type="ASSET"
+    )
     db_session.commit()
 
     seed_db = SessionLocal()
@@ -402,6 +408,8 @@ def test_concurrent_stock_issues_never_over_issue_beyond_on_hand_quantity(client
                 warehouse_id=warehouse_id,
                 project_id=project_id,
                 quantity=Decimal("30.0000"),
+                cost_of_goods_account_id=uuid.UUID(cost_account["id"]),
+                inventory_account_id=uuid.UUID(inventory_account["id"]),
             )
             return "issued"
         except InsufficientStockError:

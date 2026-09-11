@@ -751,6 +751,8 @@ def test_submit_for_approval_accepts_an_administrator_with_no_explicit_company_a
     )
     assert submit.status_code == 200, submit.text
     assert submit.json()["status"] == "REVIEW"
+    bypass = client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+    assert bypass.status_code == 409, bypass.text
 
 
 def test_cannot_submit_an_invoice_that_is_not_draft(client, db_session):

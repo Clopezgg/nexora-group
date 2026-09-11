@@ -1,6 +1,7 @@
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
+import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -16,6 +17,7 @@ from app.models.ap import (
     SupplierPayment,
 )
 from app.models.accounting import AccountingDocument
+from app.models.approval_request import ApprovalRequest
 from app.models.asset import FixedAsset
 from app.models.evidence import Evidence
 from app.models.supplier import Supplier
@@ -35,6 +37,10 @@ entidad real `Supplier` (Track C - Suppliers/Contracts)."""
 
 _PAYMENT_METHODS = {"TRANSFER", "DEPOSIT", "CHECK", "CASH", "OTHER"}
 _PAYMENT_METHODS_REQUIRING_EVIDENCE = {"TRANSFER", "DEPOSIT", "CHECK"}
+
+
+def _normalize_invoice_number(value: str) -> str:
+    return re.sub(r"\s+", "", value.strip()).upper()
 
 
 def create_supplier_invoice(
@@ -127,6 +133,7 @@ def create_supplier_invoice(
         company_id=company_id,
         supplier_id=supplier_id,
         invoice_number=invoice_number,
+        invoice_number_normalized=_normalize_invoice_number(invoice_number),
         scope=scope,
         project_id=project_id,
         cost_center_id=cost_center_id,
@@ -200,6 +207,16 @@ def approve_supplier_invoice(
     if invoice.status not in ("DRAFT", "REVIEW"):
         raise InvalidInvoiceStateError(
             f"Solo se puede aprobar una factura DRAFT o REVIEW (estado actual: {invoice.status})"
+        )
+    if invoice.status == "REVIEW" and db.execute(
+        select(ApprovalRequest.id).where(
+            ApprovalRequest.entity_type == "ap.supplier_invoice",
+            ApprovalRequest.entity_id == invoice.id,
+            ApprovalRequest.status == "PENDING",
+        ).limit(1)
+    ).first() is not None:
+        raise InvalidInvoiceStateError(
+            "Una factura en revisión debe resolverse mediante su solicitud de aprobación"
         )
 
     supplier = db.get(Supplier, invoice.supplier_id)

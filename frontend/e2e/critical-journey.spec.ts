@@ -59,6 +59,15 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     await page.getByLabel('Contraseña').fill(ADMIN_PASSWORD)
     await page.getByRole('button', { name: 'Iniciar sesión' }).click()
     await expect(page).toHaveURL(/\/inicio/, { timeout: 15_000 })
+    // Project Setup and the subsequent operational mutations are protected
+    // commands. Unlock the browser session once so the real UI flow exercises
+    // the same secondary control as the backend instead of failing at the
+    // first 428 and leaving the wizard on the list page.
+    await page.getByRole('button', { name: 'Edición protegida' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Desbloquear edición' })
+    await dialog.getByLabel('Token de seguridad').fill(process.env.E2E_EDIT_ACCESS_TOKEN!)
+    await dialog.getByRole('button', { name: 'Desbloquear', exact: true }).click()
+    await expect(dialog).not.toBeVisible()
   })
 
   let companyId = ''
@@ -104,10 +113,11 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     })
   })
 
-  let bankGl = '', expenseGl = '', payableGl = '', equityGl = '', revenueGl = '', receivableGl = ''
+  let bankGl = '', expenseGl = '', inventoryGl = '', payableGl = '', equityGl = '', revenueGl = '', receivableGl = ''
   await test.step('chart of accounts (API)', async () => {
     bankGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '1100', name: 'Bancos E2E', accountType: 'ASSET' })).id
     expenseGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '5100', name: 'Gastos E2E', accountType: 'EXPENSE' })).id
+    inventoryGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '1400', name: 'Inventario E2E', accountType: 'ASSET' })).id
     payableGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '2100', name: 'CxP E2E', accountType: 'LIABILITY' })).id
     equityGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '3100', name: 'Aportes E2E', accountType: 'EQUITY' })).id
     revenueGl = (await api(page.request, 'post', '/master-data/accounts', { companyId, code: '4100', name: 'Ingresos E2E', accountType: 'REVENUE' })).id
@@ -259,6 +269,7 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     })
     const issue = await api<any>(page.request, 'post', '/inventory/stock/issue-to-project', {
       companyId, itemId, warehouseId, projectId, quantity: '20.0000',
+      costOfGoodsAccountId: expenseGl, inventoryAccountId: inventoryGl,
     })
     expect(issue.projectId).toBe(projectId)
     const summary = await api<any>(page.request, 'get', `/projects/${projectId}/budgets/summary`)

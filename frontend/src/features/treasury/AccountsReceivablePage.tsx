@@ -19,6 +19,7 @@ import { masterDataService } from '../../services/masterDataService'
 import { projectService } from '../../services/projectService'
 import { treasuryService } from '../../services/treasuryService'
 import { useMutationError } from '../../hooks/useMutationError'
+import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { arService, type CustomerInvoice } from '../../services/apArService'
 import { arMetricsService } from '../../services/financialControlService'
 import { formatMoney } from '../../utils/currency'
@@ -30,12 +31,9 @@ import './TreasuryPage.css'
 export function AccountsReceivablePage() {
   const queryClient = useQueryClient()
   const handleMutationError = useMutationError()
-  const [companyId, setCompanyId] = useState<string | null>(null)
   const [openCreate, setOpenCreate] = useState(false)
 
-  const companiesQuery = useQuery({ queryKey: ['master-data', 'companies'], queryFn: masterDataService.listCompanies })
-  const companies = companiesQuery.data ?? []
-  const activeCompanyId = companyId ?? companies[0]?.id ?? null
+  const { companies, activeCompany, activeCompanyId, setActiveCompanyId, isLoading: companiesLoading } = useActiveCompany()
 
   const accountsQuery = useQuery({
     queryKey: ['master-data', 'accounts', activeCompanyId],
@@ -64,7 +62,7 @@ export function AccountsReceivablePage() {
     onError: (error) => handleMutationError(error, 'Aprobar factura de cliente'),
   })
 
-  if (companiesQuery.isLoading) return <LoadingState label="Cargando…" />
+  if (companiesLoading) return <LoadingState label="Cargando…" />
   if (companies.length === 0) return <EmptyState icon="receipt" title="Aún no hay compañías configuradas" description="Crea una compañía antes de registrar facturas de cliente." />
 
   const revenueAccounts = (accountsQuery.data ?? []).filter((a) => a.accountType === 'REVENUE')
@@ -97,9 +95,9 @@ export function AccountsReceivablePage() {
       <header className="nx-treasury__header">
         <div>
           <h1 className="nx-dashboard__title">Cuentas por cobrar</h1>
-          <p className="nx-field__hint">La moneda de una factura de proyecto hereda la moneda del proyecto. Para operaciones generales se selecciona explícitamente; nunca se inventa una conversión.</p>
+          <p className="nx-field__hint">Moneda funcional activa: {activeCompany?.functionalCurrencyCode ?? '—'}. La moneda de una factura de proyecto hereda la moneda del proyecto; no se inventan conversiones.</p>
         </div>
-        <Select value={activeCompanyId ?? ''} onChange={(e) => setCompanyId(e.target.value)} aria-label="Compañía">
+        <Select value={activeCompanyId ?? ''} onChange={(e) => setActiveCompanyId(e.target.value)} aria-label="Compañía">
           {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
         </Select>
       </header>

@@ -18,6 +18,7 @@ import { projectService } from '../../services/projectService'
 import { submittalService } from '../../services/submittalService'
 import type { Submittal } from '../../types/submittal'
 import { RequiresActiveProject } from '../projects/RequiresActiveProject'
+import { businessTodayIso } from '../../utils/businessDate'
 
 const STATUS_TONE: Record<Submittal['status'], 'neutral' | 'success' | 'warning' | 'danger' | 'info'> = {
   SUBMITTED: 'neutral',
@@ -27,7 +28,7 @@ const STATUS_TONE: Record<Submittal['status'], 'neutral' | 'success' | 'warning'
 }
 
 function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10)
+  return businessTodayIso()
 }
 
 function SubmittalsList({ projectId, companyId }: { projectId: string; companyId: string }) {

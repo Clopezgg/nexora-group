@@ -28,6 +28,7 @@ import {
 } from '../../services/treasuryService'
 import { formatMoney } from '../../utils/currency'
 import { statusLabel } from '../../utils/statusLabels'
+import { businessTodayIso } from '../../utils/businessDate'
 import './TreasuryPage.css'
 
 function CompanyHeader({ title, description }: { title: string; description: string }) {
@@ -145,7 +146,7 @@ function CreateStatementModal({ accounts, onClose, onCreated }: { accounts: Awai
   const handleMutationError = useMutationError()
   const bankAccounts = accounts.filter((account) => account.kind === 'BANK' && account.status === 'ACTIVE')
   const [treasuryAccountId, setTreasuryAccountId] = useState(bankAccounts[0]?.id ?? '')
-  const [statementDate, setStatementDate] = useState(new Date().toISOString().slice(0, 10))
+  const [statementDate, setStatementDate] = useState(businessTodayIso())
   const [openingBalance, setOpeningBalance] = useState<number | null>(0)
   const [closingBalance, setClosingBalance] = useState<number | null>(0)
   const [reference, setReference] = useState('')
@@ -167,7 +168,7 @@ function CreateStatementModal({ accounts, onClose, onCreated }: { accounts: Awai
 
 function AddStatementLineModal({ statementId, onClose, onCreated }: { statementId: string; onClose: () => void; onCreated: () => void }) {
   const handleMutationError = useMutationError()
-  const [lineDate, setLineDate] = useState(new Date().toISOString().slice(0, 10))
+  const [lineDate, setLineDate] = useState(businessTodayIso())
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState<number | null>(null)
   const create = useMutation({
@@ -242,7 +243,7 @@ function CreateCashClosingModal({ accounts, onClose, onCreated }: { accounts: Aw
   const cashAccounts = accounts.filter((account) => account.kind === 'CASH')
   const [treasuryAccountId, setTreasuryAccountId] = useState(cashAccounts[0]?.id ?? '')
   const selected = cashAccounts.find((account) => account.id === treasuryAccountId)
-  const [closingDate, setClosingDate] = useState(new Date().toISOString().slice(0, 10))
+  const [closingDate, setClosingDate] = useState(businessTodayIso())
   const [openingAmount, setOpeningAmount] = useState<number | null>(0)
   const [countedAmount, setCountedAmount] = useState<number | null>(null)
   const create = useMutation({

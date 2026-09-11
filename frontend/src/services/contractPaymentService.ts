@@ -18,6 +18,9 @@ export interface ContractInstallment {
   status: string
   regularNumber: number | null
   regularCount: number | null
+  payableNow: boolean
+  paymentBlockedReason: string | null
+  contractBalanceAfter: string
 }
 
 export interface ContractSchedule {
@@ -87,7 +90,8 @@ export interface FifoPreviewItem {
 }
 
 export interface LedgerAllocation {
-  paymentId: string
+  sourceType: 'SUPPLIER_PAYMENT' | 'GENERAL_EXPENSE'
+  sourceId: string
   paymentDate: string
   installmentSequence: number
   installmentPeriodLabel: string

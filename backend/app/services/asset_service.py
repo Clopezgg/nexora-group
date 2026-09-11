@@ -286,12 +286,21 @@ def apply_capitalization_reversal(
 
 
 def _accumulated_depreciation_total(db: Session, *, asset_id: uuid.UUID) -> Decimal:
-    """Sum of all depreciation entries for the asset (posted or not).
-    The accumulated depreciation on the asset record reflects the total
-    depreciation recognized, regardless of whether the GL posting succeeded."""
+    """Only effective DEP documents contribute to the asset subledger.
+
+    `POSTED` only, never `REVERSED`: reversing a DEP document nets its effect
+    to zero in GL (original REVERSED + its POSTED ANU reversal), but no
+    compensating DepreciationEntry exists (no reversal hook for this source
+    type), so counting a REVERSED entry would keep a subledger event that GL
+    already canceled -- the forbidden GL-REVERSED/subledger-active divergence.
+    """
     result = db.execute(
         select(func.coalesce(func.sum(DepreciationEntry.amount), 0))
-        .where(DepreciationEntry.asset_id == asset_id)
+        .outerjoin(AccountingDocument, AccountingDocument.id == DepreciationEntry.accounting_document_id)
+        .where(
+            DepreciationEntry.asset_id == asset_id,
+            AccountingDocument.status == "POSTED",
+        )
     ).scalar_one()
     return Decimal(str(result))
 
@@ -467,6 +476,8 @@ def generate_depreciation_entry(
         raise InvalidAssetStateError(
             f"El activo {asset.id} está {asset.status}; no se puede depreciar"
         )
+    if period_end < asset.acquisition_date:
+        raise InvalidAssetStateError("No se puede depreciar antes de la fecha de adquisición")
 
     existing = asset_repository.get_depreciation_entry_for_period(
         db, asset_id=asset_id, period_start=period_start
@@ -477,7 +488,12 @@ def generate_depreciation_entry(
             f"{period_start.isoformat()}"
         )
 
-    amount = _monthly_depreciation_amount(asset)
+    already_depreciated = _accumulated_depreciation_total(db, asset_id=asset_id)
+    depreciable_base = asset.cost - asset.salvage_value
+    remaining_base = depreciable_base - already_depreciated
+    if remaining_base <= 0:
+        raise InvalidAssetStateError("El activo ya alcanzó su base depreciable")
+    amount = min(_monthly_depreciation_amount(asset), remaining_base).quantize(Decimal("0.01"))
 
     entry = asset_repository.create_depreciation_entry(
         db, asset_id=asset_id, period_start=period_start, period_end=period_end, amount=amount

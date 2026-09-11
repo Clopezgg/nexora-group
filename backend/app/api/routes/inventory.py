@@ -1,6 +1,7 @@
 import uuid
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -263,15 +264,20 @@ def issue_to_project(
         warehouse_ids=(payload.warehouse_id,),
         project_id=payload.project_id,
     )
-    entry = inventory_service.issue_to_project(
-        db,
-        company_id=payload.company_id,
-        item_id=payload.item_id,
-        warehouse_id=payload.warehouse_id,
-        project_id=payload.project_id,
-        quantity=payload.quantity,
-        commit=False,
-    )
+    try:
+        entry = inventory_service.issue_to_project(
+            db,
+            company_id=payload.company_id,
+            item_id=payload.item_id,
+            warehouse_id=payload.warehouse_id,
+            project_id=payload.project_id,
+            quantity=payload.quantity,
+            cost_of_goods_account_id=payload.cost_of_goods_account_id,
+            inventory_account_id=payload.inventory_account_id,
+            commit=False,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     audit_service.record(
         db,
         actor_user_id=user.id,
@@ -406,11 +412,23 @@ def create_physical_count(
         db, company_id=payload.company_id, warehouse_id=payload.warehouse_id, count_date=payload.count_date
     )
     for line in payload.lines:
+        inventory_service._lock_stock_position(
+            db,
+            company_id=payload.company_id,
+            item_id=line.item_id,
+            warehouse_id=payload.warehouse_id,
+        )
+        snapshot = inventory_repository.get_last_ledger_entry(
+            db,
+            company_id=payload.company_id,
+            item_id=line.item_id,
+            warehouse_id=payload.warehouse_id,
+        )
         inventory_repository.add_physical_count_line(
             db,
             physical_count_id=count.id,
             item_id=line.item_id,
-            expected_quantity=line.expected_quantity,
+            expected_quantity=snapshot.resulting_qty_on_hand if snapshot is not None else Decimal("0"),
             counted_quantity=line.counted_quantity,
         )
     count.status = "COUNTED"

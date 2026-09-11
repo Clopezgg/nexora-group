@@ -10,7 +10,7 @@ from app.domain.errors import (
     InvalidInvoiceStateError,
     InvalidTransferError,
 )
-from app.models.accounting import AccountingDocument, JournalLine
+from app.models.accounting import AccountingDocument, JournalLine, LEDGER_EFFECTIVE_STATUSES
 from app.models.chart_of_accounts import Account
 from app.models.treasury import (
     BankStatement,
@@ -42,7 +42,12 @@ def account_balance(db: Session, *, gl_account_id: uuid.UUID) -> Decimal:
     """Saldo contable de una cuenta (débito - crédito). Cuentas de
     Tesorería son ASSET, así que un saldo positivo es normal."""
     lines = db.execute(
-        select(JournalLine).where(JournalLine.account_id == gl_account_id)
+        select(JournalLine)
+        .join(AccountingDocument, AccountingDocument.id == JournalLine.accounting_document_id)
+        .where(
+            JournalLine.account_id == gl_account_id,
+            AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
+        )
     ).scalars()
     total = Decimal("0")
     for line in lines:

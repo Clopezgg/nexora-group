@@ -50,6 +50,9 @@ class InstallmentResponse(CamelModel):
     status: str
     regular_number: int | None = None
     regular_count: int | None = None
+    payable_now: bool = False
+    payment_blocked_reason: str | None = None
+    contract_balance_after: Decimal = Decimal("0")
 
 
 class ScheduleResponse(CamelModel):
@@ -94,7 +97,8 @@ class FifoPreviewItem(CamelModel):
 
 
 class LedgerAllocationResponse(CamelModel):
-    payment_id: uuid.UUID
+    source_type: str
+    source_id: uuid.UUID
     payment_date: date
     installment_sequence: int
     installment_period_label: str

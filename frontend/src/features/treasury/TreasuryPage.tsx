@@ -28,6 +28,8 @@ import type { Account } from '../../types/masterData'
 import type { Remittance, TreasuryAccount } from '../../types/treasury'
 import { formatMoney } from '../../utils/currency'
 import { useAuth } from '../auth/auth-context'
+import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { businessTodayIso } from '../../utils/businessDate'
 import './TreasuryPage.css'
 
 type ModalKind = 'account' | 'remittance' | 'expense' | 'transfer' | null
@@ -61,16 +63,10 @@ const OTHER_REMITTANCE_SENDER = '__OTHER__'
 export function TreasuryPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const [companyId, setCompanyId] = useState<string | null>(null)
   const [openModal, setOpenModal] = useState<ModalKind>(null)
   const [remittanceOffset, setRemittanceOffset] = useState(0)
 
-  const companiesQuery = useQuery({
-    queryKey: ['master-data', 'companies'],
-    queryFn: masterDataService.listCompanies,
-  })
-  const companies = companiesQuery.data ?? []
-  const activeCompanyId = companyId ?? companies[0]?.id ?? null
+  const { companies, activeCompanyId, setActiveCompanyId, isLoading: companiesLoading, isError: companiesError, refetch: refetchCompanies } = useActiveCompany()
 
   const accountsQuery = useQuery({
     queryKey: ['master-data', 'accounts', activeCompanyId],
@@ -127,16 +123,16 @@ export function TreasuryPage() {
       return company
     },
     onSuccess: (company) => {
-      setCompanyId(company.id)
+      setActiveCompanyId(company.id)
       setRemittanceOffset(0)
       queryClient.invalidateQueries({ queryKey: ['master-data', 'companies'] })
     },
   })
 
-  if (companiesQuery.isLoading) return <LoadingState label="Cargando compañías…" />
-  if (companiesQuery.isError) {
+  if (companiesLoading) return <LoadingState label="Cargando compañías…" />
+  if (companiesError) {
     return (
-      <ErrorState title="No se pudo cargar Tesorería" onRetry={() => companiesQuery.refetch()} />
+      <ErrorState title="No se pudo cargar Tesorería" onRetry={() => refetchCompanies()} />
     )
   }
 
@@ -236,7 +232,7 @@ export function TreasuryPage() {
           aria-label="Compañía activa"
           value={activeCompanyId ?? ''}
           onChange={(event) => {
-            setCompanyId(event.target.value)
+            setActiveCompanyId(event.target.value)
             setRemittanceOffset(0)
           }}
         >
@@ -531,7 +527,7 @@ function RemittanceModal({
   const [channel, setChannel] = useState('TRANSFER')
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
-  const [remittanceDate, setRemittanceDate] = useState(new Date().toISOString().slice(0, 10))
+  const [remittanceDate, setRemittanceDate] = useState(businessTodayIso())
   const [amount, setAmount] = useState<number | null>(null)
   const [fxRate, setFxRate] = useState(1)
 
@@ -802,7 +798,7 @@ function GeneralExpenseModal({
   const [expenseAccountId, setExpenseAccountId] = useState(expenseAccounts[0]?.id ?? '')
   const [category, setCategory] = useState('administracion')
   const [description, setDescription] = useState('')
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10))
+  const [expenseDate, setExpenseDate] = useState(businessTodayIso())
   const [amount, setAmount] = useState<number | null>(null)
   // ORDEN MAESTRA §21 — guard contractual.
   const [contractGuardMessage, setContractGuardMessage] = useState<string | null>(null)
@@ -1082,7 +1078,7 @@ function TransferModal({
               destinationTreasuryAccountId: destinationId,
               amount: String(amount ?? 0),
               currencyCode: source?.currencyCode ?? 'HNL',
-              transferDate: new Date().toISOString().slice(0, 10),
+              transferDate: businessTodayIso(),
             },
             idempotencyKey: crypto.randomUUID(),
           })

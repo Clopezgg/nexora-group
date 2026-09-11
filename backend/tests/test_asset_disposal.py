@@ -9,12 +9,12 @@ from sqlalchemy import select
 
 from app.domain.errors import InvalidAssetStateError
 from app.models.accounting import AccountingDocument, JournalLine
-from app.models.asset import DepreciationEntry, FixedAsset
+from app.models.asset import FixedAsset
 from app.models.chart_of_accounts import Account, ChartOfAccount
 from app.models.company import Company
 from app.models.currency import Currency
 from app.models.document_type import DocumentType
-from app.services import asset_service
+from app.services import asset_service, posting_service
 
 
 def _create_test_setup(db):
@@ -22,6 +22,8 @@ def _create_test_setup(db):
     db.add(currency)
 
     for code, name, prefix in [
+        ("DEP", "Depreciación", "DEP"),
+        ("ANU", "Anulación", "ANU"),
         ("DIS", "Disposición de activo fijo", "DIS"),
         ("INV", "Movimiento de inventario", "INV"),
     ]:
@@ -80,14 +82,14 @@ def test_dispose_asset_posts_correct_gl(db_session):
     asset = _create_test_asset(db_session, company, accounts, cost=Decimal("10000"))
 
     for i in range(6):
-        entry = DepreciationEntry(
+        asset_service.generate_depreciation_entry(
+            db_session,
             asset_id=asset.id,
             period_start=date(2025, i + 1, 1),
             period_end=date(2025, i + 1, 28),
-            amount=Decimal("150.00"),
+            post=True,
+            commit=False,
         )
-        db_session.add(entry)
-    db_session.flush()
 
     disposed = asset_service.dispose_asset(
         db_session,
@@ -169,3 +171,44 @@ def test_dispose_proceeds_without_account_raises(db_session):
             proceeds_account_id=None,
             commit=False,
         )
+
+
+def test_reversed_depreciation_document_leaves_subledger(db_session):
+    """A reversed DEP document netts to zero in GL; the asset subledger must
+    NOT keep counting its amount (no compensating DepreciationEntry exists
+    for the ANU reversal, so only POSTED documents are effective)."""
+    company, accounts = _create_test_setup(db_session)
+    asset = _create_test_asset(db_session, company, accounts)
+
+    entry = asset_service.generate_depreciation_entry(
+        db_session,
+        asset_id=asset.id,
+        period_start=date(2025, 1, 1),
+        period_end=date(2025, 1, 28),
+        post=True,
+        commit=False,
+    )
+
+    reversal = posting_service.reverse_document(
+        db_session, document_id=entry.accounting_document_id, reason="Corrección", commit=False,
+    )
+    assert reversal.document_type_code == "ANU"
+    assert reversal.status == "POSTED"
+
+    # Subledger accumulated depreciation must be zero after the reversal.
+    disposed = asset_service.dispose_asset(
+        db_session,
+        asset_id=asset.id,
+        disposal_date=date(2025, 2, 1),
+        proceeds=Decimal("0"),
+        commit=False,
+    )
+    assert disposed.accumulated_depreciation == Decimal("0")
+    doc = db_session.get(AccountingDocument, disposed.disposal_document_id)
+    assert doc.status == "POSTED"
+    lines = list(
+        db_session.execute(
+            select(JournalLine).where(JournalLine.accounting_document_id == doc.id)
+        ).scalars()
+    )
+    assert not any(l.account_id == accounts["1510"].id for l in lines)

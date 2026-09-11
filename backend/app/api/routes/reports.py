@@ -529,7 +529,8 @@ def _ledger_entry_response(entry) -> ContractLedgerEntryResponse:
         ],
         allocations=[
             LedgerAllocationResponse(
-                payment_id=a.payment_id,
+                source_type=a.source_type,
+                source_id=a.source_id,
                 payment_date=a.payment_date,
                 installment_sequence=a.installment_sequence,
                 installment_period_label=a.installment_period_label,

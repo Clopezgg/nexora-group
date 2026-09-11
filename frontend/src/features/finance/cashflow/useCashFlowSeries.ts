@@ -7,6 +7,7 @@ import {
   type CashFlowPeriod,
 } from '../../../services/cashFlowActualService'
 import { formatPeriodLabel } from './periodLabel'
+import { businessTodayIso } from '../../../utils/businessDate'
 
 export type CashFlowMode = 'REALIZADO' | 'PROYECTADO'
 export type CashFlowRange = '1M' | '3M' | '6M' | '12M'
@@ -24,7 +25,7 @@ function isoDaysAgo(days: number): string {
   d.setDate(d.getDate() - days)
   return d.toISOString().slice(0, 10)
 }
-const today = () => new Date().toISOString().slice(0, 10)
+const today = businessTodayIso
 
 const GRANULARITY_LABEL: Record<CashFlowGranularity, string> = {
   day: 'diario',

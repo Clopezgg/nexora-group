@@ -10,6 +10,18 @@ from app.services import auth_service, edit_access_service
 
 _PROTECTED_METHODS = {"PUT", "PATCH", "DELETE"}
 _EXEMPT_PATHS = {"/api/context"}
+# Business commands are declared here instead of inferred from a small list of
+# URL examples.  Resource creation remains RBAC-only; these commands mutate an
+# existing business fact or cause money, inventory, approval, or lifecycle
+# state to move.
+_PROTECTED_COMMANDS = {
+    "approve", "cancel", "send", "decide", "reverse", "reopen", "close",
+    "post", "pay", "payments", "collect", "receipts", "reconcile", "match",
+    "unmatch", "exclude", "release", "dispose", "depreciate", "capitalize",
+    "receive", "issue-to-project", "transfer", "return-to-supplier",
+    "hard-close", "execute", "baseline", "submit", "reject", "response",
+    "decision", "status",
+}
 
 
 def _requires_protected_edit(method: str, path: str) -> bool:
@@ -24,8 +36,7 @@ def _requires_protected_edit(method: str, path: str) -> bool:
     if method != "POST":
         return False
     parts = [part for part in path.split("/") if part]
-    sensitive_suffixes = {"status", "decide", "reverse", "reopen", "close", "post", "pay", "collect"}
-    return bool(parts and parts[-1] in sensitive_suffixes)
+    return bool(parts and parts[-1].lower() in _PROTECTED_COMMANDS)
 
 
 def register_edit_access_guard(app: FastAPI) -> None:

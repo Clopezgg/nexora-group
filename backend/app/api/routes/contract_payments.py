@@ -59,6 +59,9 @@ def _installments_payload(
             status=s.status,
             regular_number=s.regular_number,
             regular_count=s.regular_count,
+            payable_now=s.payable_now,
+            payment_blocked_reason=s.payment_blocked_reason,
+            contract_balance_after=s.contract_balance_after,
         )
         for s in cps.installment_summaries(db, schedule_id=schedule_id, as_of=as_of)
     ]

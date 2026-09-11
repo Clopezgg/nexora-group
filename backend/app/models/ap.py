@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Numeric, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,6 +29,7 @@ SUPPLIER_PAYMENT_METHODS = ("TRANSFER", "DEPOSIT", "CHECK", "CASH", "OTHER")
 class SupplierInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "supplier_invoices"
     __table_args__ = (
+        Index("uq_supplier_invoice_business_number", "company_id", "supplier_id", "invoice_number_normalized", unique=True, postgresql_where=text("status <> 'CANCELLED'")),
         CheckConstraint("amount > 0", name="ck_supplier_invoices_amount_positive"),
         CheckConstraint("tax_amount >= 0", name="ck_supplier_invoices_tax_non_negative"),
         CheckConstraint(
@@ -49,6 +50,7 @@ class SupplierInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="RESTRICT"), nullable=False
     )
     invoice_number: Mapped[str] = mapped_column(String(64), nullable=False)
+    invoice_number_normalized: Mapped[str] = mapped_column(String(64), nullable=False)
     scope: Mapped[str] = mapped_column(String(16), nullable=False)
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="RESTRICT"), nullable=True

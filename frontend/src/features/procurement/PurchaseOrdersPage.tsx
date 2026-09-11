@@ -19,7 +19,7 @@ import { procurementService } from '../../services/procurementService'
 import type { PurchaseOrder } from '../../types/procurement'
 
 export function PurchaseOrdersPage() {
-  const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const { activeCompanyId, activeCompany, isLoading: loadingCompanies } = useActiveCompany()
   const handleMutationError = useMutationError()
   const [modalOpen, setModalOpen] = useState(false)
   const [supplierId, setSupplierId] = useState<string | null>(null)
@@ -47,7 +47,7 @@ export function PurchaseOrdersPage() {
       procurementService.createPurchaseOrder({
         companyId: activeCompanyId as string,
         supplierId: supplierId as string,
-        currencyCode: 'HNL',
+        currencyCode: activeCompany?.functionalCurrencyCode ?? 'HNL',
         lines: [{ description, quantity, unitPrice }],
       }),
     onSuccess: () => {

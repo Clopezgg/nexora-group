@@ -66,6 +66,10 @@ class StockIssueToProjectRequest(CamelModel):
     warehouse_id: uuid.UUID
     project_id: uuid.UUID
     quantity: Decimal
+    # Optional only so tenant/project authorization runs before the business
+    # validation; the service rejects requests that omit either account.
+    cost_of_goods_account_id: uuid.UUID | None = None
+    inventory_account_id: uuid.UUID | None = None
 
 
 class StockTransferRequest(CamelModel):

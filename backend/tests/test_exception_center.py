@@ -53,7 +53,7 @@ def test_exception_zero_for_a_clean_company(client, db_session):
     assert body["exceptions"] == []
 
 
-def test_exception_center_flags_duplicate_and_overdue_and_missing_period(client, db_session):
+def test_exception_center_flags_overdue_and_missing_period(client, db_session):
     login_admin(client)
     # Compañía SIN período fiscal ni pagador -> ya dos excepciones.
     company = create_company(client)
@@ -61,34 +61,55 @@ def test_exception_center_flags_duplicate_and_overdue_and_missing_period(client,
     payable = create_account(client, company_id=company["id"], code="2100", name="CxP", account_type="LIABILITY")
     supplier = create_supplier(client, company_id=company["id"])
 
-    # Dos facturas con el mismo número para el mismo proveedor -> duplicado.
-    for _ in range(2):
-        inv = client.post(
-            "/api/ap/supplier-invoices",
-            json={
-                "companyId": company["id"],
-                "supplierId": supplier["id"],
-                "invoiceNumber": "DUP-001",
-                "scope": "GENERAL",
-                "expenseAccountId": expense["id"],
-                "payableAccountId": payable["id"],
-                "currencyCode": "HNL",
-                "amount": "100.00",
-                "taxAmount": "0.00",
-                "invoiceDate": "2026-01-05",
-                "dueDate": str(date.today() - timedelta(days=30)),
-            },
-        )
-        assert inv.status_code == 201, inv.text
+    inv = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "DUP-001",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "100.00",
+            "taxAmount": "0.00",
+            "invoiceDate": "2026-01-05",
+            "dueDate": str(date.today() - timedelta(days=30)),
+        },
+    )
+    assert inv.status_code == 201, inv.text
 
     body = client.get(f"/api/financial-control/exceptions?companyId={company['id']}").json()
     codes = {e["code"] for e in body["exceptions"]}
-    assert "DUPLICATE_SUPPLIER_INVOICE" in codes
     assert "FISCAL_PERIOD_MISSING" in codes
     assert "VOUCHER_PAYER_UNSET" in codes
     assert body["exceptionZero"] is False
-    assert body["criticalCount"] >= 2
 
-    dup = next(e for e in body["exceptions"] if e["code"] == "DUPLICATE_SUPPLIER_INVOICE")
-    assert dup["route"] == "/finanzas/cuentas-por-pagar"
-    assert dup["suggestedAction"]
+
+def test_duplicate_supplier_invoice_number_fails_closed(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    expense = create_account(client, company_id=company["id"], code="5200", name="Mat", account_type="EXPENSE")
+    payable = create_account(client, company_id=company["id"], code="2100", name="CxP", account_type="LIABILITY")
+    supplier = create_supplier(client, company_id=company["id"])
+
+    payload = {
+        "companyId": company["id"],
+        "supplierId": supplier["id"],
+        "invoiceNumber": "DUP-001",
+        "scope": "GENERAL",
+        "expenseAccountId": expense["id"],
+        "payableAccountId": payable["id"],
+        "currencyCode": "HNL",
+        "amount": "100.00",
+        "taxAmount": "0.00",
+        "invoiceDate": "2026-01-05",
+        "dueDate": str(date.today() - timedelta(days=30)),
+    }
+    first = client.post("/api/ap/supplier-invoices", json=payload)
+    assert first.status_code == 201, first.text
+    # Un duplicado no cancelado se rechaza fail-closed por el índice parcial
+    # uq_supplier_invoice_business_number (la fuente de verdad es PostgreSQL).
+    duplicate = client.post("/api/ap/supplier-invoices", json=payload)
+    assert duplicate.status_code == 422, duplicate.text
+    assert duplicate.json()["error"]["code"] == "NXR-DATA-001"

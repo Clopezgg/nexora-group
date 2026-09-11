@@ -24,6 +24,7 @@ import { masterDataService } from '../../services/masterDataService'
 import { projectService } from '../../services/projectService'
 import { formatMoney } from '../../utils/currency'
 import { statusLabel } from '../../utils/statusLabels'
+import { businessTodayIso } from '../../utils/businessDate'
 import '../treasury/TreasuryPage.css'
 
 export function BillingPage() {
@@ -154,8 +155,8 @@ function BillingCreateModal({ companyId, customers, projects, revenueAccounts, r
   const [scope, setScope] = useState<'CENTRAL' | 'GENERAL' | 'PROJECT'>('GENERAL')
   const [projectId, setProjectId] = useState('')
   const [amount, setAmount] = useState<number | null>(null)
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10))
-  const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10))
+  const [invoiceDate, setInvoiceDate] = useState(businessTodayIso())
+  const [dueDate, setDueDate] = useState(businessTodayIso())
   const [revenueAccountId, setRevenueAccountId] = useState(revenueAccounts[0]?.id ?? '')
   const [receivableAccountId, setReceivableAccountId] = useState(receivableAccounts[0]?.id ?? '')
 

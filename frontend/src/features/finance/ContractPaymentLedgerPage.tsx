@@ -13,18 +13,21 @@ import {
   type TableColumn,
 } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
+import { apService } from '../../services/apArService'
 import {
   contractPaymentService,
   type ContractInstallment,
   type ContractLedgerEntry,
   type LedgerAllocation,
 } from '../../services/contractPaymentService'
-import { formatMoney } from '../../utils/currency'
-import { apService } from '../../services/apArService'
 import { masterDataService } from '../../services/masterDataService'
 import { procurementService } from '../../services/procurementService'
 import { treasuryService } from '../../services/treasuryService'
-import { CreateSupplierInvoiceModal, PaySupplierInvoiceButton } from '../treasury/SupplierInvoiceFlows'
+import { formatMoney } from '../../utils/currency'
+import {
+  CreateSupplierInvoiceModal,
+  PaySupplierInvoiceButton,
+} from '../treasury/SupplierInvoiceFlows'
 
 const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
   PAID: 'success',
@@ -41,9 +44,16 @@ export function ContractPaymentLedgerPage() {
     entry: ContractLedgerEntry
     installment: ContractInstallment
   } | null>(null)
-  const { companies, activeCompanyId, activeCompany, setActiveCompanyId, isLoading, isError, refetch } =
-    useActiveCompany()
-  const currency = activeCompany?.functionalCurrencyCode ?? undefined
+  const {
+    companies,
+    activeCompanyId,
+    activeCompany,
+    setActiveCompanyId,
+    isLoading,
+    isError,
+    refetch,
+  } = useActiveCompany()
+  const currency = activeCompany?.functionalCurrencyCode ?? null
 
   const query = useQuery({
     queryKey: ['contract-payment-ledger', activeCompanyId],
@@ -77,13 +87,51 @@ export function ContractPaymentLedgerPage() {
   })
 
   if (isLoading) return <LoadingState label="Cargando compañías…" />
-  if (isError) return <ErrorState description="No se pudieron cargar las compañías." onRetry={() => refetch()} />
+  if (isError) {
+    return (
+      <ErrorState
+        description="No se pudieron cargar las compañías."
+        onRetry={() => refetch()}
+      />
+    )
+  }
   if (companies.length === 0) {
     return (
       <EmptyState
         icon="book"
         title="Configura una compañía primero"
         description="El libro contractual de pagos necesita una compañía."
+      />
+    )
+  }
+  if (!activeCompanyId || !activeCompany) {
+    return (
+      <div>
+        <header className="nx-page__header">
+          <div>
+            <p className="nx-page__eyebrow">Finanzas</p>
+            <h1 className="nx-dashboard__title">Libro contractual de pagos</h1>
+          </div>
+          <CompanySelector
+            options={companies.map((company) => ({ id: company.id, label: company.name }))}
+            value={activeCompanyId}
+            onChange={setActiveCompanyId}
+          />
+        </header>
+        <EmptyState
+          icon="book"
+          title="Selecciona una compañía"
+          description="El libro contractual no mezcla importes entre compañías."
+        />
+      </div>
+    )
+  }
+  if (!currency) {
+    return (
+      <EmptyState
+        icon="warning"
+        title="La compañía activa no tiene moneda funcional"
+        description="Configura la moneda funcional antes de consultar el libro contractual."
       />
     )
   }
@@ -96,16 +144,30 @@ export function ContractPaymentLedgerPage() {
 
   const installmentColumns = (entry: ContractLedgerEntry): TableColumn<ContractInstallment>[] => [
     { key: 'sequence', header: '#', render: (row) => row.sequence },
-    { key: 'periodLabel', header: 'Período contractual', render: (row) => row.periodLabel },
+    {
+      key: 'periodLabel',
+      header: 'Período contractual',
+      render: (row) => row.periodLabel,
+    },
     { key: 'dueDate', header: 'Vence', render: (row) => row.dueDate },
     { key: 'netDue', header: 'Neto', render: (row) => formatMoney(row.netDue, currency) },
     { key: 'paid', header: 'Pagado', render: (row) => formatMoney(row.paid, currency) },
-    { key: 'remaining', header: 'Pendiente cuota', render: (row) => formatMoney(row.remaining, currency) },
-    { key: 'contractBalanceAfter', header: 'Saldo contractual', render: (row) => formatMoney(row.contractBalanceAfter, currency) },
+    {
+      key: 'remaining',
+      header: 'Pendiente cuota',
+      render: (row) => formatMoney(row.remaining, currency),
+    },
+    {
+      key: 'contractBalanceAfter',
+      header: 'Saldo contractual',
+      render: (row) => formatMoney(row.contractBalanceAfter, currency),
+    },
     {
       key: 'status',
       header: 'Estado',
-      render: (row) => <Badge tone={STATUS_TONE[row.status] ?? 'neutral'}>{statusLabel(row.status)}</Badge>,
+      render: (row) => (
+        <Badge tone={STATUS_TONE[row.status] ?? 'neutral'}>{statusLabel(row.status)}</Badge>
+      ),
     },
     {
       key: 'actions',
@@ -121,7 +183,7 @@ export function ContractPaymentLedgerPage() {
             <div className="nx-treasury__actions">
               <PaySupplierInvoiceButton
                 invoice={invoice}
-                companyId={activeCompanyId as string}
+                companyId={activeCompanyId}
                 treasuryAccounts={treasuryAccountsQuery.data ?? []}
                 remaining={invoiceRemaining}
                 selectedInstallmentId={row.installmentId}
@@ -129,7 +191,7 @@ export function ContractPaymentLedgerPage() {
               />
               <PaySupplierInvoiceButton
                 invoice={invoice}
-                companyId={activeCompanyId as string}
+                companyId={activeCompanyId}
                 treasuryAccounts={treasuryAccountsQuery.data ?? []}
                 remaining={invoiceRemaining}
                 selectedInstallmentId={row.installmentId}
@@ -155,9 +217,22 @@ export function ContractPaymentLedgerPage() {
 
   const allocationColumns: TableColumn<LedgerAllocation>[] = [
     { key: 'paymentDate', header: 'Fecha económica', render: (row) => row.paymentDate },
-    { key: 'sourceType', header: 'Origen', render: (row) => row.sourceType === 'GENERAL_EXPENSE' ? 'Gasto general' : 'Pago a proveedor' },
-    { key: 'installmentPeriodLabel', header: 'Cuota liquidada', render: (row) => row.installmentPeriodLabel },
-    { key: 'amountApplied', header: 'Importe aplicado', render: (row) => formatMoney(row.amountApplied, currency) },
+    {
+      key: 'sourceType',
+      header: 'Origen',
+      render: (row) =>
+        row.sourceType === 'GENERAL_EXPENSE' ? 'Gasto general' : 'Pago a proveedor',
+    },
+    {
+      key: 'installmentPeriodLabel',
+      header: 'Cuota liquidada',
+      render: (row) => row.installmentPeriodLabel,
+    },
+    {
+      key: 'amountApplied',
+      header: 'Importe aplicado',
+      render: (row) => formatMoney(row.amountApplied, currency),
+    },
     {
       key: 'bankTransactionReference',
       header: 'Referencia bancaria',
@@ -167,7 +242,9 @@ export function ContractPaymentLedgerPage() {
       key: 'reversed',
       header: 'Estado',
       render: (row) => (
-        <Badge tone={row.reversed ? 'danger' : 'success'}>{row.reversed ? 'Reversado' : 'Vigente'}</Badge>
+        <Badge tone={row.reversed ? 'danger' : 'success'}>
+          {row.reversed ? 'Reversado' : 'Vigente'}
+        </Badge>
       ),
     },
   ]
@@ -179,9 +256,9 @@ export function ContractPaymentLedgerPage() {
           <p className="nx-page__eyebrow">Finanzas</p>
           <h1 className="nx-dashboard__title">Libro contractual de pagos</h1>
           <p className="nx-field__hint">
-            Por cada contrato con plan de pagos: sus cuotas con estado real y las asignaciones de pago que
-            las liquidaron. El período contractual es independiente de la fecha de pago y del período
-            contable.
+            Por cada contrato con plan de pagos: sus cuotas con estado real y las asignaciones de
+            pago que las liquidaron. El período contractual es independiente de la fecha de pago y
+            del período contable.
           </p>
         </div>
         <CompanySelector
@@ -194,7 +271,10 @@ export function ContractPaymentLedgerPage() {
       {query.isLoading ? (
         <LoadingState label="Cargando libro contractual…" />
       ) : query.isError ? (
-        <ErrorState description="No se pudo cargar el libro contractual." onRetry={() => query.refetch()} />
+        <ErrorState
+          description="No se pudo cargar el libro contractual."
+          onRetry={() => query.refetch()}
+        />
       ) : query.data ? (
         query.data.entries.length === 0 ? (
           <EmptyState
@@ -250,7 +330,9 @@ export function ContractPaymentLedgerPage() {
                 <Table
                   columns={allocationColumns}
                   rows={entry.allocations}
-                  getRowKey={(row) => `${row.sourceType}-${row.sourceId}-${row.installmentSequence}`}
+                  getRowKey={(row) =>
+                    `${row.sourceType}-${row.sourceId}-${row.installmentSequence}`
+                  }
                   emptyMessage="Todavía no se ha aplicado ningún pago a este contrato."
                 />
               </Card>
@@ -259,10 +341,10 @@ export function ContractPaymentLedgerPage() {
         )
       ) : null}
 
-      {prepare && activeCompanyId ? (
+      {prepare ? (
         <CreateSupplierInvoiceModal
           companyId={activeCompanyId}
-          functionalCurrencyCode={currency ?? prepare.entry.currencyCode}
+          functionalCurrencyCode={currency}
           expenseAccounts={(accountsQuery.data ?? []).filter(
             (account) => account.accountType === 'EXPENSE' || account.accountType === 'ASSET',
           )}
@@ -282,7 +364,9 @@ export function ContractPaymentLedgerPage() {
           onClose={() => setPrepare(null)}
           onCreated={() => {
             setPrepare(null)
-            queryClient.invalidateQueries({ queryKey: ['ap', 'supplier-invoices', activeCompanyId] })
+            queryClient.invalidateQueries({
+              queryKey: ['ap', 'supplier-invoices', activeCompanyId],
+            })
           }}
         />
       ) : null}
@@ -291,5 +375,14 @@ export function ContractPaymentLedgerPage() {
 }
 
 function statusLabel(status: string) {
-  return ({ PAID: 'Pagada', PARTIALLY_PAID: 'Parcialmente pagada', DUE: 'Vigente', OVERDUE: 'Vencida', UPCOMING: 'Próxima', CANCELLED: 'Cancelada' } as Record<string, string>)[status] ?? status
+  return (
+    {
+      PAID: 'Pagada',
+      PARTIALLY_PAID: 'Parcialmente pagada',
+      DUE: 'Vigente',
+      OVERDUE: 'Vencida',
+      UPCOMING: 'Próxima',
+      CANCELLED: 'Cancelada',
+    } as Record<string, string>
+  )[status] ?? status
 }

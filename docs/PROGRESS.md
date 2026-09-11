@@ -4615,3 +4615,41 @@ Edit, drill-down, PDF §13): cubierto por CI contra BD efímera —
 **PENDIENTE (P1)** — ver PR-D/PR-E: auditoría visual sistemática con capturas
 a 390/430/768/1024/1440 en rutas autenticadas (§17/§23); NEXORA Document
 Design System completo + pipeline HEIC→JPEG derivado (§14).
+
+### 2026-09-10 — Iteración 19 · Plan `2026-09-10-final-closure` cerrado (PR #130)
+
+Verificado con evidencia real (no "parece correcto"):
+
+- **Backend suite completa verde** — `pytest -q` contra `nexora_test_nexora_group`:
+  **639 passed, 0 failed** en 12m49s (HEAD `c2f62986`).
+- **Asset subledger ↔ GL**: `_accumulated_depreciation_total` cuenta solo
+  `POSTED` (`asset_service.py`), porque revertir un DEP no crea un
+  `DepreciationEntry` compensatorio (CK `amount > 0`); incluir `REVERSED`
+  producía divergencia subledger↔GL prohibida. Regresión nueva
+  `test_reversed_depreciation_document_leaves_subledger`, y
+  `test_dispose_asset_posts_correct_gl` reescrito para postear 6 DEP reales
+  por medio del servicio.
+- **AP approval** (`approval_service.decide`): `db.flush()` antes de invocar
+  el adapter del ApprovalRequest; `SessionLocal(autoflush=False)` ocultaba el
+  cambio de estado y el guarda de `ef1283cc` bloqueaba el camino sancionado.
+  `test_ap_ar.py` completo verde.
+- **Exception Center**: el índice único parcial `uq_supplier_invoice_business_number`
+  hace inalcanzable la bandera `DUPLICATE_SUPPLIER_INVOICE`; bloque eliminado
+  y prueba reescrita incluyendo `test_duplicate_supplier_invoice_number_fails_closed`
+  (422 `NXR-DATA-001`).
+- **Forecast AC**: `compute_forecast` ahora usa SOLO el GL contabilizado
+  (el inventory issue se postea al mismo GL por el servicio canónico); se
+  eliminó la doble suma desde el Stock Ledger que duplicaba el costo (60 vs 30).
+- **Frontend gates verdes**: `tsc -b --noEmit` ✓, `eslint .` ✓,
+  `vitest run` **240 passed** ✓, `npm run build` ✓.
+- **CI verde** en rama y en `main`: backend, frontend, e2e, Docker Compose
+  smoke, Compile Azure Bicep.
+- **PR #130 merged** a `origin/main` (`ca92676b`). El job `Deploy infra +
+  apps` queda deliberadamente **gated** (no `[deploy]` en el mensaje ni
+  `workflow_dispatch` con `deploy:true`); solo corrió el what-if. Desplegar
+  Azure real requiere confirmación explícita puntual (§11 ORDEN MAESTRA: la
+  suscripción activa es tenant UNAH).
+
+**SIGUIENTE (P1)** — deploy Azure real + smoke de producción del SHA
+`ca92676b` (imagen `ghcr.io/clopezgg/nexora-backend:<sha>`), auditoría visual
+sistemática pendiente según PR-D/PR-E.

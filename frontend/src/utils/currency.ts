@@ -1,9 +1,15 @@
-export const DEFAULT_CURRENCY = 'HNL'
-
 const symbolCache = new Map<string, string>()
 
+function normalizeCurrency(currency: string): string {
+  const key = currency.trim().toUpperCase()
+  if (!/^[A-Z]{3}$/.test(key)) {
+    throw new Error('Se requiere un código de moneda ISO explícito para formatear importes.')
+  }
+  return key
+}
+
 function currencySymbol(currency: string): string {
-  const key = currency || DEFAULT_CURRENCY
+  const key = normalizeCurrency(currency)
   let symbol = symbolCache.get(key)
   if (!symbol) {
     try {
@@ -26,16 +32,17 @@ function currencySymbol(currency: string): string {
  * La representación financiera autoritativa viaja como string; aquí se
  * normaliza a centavos con BigInt y redondeo decimal exacto. Los `number`
  * siguen aceptándose para inputs/UI no autoritativos por compatibilidad.
- * Se conserva el espacio no separable que utilizaba Intl.NumberFormat para
- * no romper snapshots/E2E ni permitir saltos de línea entre símbolo y monto.
+ * La moneda es obligatoria: ningún flujo financiero puede caer silenciosamente
+ * a una divisa predeterminada.
  */
-export function formatMoney(value: number | string, currency = DEFAULT_CURRENCY): string {
+export function formatMoney(value: number | string, currency: string): string {
   const raw = typeof value === 'number'
     ? (Number.isFinite(value) ? value.toFixed(2) : '0')
     : String(value).trim()
   const match = raw.match(/^([+-]?)(\d+)(?:\.(\d+))?$/)
   const separator = '\u00a0'
-  if (!match) return `${currencySymbol(currency)}${separator}0.00`
+  const symbol = currencySymbol(currency)
+  if (!match) return `${symbol}${separator}0.00`
 
   const negative = match[1] === '-'
   const integer = BigInt(match[2])
@@ -47,12 +54,12 @@ export function formatMoney(value: number | string, currency = DEFAULT_CURRENCY)
   const decimal = String(cents % 100n).padStart(2, '0')
   const grouped = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   const sign = negative && cents !== 0n ? '-' : ''
-  return `${sign}${currencySymbol(currency || DEFAULT_CURRENCY)}${separator}${grouped}.${decimal}`
+  return `${sign}${symbol}${separator}${grouped}.${decimal}`
 }
 
 /** Abbreviated money is deliberately presentational (axes/sparklines), never
  * used as an accounting value or request payload. */
-export function formatMoneyCompact(value: number | string, currency = DEFAULT_CURRENCY): string {
+export function formatMoneyCompact(value: number | string, currency: string): string {
   const amount = Number(value)
   if (!Number.isFinite(amount)) return formatMoney(0, currency)
   const symbol = currencySymbol(currency)

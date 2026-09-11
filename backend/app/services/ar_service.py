@@ -1,6 +1,7 @@
 import uuid
 from datetime import date
 from decimal import Decimal
+import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -64,6 +65,7 @@ def create_customer_invoice(
         company_id=company_id,
         customer_id=customer_id,
         invoice_number=invoice_number,
+        invoice_number_normalized=re.sub(r"\s+", "", invoice_number.strip()).upper(),
         scope=scope,
         project_id=project_id,
         revenue_account_id=revenue_account_id,

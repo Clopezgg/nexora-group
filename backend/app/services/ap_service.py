@@ -1,6 +1,7 @@
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
+import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -35,6 +36,10 @@ entidad real `Supplier` (Track C - Suppliers/Contracts)."""
 
 _PAYMENT_METHODS = {"TRANSFER", "DEPOSIT", "CHECK", "CASH", "OTHER"}
 _PAYMENT_METHODS_REQUIRING_EVIDENCE = {"TRANSFER", "DEPOSIT", "CHECK"}
+
+
+def _normalize_invoice_number(value: str) -> str:
+    return re.sub(r"\s+", "", value.strip()).upper()
 
 
 def create_supplier_invoice(
@@ -127,6 +132,7 @@ def create_supplier_invoice(
         company_id=company_id,
         supplier_id=supplier_id,
         invoice_number=invoice_number,
+        invoice_number_normalized=_normalize_invoice_number(invoice_number),
         scope=scope,
         project_id=project_id,
         cost_center_id=cost_center_id,

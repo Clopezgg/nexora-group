@@ -30,7 +30,7 @@ import '../treasury/TreasuryPage.css'
 export function BillingPage() {
   const queryClient = useQueryClient()
   const handleMutationError = useMutationError()
-  const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
+  const { companies, activeCompany, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
   const [createOpen, setCreateOpen] = useState(false)
 
   const invoicesQuery = useQuery({
@@ -64,6 +64,9 @@ export function BillingPage() {
   if (isError) return <ErrorState description="No se pudieron cargar las compañías." onRetry={() => refetch()} />
   if (companies.length === 0) {
     return <EmptyState icon="receipt" title="No hay compañía configurada" description="Configura la compañía antes de facturar." />
+  }
+  if (!activeCompany?.functionalCurrencyCode) {
+    return <EmptyState icon="receipt" title="Selecciona una compañía" description="Selecciona una compañía con moneda funcional para consultar y emitir facturas." />
   }
 
   const invoices = invoicesQuery.data ?? []
@@ -110,8 +113,8 @@ export function BillingPage() {
       </header>
 
       <div className="nx-dashboard__kpi-grid">
-        <Card title="Facturado"><strong>{formatMoney(totalBilled, 'HNL')}</strong></Card>
-        <Card title="Saldo por cobrar"><strong>{formatMoney(outstanding, 'HNL')}</strong></Card>
+        <Card title="Facturado"><strong>{formatMoney(totalBilled, activeCompany.functionalCurrencyCode)}</strong></Card>
+        <Card title="Saldo por cobrar"><strong>{formatMoney(outstanding, activeCompany.functionalCurrencyCode)}</strong></Card>
         <Card title="Documentos"><strong>{invoices.length}</strong></Card>
       </div>
 
@@ -128,6 +131,7 @@ export function BillingPage() {
       {createOpen && activeCompanyId ? (
         <BillingCreateModal
           companyId={activeCompanyId}
+          currencyCode={activeCompany.functionalCurrencyCode}
           customers={customers}
           projects={projects}
           revenueAccounts={accounts.filter((account) => account.accountType === 'REVENUE' && account.isPostable)}
@@ -140,8 +144,9 @@ export function BillingPage() {
   )
 }
 
-function BillingCreateModal({ companyId, customers, projects, revenueAccounts, receivableAccounts, onClose, onCreated }: {
+function BillingCreateModal({ companyId, currencyCode, customers, projects, revenueAccounts, receivableAccounts, onClose, onCreated }: {
   companyId: string
+  currencyCode: string
   customers: { id: string; legalName: string }[]
   projects: { id: string; name: string; code?: string | null }[]
   revenueAccounts: { id: string; name: string }[]
@@ -169,7 +174,7 @@ function BillingCreateModal({ companyId, customers, projects, revenueAccounts, r
       projectId: scope === 'PROJECT' ? projectId : null,
       revenueAccountId,
       receivableAccountId,
-      currencyCode: 'HNL',
+      currencyCode,
       amount: String(amount ?? 0),
       invoiceDate,
       dueDate,
@@ -191,7 +196,7 @@ function BillingCreateModal({ companyId, customers, projects, revenueAccounts, r
         {scope === 'PROJECT' ? <Select label="Proyecto" value={projectId} onChange={(event) => setProjectId(event.target.value)} required><option value="">Selecciona…</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.code ? `${project.code} — ` : ''}{project.name}</option>)}</Select> : null}
         <Select label="Cuenta de ingresos" value={revenueAccountId} onChange={(event) => setRevenueAccountId(event.target.value)}>{revenueAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</Select>
         <Select label="Cuenta por cobrar" value={receivableAccountId} onChange={(event) => setReceivableAccountId(event.target.value)}>{receivableAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</Select>
-        <MoneyInput label="Monto HNL" value={amount} onChange={setAmount} />
+        <MoneyInput label={`Monto (${currencyCode})`} value={amount} onChange={setAmount} />
         <Input label="Fecha de factura" type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} required />
         <Input label="Vencimiento" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} required />
         {dueDate < invoiceDate ? <p className="nx-field__error">El vencimiento no puede ser anterior a la fecha de factura.</p> : null}

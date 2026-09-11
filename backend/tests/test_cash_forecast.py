@@ -82,3 +82,13 @@ def test_cash_forecast_no_alert_when_balance_stays_positive(client):
     assert body["hasLiquidityAlert"] is False
     assert body["firstNegativeWeekIndex"] is None
     assert all(Decimal(w["projectedBalance"]) == Decimal("1000.00") for w in body["weeks"])
+
+
+def test_cash_forecast_uses_company_currency_without_treasury_accounts(client):
+    login_admin(client)
+    company = create_company(client, currency="USD")
+
+    response = client.get(f"/api/financial-control/cash-forecast?companyId={company['id']}")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["currencyCode"] == "USD"

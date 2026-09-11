@@ -18,7 +18,8 @@ const EMPTY_FORM = { reason: '', wbsNodeId: '', scopeChange: '', costImpact: nul
 
 function ChangeOrdersList({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient()
-  const { activeCompanyId } = useActiveCompany()
+  const { activeCompany, activeCompanyId } = useActiveCompany()
+  const currencyCode = activeCompany?.functionalCurrencyCode
   const [form, setForm] = useState(EMPTY_FORM)
   const changeOrdersQuery = useQuery({ queryKey: ['change-orders', projectId], queryFn: () => projectService.listChangeOrders(projectId) })
   const wbsQuery = useQuery({ queryKey: ['wbs', projectId], queryFn: () => projectService.listWbs(projectId) })
@@ -52,8 +53,8 @@ function ChangeOrdersList({ projectId }: { projectId: string }) {
     { key: 'reason', header: 'Motivo', render: (row) => row.reason },
     { key: 'wbs', header: 'WBS', render: (row) => row.wbsNodeId ? (wbsById.get(row.wbsNodeId) ?? 'WBS no disponible') : 'Proyecto general' },
     { key: 'scope', header: 'Cambio de alcance', render: (row) => row.scopeChange ?? '—' },
-    { key: 'cost', header: 'Impacto en costo', render: (row) => formatMoney(Number(row.budgetChangeAmount), 'HNL') },
-    { key: 'contract', header: 'Impacto contractual', render: (row) => formatMoney(Number(row.contractChangeAmount), 'HNL') },
+    { key: 'cost', header: 'Impacto en costo', render: (row) => currencyCode ? formatMoney(Number(row.budgetChangeAmount), currencyCode) : '—' },
+    { key: 'contract', header: 'Impacto contractual', render: (row) => currencyCode ? formatMoney(Number(row.contractChangeAmount), currencyCode) : '—' },
     { key: 'schedule', header: 'Calendario', render: (row) => row.scheduleChangeDays === null ? '—' : `${row.scheduleChangeDays >= 0 ? '+' : ''}${row.scheduleChangeDays} día(s)` },
     { key: 'requested', header: 'Solicitado por', render: (row) => userById.get(row.requestedBy) ?? row.requestedBy.slice(0, 8) },
     { key: 'approved', header: 'Aprobado por', render: (row) => row.approvedBy ? (userById.get(row.approvedBy) ?? row.approvedBy.slice(0, 8)) : '—' },
@@ -75,8 +76,8 @@ function ChangeOrdersList({ projectId }: { projectId: string }) {
       </Select>
       <Textarea label="Motivo" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} required />
       <Textarea label="Descripción del cambio de alcance" value={form.scopeChange} onChange={(event) => setForm({ ...form, scopeChange: event.target.value })} />
-      <MoneyInput label="Impacto en COSTO interno (+/- HNL)" value={form.costImpact} onChange={(value) => setForm({ ...form, costImpact: value })} />
-      <MoneyInput label="Impacto CONTRACTUAL al cliente (+/- HNL)" value={form.contractImpact} onChange={(value) => setForm({ ...form, contractImpact: value })} />
+      <MoneyInput label={`Impacto en COSTO interno (+/- ${currencyCode ?? 'moneda funcional'})`} value={form.costImpact} onChange={(value) => setForm({ ...form, costImpact: value })} />
+      <MoneyInput label={`Impacto CONTRACTUAL al cliente (+/- ${currencyCode ?? 'moneda funcional'})`} value={form.contractImpact} onChange={(value) => setForm({ ...form, contractImpact: value })} />
       <p className="nx-field__hint">El impacto contractual se documenta por separado y no modifica silenciosamente el Contrato de venta. El impacto en costo es el único que revisa el Budget del proyecto al aprobarse.</p>
       <Input label="Impacto en calendario (días, +/-)" type="number" step="1" value={form.scheduleDays} onChange={(event) => setForm({ ...form, scheduleDays: event.target.value })} />
       <Button disabled={!form.reason.trim() || createChangeOrder.isPending} loading={createChangeOrder.isPending} onClick={() => createChangeOrder.mutate()}>Crear borrador</Button>

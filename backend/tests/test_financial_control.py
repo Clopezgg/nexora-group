@@ -78,3 +78,13 @@ def test_daily_status_denies_company_without_access(client, db_session):
     login_as(client, email="outsider@nexora.group")
     denied = client.get(f"/api/financial-control/daily-status?companyId={company['id']}")
     assert denied.status_code in (403, 404), denied.text
+
+
+def test_daily_status_uses_company_currency_without_treasury_accounts(client):
+    login_admin(client)
+    company = create_company(client, currency="USD")
+
+    response = client.get(f"/api/financial-control/daily-status?companyId={company['id']}")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["currencyCode"] == "USD"

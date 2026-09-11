@@ -4651,5 +4651,33 @@ Verificado con evidencia real (no "parece correcto"):
   suscripción activa es tenant UNAH).
 
 **SIGUIENTE (P1)** — deploy Azure real + smoke de producción del SHA
-`ca92676b` (imagen `ghcr.io/clopezgg/nexora-backend:<sha>`), auditoría visual
+`ca92676b` (imagen `ghcr.io/clopezg/nexora-backend:<sha>`), auditoría visual
 sistemática pendiente según PR-D/PR-E.
+
+### 2026-09-11 — Iteración 20 · integración de los dos streams huérfanos (PR #132)
+
+`origin/main` estaba 14 commits por detrás de la suma del trabajo local: los 7
+commits de `main` local (stream A: source accounting/contratos/TWM guards,
+`9177d710..33f6dd40`) y la rama divergente `fix/nexora-absolute-final-closure`
+(stream B: FX fail-closed, moneda funcional derivada, GL de inventario/activos,
+`6603df22`). Se consolidó en `work/integrate-absolute-final-closure-33f6`
+(merge limpio, 16 commits) y se entregó por PR.
+
+- **Backend suite completa sobre el SHA final**: **670 passed, 0 failed** en
+  14m01s contra PostgreSQL real (`/tmp/pytest_merged_full2.log`). Incluye la
+  corrección de regresión del merge (`test_asset_disposal` con moneda
+  funcional `HNL` de la compañía) y +1 test nuevo de cookie same-site.
+- **NX-AUD-024**: cookie de sesión `SameSite=Lax` en todos los entornos
+  (arquitectura first-party SWA→backend link); `HttpOnly`+`Secure`+guard de
+  `Origin` intactos; regresión nueva en `test_auth.py`.
+- **Frontend gates verdes**: `tsc -b --noEmit` ✓ · `eslint .` ✓ ·
+  `vitest run` **249 passed** ✓ · `npm run build` ✓.
+- **Alembic**: único head `f2c3d4e5f6a7`; `upgrade head` limpio e idempotente
+  sobre instalación PostgreSQL aislada.
+- **Auditorías**: pip-audit 0 · npm audit `--audit-level=high` 0 · ruff CI
+  subset limpio.
+- **PR #132 merged** → `origin/main` `55b8b3eb`. CI 5/5 gates verdes en rama;
+  `Deploy infra + apps` **gated** (sin `deploy:true`), solo what-if.
+- **PENDIENTE (P1)** — deploy Azure real del SHA `55b8b3eb` + smoke de
+  producción. Requiere confirmación explícita puntual (§11: suscripción tenant
+  UNAH). Producción sigue en `a3cc6136` (PR #121).

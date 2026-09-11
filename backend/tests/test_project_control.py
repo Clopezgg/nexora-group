@@ -376,7 +376,7 @@ def test_budget_summary_excludes_an_advance_prepayment_invoice_from_accrued(clie
     assert Decimal(body["available"]) == Decimal("1000.00")
 
 
-def test_budget_summary_rejects_a_non_functional_currency_ap_accrual(client, db_session):
+def test_ap_accrual_rejects_non_functional_currency_before_reaching_budget(client, db_session):
     login_admin(client)
     company = create_company(client, currency="HNL")
     project = _create_project(client, company_id=company["id"])
@@ -407,12 +407,15 @@ def test_budget_summary_rejects_a_non_functional_currency_ap_accrual(client, db_
             "dueDate": "2026-02-10",
         },
     ).json()
-    client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+    approval = client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+
+    assert approval.status_code == 422, approval.text
+    assert approval.json()["error"]["code"] == "NXR-FINANCIAL-001"
 
     summary = client.get(f"/api/projects/{project['id']}/budgets/summary")
 
-    assert summary.status_code == 409, summary.text
-    assert summary.json()["error"]["code"] == "NXR-BUDGET-002"
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["accrued"] == "0"
 
 
 def test_project_purchase_order_approval_rejects_non_functional_currency(client, db_session):

@@ -51,7 +51,7 @@ def login(
         value=raw_token,
         httponly=True,
         secure=settings.is_production,
-        samesite="none" if settings.is_production else "lax",
+        samesite="lax",
         max_age=max(max_age, 0),
         path="/",
     )

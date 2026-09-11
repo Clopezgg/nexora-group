@@ -5,17 +5,18 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.config import get_settings
 from app.core.logging import get_correlation_id
 
-"""NXR-REQ-0008 (CSRF). Decisión explícita: la sesión vive en una cookie
-httponly (`SameSite=Lax` en dev, `SameSite=None; Secure` en producción --
-frontend y backend en subdominios distintos, ver auth.py). `SameSite=Lax`
-ya bloquea la mayoría de CSRF en dev, pero en producción `SameSite=None`
-es cross-site por diseño, así que SameSite por sí solo no alcanza ahí.
-CORS con `allow_origins=[frontend_url]` ya bloquea cualquier fetch/XHR con
+"""NXR-REQ-0008 (CSRF). NX-AUD-024 (F3.10) — Arquitectura de producción
+first-party: Static Web Apps vincula el Container App como backend,
+proxyando `/api/*` desde el mismo origen del SPA. La cookie de sesión
+es first-party (`SameSite=Lax`, `HttpOnly`, `Secure` en producción).
+
+`SameSite=Lax` ya bloquea la mayoría de CSRF en ambos entornos. CORS
+con `allow_origins=[frontend_url]` bloquea cualquier fetch/XHR con
 `Content-Type: application/json` desde otro origen (dispara preflight,
 que solo el origen configurado puede pasar) -- eso cubre casi toda la
 API, que es JSON puro. La excepción real es `POST /api/evidence`
 (`multipart/form-data`, ver evidence.py): ese Content-Type NO dispara
-preflight, así que un <form> HTML malicioso en otro sitio SÍ podría
+preflight, así que un <form> HTML malicioso en otro sitio podría
 enviarlo con las cookies de la víctima. En vez de una excepción puntual
 para ese endpoint, se valida el header `Origin` en TODA mutación
 (POST/PUT/PATCH/DELETE) -- defensa uniforme, no depende de que cada

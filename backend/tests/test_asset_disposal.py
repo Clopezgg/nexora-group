@@ -20,6 +20,7 @@ from app.services import asset_service, posting_service
 def _create_test_setup(db):
     currency = Currency(code="HNL", name="Lempira", symbol="L")
     db.add(currency)
+    db.flush()
 
     for code, name, prefix in [
         ("DEP", "Depreciación", "DEP"),
@@ -29,7 +30,7 @@ def _create_test_setup(db):
     ]:
         db.add(DocumentType(code=code, name=name, number_prefix=prefix))
 
-    company = Company(name="Test Disposal Co")
+    company = Company(name="Test Disposal Co", functional_currency_code="HNL")
     db.add(company)
     db.flush()
 

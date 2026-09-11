@@ -12,8 +12,8 @@ describe('formatMoney', () => {
     expect(formatMoney('1234.5', 'HNL')).toMatch(/1,234\.50/)
   })
 
-  it('falls back to the default currency when none is given', () => {
-    expect(formatMoney(10)).toMatch(/10\.00/)
+  it('fails closed when currency is blank instead of inventing HNL', () => {
+    expect(() => formatMoney(10, '')).toThrow(/moneda ISO explícito/i)
   })
 
   it('formats negatives without dropping the sign', () => {

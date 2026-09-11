@@ -8,6 +8,7 @@ import type {
   Supplier,
   SupplierContract,
   SupplierContractCategory,
+  ThreeWayMatch,
 } from '../types/procurement'
 
 export const procurementService = {
@@ -143,4 +144,16 @@ export const procurementService = {
     receivedAt: string
     lines: { purchaseOrderLineId: string; quantityReceived: string }[]
   }) => apiFetch<GoodsReceipt>('/procurement/goods-receipts', { method: 'POST', body: JSON.stringify(payload) }),
+  listThreeWayMatches: (companyId: string) =>
+    apiFetch<ThreeWayMatch[]>(`/procurement/three-way-match?company_id=${encodeURIComponent(companyId)}`),
+  runThreeWayMatch: (payload: {
+    purchaseOrderId: string
+    supplierInvoiceId: string
+    supplierInvoiceQuantity: string
+  }) => apiFetch<ThreeWayMatch>('/procurement/three-way-match', { method: 'POST', body: JSON.stringify(payload) }),
+  overrideThreeWayMatch: (id: string, reason: string, evidenceId?: string) =>
+    apiFetch<ThreeWayMatch>(`/procurement/three-way-match/${id}/override`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, evidenceId }),
+    }),
 }

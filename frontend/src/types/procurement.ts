@@ -148,3 +148,20 @@ export interface GoodsReceipt {
   warehouseId: string
   receivedAt: string
 }
+
+export interface ThreeWayMatch {
+  id: string
+  purchaseOrderId: string
+  supplierInvoiceId: string
+  supplierInvoiceAmount: string
+  supplierInvoiceQuantity: string
+  matchKind: 'FINANCIAL'
+  status: 'MATCHED' | 'EXCEPTION'
+  orderedAmount: string
+  receivedQuantity: string
+  exceptions: Array<Record<string, string>>
+  overrideReason: string | null
+  overriddenByUserId: string | null
+  overriddenAt: string | null
+  overrideEvidenceId: string | null
+}

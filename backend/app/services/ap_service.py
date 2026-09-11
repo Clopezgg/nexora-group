@@ -369,6 +369,29 @@ def pay_supplier_invoice(
     if invoice.status not in ("APPROVED", "SCHEDULED", "PARTIALLY_PAID"):
         raise InvalidInvoiceStateError(f"No se puede pagar una factura en estado {invoice.status}")
 
+    if invoice.purchase_order_id is not None:
+        from app.models.procurement import ThreeWayMatchResult
+
+        match = db.execute(
+            select(ThreeWayMatchResult)
+            .where(
+                ThreeWayMatchResult.purchase_order_id == invoice.purchase_order_id,
+                ThreeWayMatchResult.supplier_invoice_id == invoice.id,
+                ThreeWayMatchResult.match_kind == "FINANCIAL",
+            )
+            .with_for_update()
+        ).scalar_one_or_none()
+        if match is None:
+            raise InvalidFinancialReferenceError(
+                "La factura de orden de compra requiere un three-way match financiero antes del pago"
+            )
+        if match.status == "EXCEPTION" and (
+            not match.override_reason or match.overridden_by_user_id is None or match.overridden_at is None
+        ):
+            raise InvalidFinancialReferenceError(
+                "La factura tiene una excepción de three-way match pendiente de autorización"
+            )
+
     total = invoice.amount + invoice.tax_amount
     remaining = total - invoice.amount_paid
     if amount <= 0 or amount > remaining:

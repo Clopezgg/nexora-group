@@ -14,6 +14,7 @@ export interface SupplierInvoice {
   status: string
   supplierContractId: string | null
   contractInstallmentId: string | null
+  purchaseOrderId: string | null
 }
 
 export interface SupplierPayment {

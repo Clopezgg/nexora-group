@@ -385,7 +385,7 @@ def create_three_way_match_result(
     db: Session,
     *,
     purchase_order_id: uuid.UUID,
-    supplier_invoice_id: uuid.UUID | None,
+    supplier_invoice_id: uuid.UUID,
     supplier_invoice_amount: Decimal,
     supplier_invoice_quantity: Decimal,
     received_quantity: Decimal,
@@ -398,6 +398,7 @@ def create_three_way_match_result(
     result = ThreeWayMatchResult(
         purchase_order_id=purchase_order_id,
         supplier_invoice_id=supplier_invoice_id,
+        match_kind="FINANCIAL",
         supplier_invoice_amount=supplier_invoice_amount,
         supplier_invoice_quantity=supplier_invoice_quantity,
         received_quantity=received_quantity,
@@ -410,3 +411,18 @@ def create_three_way_match_result(
     db.add(result)
     db.flush()
     return result
+
+
+def list_financial_three_way_matches(
+    db: Session, *, company_id: uuid.UUID
+) -> list[ThreeWayMatchResult]:
+    stmt = (
+        select(ThreeWayMatchResult)
+        .join(PurchaseOrder, PurchaseOrder.id == ThreeWayMatchResult.purchase_order_id)
+        .where(
+            PurchaseOrder.company_id == company_id,
+            ThreeWayMatchResult.match_kind == "FINANCIAL",
+        )
+        .order_by(ThreeWayMatchResult.created_at.desc())
+    )
+    return list(db.execute(stmt).scalars())

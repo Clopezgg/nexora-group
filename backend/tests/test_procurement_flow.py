@@ -53,6 +53,37 @@ def _create_po(client, *, company_id: str, supplier_id: str, item_id: str) -> di
     return sent.json()
 
 
+def _create_po_invoice(
+    client,
+    *,
+    company_id: str,
+    supplier_id: str,
+    po_id: str,
+    expense_account_id: str,
+    payable_account_id: str,
+    invoice_number: str,
+    amount: str,
+) -> dict:
+    response = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company_id,
+            "supplierId": supplier_id,
+            "invoiceNumber": invoice_number,
+            "scope": "GENERAL",
+            "expenseAccountId": expense_account_id,
+            "payableAccountId": payable_account_id,
+            "currencyCode": "HNL",
+            "amount": amount,
+            "invoiceDate": "2026-08-24",
+            "dueDate": "2026-09-24",
+            "purchaseOrderId": po_id,
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 def test_requisition_to_purchase_order_end_to_end(client):
     """PR -> approval -> RFQ -> quotation -> PO (orden maestra §44-49)."""
     login_admin(client)
@@ -188,6 +219,8 @@ def test_three_way_match_matched_and_exception(client):
     warehouse = _create_warehouse(client, company_id=company["id"])
     po = _create_po(client, company_id=company["id"], supplier_id=supplier["id"], item_id=item["id"])
     po_line_id = po["lines"][0]["id"]
+    expense = create_account(client, company_id=company["id"], code="5200", name="Compras", account_type="EXPENSE")
+    payable = create_account(client, company_id=company["id"], code="2100", name="Proveedores", account_type="LIABILITY")
 
     client.post(
         "/api/procurement/goods-receipts",
@@ -199,22 +232,42 @@ def test_three_way_match_matched_and_exception(client):
         },
     )
 
+    matched_invoice = _create_po_invoice(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        po_id=po["id"],
+        expense_account_id=expense["id"],
+        payable_account_id=payable["id"],
+        invoice_number="TWM-MATCHED",
+        amount="1000.00",
+    )
     matched = client.post(
         "/api/procurement/three-way-match",
         json={
             "purchaseOrderId": po["id"],
-            "supplierInvoiceAmount": "1000.00",
+            "supplierInvoiceId": matched_invoice["id"],
             "supplierInvoiceQuantity": "100.0000",
         },
     ).json()
     assert matched["status"] == "MATCHED"
     assert matched["exceptions"] == []
 
+    exception_invoice = _create_po_invoice(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        po_id=po["id"],
+        expense_account_id=expense["id"],
+        payable_account_id=payable["id"],
+        invoice_number="TWM-EXCEPTION",
+        amount="1500.00",
+    )
     exception = client.post(
         "/api/procurement/three-way-match",
         json={
             "purchaseOrderId": po["id"],
-            "supplierInvoiceAmount": "1500.00",
+            "supplierInvoiceId": exception_invoice["id"],
             "supplierInvoiceQuantity": "100.0000",
         },
     ).json()

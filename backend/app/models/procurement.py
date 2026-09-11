@@ -1,8 +1,8 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, Numeric, String
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -296,6 +296,23 @@ class ThreeWayMatchResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "amount_tolerance_pct >= 0 AND amount_tolerance_pct <= 100",
             name="ck_twm_amount_tolerance_valid",
         ),
+        CheckConstraint(
+            "match_kind = 'LEGACY_PREVIEW' OR "
+            "(match_kind = 'FINANCIAL' AND supplier_invoice_id IS NOT NULL)",
+            name="ck_twm_financial_invoice_required",
+        ),
+        CheckConstraint(
+            "(override_reason IS NULL AND overridden_by_user_id IS NULL AND overridden_at IS NULL) OR "
+            "(status = 'EXCEPTION' AND override_reason IS NOT NULL "
+            "AND overridden_by_user_id IS NOT NULL AND overridden_at IS NOT NULL)",
+            name="ck_twm_override_complete",
+        ),
+        Index(
+            "uq_twm_financial_supplier_invoice",
+            "supplier_invoice_id",
+            unique=True,
+            postgresql_where=text("match_kind = 'FINANCIAL'"),
+        ),
     )
 
     purchase_order_id: Mapped[uuid.UUID] = mapped_column(
@@ -304,6 +321,7 @@ class ThreeWayMatchResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     supplier_invoice_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("supplier_invoices.id", ondelete="SET NULL"), nullable=True
     )
+    match_kind: Mapped[str] = mapped_column(String(20), nullable=False, default="FINANCIAL")
     supplier_invoice_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     supplier_invoice_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     received_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
@@ -312,3 +330,11 @@ class ThreeWayMatchResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     amount_tolerance_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     exceptions: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    override_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    overridden_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    overridden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    override_evidence_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("evidence.id", ondelete="RESTRICT"), nullable=True
+    )

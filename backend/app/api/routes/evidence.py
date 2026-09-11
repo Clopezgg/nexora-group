@@ -12,7 +12,7 @@ from app.api.deps_correlation import get_correlation_id
 from app.models.accounting import AccountingDocument
 from app.models.change_order import ChangeOrder
 from app.models.evidence import Evidence
-from app.models.procurement import GoodsReceipt, PurchaseOrder, ServiceEntry
+from app.models.procurement import GoodsReceipt, PurchaseOrder, ServiceEntry, ThreeWayMatchResult
 from app.models.progress import ProgressRecord
 from app.models.project import Project
 from app.models.project_setup import ProjectSetupRun
@@ -167,6 +167,15 @@ def _resolve_evidence_context(
         if order is None:
             raise HTTPException(status_code=404, detail="Orden de compra de la entrada de servicio no encontrada")
         return entry.company_id, order.project_id
+
+    if normalized == "THREE_WAY_MATCH":
+        result = db.get(ThreeWayMatchResult, entity_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Three-way match de evidencia no encontrado")
+        order = db.get(PurchaseOrder, result.purchase_order_id)
+        if order is None:
+            raise HTTPException(status_code=404, detail="Orden de compra del match no encontrada")
+        return order.company_id, order.project_id
 
     if strict:
         raise HTTPException(

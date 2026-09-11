@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from app.schemas.base import CamelModel
@@ -182,8 +182,7 @@ class ServiceEntryResponse(CamelModel):
 
 class ThreeWayMatchRequest(CamelModel):
     purchase_order_id: uuid.UUID
-    supplier_invoice_id: uuid.UUID | None = None
-    supplier_invoice_amount: Decimal
+    supplier_invoice_id: uuid.UUID
     supplier_invoice_quantity: Decimal
     quantity_tolerance_pct: Decimal = Decimal("0")
     amount_tolerance_pct: Decimal = Decimal("0")
@@ -192,7 +191,20 @@ class ThreeWayMatchRequest(CamelModel):
 class ThreeWayMatchResponse(CamelModel):
     id: uuid.UUID
     purchase_order_id: uuid.UUID
+    supplier_invoice_id: uuid.UUID
+    supplier_invoice_amount: Decimal
+    supplier_invoice_quantity: Decimal
+    match_kind: str
     status: str
     ordered_amount: Decimal
     received_quantity: Decimal
     exceptions: list = []
+    override_reason: str | None = None
+    overridden_by_user_id: uuid.UUID | None = None
+    overridden_at: datetime | None = None
+    override_evidence_id: uuid.UUID | None = None
+
+
+class ThreeWayMatchOverrideRequest(CamelModel):
+    reason: str
+    evidence_id: uuid.UUID | None = None

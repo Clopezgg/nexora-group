@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -9,6 +10,8 @@ from app.domain.errors import (
     ProcurementCurrencyMismatchError,
 )
 from app.models.company import Company
+from app.models.ap import SupplierInvoice
+from app.models.evidence import Evidence
 from app.models.procurement import (
     GoodsReceipt,
     PurchaseOrder,
@@ -453,8 +456,7 @@ def run_three_way_match(
     db: Session,
     *,
     purchase_order_id: uuid.UUID,
-    supplier_invoice_id: uuid.UUID | None,
-    supplier_invoice_amount: Decimal,
+    supplier_invoice_id: uuid.UUID,
     supplier_invoice_quantity: Decimal,
     quantity_tolerance_pct: Decimal = Decimal("0"),
     amount_tolerance_pct: Decimal = Decimal("0"),
@@ -467,6 +469,27 @@ def run_three_way_match(
     order = procurement_repository.get_purchase_order(db, purchase_order_id)
     if order is None:
         raise ValueError(f"PurchaseOrder {purchase_order_id} no existe")
+    invoice = db.get(SupplierInvoice, supplier_invoice_id)
+    if invoice is None:
+        raise InvalidFinancialReferenceError("La factura de proveedor no existe")
+    if invoice.company_id != order.company_id:
+        raise InvalidFinancialReferenceError("La factura y la orden pertenecen a compañías distintas")
+    if invoice.supplier_id != order.supplier_id:
+        raise InvalidFinancialReferenceError("La factura y la orden pertenecen a proveedores distintos")
+    if invoice.project_id != order.project_id:
+        raise InvalidFinancialReferenceError("La factura y la orden pertenecen a proyectos distintos")
+    if invoice.currency_code != order.currency_code:
+        raise InvalidFinancialReferenceError("La moneda de la factura no coincide con la orden")
+    if invoice.purchase_order_id != order.id:
+        raise InvalidFinancialReferenceError("La factura no corresponde a esta orden de compra")
+    existing = db.query(ThreeWayMatchResult.id).filter(
+        ThreeWayMatchResult.supplier_invoice_id == invoice.id,
+        ThreeWayMatchResult.match_kind == "FINANCIAL",
+    ).first()
+    if existing is not None:
+        raise InvalidFinancialReferenceError("La factura ya tiene un three-way match financiero")
+
+    supplier_invoice_amount = invoice.amount + invoice.tax_amount
 
     received_quantity = sum(
         (line.quantity_received for line in procurement_repository.list_purchase_order_lines(db, purchase_order_id)),
@@ -519,6 +542,50 @@ def run_three_way_match(
         status="EXCEPTION" if exceptions else "MATCHED",
         exceptions=exceptions,
     )
+    if commit:
+        db.commit()
+        db.refresh(result)
+    else:
+        db.flush()
+    return result
+
+
+def override_three_way_match_exception(
+    db: Session,
+    *,
+    result_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    reason: str,
+    evidence_id: uuid.UUID | None = None,
+    commit: bool = True,
+) -> ThreeWayMatchResult:
+    result = db.query(ThreeWayMatchResult).filter(
+        ThreeWayMatchResult.id == result_id
+    ).with_for_update().one_or_none()
+    if result is None:
+        raise InvalidFinancialReferenceError("Three-way match no existe")
+    if result.match_kind != "FINANCIAL" or result.status != "EXCEPTION":
+        raise InvalidFinancialReferenceError("Solo una excepción financiera puede autorizarse")
+    if result.overridden_at is not None:
+        raise InvalidFinancialReferenceError("La excepción ya fue autorizada")
+    normalized_reason = reason.strip()
+    if len(normalized_reason) < 10:
+        raise InvalidFinancialReferenceError("El motivo de autorización requiere al menos 10 caracteres")
+    if evidence_id is not None:
+        evidence = db.get(Evidence, evidence_id)
+        order = db.get(PurchaseOrder, result.purchase_order_id)
+        if evidence is None:
+            raise InvalidFinancialReferenceError("La evidencia de la excepción no existe")
+        if order is None or evidence.company_id != order.company_id:
+            raise InvalidFinancialReferenceError("La evidencia pertenece a otra compañía")
+        if evidence.entity_type != "THREE_WAY_MATCH" or evidence.entity_id != result.id:
+            raise InvalidFinancialReferenceError("La evidencia no está vinculada a este three-way match")
+        if evidence.category != "TWM_EXCEPTION_OVERRIDE":
+            raise InvalidFinancialReferenceError("La evidencia no documenta una excepción de three-way match")
+    result.override_reason = normalized_reason
+    result.overridden_by_user_id = actor_user_id
+    result.overridden_at = datetime.now(timezone.utc)
+    result.override_evidence_id = evidence_id
     if commit:
         db.commit()
         db.refresh(result)

@@ -83,6 +83,17 @@ class ContractSummaryResponse(CamelModel):
     advance_paid: Decimal = Decimal("0")
     advance_remaining: Decimal = Decimal("0")
     retention_outstanding: Decimal = Decimal("0")
+    retention_withheld: Decimal = Decimal("0")
+    retention_released: Decimal = Decimal("0")
+    retention_paid: Decimal = Decimal("0")
+    retention_available_to_release: Decimal = Decimal("0")
+
+
+class RetentionReleaseRequest(CamelModel):
+    amount: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
+    due_date: date
+    reason: str = Field(min_length=10, max_length=1000)
+    evidence_id: uuid.UUID | None = None
 
 
 class FifoPreviewRequest(CamelModel):

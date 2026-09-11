@@ -100,6 +100,14 @@ class ContractPaymentInstallment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     net_due: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="UPCOMING")
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    retention_release_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    retention_released_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    retention_released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retention_release_evidence_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("evidence.id", ondelete="RESTRICT"), nullable=True
+    )
 
 
 class ContractPaymentAllocation(UUIDPrimaryKeyMixin, TimestampMixin, Base):

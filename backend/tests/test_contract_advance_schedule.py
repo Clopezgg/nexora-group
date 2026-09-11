@@ -177,7 +177,10 @@ def test_retention_5pct_gross_net_split(client):
     summary = client.get(
         f"/api/contract-payments/schedules/{created.json()['id']}/summary"
     ).json()
-    assert Decimal(summary["retentionOutstanding"]) == Decimal("5000.00")
+    # La retención pactada sólo se vuelve WITHHELD/OUTSTANDING cuando se paga
+    # el neto de la cuota; configurarla no equivale a haberla retenido.
+    assert Decimal(summary["retentionWithheld"]) == Decimal("0.00")
+    assert Decimal(summary["retentionOutstanding"]) == Decimal("0.00")
 
 
 def _pay_setup(client, company, tag):

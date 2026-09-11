@@ -13,6 +13,7 @@ from app.models.accounting import AccountingDocument
 from app.models.change_order import ChangeOrder
 from app.models.evidence import Evidence
 from app.models.procurement import GoodsReceipt, PurchaseOrder, ServiceEntry, ThreeWayMatchResult
+from app.models.contract_payment import ContractPaymentSchedule
 from app.models.progress import ProgressRecord
 from app.models.project import Project
 from app.models.project_setup import ProjectSetupRun
@@ -176,6 +177,12 @@ def _resolve_evidence_context(
         if order is None:
             raise HTTPException(status_code=404, detail="Orden de compra del match no encontrada")
         return order.company_id, order.project_id
+
+    if normalized == "CONTRACT_PAYMENT_SCHEDULE":
+        schedule = db.get(ContractPaymentSchedule, entity_id)
+        if schedule is None:
+            raise HTTPException(status_code=404, detail="Plan contractual de evidencia no encontrado")
+        return schedule.company_id, schedule.project_id
 
     if strict:
         raise HTTPException(

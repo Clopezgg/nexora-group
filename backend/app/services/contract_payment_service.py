@@ -28,6 +28,7 @@ from app.models.contract_payment import (
     ContractPaymentInstallment,
     ContractPaymentSchedule,
 )
+from app.models.evidence import Evidence
 from app.models.supplier import Supplier, SupplierContract
 
 _ZERO = Decimal("0.00")
@@ -92,6 +93,10 @@ class ContractSummary:
     advance_paid: Decimal = _ZERO
     advance_remaining: Decimal = _ZERO
     retention_outstanding: Decimal = _ZERO
+    retention_withheld: Decimal = _ZERO
+    retention_released: Decimal = _ZERO
+    retention_paid: Decimal = _ZERO
+    retention_available_to_release: Decimal = _ZERO
 
 
 @dataclass(frozen=True)
@@ -316,6 +321,10 @@ def create_schedule(
         kind = raw.get("installment_kind", "REGULAR")
         if kind not in {"ADVANCE", "REGULAR", "RETENTION_RELEASE"}:
             raise InvalidFinancialReferenceError(f"installment_kind inválido: {kind!r}")
+        if kind == "RETENTION_RELEASE":
+            raise InvalidFinancialReferenceError(
+                "La liberación de retención requiere autorización formal; usa el comando retention-releases."
+            )
         normalized.append(
             {
                 "installment_kind": kind,
@@ -336,10 +345,20 @@ def create_schedule(
         raise InvalidFinancialReferenceError("Un contrato no puede tener más de un anticipo.")
 
     total = sum((r["scheduled_amount"] for r in normalized), _ZERO)
-    if total > _q(contract.value):
+    contractual_total = sum(
+        (r["scheduled_amount"] for r in normalized if r["installment_kind"] != "RETENTION_RELEASE"),
+        _ZERO,
+    )
+    if contractual_total > _q(contract.value):
         raise OverpaymentError(
             "El total del plan supera el valor contractual "
-            f"({total} > {contract.value})."
+            f"({contractual_total} > {contract.value})."
+        )
+    if contractual_total < _q(contract.value):
+        raise InvalidFinancialReferenceError(
+            "El total del plan debe cubrir exactamente el valor contractual; "
+            f"faltan {_q(contract.value) - contractual_total}. "
+            "Un plan incompleto no puede activarse ni dejar saldo sin obligación futura."
         )
 
     # El plan define el modo de pago del contrato (§6): crear un
@@ -722,6 +741,8 @@ def installment_summaries(
                 period_month=r.period_month,
                 period_label=(
                     "Anticipo" if kind == "ADVANCE"
+                    else f"Liberación de retención · {period_label(r.period_year, r.period_month)}"
+                    if kind == "RETENTION_RELEASE"
                     else period_label(r.period_year, r.period_month)
                 ),
                 due_date=r.due_date,
@@ -803,10 +824,22 @@ def contract_summary(
     regular_scheduled = sum(
         (s.scheduled_amount for s in summaries if s.installment_kind == "REGULAR"), _ZERO
     )
-    total_contractual = sum((s.scheduled_amount for s in summaries), _ZERO)
-    retention_outstanding = sum(
-        (s.retention_amount for s in summaries if s.installment_kind == "REGULAR"), _ZERO
+    total_contractual = sum(
+        (s.scheduled_amount for s in summaries if s.installment_kind != "RETENTION_RELEASE"),
+        _ZERO,
     )
+    retention_withheld = sum(
+        (
+            _q(s.retention_amount * min(s.paid / s.net_due, Decimal("1")))
+            if s.installment_kind == "REGULAR" and s.net_due > _ZERO
+            else _ZERO
+        )
+        for s in summaries
+    )
+    release_rows = [s for s in summaries if s.installment_kind == "RETENTION_RELEASE"]
+    retention_released = sum((s.scheduled_amount for s in release_rows), _ZERO)
+    retention_paid = sum((s.paid for s in release_rows), _ZERO)
+    retention_outstanding = max(retention_withheld - retention_paid, _ZERO)
     value = _q(contract.value if contract else schedule.total_scheduled)
 
     return ContractSummary(
@@ -824,7 +857,90 @@ def contract_summary(
         advance_paid=_q(advance_paid),
         advance_remaining=_q(max(advance_scheduled - advance_paid, _ZERO)),
         retention_outstanding=_q(retention_outstanding),
+        retention_withheld=_q(retention_withheld),
+        retention_released=_q(retention_released),
+        retention_paid=_q(retention_paid),
+        retention_available_to_release=_q(max(retention_withheld - retention_released, _ZERO)),
     )
+
+
+def authorize_retention_release(
+    db: Session,
+    *,
+    schedule_id: uuid.UUID,
+    amount: Decimal,
+    due_date: date,
+    reason: str,
+    actor_user_id: uuid.UUID,
+    evidence_id: uuid.UUID | None = None,
+    commit: bool = True,
+) -> ContractPaymentInstallment:
+    schedule = db.execute(
+        select(ContractPaymentSchedule)
+        .where(ContractPaymentSchedule.id == schedule_id)
+        .with_for_update()
+    ).scalar_one_or_none()
+    if schedule is None:
+        raise InvalidFinancialReferenceError("El plan contractual no existe")
+    if schedule.status == "CANCELLED":
+        raise InvalidFinancialReferenceError("Un plan cancelado no admite liberaciones")
+    rows = list(
+        db.execute(
+            select(ContractPaymentInstallment)
+            .where(ContractPaymentInstallment.schedule_id == schedule.id)
+            .order_by(ContractPaymentInstallment.sequence)
+            .with_for_update()
+        ).scalars()
+    )
+    summary = contract_summary(db, schedule_id=schedule.id)
+    release_amount = _q(amount)
+    if release_amount <= _ZERO or release_amount > summary.retention_available_to_release:
+        raise InvalidFinancialReferenceError(
+            "La liberación no puede superar la retención efectivamente retenida y aún no autorizada."
+        )
+    normalized_reason = reason.strip()
+    if len(normalized_reason) < 10:
+        raise InvalidFinancialReferenceError("El motivo de liberación requiere al menos 10 caracteres")
+    if evidence_id is not None:
+        evidence = db.get(Evidence, evidence_id)
+        if evidence is None or evidence.company_id != schedule.company_id:
+            raise InvalidFinancialReferenceError("La evidencia de liberación no existe en esta compañía")
+        if evidence.entity_type != "CONTRACT_PAYMENT_SCHEDULE" or evidence.entity_id != schedule.id:
+            raise InvalidFinancialReferenceError("La evidencia no está vinculada a este plan contractual")
+        if evidence.category != "RETENTION_RELEASE":
+            raise InvalidFinancialReferenceError("La evidencia no documenta una liberación de retención")
+    duplicate_period = any(
+        row.installment_kind == "RETENTION_RELEASE"
+        and row.period_year == due_date.year
+        and row.period_month == due_date.month
+        for row in rows
+    )
+    if duplicate_period:
+        raise InvalidFinancialReferenceError("Ya existe una liberación de retención en ese período")
+    installment = ContractPaymentInstallment(
+        schedule_id=schedule.id,
+        sequence=max((row.sequence for row in rows), default=0) + 1,
+        installment_kind="RETENTION_RELEASE",
+        period_year=due_date.year,
+        period_month=due_date.month,
+        due_date=due_date,
+        scheduled_amount=release_amount,
+        retention_amount=_ZERO,
+        net_due=release_amount,
+        status="UPCOMING",
+        description="Liberación de retención contractual",
+        retention_release_reason=normalized_reason,
+        retention_released_by_user_id=actor_user_id,
+        retention_released_at=datetime.now(timezone.utc),
+        retention_release_evidence_id=evidence_id,
+    )
+    db.add(installment)
+    schedule.status = "ACTIVE"
+    db.flush()
+    if commit:
+        db.commit()
+        db.refresh(installment)
+    return installment
 
 
 def contract_payment_ledger(
@@ -1016,6 +1132,14 @@ def allocate_payment(
         installment = by_id[inst_id]
         if installment.status == "CANCELLED":
             raise InstallmentClosedError("La cuota está cancelada.")
+        if installment.installment_kind == "RETENTION_RELEASE" and (
+            not installment.retention_release_reason
+            or installment.retention_released_by_user_id is None
+            or installment.retention_released_at is None
+        ):
+            raise InvalidFinancialReferenceError(
+                "La liberación de retención no tiene autorización formal completa."
+            )
         assert_installment_payable(installment)
         already = paid_map.get(inst_id, _ZERO)
         remaining = _q(installment.net_due) - already
@@ -1045,6 +1169,7 @@ def allocate_payment(
         raise InvalidFinancialReferenceError(
             "El pago contractual debe quedar asignado por completo."
         )
+    _refresh_schedule_status(db, schedule.id)
     if commit:
         db.commit()
     return created
@@ -1063,11 +1188,31 @@ def reverse_payment_allocations(db: Session, *, supplier_payment_id: uuid.UUID) 
             )
         ).scalars()
     )
+    schedule_ids = {
+        installment.schedule_id
+        for row in rows
+        if (installment := db.get(ContractPaymentInstallment, row.installment_id)) is not None
+    }
     now = datetime.now(timezone.utc)
     for row in rows:
         row.reversed_at = now
     db.flush()
+    for schedule_id in schedule_ids:
+        _refresh_schedule_status(db, schedule_id)
     return len(rows)
+
+
+def _refresh_schedule_status(db: Session, schedule_id: uuid.UUID) -> None:
+    schedule = db.get(ContractPaymentSchedule, schedule_id)
+    if schedule is None or schedule.status == "CANCELLED":
+        return
+    summary = contract_summary(db, schedule_id=schedule_id)
+    schedule.status = (
+        "COMPLETED"
+        if summary.contract_balance == _ZERO and summary.retention_outstanding == _ZERO
+        else "ACTIVE"
+    )
+    db.flush()
 
 
 def resolve_schedule_for_invoice(db: Session, invoice) -> ContractPaymentSchedule | None:

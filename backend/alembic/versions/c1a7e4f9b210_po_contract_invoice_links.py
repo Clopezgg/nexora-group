@@ -13,6 +13,7 @@ ni de una PO.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "c1a7e4f9b210"

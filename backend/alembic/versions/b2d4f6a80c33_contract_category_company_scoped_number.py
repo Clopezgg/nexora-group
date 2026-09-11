@@ -21,8 +21,9 @@ ORDEN MAESTRA DEFINITIVA DE INTEGRACIÓN §13/§15/§16.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "b2d4f6a80c33"
 down_revision: Union[str, None] = "a1c3e5f70b21"

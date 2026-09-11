@@ -12,8 +12,9 @@ Configuración -> Perfil de empresa -> Documentos. No destructiva.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "952f802ae816"
 down_revision: Union[str, None] = "2640b82e65b8"

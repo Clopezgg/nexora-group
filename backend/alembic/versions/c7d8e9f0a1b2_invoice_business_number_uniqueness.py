@@ -1,7 +1,8 @@
 """Prevent duplicate AP/AR invoice numbers within a company and party."""
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "c7d8e9f0a1b2"
 down_revision = "b9c0d1e2f3a4"

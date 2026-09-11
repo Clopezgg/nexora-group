@@ -21,6 +21,7 @@ la fija explícitamente.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "a1c3e5f70b21"

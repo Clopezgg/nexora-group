@@ -155,6 +155,35 @@ def test_supplier_invoice_can_bind_exact_contract_installment(client):
     assert invoice.json()["contractInstallmentId"] == installment_id
 
 
+def test_supplier_invoice_rejects_installment_from_another_contract(client):
+    login_admin(client)
+    company = create_company(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    first = _contract(client, company["id"], supplier["id"], value="100000.00", number="CTR-API-LINK-A")
+    second = _contract(client, company["id"], supplier["id"], value="100000.00", number="CTR-API-LINK-B")
+    first_schedule = client.post(
+        "/api/contract-payments/schedules",
+        json={
+            "supplierContractId": first["id"], "scheduleType": "CUSTOM",
+            "installments": [{"periodYear": 2026, "periodMonth": 8, "dueDate": "2026-08-31", "scheduledAmount": "100000.00"}],
+        },
+    )
+    assert first_schedule.status_code == 201, first_schedule.text
+    installment_id = first_schedule.json()["installments"][0]["installmentId"]
+    expense = create_account(client, company_id=company["id"], code="520002", name="Obra 2", account_type="EXPENSE")
+    payable = create_account(client, company_id=company["id"], code="210002", name="CxP 2", account_type="LIABILITY")
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"], "supplierId": supplier["id"], "invoiceNumber": "FAC-LINK-002",
+            "scope": "GENERAL", "expenseAccountId": expense["id"], "payableAccountId": payable["id"],
+            "currencyCode": "HNL", "amount": "100000.00", "invoiceDate": "2026-08-01", "dueDate": "2026-08-31",
+            "supplierContractId": second["id"], "contractInstallmentId": installment_id,
+        },
+    )
+    assert invoice.status_code == 422, invoice.text
+
+
 def test_summary_and_fifo_preview(client):
     login_admin(client)
     company = create_company(client)

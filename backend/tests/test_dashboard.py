@@ -212,8 +212,11 @@ def test_company_dashboard_isolates_companies_and_functional_currencies(client):
 
 
 def test_dashboard_active_projects_never_counts_another_companys_projects(client, db_session):
-    """INV-COMP-001: un dashboard con Company explícita solo cuenta proyectos
-    visibles dentro de esa misma Company."""
+    """INV-COMP-001: un dashboard con Company explícita nunca cuenta proyectos
+    de otra Company. La autorización de lectura de la Company respeta RBAC:
+    `SCOPE_ANY` puede abrir otra Company, pero el project scope sigue filtrando
+    estrictamente los proyectos visibles y no convierte al usuario en miembro
+    operativo de esa Company."""
     _login(client)
     company_a = create_company(client, name="Dashboard A")
     company_b = create_company(client, name="Dashboard B")
@@ -244,10 +247,14 @@ def test_dashboard_active_projects_never_counts_another_companys_projects(client
     login_as(client, email="dashboard-scoped@nexora.group")
 
     scoped_summary = client.get(f"/api/dashboard/summary?companyId={company_a['id']}")
-    forbidden_summary = client.get(f"/api/dashboard/summary?companyId={company_b['id']}")
+    cross_company_summary = client.get(f"/api/dashboard/summary?companyId={company_b['id']}")
     assert scoped_summary.status_code == 200, scoped_summary.text
     assert scoped_summary.json()["activeProjects"] == 2
-    assert forbidden_summary.status_code == 403, forbidden_summary.text
+    # Project Manager tiene `core.company/read` SCOPE_ANY por diseño para vistas
+    # cross-company, pero sus proyectos siguen en SCOPE_OWN: company B puede
+    # abrirse sin filtrar/leakear el proyecto B1 que no le fue asignado.
+    assert cross_company_summary.status_code == 200, cross_company_summary.text
+    assert cross_company_summary.json()["activeProjects"] == 0
 
 
 def test_dashboard_active_projects_respects_explicit_project_assignments(client, db_session):

@@ -146,9 +146,17 @@ def project_actuals_by_project(db: Session, *, company_id: uuid.UUID) -> dict[uu
 
 
 def create_physical_count(
-    db: Session, *, company_id: uuid.UUID, warehouse_id: uuid.UUID, count_date
+    db: Session, *, company_id: uuid.UUID, warehouse_id: uuid.UUID, count_date,
+    inventory_account_id: uuid.UUID | None = None,
+    adjustment_gain_account_id: uuid.UUID | None = None,
+    adjustment_loss_account_id: uuid.UUID | None = None,
 ) -> PhysicalCount:
-    count = PhysicalCount(company_id=company_id, warehouse_id=warehouse_id, count_date=count_date)
+    count = PhysicalCount(
+        company_id=company_id, warehouse_id=warehouse_id, count_date=count_date,
+        inventory_account_id=inventory_account_id,
+        adjustment_gain_account_id=adjustment_gain_account_id,
+        adjustment_loss_account_id=adjustment_loss_account_id,
+    )
     db.add(count)
     db.flush()
     return count

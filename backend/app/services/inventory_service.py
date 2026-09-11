@@ -368,6 +368,21 @@ def apply_physical_count(
     if count.status != "COUNTED":
         raise ValueError(f"PhysicalCount {physical_count_id} no está listo para aprobarse")
     lines = inventory_repository.list_physical_count_lines(db, physical_count_id)
+    company = db.get(Company, count.company_id)
+    if company is None or not company.functional_currency_code:
+        raise ValueError("La compañía debe tener moneda funcional configurada")
+    if any(line.counted_quantity != line.expected_quantity for line in lines):
+        if count.inventory_account_id is None:
+            raise ValueError("El conteo con variación requiere cuenta de inventario")
+        from app.services import posting_service
+        from app.services.financial_validation_service import assert_account_belongs_to_company
+
+        inventory_account = assert_account_belongs_to_company(
+            db, account_id=count.inventory_account_id, company_id=count.company_id,
+            field_name="inventory_account_id",
+        )
+        if inventory_account.account_type != "ASSET":
+            raise ValueError("inventory_account_id debe ser una cuenta ASSET")
     for line in lines:
         variance = line.counted_quantity - line.expected_quantity
         if variance == 0:
@@ -390,6 +405,42 @@ def apply_physical_count(
             source_id=physical_count_id,
             notes=f"Ajuste por conteo físico: esperado={line.expected_quantity}, contado={line.counted_quantity}",
         )
+        adjustment_account_id = (
+            count.adjustment_gain_account_id if variance > 0 else count.adjustment_loss_account_id
+        )
+        if adjustment_account_id is None:
+            raise ValueError("Falta la cuenta de ajuste de inventario para la variación")
+        adjustment_account = assert_account_belongs_to_company(
+            db, account_id=adjustment_account_id, company_id=count.company_id,
+            field_name="adjustment_account_id",
+        )
+        expected_type = "INCOME" if variance > 0 else "EXPENSE"
+        if adjustment_account.account_type != expected_type:
+            raise ValueError(f"La cuenta de ajuste debe ser {expected_type}")
+        value = (abs(variance) * avg_cost).quantize(Decimal("0.01"))
+        if value > 0:
+            lines_to_post = [
+                posting_service.JournalLineInput(
+                    account_id=count.inventory_account_id,
+                    debit_amount=value if variance > 0 else Decimal("0"),
+                    credit_amount=value if variance < 0 else Decimal("0"),
+                    description="Ajuste de inventario por conteo físico",
+                ),
+                posting_service.JournalLineInput(
+                    account_id=adjustment_account_id,
+                    debit_amount=value if variance < 0 else Decimal("0"),
+                    credit_amount=value if variance > 0 else Decimal("0"),
+                    description="Contrapartida de ajuste de inventario",
+                ),
+            ]
+            posting_service.post_manual(
+                db, company_id=count.company_id, document_type_code="INV",
+                scope="GENERAL", project_id=None, currency_code=company.functional_currency_code,
+                effective_date=count.count_date, lines=lines_to_post,
+                description="Ajuste de inventario por conteo físico",
+                source_type="physical_count", source_id=physical_count_id,
+                commit=False,
+            )
     count.status = "APPROVED"
     count.approved_by_id = approved_by_id
     if commit:

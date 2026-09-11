@@ -114,6 +114,9 @@ class PhysicalCountCreateRequest(CamelModel):
     company_id: uuid.UUID
     warehouse_id: uuid.UUID
     count_date: date
+    inventory_account_id: uuid.UUID | None = None
+    adjustment_gain_account_id: uuid.UUID | None = None
+    adjustment_loss_account_id: uuid.UUID | None = None
     lines: list[PhysicalCountLineRequest]
 
 

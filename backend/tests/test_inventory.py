@@ -8,7 +8,7 @@ from app.models.inventory import StockLedgerEntry
 from app.models.permission import UserCompanyAccess
 from app.repositories import inventory_repository
 from app.services import inventory_service
-from tests.helpers import create_company, create_supplier, create_user_with_role, login_admin, login_as
+from tests.helpers import create_account, create_company, create_supplier, create_user_with_role, login_admin, login_as
 
 
 def _setup(client):
@@ -340,7 +340,7 @@ def test_transfer_moves_stock_between_warehouses(client):
     assert float(incoming["unitCost"]) == 8.0
 
 
-def test_physical_count_creates_adjustment_for_variance(client):
+def test_physical_count_creates_adjustment_for_variance(client, db_session):
     login_admin(client)
     company, item, warehouse = _setup(client)
     client.post(
@@ -348,6 +348,8 @@ def test_physical_count_creates_adjustment_for_variance(client):
         json={"companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
               "quantity": "50.0000", "unitCost": "4.0000"},
     )
+    inventory_account = create_account(client, company_id=company["id"], code="140001", name="Inventario", account_type="ASSET")
+    loss_account = create_account(client, company_id=company["id"], code="560001", name="Ajuste inventario", account_type="EXPENSE")
 
     count = client.post(
         "/api/inventory/physical-counts",
@@ -355,6 +357,8 @@ def test_physical_count_creates_adjustment_for_variance(client):
             "companyId": company["id"],
             "warehouseId": warehouse["id"],
             "countDate": "2026-08-24",
+            "inventoryAccountId": inventory_account["id"],
+            "adjustmentLossAccountId": loss_account["id"],
             "lines": [{"itemId": item["id"], "expectedQuantity": "50.0000", "countedQuantity": "47.0000"}],
         },
     ).json()
@@ -367,6 +371,17 @@ def test_physical_count_creates_adjustment_for_variance(client):
         "/api/inventory/stock/position", params={"item_id": item["id"], "warehouse_id": warehouse["id"]}
     ).json()
     assert float(position["quantityOnHand"]) == 47.0
+    from app.models.accounting import AccountingDocument, AccountingSourceLink
+    document = db_session.execute(
+        select(AccountingDocument).join(
+            AccountingSourceLink,
+            AccountingSourceLink.accounting_document_id == AccountingDocument.id,
+        ).where(
+            AccountingSourceLink.source_type == "physical_count",
+            AccountingSourceLink.source_id == uuid.UUID(count["id"]),
+        )
+    ).scalar_one()
+    assert document.status == "POSTED"
 
 
 def test_return_to_supplier_reduces_stock_and_tags_the_supplier(client):

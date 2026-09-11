@@ -409,7 +409,10 @@ def create_physical_count(
         db, user_id=user.id, resource="inventory.physical_count", action="create", company_id=payload.company_id
     )
     count = inventory_repository.create_physical_count(
-        db, company_id=payload.company_id, warehouse_id=payload.warehouse_id, count_date=payload.count_date
+        db, company_id=payload.company_id, warehouse_id=payload.warehouse_id, count_date=payload.count_date,
+        inventory_account_id=payload.inventory_account_id,
+        adjustment_gain_account_id=payload.adjustment_gain_account_id,
+        adjustment_loss_account_id=payload.adjustment_loss_account_id,
     )
     for line in payload.lines:
         inventory_service._lock_stock_position(

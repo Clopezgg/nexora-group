@@ -23,3 +23,25 @@ export interface StockPosition {
   quantityOnHand: string
   averageCost: string
 }
+
+export interface StockLedgerEntry {
+  id: string
+  itemId: string
+  warehouseId: string
+  movementType: string
+  quantity: string
+  unitCost: string
+  resultingQtyOnHand: string
+  resultingAvgCost: string
+  projectId: string | null
+  sourceType: string | null
+  sourceId: string | null
+  notes: string | null
+}
+
+export interface PhysicalCount {
+  id: string
+  warehouseId: string
+  countDate: string
+  status: string
+}

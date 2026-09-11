@@ -84,6 +84,19 @@ def test_invoice_against_po_relieves_open_commitment_without_double_count(client
         "sender": "Fondeo", "currencyCode": "HNL", "originalAmount": "500000.00", "remittanceDate": "2026-01-01",
     })
 
+    item_resp = client.post("/api/inventory/items", json={
+        "companyId": company["id"], "sku": "CE-MAT", "name": "Material", "itemType": "MATERIAL", "uom": "UN",
+    })
+    item = item_resp.json()
+    wh = client.post("/api/inventory/warehouses", json={
+        "companyId": company["id"], "code": "CE-WH", "name": "Almacen",
+    }).json()
+    client.post("/api/procurement/purchase-orders/" + po["id"] + "/send")
+    client.post("/api/procurement/goods-receipts", json={
+        "purchaseOrderId": po["id"], "warehouseId": wh["id"], "receivedAt": "2026-09-01",
+        "lines": [{"purchaseOrderLineId": po["lines"][0]["id"], "quantityReceived": "0.5000"}],
+    })
+
     inv = client.post("/api/ap/supplier-invoices", json={
         "companyId": company["id"], "supplierId": supplier["id"], "invoiceNumber": "F-CE-2",
         "scope": "PROJECT", "projectId": project["id"], "purchaseOrderId": po["id"],
@@ -95,14 +108,25 @@ def test_invoice_against_po_relieves_open_commitment_without_double_count(client
     assert inv.json()["supplierContractId"] == contract["id"]  # heredado de la PO
     client.post(f"/api/ap/supplier-invoices/{inv.json()['id']}/approve")
 
+    match = client.post("/api/procurement/three-way-match", json={
+        "purchaseOrderId": po["id"],
+        "supplierInvoiceId": inv.json()["id"],
+        "supplierInvoiceQuantity": "0.5000",
+    })
+    assert match.status_code == 201, match.text
+    if match.json()["status"] == "EXCEPTION":
+        client.post(f"/api/procurement/three-way-match/{match.json()['id']}/override",
+                     json={"reason": "Autorizado por variación contractual documentada"})
+
     body = client.get(f"/api/projects/{project['id']}/budgets/summary").json()
     assert Decimal(body["committed"]) == Decimal("200000.00")
     assert Decimal(body["openCommitment"]) == Decimal("150000.00")
     assert Decimal(body["accrued"]) == Decimal("50000.00")
     assert Decimal(body["available"]) == Decimal("800000.00")
 
-    client.post(f"/api/ap/supplier-invoices/{inv.json()['id']}/payments",
+    pay_resp = client.post(f"/api/ap/supplier-invoices/{inv.json()['id']}/payments",
                 json={"treasuryAccountId": bank["id"], "amount": "50000.00", "paymentDate": "2026-09-05"})
+    assert pay_resp.status_code == 201, pay_resp.text
     after = client.get(f"/api/projects/{project['id']}/budgets/summary").json()
     assert Decimal(after["available"]) == Decimal("800000.00")
     assert Decimal(after["paid"]) == Decimal("50000.00")

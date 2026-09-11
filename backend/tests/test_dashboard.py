@@ -257,6 +257,30 @@ def test_dashboard_active_projects_never_counts_another_companys_projects(client
     assert cross_company_summary.json()["activeProjects"] == 0
 
 
+def test_dashboard_scope_own_blocks_unassigned_company(client, db_session):
+    """Un rol con `core.company/read` SCOPE_OWN debe recibir 403 cuando intenta
+    consultar una Company que no está en UserCompanyAccess. Esto preserva el
+    fail-closed exigido por la Orden Maestra sin romper los roles que poseen
+    SCOPE_ANY explícito para lectura cross-company."""
+    _login(client)
+    company_a = create_company(client, name="Finance Dashboard A")
+    company_b = create_company(client, name="Finance Dashboard B")
+    user = create_user_with_role(
+        db_session,
+        email="dashboard-finance-own@nexora.group",
+        role_name="Finance Manager",
+    )
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_a["id"]))
+    db_session.commit()
+    login_as(client, email="dashboard-finance-own@nexora.group")
+
+    allowed = client.get(f"/api/dashboard/summary?companyId={company_a['id']}")
+    forbidden = client.get(f"/api/dashboard/summary?companyId={company_b['id']}")
+
+    assert allowed.status_code == 200, allowed.text
+    assert forbidden.status_code == 403, forbidden.text
+
+
 def test_dashboard_active_projects_respects_explicit_project_assignments(client, db_session):
     _login(client)
     company = create_company(client, name="Dashboard Project Scope")

@@ -73,7 +73,7 @@ export function AccountsPayablePage() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterSupplier, setFilterSupplier] = useState('')
 
-  const { companies, activeCompanyId, setActiveCompanyId, isLoading: companiesLoading } = useActiveCompany()
+  const { companies, activeCompany, activeCompanyId, setActiveCompanyId, isLoading: companiesLoading } = useActiveCompany()
 
   const accountsQuery = useQuery({
     queryKey: ['master-data', 'accounts', activeCompanyId],
@@ -179,7 +179,7 @@ export function AccountsPayablePage() {
         </Select>
       </header>
 
-      <ApMetricsCard companyId={activeCompanyId} />
+      <ApMetricsCard companyId={activeCompanyId} currencyCode={activeCompany?.functionalCurrencyCode ?? undefined} />
 
       <Card title="Acciones">
         <Button
@@ -218,6 +218,7 @@ export function AccountsPayablePage() {
       {openCreate && activeCompanyId ? (
         <CreateSupplierInvoiceModal
           companyId={activeCompanyId}
+          functionalCurrencyCode={activeCompany?.functionalCurrencyCode ?? ''}
           expenseAccounts={expenseAccounts}
           payableAccounts={payableAccounts}
           suppliers={suppliers}
@@ -270,6 +271,7 @@ function SubmitForApprovalModal({ invoiceId, companyId, onClose, onSubmitted }: 
 
 export function CreateSupplierInvoiceModal({
   companyId,
+  functionalCurrencyCode,
   expenseAccounts,
   payableAccounts,
   suppliers,
@@ -281,6 +283,7 @@ export function CreateSupplierInvoiceModal({
   onCreated,
 }: {
   companyId: string
+  functionalCurrencyCode: string
   expenseAccounts: { id: string; name: string }[]
   payableAccounts: { id: string; name: string }[]
   suppliers: { id: string; legalName: string }[]
@@ -346,7 +349,7 @@ export function CreateSupplierInvoiceModal({
       projectId: scope === 'PROJECT' ? projectId : null,
       expenseAccountId,
       payableAccountId,
-      currencyCode: selectedContract?.currencyCode ?? projects.find((p) => p.id === projectId)?.currencyCode ?? 'HNL',
+      currencyCode: selectedContract?.currencyCode ?? projects.find((p) => p.id === projectId)?.currencyCode ?? functionalCurrencyCode,
       amount: String(amount ?? 0),
       invoiceDate,
       dueDate,
@@ -564,7 +567,7 @@ export function PaySupplierInvoiceButton({
   )
 }
 
-function ApMetricsCard({ companyId }: { companyId: string | null }) {
+function ApMetricsCard({ companyId, currencyCode }: { companyId: string | null; currencyCode?: string }) {
   const query = useQuery({ queryKey: ['ap-metrics', companyId], queryFn: () => apMetricsService.get(companyId as string), enabled: Boolean(companyId) })
   if (!companyId) return null
   const m = query.data
@@ -572,12 +575,12 @@ function ApMetricsCard({ companyId }: { companyId: string | null }) {
     <Card title="Aging de cuentas por pagar">
       {query.isLoading ? <LoadingState label="Calculando aging…" /> : m?.aging ? (
         <div className="nx-treasury__actions" style={{ flexWrap: 'wrap' }}>
-          <Badge>Cartera abierta {formatMoney(Number(m.apOutstanding ?? 0))}</Badge>
-          <Badge tone="neutral">Al día {formatMoney(Number(m.aging.current ?? 0))}</Badge>
-          <Badge tone="warning">1–30 {formatMoney(Number(m.aging['1_30'] ?? 0))}</Badge>
-          <Badge tone="warning">31–60 {formatMoney(Number(m.aging['31_60'] ?? 0))}</Badge>
-          <Badge tone="danger">61–90 {formatMoney(Number(m.aging['61_90'] ?? 0))}</Badge>
-          <Badge tone="danger">+90 {formatMoney(Number(m.aging.over_90 ?? 0))}</Badge>
+          <Badge>Cartera abierta {formatMoney(Number(m.apOutstanding ?? 0), currencyCode)}</Badge>
+          <Badge tone="neutral">Al día {formatMoney(Number(m.aging.current ?? 0), currencyCode)}</Badge>
+          <Badge tone="warning">1–30 {formatMoney(Number(m.aging['1_30'] ?? 0), currencyCode)}</Badge>
+          <Badge tone="warning">31–60 {formatMoney(Number(m.aging['31_60'] ?? 0), currencyCode)}</Badge>
+          <Badge tone="danger">61–90 {formatMoney(Number(m.aging['61_90'] ?? 0), currencyCode)}</Badge>
+          <Badge tone="danger">+90 {formatMoney(Number(m.aging.over_90 ?? 0), currencyCode)}</Badge>
         </div>
       ) : null}
     </Card>

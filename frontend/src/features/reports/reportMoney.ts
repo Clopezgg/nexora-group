@@ -6,8 +6,8 @@ import { formatMoney } from '../../utils/currency'
  * crudo del backend. */
 export function useReportCurrency() {
   const { activeCompany } = useActiveCompany()
-  const currency = activeCompany?.functionalCurrencyCode ?? 'HNL'
+  const currency = activeCompany?.functionalCurrencyCode
   const fmt = (value: string | number | null | undefined): string =>
-    value === null || value === undefined || value === '' ? '—' : formatMoney(Number(value), currency)
+    value === null || value === undefined || value === '' || !currency ? '—' : formatMoney(Number(value), currency)
   return { currency, fmt }
 }

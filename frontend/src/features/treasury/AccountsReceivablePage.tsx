@@ -102,7 +102,7 @@ export function AccountsReceivablePage() {
         </Select>
       </header>
 
-      <ArMetricsCard companyId={activeCompanyId} />
+      <ArMetricsCard companyId={activeCompanyId} currencyCode={activeCompany?.functionalCurrencyCode ?? undefined} />
       <Card title="Acciones">
         <Button variant="secondary" onClick={() => setOpenCreate(true)} disabled={revenueAccounts.length === 0 || receivableAccounts.length === 0 || customers.length === 0}>Registrar factura de cliente</Button>
         {revenueAccounts.length === 0 || receivableAccounts.length === 0 ? <p className="nx-field__error">Necesitas una cuenta de ingreso y una cuenta por cobrar.</p> : null}
@@ -113,6 +113,7 @@ export function AccountsReceivablePage() {
       {openCreate && activeCompanyId ? (
         <CreateCustomerInvoiceModal
           companyId={activeCompanyId}
+          functionalCurrencyCode={activeCompany?.functionalCurrencyCode ?? ''}
           revenueAccounts={revenueAccounts}
           receivableAccounts={receivableAccounts}
           customers={customers}
@@ -124,8 +125,9 @@ export function AccountsReceivablePage() {
   )
 }
 
-function CreateCustomerInvoiceModal({ companyId, revenueAccounts, receivableAccounts, customers, onClose, onCreated }: {
+function CreateCustomerInvoiceModal({ companyId, functionalCurrencyCode, revenueAccounts, receivableAccounts, customers, onClose, onCreated }: {
   companyId: string
+  functionalCurrencyCode: string
   revenueAccounts: { id: string; name: string }[]
   receivableAccounts: { id: string; name: string }[]
   customers: { id: string; legalName: string }[]
@@ -137,7 +139,7 @@ function CreateCustomerInvoiceModal({ companyId, revenueAccounts, receivableAcco
   const [amount, setAmount] = useState<number | null>(null)
   const [scope, setScope] = useState<'CENTRAL' | 'GENERAL' | 'PROJECT'>('GENERAL')
   const [projectId, setProjectId] = useState('')
-  const [currencyCode, setCurrencyCode] = useState('HNL')
+  const [currencyCode] = useState(functionalCurrencyCode)
   const [invoiceDate, setInvoiceDate] = useState(businessTodayIso())
   const [dueDate, setDueDate] = useState(businessTodayIso())
   const [revenueAccountId, setRevenueAccountId] = useState(revenueAccounts[0]?.id ?? '')
@@ -185,12 +187,7 @@ function CreateCustomerInvoiceModal({ companyId, revenueAccounts, receivableAcco
             <option value="">Selecciona un proyecto…</option>
             {projects.map((project) => <option key={project.id} value={project.id}>{project.code ? `${project.code} — ` : ''}{project.name} · {project.currencyCode}</option>)}
           </Select>
-        ) : (
-          <Select label="Moneda de la factura" value={currencyCode} onChange={(event) => setCurrencyCode(event.target.value)}>
-            <option value="HNL">HNL — Lempira hondureño</option>
-            <option value="USD">USD — Dólar estadounidense</option>
-          </Select>
-        )}
+        ) : <Input label="Moneda funcional" value={currencyCode} readOnly />}
         {selectedProject ? <p className="nx-field__hint">Moneda heredada del proyecto: {selectedProject.currencyCode}. No se aplica tipo de cambio implícito.</p> : null}
         <CustomerSelector options={customerOptions} value={customerId} onChange={setCustomerId} />
         <Input label="Número de factura" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} required />
@@ -261,7 +258,7 @@ function CollectButton({ invoiceId, treasuryAccounts, currencyCode, remaining }:
   )
 }
 
-function ArMetricsCard({ companyId }: { companyId: string | null }) {
+function ArMetricsCard({ companyId, currencyCode }: { companyId: string | null; currencyCode?: string }) {
   const query = useQuery({ queryKey: ['ar-metrics', companyId], queryFn: () => arMetricsService.get(companyId as string), enabled: Boolean(companyId) })
   if (!companyId) return null
   const m = query.data
@@ -270,12 +267,12 @@ function ArMetricsCard({ companyId }: { companyId: string | null }) {
       {query.isLoading ? <LoadingState label="Calculando DSO…" /> : m?.aging ? (
         <div className="nx-treasury__actions" style={{ flexWrap: 'wrap' }}>
           <Badge>{m.dso == null ? 'DSO — (sin ventas recientes)' : `DSO ${m.dso} días`}</Badge>
-          <Badge>Cartera abierta {formatMoney(Number(m.arOutstanding ?? 0))}</Badge>
-          <Badge tone="neutral">Al día {formatMoney(Number(m.aging.current ?? 0))}</Badge>
-          <Badge tone="warning">1–30 {formatMoney(Number(m.aging['1_30'] ?? 0))}</Badge>
-          <Badge tone="warning">31–60 {formatMoney(Number(m.aging['31_60'] ?? 0))}</Badge>
-          <Badge tone="danger">61–90 {formatMoney(Number(m.aging['61_90'] ?? 0))}</Badge>
-          <Badge tone="danger">+90 {formatMoney(Number(m.aging.over_90 ?? 0))}</Badge>
+          <Badge>Cartera abierta {formatMoney(Number(m.arOutstanding ?? 0), currencyCode)}</Badge>
+          <Badge tone="neutral">Al día {formatMoney(Number(m.aging.current ?? 0), currencyCode)}</Badge>
+          <Badge tone="warning">1–30 {formatMoney(Number(m.aging['1_30'] ?? 0), currencyCode)}</Badge>
+          <Badge tone="warning">31–60 {formatMoney(Number(m.aging['31_60'] ?? 0), currencyCode)}</Badge>
+          <Badge tone="danger">61–90 {formatMoney(Number(m.aging['61_90'] ?? 0), currencyCode)}</Badge>
+          <Badge tone="danger">+90 {formatMoney(Number(m.aging.over_90 ?? 0), currencyCode)}</Badge>
         </div>
       ) : null}
     </Card>

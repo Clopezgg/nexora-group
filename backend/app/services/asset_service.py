@@ -141,35 +141,39 @@ def create_fixed_asset(
             company_id=company_id,
             field_name="acquisition_offset_account_id",
         )
-        capitalization = posting_service.post_manual(
-            db,
-            company_id=company_id,
-            document_type_code="CAP",
-            scope=scope,
-            project_id=project_id,
-            currency_code=currency_code,
-            effective_date=acquisition_date,
-            lines=[
-                posting_service.JournalLineInput(
-                    account_id=asset_account_id,
-                    debit_amount=cost,
-                    description=f"Alta manual activo {name}",
-                    project_id=project_id,
-                    cost_center_id=cost_center_id,
-                ),
-                posting_service.JournalLineInput(
-                    account_id=acquisition_offset_account_id,
-                    credit_amount=cost,
-                    description=f"Contrapartida alta manual activo {name}",
-                    project_id=project_id,
-                    cost_center_id=cost_center_id,
-                ),
-            ],
-            description=f"Alta manual activo {name}",
-            source_type="fixed_asset",
-            source_id=asset.id,
-            commit=False,
-        )
+        try:
+            capitalization = posting_service.post_manual(
+                db,
+                company_id=company_id,
+                document_type_code="CAP",
+                scope=scope,
+                project_id=project_id,
+                currency_code=currency_code,
+                effective_date=acquisition_date,
+                lines=[
+                    posting_service.JournalLineInput(
+                        account_id=asset_account_id,
+                        debit_amount=cost,
+                        description=f"Alta manual activo {name}",
+                        project_id=project_id,
+                        cost_center_id=cost_center_id,
+                    ),
+                    posting_service.JournalLineInput(
+                        account_id=acquisition_offset_account_id,
+                        credit_amount=cost,
+                        description=f"Contrapartida alta manual activo {name}",
+                        project_id=project_id,
+                        cost_center_id=cost_center_id,
+                    ),
+                ],
+                description=f"Alta manual activo {name}",
+                source_type="fixed_asset",
+                source_id=asset.id,
+                commit=False,
+            )
+        except Exception:
+            db.rollback()
+            raise
         asset.capitalization_account_id = asset_account_id
         asset.capitalization_document_id = capitalization.id
     if commit:
@@ -584,35 +588,39 @@ def generate_depreciation_entry(
     )
 
     if post:
-        document = posting_service.post_manual(
-            db,
-            company_id=asset.company_id,
-            document_type_code="DEP",
-            scope=asset.scope,
-            project_id=asset.project_id,
-            currency_code=asset.currency_code,
-            effective_date=period_end,
-            lines=[
-                posting_service.JournalLineInput(
-                    account_id=asset.depreciation_expense_account_id,
-                    debit_amount=amount,
-                    description=f"Depreciación {asset.name} {period_start.isoformat()}",
-                    project_id=asset.project_id,
-                    cost_center_id=asset.cost_center_id,
-                ),
-                posting_service.JournalLineInput(
-                    account_id=asset.accumulated_depreciation_account_id,
-                    credit_amount=amount,
-                    description=f"Depreciación acumulada {asset.name} {period_start.isoformat()}",
-                    project_id=asset.project_id,
-                    cost_center_id=asset.cost_center_id,
-                ),
-            ],
-            source_type="DepreciationEntry",
-            source_id=entry.id,
-            commit=False,
-        )
-        entry.accounting_document_id = document.id
+        try:
+            document = posting_service.post_manual(
+                db,
+                company_id=asset.company_id,
+                document_type_code="DEP",
+                scope=asset.scope,
+                project_id=asset.project_id,
+                currency_code=asset.currency_code,
+                effective_date=period_end,
+                lines=[
+                    posting_service.JournalLineInput(
+                        account_id=asset.depreciation_expense_account_id,
+                        debit_amount=amount,
+                        description=f"Depreciación {asset.name} {period_start.isoformat()}",
+                        project_id=asset.project_id,
+                        cost_center_id=asset.cost_center_id,
+                    ),
+                    posting_service.JournalLineInput(
+                        account_id=asset.accumulated_depreciation_account_id,
+                        credit_amount=amount,
+                        description=f"Depreciación acumulada {asset.name} {period_start.isoformat()}",
+                        project_id=asset.project_id,
+                        cost_center_id=asset.cost_center_id,
+                    ),
+                ],
+                source_type="DepreciationEntry",
+                source_id=entry.id,
+                commit=False,
+            )
+            entry.accounting_document_id = document.id
+        except Exception:
+            db.rollback()
+            raise
 
     if commit:
         db.commit()

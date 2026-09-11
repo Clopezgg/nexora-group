@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Input, Select, Textarea } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
@@ -43,7 +43,6 @@ export function ExecutionContractForm({
     contractNumber: '',
     contractCategory: 'LABOR' as SupplierContractCategory,
     value: '',
-    currencyCode: authoritativeCurrency,
     startDate: '',
     endDate: '',
     advanceMode: 'AMOUNT' as 'AMOUNT' | 'PERCENT',
@@ -54,12 +53,6 @@ export function ExecutionContractForm({
     scopeDescription: '',
     paymentTermsType: 'MONTHLY' as SupplierContractPaymentTermsType,
   })
-
-  useEffect(() => {
-    if (authoritativeCurrency && form.currencyCode !== authoritativeCurrency) {
-      setForm((current) => ({ ...current, currencyCode: authoritativeCurrency }))
-    }
-  }, [authoritativeCurrency, form.currencyCode])
 
   const suppliersQuery = useQuery({
     queryKey: ['procurement', 'suppliers', activeCompanyId],
@@ -91,7 +84,7 @@ export function ExecutionContractForm({
 
   const createMutation = useMutation({
     mutationFn: () => {
-      if (!activeCompanyId || !form.currencyCode || currencyMismatch) {
+      if (!activeCompanyId || !authoritativeCurrency || currencyMismatch) {
         throw new Error(
           currencyMismatch
             ? 'La moneda del proyecto/contrato no coincide con la moneda funcional de la compañía activa.'
@@ -105,7 +98,7 @@ export function ExecutionContractForm({
         contractNumber: form.contractNumber.trim(),
         contractCategory: form.contractCategory,
         value: form.value,
-        currencyCode: form.currencyCode,
+        currencyCode: authoritativeCurrency,
         startDate: form.startDate,
         endDate: form.endDate || undefined,
         // El anticipo se guarda como MONTO exacto (§7/§8); el % es informativo.
@@ -134,7 +127,7 @@ export function ExecutionContractForm({
   const canSubmit = useMemo(
     () =>
       Boolean(activeCompanyId) &&
-      Boolean(form.currencyCode) &&
+      Boolean(authoritativeCurrency) &&
       !currencyMismatch &&
       Boolean(form.supplierId) &&
       Boolean(form.contractNumber.trim()) &&
@@ -144,7 +137,7 @@ export function ExecutionContractForm({
       !datesInvalid,
     [
       activeCompanyId,
-      form.currencyCode,
+      authoritativeCurrency,
       currencyMismatch,
       form.supplierId,
       form.contractNumber,
@@ -226,7 +219,7 @@ export function ExecutionContractForm({
         )}
       </Select>
       <Input
-        label={`Valor contractual${form.currencyCode ? ` (${form.currencyCode})` : ''}`}
+        label={`Valor contractual${authoritativeCurrency ? ` (${authoritativeCurrency})` : ''}`}
         inputMode="decimal"
         value={form.value}
         onChange={(event) => setForm({ ...form, value: event.target.value })}
@@ -234,7 +227,7 @@ export function ExecutionContractForm({
       />
       <Input
         label="Moneda"
-        value={form.currencyCode}
+        value={authoritativeCurrency}
         readOnly
         placeholder="Configura la moneda funcional de la compañía"
       />
@@ -244,7 +237,7 @@ export function ExecutionContractForm({
           activa. Corrige el contexto antes de crear el contrato.
         </p>
       ) : null}
-      {!form.currencyCode ? (
+      {!authoritativeCurrency ? (
         <p className="nx-field__error" role="alert">
           La compañía activa no tiene moneda funcional configurada.
         </p>

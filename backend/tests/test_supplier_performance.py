@@ -12,7 +12,7 @@ supplier/metric."""
 
 from datetime import date, timedelta
 
-from tests.helpers import create_company, create_user_with_role, login_admin, login_as
+from tests.helpers import create_account, create_company, create_user_with_role, login_admin, login_as
 
 
 def _create_warehouse(client, *, company_id: str, code: str) -> dict:
@@ -71,10 +71,39 @@ def _receive(client, *, po: dict, warehouse_id: str, received_at: str) -> None:
     assert response.status_code == 201, response.text
 
 
-def _match(client, *, po_id: str, amount: str, quantity: str = "10.0000") -> dict:
+def _match(
+    client,
+    *,
+    po: dict,
+    amount: str,
+    expense_account_id: str,
+    payable_account_id: str,
+    quantity: str = "10.0000",
+) -> dict:
+    invoice_response = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": po["companyId"],
+            "supplierId": po["supplierId"],
+            "invoiceNumber": f"PERF-{po['id']}",
+            "scope": "GENERAL",
+            "expenseAccountId": expense_account_id,
+            "payableAccountId": payable_account_id,
+            "currencyCode": po["currencyCode"],
+            "amount": amount,
+            "invoiceDate": date.today().isoformat(),
+            "dueDate": date.today().isoformat(),
+            "purchaseOrderId": po["id"],
+        },
+    )
+    assert invoice_response.status_code == 201, invoice_response.text
     response = client.post(
         "/api/procurement/three-way-match",
-        json={"purchaseOrderId": po_id, "supplierInvoiceAmount": amount, "supplierInvoiceQuantity": quantity},
+        json={
+            "purchaseOrderId": po["id"],
+            "supplierInvoiceId": invoice_response.json()["id"],
+            "supplierInvoiceQuantity": quantity,
+        },
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -84,6 +113,8 @@ def test_supplier_performance_computes_real_metrics_from_real_fixtures(client):
     login_admin(client)
     company = create_company(client)
     warehouse = _create_warehouse(client, company_id=company["id"], code="ALM-PERF")
+    expense = create_account(client, company_id=company["id"], code="5200", name="Compras", account_type="EXPENSE")
+    payable = create_account(client, company_id=company["id"], code="2100", name="Proveedores", account_type="LIABILITY")
 
     good_supplier = _create_supplier(client, company_id=company["id"], legal_name="Buen Proveedor S.A.")
     bad_supplier = _create_supplier(client, company_id=company["id"], legal_name="Mal Proveedor S.A.")
@@ -98,14 +129,14 @@ def test_supplier_performance_computes_real_metrics_from_real_fixtures(client):
         unit_price="10.0000", delivery_days=30,
     )
     _receive(client, po=po1, warehouse_id=warehouse["id"], received_at=today.isoformat())
-    _match(client, po_id=po1["id"], amount="100.00")
+    _match(client, po=po1, amount="100.00", expense_account_id=expense["id"], payable_account_id=payable["id"])
 
     po2 = _po_from_quotation(
         client, company_id=company["id"], supplier_id=good_supplier["id"],
         unit_price="10.0000", delivery_days=30,
     )
     _receive(client, po=po2, warehouse_id=warehouse["id"], received_at=today.isoformat())
-    _match(client, po_id=po2["id"], amount="100.00")
+    _match(client, po=po2, amount="100.00", expense_account_id=expense["id"], payable_account_id=payable["id"])
 
     # Bad supplier: one late delivery (delivery_days=1 but received 30 days
     # later), one price EXCEPTION on the 3-way match, and a second order at
@@ -115,14 +146,14 @@ def test_supplier_performance_computes_real_metrics_from_real_fixtures(client):
         unit_price="10.0000", delivery_days=1,
     )
     _receive(client, po=po3, warehouse_id=warehouse["id"], received_at=(today + timedelta(days=30)).isoformat())
-    _match(client, po_id=po3["id"], amount="500.00")  # far off ordered_amount (100.00) -> EXCEPTION
+    _match(client, po=po3, amount="500.00", expense_account_id=expense["id"], payable_account_id=payable["id"])
 
     po4 = _po_from_quotation(
         client, company_id=company["id"], supplier_id=bad_supplier["id"],
         unit_price="20.0000", delivery_days=1,
     )
     _receive(client, po=po4, warehouse_id=warehouse["id"], received_at=(today + timedelta(days=30)).isoformat())
-    _match(client, po_id=po4["id"], amount="260.00")  # ordered_amount is 200.00 -> EXCEPTION
+    _match(client, po=po4, amount="260.00", expense_account_id=expense["id"], payable_account_id=payable["id"])
 
     response = client.get(f"/api/reports/supplier-performance?companyId={company['id']}")
     assert response.status_code == 200, response.text

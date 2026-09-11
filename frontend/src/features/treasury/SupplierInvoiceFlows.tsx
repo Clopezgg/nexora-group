@@ -28,6 +28,7 @@ import {
 } from '../../types/procurement'
 import { treasuryService } from '../../services/treasuryService'
 import { apService, type SupplierInvoice } from '../../services/apArService'
+import { contractPaymentService } from '../../services/contractPaymentService'
 import { apMetricsService } from '../../services/financialControlService'
 import { formatMoney } from '../../utils/currency'
 import { businessTodayIso } from '../../utils/businessDate'
@@ -72,7 +73,7 @@ export function AccountsPayablePage() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterSupplier, setFilterSupplier] = useState('')
 
-  const { companies, activeCompanyId, setActiveCompanyId, isLoading: companiesLoading } = useActiveCompany()
+  const { companies, activeCompany, activeCompanyId, setActiveCompanyId, isLoading: companiesLoading } = useActiveCompany()
 
   const accountsQuery = useQuery({
     queryKey: ['master-data', 'accounts', activeCompanyId],
@@ -178,7 +179,7 @@ export function AccountsPayablePage() {
         </Select>
       </header>
 
-      <ApMetricsCard companyId={activeCompanyId} />
+      <ApMetricsCard companyId={activeCompanyId} currencyCode={activeCompany?.functionalCurrencyCode ?? undefined} />
 
       <Card title="Acciones">
         <Button
@@ -217,6 +218,7 @@ export function AccountsPayablePage() {
       {openCreate && activeCompanyId ? (
         <CreateSupplierInvoiceModal
           companyId={activeCompanyId}
+          functionalCurrencyCode={activeCompany?.functionalCurrencyCode ?? ''}
           expenseAccounts={expenseAccounts}
           payableAccounts={payableAccounts}
           suppliers={suppliers}
@@ -269,42 +271,60 @@ function SubmitForApprovalModal({ invoiceId, companyId, onClose, onSubmitted }: 
 
 export function CreateSupplierInvoiceModal({
   companyId,
+  functionalCurrencyCode,
   expenseAccounts,
   payableAccounts,
   suppliers,
   contracts,
   initialContractId,
+  initialInstallment,
   lockedProjectId,
   onClose,
   onCreated,
 }: {
   companyId: string
+  functionalCurrencyCode: string
   expenseAccounts: { id: string; name: string }[]
   payableAccounts: { id: string; name: string }[]
   suppliers: { id: string; legalName: string }[]
   contracts: SupplierContract[]
   initialContractId?: string
+  initialInstallment?: { installmentId: string; remaining: string; dueDate: string; periodLabel: string }
   lockedProjectId?: string
   onClose: () => void
   onCreated: (invoice: SupplierInvoice) => void
 }) {
   const initialContract = contracts.find((c) => c.id === initialContractId) ?? null
   const [supplierContractId, setSupplierContractId] = useState(initialContract?.id ?? '')
+  const [contractInstallmentId, setContractInstallmentId] = useState(
+    initialInstallment?.installmentId ?? '',
+  )
   const [supplierId, setSupplierId] = useState<string | null>(initialContract?.supplierId ?? null)
   const [invoiceNumber, setInvoiceNumber] = useState('')
-  const [amount, setAmount] = useState<number | null>(null)
+  const [amount, setAmount] = useState<number | null>(
+    initialInstallment ? Number(initialInstallment.remaining) : null,
+  )
   const initialProjectId = lockedProjectId ?? initialContract?.projectId ?? ''
   const [scope, setScope] = useState<'CENTRAL' | 'GENERAL' | 'PROJECT'>(initialProjectId ? 'PROJECT' : 'GENERAL')
   const [projectId, setProjectId] = useState(initialProjectId)
   const [expenseAccountId, setExpenseAccountId] = useState(expenseAccounts[0]?.id ?? '')
   const [payableAccountId, setPayableAccountId] = useState(payableAccounts[0]?.id ?? '')
   const [invoiceDate, setInvoiceDate] = useState(businessTodayIso())
-  const [dueDate, setDueDate] = useState(initialContract?.advanceDueDate ?? businessTodayIso())
+  const [dueDate, setDueDate] = useState(
+    initialInstallment?.dueDate ?? initialContract?.advanceDueDate ?? businessTodayIso(),
+  )
   const handleMutationError = useMutationError()
   const selectedContract = contracts.find((c) => c.id === supplierContractId) ?? null
+  const scheduleQuery = useQuery({
+    queryKey: ['contract-payments', 'by-contract', supplierContractId],
+    queryFn: () => contractPaymentService.getByContract(supplierContractId),
+    enabled: Boolean(supplierContractId),
+    retry: false,
+  })
 
   function applyContract(nextContractId: string) {
     setSupplierContractId(nextContractId)
+    setContractInstallmentId('')
     const contract = contracts.find((c) => c.id === nextContractId)
     if (!contract) return
     setSupplierId(contract.supplierId)
@@ -323,12 +343,13 @@ export function CreateSupplierInvoiceModal({
       companyId,
       supplierId,
       supplierContractId: supplierContractId || null,
+      contractInstallmentId: contractInstallmentId || null,
       invoiceNumber,
       scope,
       projectId: scope === 'PROJECT' ? projectId : null,
       expenseAccountId,
       payableAccountId,
-      currencyCode: selectedContract?.currencyCode ?? projects.find((p) => p.id === projectId)?.currencyCode ?? 'HNL',
+      currencyCode: selectedContract?.currencyCode ?? projects.find((p) => p.id === projectId)?.currencyCode ?? functionalCurrencyCode,
       amount: String(amount ?? 0),
       invoiceDate,
       dueDate,
@@ -345,6 +366,38 @@ export function CreateSupplierInvoiceModal({
           {contracts.map((contract) => <option key={contract.id} value={contract.id}>{contract.contractNumber} · {SUPPLIER_CONTRACT_CATEGORY_LABELS[contract.contractCategory] ?? contract.contractCategory}</option>)}
         </Select>
         {selectedContract ? <p className="nx-field__hint">La obligación hereda tercero, proyecto y moneda del contrato. El pago se asignará al plan contractual.</p> : null}
+        {initialInstallment ? (
+          <p className="nx-field__hint">
+            Cuota vinculada: {initialInstallment.periodLabel}. La factura representa exactamente su neto pendiente.
+          </p>
+        ) : null}
+        {selectedContract && scheduleQuery.data && !initialInstallment ? (
+          <Select
+            label="Cuota contractual"
+            value={contractInstallmentId}
+            onChange={(event) => {
+              const nextId = event.target.value
+              const installment = scheduleQuery.data?.installments.find(
+                (row) => row.installmentId === nextId,
+              )
+              setContractInstallmentId(nextId)
+              if (installment) {
+                setAmount(Number(installment.remaining))
+                setDueDate(installment.dueDate)
+              }
+            }}
+            required
+          >
+            <option value="">Selecciona la cuota exacta…</option>
+            {scheduleQuery.data.installments
+              .filter((row) => row.remaining !== '0.00' && row.status !== 'CANCELLED')
+              .map((row) => (
+                <option key={row.installmentId} value={row.installmentId}>
+                  {row.periodLabel} — {formatMoney(row.remaining, selectedContract.currencyCode)}
+                </option>
+              ))}
+          </Select>
+        ) : null}
         <Select label="Alcance de la operación" value={scope} disabled={Boolean(lockedProjectId || selectedContract?.projectId)} onChange={(event) => {
           const next = event.target.value as 'CENTRAL' | 'GENERAL' | 'PROJECT'
           setScope(next)
@@ -368,11 +421,11 @@ export function CreateSupplierInvoiceModal({
         <Select label="Cuenta por pagar" value={payableAccountId} onChange={(e) => setPayableAccountId(e.target.value)}>
           {payableAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </Select>
-        <MoneyInput label="Monto" value={amount} onChange={setAmount} />
+        <MoneyInput label="Monto" value={amount} onChange={setAmount} disabled={Boolean(initialInstallment)} />
         <Input label="Fecha económica de la obligación" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} required />
-        <Input label="Vencimiento contractual / comercial" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+        <Input label="Vencimiento contractual / comercial" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required disabled={Boolean(initialInstallment)} />
         {mutation.isError ? <p className="nx-field__error">{(mutation.error as Error).message}</p> : null}
-        <Button type="submit" loading={mutation.isPending} disabled={!amount || !supplierId || !invoiceNumber || !invoiceDate || !dueDate || (scope === 'PROJECT' && !projectId)}>Registrar obligación</Button>
+        <Button type="submit" loading={mutation.isPending} disabled={!amount || !supplierId || !invoiceNumber || !invoiceDate || !dueDate || (scope === 'PROJECT' && !projectId) || Boolean(scheduleQuery.data && !contractInstallmentId)}>Registrar obligación</Button>
       </form>
     </Modal>
   )
@@ -385,6 +438,7 @@ export function PaySupplierInvoiceButton({
   remaining,
   selectedInstallmentId,
   label,
+  lockAmount = false,
 }: {
   invoice: SupplierInvoice
   companyId: string
@@ -392,6 +446,7 @@ export function PaySupplierInvoiceButton({
   remaining: number
   selectedInstallmentId?: string | null
   label?: string
+  lockAmount?: boolean
 }) {
   const invoiceId = invoice.id
   const currencyCode = invoice.currencyCode
@@ -453,7 +508,7 @@ export function PaySupplierInvoiceButton({
             <Select name="paymentTreasuryAccountId" label="Cuenta pagadora" value={treasuryAccountId} onChange={(event) => setTreasuryAccountId(event.target.value)} required>
               {eligibleTreasuryAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} — {account.currencyCode}</option>)}
             </Select>
-            <MoneyInput label={`Monto a pagar (${currencyCode})`} value={amount} onChange={setAmount} />
+            <MoneyInput label={`Monto a pagar (${currencyCode})`} value={amount} onChange={setAmount} disabled={lockAmount} />
             <Input label="Fecha efectiva del pago (movimiento bancario)" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} required />
             {invoice.supplierContractId ? (
               <>
@@ -512,7 +567,7 @@ export function PaySupplierInvoiceButton({
   )
 }
 
-function ApMetricsCard({ companyId }: { companyId: string | null }) {
+function ApMetricsCard({ companyId, currencyCode }: { companyId: string | null; currencyCode?: string }) {
   const query = useQuery({ queryKey: ['ap-metrics', companyId], queryFn: () => apMetricsService.get(companyId as string), enabled: Boolean(companyId) })
   if (!companyId) return null
   const m = query.data
@@ -520,12 +575,12 @@ function ApMetricsCard({ companyId }: { companyId: string | null }) {
     <Card title="Aging de cuentas por pagar">
       {query.isLoading ? <LoadingState label="Calculando aging…" /> : m?.aging ? (
         <div className="nx-treasury__actions" style={{ flexWrap: 'wrap' }}>
-          <Badge>Cartera abierta {formatMoney(Number(m.apOutstanding ?? 0))}</Badge>
-          <Badge tone="neutral">Al día {formatMoney(Number(m.aging.current ?? 0))}</Badge>
-          <Badge tone="warning">1–30 {formatMoney(Number(m.aging['1_30'] ?? 0))}</Badge>
-          <Badge tone="warning">31–60 {formatMoney(Number(m.aging['31_60'] ?? 0))}</Badge>
-          <Badge tone="danger">61–90 {formatMoney(Number(m.aging['61_90'] ?? 0))}</Badge>
-          <Badge tone="danger">+90 {formatMoney(Number(m.aging.over_90 ?? 0))}</Badge>
+          <Badge>Cartera abierta {formatMoney(Number(m.apOutstanding ?? 0), currencyCode)}</Badge>
+          <Badge tone="neutral">Al día {formatMoney(Number(m.aging.current ?? 0), currencyCode)}</Badge>
+          <Badge tone="warning">1–30 {formatMoney(Number(m.aging['1_30'] ?? 0), currencyCode)}</Badge>
+          <Badge tone="warning">31–60 {formatMoney(Number(m.aging['31_60'] ?? 0), currencyCode)}</Badge>
+          <Badge tone="danger">61–90 {formatMoney(Number(m.aging['61_90'] ?? 0), currencyCode)}</Badge>
+          <Badge tone="danger">+90 {formatMoney(Number(m.aging.over_90 ?? 0), currencyCode)}</Badge>
         </div>
       ) : null}
     </Card>

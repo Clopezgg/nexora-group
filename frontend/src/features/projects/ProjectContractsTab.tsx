@@ -72,6 +72,14 @@ export function ProjectContractsTab({ companyId, projectId }: { companyId: strin
       enabled: Boolean(sq.data?.id),
     })),
   })
+  const obligationContractIndex = obligationContract
+    ? projectContracts.findIndex((contract) => contract.id === obligationContract.id)
+    : -1
+  const obligationInstallment = obligationContractIndex >= 0
+    ? scheduleQueries[obligationContractIndex]?.data?.installments.find(
+        (row) => !['PAID', 'CANCELLED'].includes(row.status),
+      ) ?? null
+    : null
 
   if (contractsQuery.isLoading) return <LoadingState label="Cargando contratos…" />
 
@@ -187,7 +195,7 @@ export function ProjectContractsTab({ companyId, projectId }: { companyId: strin
       {planContract ? (
         <ContractPaymentPlanModal
           contract={planContract}
-          currencyCode={planContract.currencyCode ?? 'HNL'}
+          currencyCode={planContract.currencyCode ?? ''}
           onClose={() => {
             setPlanContract(null)
             queryClient.invalidateQueries({ queryKey: ['contract-payments'] })
@@ -198,11 +206,18 @@ export function ProjectContractsTab({ companyId, projectId }: { companyId: strin
       {obligationContract ? (
         <CreateSupplierInvoiceModal
           companyId={companyId}
+          functionalCurrencyCode={obligationContract.currencyCode ?? ''}
           expenseAccounts={expenseAccounts}
           payableAccounts={payableAccounts}
           suppliers={(suppliersQuery.data ?? []).map((s) => ({ id: s.id, legalName: s.legalName }))}
           contracts={projectContracts}
           initialContractId={obligationContract.id}
+          initialInstallment={obligationInstallment ? {
+            installmentId: obligationInstallment.installmentId,
+            remaining: obligationInstallment.remaining,
+            dueDate: obligationInstallment.dueDate,
+            periodLabel: obligationInstallment.periodLabel,
+          } : undefined}
           lockedProjectId={projectId}
           onClose={() => setObligationContract(null)}
           onCreated={() => {

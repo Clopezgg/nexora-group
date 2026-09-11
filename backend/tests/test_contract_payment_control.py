@@ -305,6 +305,58 @@ def test_contract_payment_allocation_via_ap_endpoint_and_reversal(client, db_ses
     assert float(invoice_after["amountPaid"]) == 0.0
 
 
+def test_invoice_linked_to_installment_rejects_allocation_to_another_installment(
+    client, db_session
+):
+    login_admin(client)
+    company = create_company(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    contract = _contract(client, company_id=company["id"], supplier_id=supplier["id"])
+    schedule = _monthly_plan(db_session, contract["id"])
+    bank, expense, payable = _ap_setup(client, company, tag="70B")
+    installments = cps.installment_summaries(db_session, schedule_id=schedule.id)
+    linked, other = installments[0], installments[1]
+
+    created = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "F-CTR-LINKED",
+            "scope": "GENERAL",
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": str(linked.net_due),
+            "invoiceDate": "2026-09-01",
+            "dueDate": str(linked.due_date),
+            "supplierContractId": contract["id"],
+            "contractInstallmentId": str(linked.installment_id),
+        },
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["contractInstallmentId"] == str(linked.installment_id)
+    approved = client.post(f"/api/ap/supplier-invoices/{created.json()['id']}/approve")
+    assert approved.status_code == 200, approved.text
+
+    rejected = client.post(
+        f"/api/ap/supplier-invoices/{created.json()['id']}/payments",
+        json={
+            "treasuryAccountId": bank["id"],
+            "amount": str(linked.net_due),
+            "paymentDate": "2026-09-03",
+            "contractAllocations": [
+                {
+                    "installmentId": str(other.installment_id),
+                    "amountApplied": str(linked.net_due),
+                }
+            ],
+        },
+    )
+    assert rejected.status_code == 422, rejected.text
+    assert "cuota vinculada" in rejected.text
+
+
 def test_contract_allocation_sum_must_equal_payment_amount(client, db_session):
     login_admin(client)
     company = create_company(client)

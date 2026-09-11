@@ -33,7 +33,7 @@ import '../treasury/TreasuryPage.css'
 
 export function CollectionsPage() {
   const queryClient = useQueryClient()
-  const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
+  const { companies, activeCompany, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } = useActiveCompany()
   const [collectInvoice, setCollectInvoice] = useState<CustomerInvoice | null>(null)
   const [historyInvoice, setHistoryInvoice] = useState<CustomerInvoice | null>(null)
 
@@ -62,6 +62,9 @@ export function CollectionsPage() {
   if (isError) return <ErrorState description="No se pudieron cargar las compañías." onRetry={() => refetch()} />
   if (companies.length === 0) {
     return <EmptyState icon="bank" title="No hay compañía configurada" description="Configura la compañía antes de registrar cobros." />
+  }
+  if (!activeCompany?.functionalCurrencyCode) {
+    return <EmptyState icon="bank" title="Selecciona una compañía" description="Selecciona una compañía con moneda funcional para consultar y registrar cobros." />
   }
 
   const invoices = invoicesQuery.data ?? []
@@ -117,8 +120,8 @@ export function CollectionsPage() {
       </header>
 
       <div className="nx-dashboard__kpi-grid">
-        <Card title="Pendiente de cobro"><strong>{formatMoney(totalOutstanding, 'HNL')}</strong></Card>
-        <Card title="Cobrado acumulado"><strong>{formatMoney(collected, 'HNL')}</strong></Card>
+        <Card title="Pendiente de cobro"><strong>{formatMoney(totalOutstanding, activeCompany.functionalCurrencyCode)}</strong></Card>
+        <Card title="Cobrado acumulado"><strong>{formatMoney(collected, activeCompany.functionalCurrencyCode)}</strong></Card>
         <Card title="Facturas pendientes"><strong>{collectible.length}</strong></Card>
       </div>
 

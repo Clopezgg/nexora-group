@@ -24,6 +24,7 @@ from app.schemas.contract_payment import (
     FifoPreviewRequest,
     InstallmentResponse,
     ScheduleCreateRequest,
+    RetentionReleaseRequest,
     ScheduleResponse,
 )
 from app.services import audit_service, contract_payment_service as cps
@@ -209,7 +210,65 @@ def get_summary(
         advance_paid=s.advance_paid,
         advance_remaining=s.advance_remaining,
         retention_outstanding=s.retention_outstanding,
+        retention_withheld=s.retention_withheld,
+        retention_released=s.retention_released,
+        retention_paid=s.retention_paid,
+        retention_available_to_release=s.retention_available_to_release,
     )
+
+
+@router.post(
+    "/schedules/{schedule_id}/retention-releases",
+    response_model=ScheduleResponse,
+    status_code=201,
+)
+def authorize_retention_release(
+    schedule_id: uuid.UUID,
+    payload: RetentionReleaseRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("contract.payment_schedule", "manage")),
+    correlation_id: str = Depends(get_correlation_id),
+) -> ScheduleResponse:
+    schedule = _schedule_or_404(db, schedule_id)
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="contract.payment_schedule",
+        action="manage",
+        company_id=schedule.company_id,
+    )
+    installment = cps.authorize_retention_release(
+        db,
+        schedule_id=schedule.id,
+        amount=payload.amount,
+        due_date=payload.due_date,
+        reason=payload.reason,
+        actor_user_id=user.id,
+        evidence_id=payload.evidence_id,
+        commit=False,
+    )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="contract.retention.release",
+        entity_type="contract.payment_installment",
+        entity_id=installment.id,
+        company_id=schedule.company_id,
+        project_id=schedule.project_id,
+        before=None,
+        after={
+            "scheduleId": str(schedule.id),
+            "amount": str(installment.scheduled_amount),
+            "dueDate": installment.due_date.isoformat(),
+            "reason": installment.retention_release_reason,
+            "evidenceId": str(installment.retention_release_evidence_id)
+            if installment.retention_release_evidence_id else None,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    db.refresh(schedule)
+    return _schedule_payload(db, schedule)
 
 
 @router.post("/schedules/{schedule_id}/fifo-preview", response_model=list[FifoPreviewItem])
@@ -337,6 +396,7 @@ def prepare_advance_invoice(
             due_date=advance.due_date,
             description=f"Anticipo contractual {contract.contract_number}",
             supplier_contract_id=contract.id,
+            contract_installment_id=advance.id,
             commit=False,
         )
         audit_service.record(

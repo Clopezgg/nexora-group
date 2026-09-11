@@ -10,6 +10,7 @@ import {
   LoadingState,
   Modal,
   Select,
+  MoneyInput,
   Table,
   type TableColumn,
 } from '../../design-system'
@@ -19,6 +20,7 @@ import { apService } from '../../services/apArService'
 import { masterDataService } from '../../services/masterDataService'
 import { projectService } from '../../services/projectService'
 import type { FixedAsset } from '../../types/asset'
+import { businessTodayIso } from '../../utils/businessDate'
 
 const STATUS_TONE: Record<FixedAsset['status'], 'success' | 'warning' | 'neutral' | 'danger'> = {
   ACTIVE: 'success',
@@ -32,6 +34,7 @@ export function FixedAssetsPage() {
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [depreciationAsset, setDepreciationAsset] = useState<FixedAsset | null>(null)
+  const [disposalAsset, setDisposalAsset] = useState<FixedAsset | null>(null)
 
   const [form, setForm] = useState({
     supplierInvoiceId: '',
@@ -44,6 +47,7 @@ export function FixedAssetsPage() {
     depreciationExpenseAccountId: '',
     accumulatedDepreciationAccountId: '',
     assetAccountId: '',
+    acquisitionOffsetAccountId: '',
     scope: 'GENERAL' as 'GENERAL' | 'PROJECT',
     projectId: '',
   })
@@ -97,13 +101,15 @@ export function FixedAssetsPage() {
         name: form.name,
         acquisitionDate: form.acquisitionDate,
         cost: form.cost,
-        currencyCode: activeCompany?.functionalCurrencyCode ?? 'HNL',
+        currencyCode: activeCompany?.functionalCurrencyCode as string,
         usefulLifeMonths: Number(form.usefulLifeMonths),
         salvageValue: form.salvageValue,
         scope: form.scope,
         projectId: form.scope === 'PROJECT' ? form.projectId || undefined : undefined,
         depreciationExpenseAccountId: form.depreciationExpenseAccountId,
         accumulatedDepreciationAccountId: form.accumulatedDepreciationAccountId,
+        assetAccountId: form.assetAccountId,
+        acquisitionOffsetAccountId: form.acquisitionOffsetAccountId,
       })
     },
     onSuccess: () => {
@@ -120,6 +126,7 @@ export function FixedAssetsPage() {
         depreciationExpenseAccountId: '',
         accumulatedDepreciationAccountId: '',
         assetAccountId: '',
+        acquisitionOffsetAccountId: '',
         scope: 'GENERAL',
         projectId: '',
       })
@@ -134,11 +141,16 @@ export function FixedAssetsPage() {
     },
   })
 
-  const statusMutation = useMutation({
-    mutationFn: ({ assetId, status }: { assetId: string; status: FixedAsset['status'] }) =>
-      assetService.changeStatus(assetId, status),
+  const disposalMutation = useMutation({
+    mutationFn: ({ assetId, disposalDate, proceeds, proceedsAccountId }: {
+      assetId: string
+      disposalDate: string
+      proceeds: string
+      proceedsAccountId?: string
+    }) => assetService.dispose(assetId, { disposalDate, proceeds, proceedsAccountId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assets', 'fixed-assets', activeCompanyId] })
+      setDisposalAsset(null)
     },
   })
 
@@ -164,7 +176,7 @@ export function FixedAssetsPage() {
           {row.status !== 'DISPOSED' && row.status !== 'RETIRED' ? (
             <Button
               variant="ghost"
-              onClick={() => statusMutation.mutate({ assetId: row.id, status: 'DISPOSED' })}
+              onClick={() => setDisposalAsset(row)}
             >
               Dar de baja
             </Button>
@@ -306,6 +318,32 @@ export function FixedAssetsPage() {
               ))}
             </Select>
           ) : null}
+          {!form.supplierInvoiceId ? (
+            <>
+              <Select
+                label="Cuenta del activo"
+                value={form.assetAccountId}
+                onChange={(e) => setForm({ ...form, assetAccountId: e.target.value })}
+                required
+              >
+                <option value="">Selecciona una cuenta ASSET postable…</option>
+                {assetAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+                ))}
+              </Select>
+              <Select
+                label="Contrapartida de adquisición"
+                value={form.acquisitionOffsetAccountId}
+                onChange={(e) => setForm({ ...form, acquisitionOffsetAccountId: e.target.value })}
+                required
+              >
+                <option value="">Selecciona la cuenta que financió la adquisición…</option>
+                {(accountsQuery.data ?? []).map((account) => (
+                  <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+                ))}
+              </Select>
+            </>
+          ) : null}
           <Select
             label="Cuenta de gasto de depreciación"
             value={form.depreciationExpenseAccountId}
@@ -332,7 +370,9 @@ export function FixedAssetsPage() {
               </option>
             ))}
           </Select>
-          <Button type="submit" loading={createMutation.isPending}>
+          <Button type="submit" loading={createMutation.isPending} disabled={
+            !form.supplierInvoiceId && (!form.assetAccountId || !form.acquisitionOffsetAccountId)
+          }>
             Guardar
           </Button>
         </form>
@@ -364,7 +404,70 @@ export function FixedAssetsPage() {
           </>
         )}
       </Modal>
+
+      {disposalAsset ? (
+        <AssetDisposalForm
+          asset={disposalAsset}
+          assetAccounts={assetAccounts}
+          loading={disposalMutation.isPending}
+          error={disposalMutation.isError ? String(disposalMutation.error) : null}
+          onClose={() => setDisposalAsset(null)}
+          onSubmit={(payload) => disposalMutation.mutate({ assetId: disposalAsset.id, ...payload })}
+        />
+      ) : null}
     </div>
+  )
+}
+
+function AssetDisposalForm({
+  asset,
+  assetAccounts,
+  loading,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  asset: FixedAsset
+  assetAccounts: Array<{ id: string; code: string; name: string }>
+  loading: boolean
+  error: string | null
+  onClose: () => void
+  onSubmit: (payload: { disposalDate: string; proceeds: string; proceedsAccountId?: string }) => void
+}) {
+  const [disposalDate, setDisposalDate] = useState(businessTodayIso())
+  const [proceeds, setProceeds] = useState<number | null>(0)
+  const [proceedsAccountId, setProceedsAccountId] = useState('')
+  const hasProceeds = (proceeds ?? 0) > 0
+
+  return (
+    <Modal open title={`Baja contable — ${asset.name}`} onClose={onClose}>
+      <form onSubmit={(event) => {
+        event.preventDefault()
+        onSubmit({
+          disposalDate,
+          proceeds: String(proceeds ?? 0),
+          proceedsAccountId: hasProceeds ? proceedsAccountId : undefined,
+        })
+      }}>
+        <Input label="Fecha económica de la baja" type="date" value={disposalDate} onChange={(event) => setDisposalDate(event.target.value)} required />
+        <MoneyInput label={`Ingreso por disposición (${asset.currencyCode})`} value={proceeds} onChange={setProceeds} />
+        {hasProceeds ? (
+          <Select label="Cuenta de efectivo o por cobrar" value={proceedsAccountId} onChange={(event) => setProceedsAccountId(event.target.value)} required>
+            <option value="">Selecciona una cuenta ASSET postable…</option>
+            {assetAccounts.map((account) => (
+              <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+            ))}
+          </Select>
+        ) : null}
+        <p className="nx-field__hint">
+          La baja genera un asiento DIS, retira costo y depreciación acumulada y usa las cuentas configuradas de ganancia o pérdida.
+        </p>
+        {error ? <p className="nx-field__error" role="alert">{error}</p> : null}
+        <Button type="submit" loading={loading} disabled={!disposalDate || (hasProceeds && !proceedsAccountId)}>
+          Confirmar baja y contabilizar
+        </Button>
+      </form>
+    </Modal>
   )
 }
 

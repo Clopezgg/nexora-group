@@ -142,7 +142,7 @@ function EquipmentTab({ companyId }: { companyId: string }) {
 function FuelTab({ companyId }: { companyId: string }) {
   const queryClient = useQueryClient()
   const { activeCompany } = useActiveCompany()
-  const currency = activeCompany?.functionalCurrencyCode ?? 'HNL'
+  const currency = activeCompany?.functionalCurrencyCode
   const equipmentQuery = useEquipmentList(companyId)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -181,8 +181,8 @@ function FuelTab({ companyId }: { companyId: string }) {
   const columns: TableColumn<FuelLog>[] = [
     { key: 'logDate', header: 'Fecha', render: (row) => row.logDate },
     { key: 'quantity', header: 'Cantidad', render: (row) => row.quantity },
-    { key: 'unitCost', header: 'Costo unitario', numeric: true, render: (row) => formatMoney(row.unitCost, currency) },
-    { key: 'totalCost', header: 'Total', numeric: true, render: (row) => formatMoney(row.totalCost, currency) },
+    { key: 'unitCost', header: 'Costo unitario', numeric: true, render: (row) => currency ? formatMoney(row.unitCost, currency) : '—' },
+    { key: 'totalCost', header: 'Total', numeric: true, render: (row) => currency ? formatMoney(row.totalCost, currency) : '—' },
   ]
 
   return (

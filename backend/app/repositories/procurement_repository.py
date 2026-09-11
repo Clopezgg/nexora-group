@@ -118,6 +118,15 @@ def get_rfq(db: Session, rfq_id: uuid.UUID) -> RequestForQuotation | None:
     return db.get(RequestForQuotation, rfq_id)
 
 
+def supplier_is_invited(db: Session, *, rfq_id: uuid.UUID, supplier_id: uuid.UUID) -> bool:
+    return db.execute(
+        select(RfqSupplier.id).where(
+            RfqSupplier.request_for_quotation_id == rfq_id,
+            RfqSupplier.supplier_id == supplier_id,
+        )
+    ).scalar_one_or_none() is not None
+
+
 def list_rfqs(db: Session, *, company_id: uuid.UUID) -> list[RequestForQuotation]:
     stmt = (
         select(RequestForQuotation)
@@ -188,6 +197,7 @@ def create_purchase_order(
     project_id: uuid.UUID | None,
     supplier_quotation_id: uuid.UUID | None,
     currency_code: str,
+    fulfillment_type: str,
     lines: list[dict],
     supplier_contract_id: uuid.UUID | None = None,
 ) -> PurchaseOrder:
@@ -199,6 +209,7 @@ def create_purchase_order(
         supplier_quotation_id=supplier_quotation_id,
         supplier_contract_id=supplier_contract_id,
         currency_code=currency_code,
+        fulfillment_type=fulfillment_type,
         status="DRAFT",
     )
     db.add(order)
@@ -360,6 +371,7 @@ def create_service_entry(
     progress_percentage: Decimal,
     accepted_value: Decimal,
     approved_by_id: uuid.UUID,
+    evidence_id: uuid.UUID | None,
 ) -> ServiceEntry:
     entry = ServiceEntry(
         company_id=company_id,
@@ -370,6 +382,7 @@ def create_service_entry(
         progress_percentage=progress_percentage,
         accepted_value=accepted_value,
         approved_by_id=approved_by_id,
+        evidence_id=evidence_id,
     )
     db.add(entry)
     db.flush()
@@ -381,15 +394,26 @@ def list_service_entries_for_po(db: Session, po_id: uuid.UUID) -> list[ServiceEn
     return list(db.execute(stmt).scalars())
 
 
+def list_service_entries(db: Session, *, company_id: uuid.UUID) -> list[ServiceEntry]:
+    stmt = (
+        select(ServiceEntry)
+        .where(ServiceEntry.company_id == company_id)
+        .order_by(ServiceEntry.period_end.desc(), ServiceEntry.created_at.desc())
+    )
+    return list(db.execute(stmt).scalars())
+
+
 def create_three_way_match_result(
     db: Session,
     *,
     purchase_order_id: uuid.UUID,
-    supplier_invoice_id: uuid.UUID | None,
+    supplier_invoice_id: uuid.UUID,
     supplier_invoice_amount: Decimal,
     supplier_invoice_quantity: Decimal,
     received_quantity: Decimal,
     ordered_amount: Decimal,
+    receipt_basis: str,
+    accepted_amount: Decimal,
     quantity_tolerance_pct: Decimal,
     amount_tolerance_pct: Decimal,
     status: str,
@@ -398,10 +422,13 @@ def create_three_way_match_result(
     result = ThreeWayMatchResult(
         purchase_order_id=purchase_order_id,
         supplier_invoice_id=supplier_invoice_id,
+        match_kind="FINANCIAL",
         supplier_invoice_amount=supplier_invoice_amount,
         supplier_invoice_quantity=supplier_invoice_quantity,
         received_quantity=received_quantity,
         ordered_amount=ordered_amount,
+        receipt_basis=receipt_basis,
+        accepted_amount=accepted_amount,
         quantity_tolerance_pct=quantity_tolerance_pct,
         amount_tolerance_pct=amount_tolerance_pct,
         status=status,
@@ -410,3 +437,18 @@ def create_three_way_match_result(
     db.add(result)
     db.flush()
     return result
+
+
+def list_financial_three_way_matches(
+    db: Session, *, company_id: uuid.UUID
+) -> list[ThreeWayMatchResult]:
+    stmt = (
+        select(ThreeWayMatchResult)
+        .join(PurchaseOrder, PurchaseOrder.id == ThreeWayMatchResult.purchase_order_id)
+        .where(
+            PurchaseOrder.company_id == company_id,
+            ThreeWayMatchResult.match_kind == "FINANCIAL",
+        )
+        .order_by(ThreeWayMatchResult.created_at.desc())
+    )
+    return list(db.execute(stmt).scalars())

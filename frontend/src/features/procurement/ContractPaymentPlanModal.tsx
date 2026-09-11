@@ -10,6 +10,7 @@ import {
   Modal,
   Select,
   Table,
+  Textarea,
   type TableColumn,
 } from '../../design-system'
 import { ApiError } from '../../services/httpClient'
@@ -122,8 +123,22 @@ export function ContractPaymentPlanModal({ contract, currencyCode, onClose }: {
               <div><dt>Pagado acumulado</dt><dd>{formatMoney(summaryQuery.data.paidAccumulated, currency)}</dd></div>
               <div><dt>Saldo contractual</dt><dd>{formatMoney(summaryQuery.data.contractBalance, currency)}</dd></div>
               <div><dt>Retención pendiente</dt><dd>{formatMoney(summaryQuery.data.retentionOutstanding, currency)}</dd></div>
+              <div><dt>Retención efectivamente retenida</dt><dd>{formatMoney(summaryQuery.data.retentionWithheld, currency)}</dd></div>
+              <div><dt>Retención autorizada</dt><dd>{formatMoney(summaryQuery.data.retentionReleased, currency)}</dd></div>
+              <div><dt>Retención pagada</dt><dd>{formatMoney(summaryQuery.data.retentionPaid, currency)}</dd></div>
               <div><dt>Próximo vencimiento</dt><dd>{summaryQuery.data.nextDuePeriod ? `${summaryQuery.data.nextDuePeriod} · ${formatMoney(summaryQuery.data.nextDueAmount ?? '0', currency)}` : '—'}</dd></div>
             </dl>
+          ) : null}
+          {scheduleId && summaryQuery.data && summaryQuery.data.retentionAvailableToRelease !== '0.00' ? (
+            <RetentionReleaseForm
+              scheduleId={scheduleId}
+              available={summaryQuery.data.retentionAvailableToRelease}
+              currency={currency}
+              onReleased={() => {
+                queryClient.invalidateQueries({ queryKey: ['contract-payments'] })
+                queryClient.invalidateQueries({ queryKey: ['reports', 'contract-payment-ledger'] })
+              }}
+            />
           ) : null}
           <div style={{ overflowX: 'auto' }}>
             <Table columns={columns} rows={scheduleQuery.data?.installments ?? []} getRowKey={(r) => r.installmentId} emptyMessage="El plan no tiene cuotas." />
@@ -143,6 +158,36 @@ export function ContractPaymentPlanModal({ contract, currencyCode, onClose }: {
         </>
       )}
     </Modal>
+  )
+}
+
+function RetentionReleaseForm({ scheduleId, available, currency, onReleased }: {
+  scheduleId: string
+  available: string
+  currency: string
+  onReleased: () => void
+}) {
+  const [amount, setAmount] = useState(available)
+  const [dueDate, setDueDate] = useState(businessTodayIso())
+  const [reason, setReason] = useState('')
+  const mutation = useMutation({
+    mutationFn: () => contractPaymentService.authorizeRetentionRelease(scheduleId, { amount, dueDate, reason }),
+    onSuccess: onReleased,
+  })
+  return (
+    <section className="nx-section" aria-labelledby={`retention-release-${scheduleId}`}>
+      <h3 id={`retention-release-${scheduleId}`}>Liberar retención</h3>
+      <p>Disponible para autorizar: {formatMoney(available, currency)}. La autorización crea una obligación pagable trazable.</p>
+      <form onSubmit={(event) => { event.preventDefault(); mutation.mutate() }}>
+        <Input label="Importe a liberar" value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" required />
+        <Input label="Fecha de exigibilidad" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} required />
+        <Textarea label="Motivo de liberación" value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} required />
+        <Button type="submit" loading={mutation.isPending} disabled={!amount || !dueDate || reason.trim().length < 10}>
+          Autorizar liberación
+        </Button>
+        {mutation.isError ? <p className="nx-field__error" role="alert">{mutation.error instanceof ApiError ? mutation.error.message : 'No se pudo autorizar la liberación.'}</p> : null}
+      </form>
+    </section>
   )
 }
 

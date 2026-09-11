@@ -21,7 +21,7 @@ import type { WBSNode } from '../../types/project'
 import { formatMoney } from '../../utils/currency'
 import { RequiresActiveProject } from './RequiresActiveProject'
 
-function formatAmount(value: string | null, currencyCode = 'HNL'): string {
+function formatAmount(value: string | null, currencyCode: string): string {
   if (value === null) return '—'
   return formatMoney(Number(value), currencyCode)
 }
@@ -39,6 +39,7 @@ function BudgetLineEditor({
   costCenters,
   periods,
   requireWbs,
+  currencyCode,
 }: {
   lines: DraftLine[]
   onChange: (lines: DraftLine[]) => void
@@ -47,6 +48,7 @@ function BudgetLineEditor({
   costCenters: Array<{ id: string; code: string; name: string }>
   periods: Array<{ id: string; periodNumber: number; startDate: string; endDate: string }>
   requireWbs: boolean
+  currencyCode: string
 }) {
   const update = (key: number, patch: Partial<DraftLine>) => onChange(lines.map((line) => line.key === key ? { ...line, ...patch } : line))
   return <>
@@ -67,7 +69,7 @@ function BudgetLineEditor({
         <option value="">Sin período específico</option>
         {periods.map((period) => <option key={period.id} value={period.id}>P{String(period.periodNumber).padStart(2, '0')} · {period.startDate} → {period.endDate}</option>)}
       </Select>
-      <MoneyInput label="Presupuesto de costos autorizado (HNL)" value={line.authorizedAmount || null} onChange={(value) => update(line.key, { authorizedAmount: value ?? 0 })} />
+      <MoneyInput label={`Presupuesto de costos autorizado (${currencyCode})`} value={line.authorizedAmount || null} onChange={(value) => update(line.key, { authorizedAmount: value ?? 0 })} />
       {lines.length > 1 ? <Button variant="ghost" onClick={() => onChange(lines.filter((candidate) => candidate.key !== line.key))}>Eliminar línea</Button> : null}
     </Card>)}
     <Button variant="secondary" onClick={() => onChange([...lines, makeLine()])}>Agregar línea</Button>
@@ -77,7 +79,7 @@ function BudgetLineEditor({
 function BudgetAndForecast({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient()
   const { activeCompanyId, activeCompany } = useActiveCompany()
-  const functionalCurrencyCode = activeCompany?.functionalCurrencyCode ?? 'HNL'
+  const functionalCurrencyCode = activeCompany?.functionalCurrencyCode
   const [baselineLines, setBaselineLines] = useState<DraftLine[]>([makeLine()])
   const [redistributionLines, setRedistributionLines] = useState<DraftLine[]>([makeLine()])
   const [notes, setNotes] = useState('')
@@ -100,7 +102,7 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
 
   const createBaseline = useMutation({
     mutationFn: () => projectService.createBaseline(projectId, {
-      currencyCode: functionalCurrencyCode,
+      currencyCode: functionalCurrencyCode as string,
       lines: baselineLines.map(({ key: _key, ...line }) => line),
       notes: notes.trim() || undefined,
     }),
@@ -121,7 +123,8 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
   const forecast = forecastQuery.data
   const activeBudget = activeBudgetQuery.data
   const showCreateBaseline = !activeBudgetQuery.isLoading && !activeBudget
-  const currencyCode = activeBudget?.currencyCode ?? 'HNL'
+  const currencyCode = activeBudget?.currencyCode ?? functionalCurrencyCode
+  if (!currencyCode) return <ErrorState description="La compañía activa no tiene moneda funcional configurada." />
   const authorized = Number(summary?.authorized ?? 0)
   const accrued = Number(summary?.accrued ?? 0)
   const executedPercent = authorized > 0 ? `${((accrued / authorized) * 100).toFixed(1)}%` : '—'
@@ -150,10 +153,10 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
     {showCreateBaseline ? <Card title="Crear BASELINE de costos">
       <p className="nx-field__hint"><strong>Este presupuesto representa el COSTO previsto/autorizado de ejecución, no el precio contratado al cliente.</strong> El valor de venta vive en Comercial → Contratos.</p>
       {wbsNodes.length === 0 ? <EmptyState icon="project" title="Crea primero la WBS" description="NEXORA evita congelar accidentalmente todo el presupuesto como “Sin WBS asignado”. Define la estructura WBS y vuelve aquí." /> : <>
-        <BudgetLineEditor lines={baselineLines} onChange={setBaselineLines} wbs={wbsNodes} economicCategories={categoriesQuery.data ?? []} costCenters={costCentersQuery.data ?? []} periods={periodsQuery.data ?? []} requireWbs />
-        <p><strong>Total BASELINE de costos: {formatMoney(baselineTotal, 'HNL')}</strong></p>
+        <BudgetLineEditor lines={baselineLines} onChange={setBaselineLines} wbs={wbsNodes} economicCategories={categoriesQuery.data ?? []} costCenters={costCentersQuery.data ?? []} periods={periodsQuery.data ?? []} requireWbs currencyCode={currencyCode} />
+        <p><strong>Total BASELINE de costos: {formatMoney(baselineTotal, currencyCode)}</strong></p>
         <Textarea label="Notas del BASELINE" value={notes} onChange={(event) => setNotes(event.target.value)} />
-        <Button disabled={!baselineValid || createBaseline.isPending} loading={createBaseline.isPending} onClick={() => window.confirm(`¿Congelar BASELINE de costos por ${formatMoney(baselineTotal, 'HNL')}? No se sobrescribirá; cambios posteriores requerirán una revisión.`) && createBaseline.mutate()}>Congelar BASELINE</Button>
+        <Button disabled={!baselineValid || createBaseline.isPending} loading={createBaseline.isPending} onClick={() => window.confirm(`¿Congelar BASELINE de costos por ${formatMoney(baselineTotal, currencyCode)}? No se sobrescribirá; cambios posteriores requerirán una revisión.`) && createBaseline.mutate()}>Congelar BASELINE</Button>
         {createBaseline.isError ? <p className="nx-field__error" role="alert">{(createBaseline.error as Error).message}</p> : null}
       </>}
     </Card> : null}
@@ -178,7 +181,7 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
     {activeBudget && hasOnlyUnassigned ? <Card title="Distribuir presupuesto histórico por WBS">
       <p className="nx-field__hint">El presupuesto actual está íntegramente “Sin WBS asignado”. Esta operación <strong>no edita ni borra el BASELINE</strong>: crea una versión REVISED auditada y conserva exactamente el total histórico {formatMoney(historicTotal, currencyCode)}. Si ya existe ejecución financiera el backend bloqueará la reclasificación.</p>
       {wbsNodes.length === 0 ? <EmptyState icon="project" title="Crea primero la WBS" description="Se necesita una WBS real para distribuir el histórico." /> : <>
-        <BudgetLineEditor lines={redistributionLines} onChange={setRedistributionLines} wbs={wbsNodes} economicCategories={categoriesQuery.data ?? []} costCenters={costCentersQuery.data ?? []} periods={periodsQuery.data ?? []} requireWbs />
+        <BudgetLineEditor lines={redistributionLines} onChange={setRedistributionLines} wbs={wbsNodes} economicCategories={categoriesQuery.data ?? []} costCenters={costCentersQuery.data ?? []} periods={periodsQuery.data ?? []} requireWbs currencyCode={currencyCode} />
         <p><strong>Total a redistribuir: {formatMoney(redistributionTotal, currencyCode)} / histórico: {formatMoney(historicTotal, currencyCode)}</strong></p>
         <Button disabled={!redistributionValid || redistribute.isPending} loading={redistribute.isPending} onClick={() => window.confirm('¿Crear una revisión auditada que redistribuya el presupuesto histórico por WBS sin cambiar su total?') && redistribute.mutate()}>Distribuir presupuesto por WBS</Button>
         {redistribute.isError ? <p className="nx-field__error" role="alert">{(redistribute.error as Error).message}</p> : null}

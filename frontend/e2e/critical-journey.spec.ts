@@ -242,12 +242,13 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
       expenseAccountId: expenseGl, payableAccountId: payableGl, currencyCode: 'HNL',
       amount: '1000.00', invoiceDate: new Date().toISOString().slice(0, 10),
       dueDate: new Date().toISOString().slice(0, 10),
+      purchaseOrderId: poId,
     })
     apInvoiceId = invoice.id
     await api(page.request, 'post', `/ap/supplier-invoices/${invoice.id}/approve`)
 
     const match = await api<any>(page.request, 'post', '/procurement/three-way-match', {
-      purchaseOrderId: poId, supplierInvoiceAmount: '1000.00', supplierInvoiceQuantity: '100.0000',
+      purchaseOrderId: poId, supplierInvoiceId: invoice.id, supplierInvoiceQuantity: '100.0000',
     })
     expect(match.status).toBe('MATCHED')
 

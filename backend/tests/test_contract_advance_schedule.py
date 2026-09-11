@@ -177,7 +177,10 @@ def test_retention_5pct_gross_net_split(client):
     summary = client.get(
         f"/api/contract-payments/schedules/{created.json()['id']}/summary"
     ).json()
-    assert Decimal(summary["retentionOutstanding"]) == Decimal("5000.00")
+    # La retención pactada sólo se vuelve WITHHELD/OUTSTANDING cuando se paga
+    # el neto de la cuota; configurarla no equivale a haberla retenido.
+    assert Decimal(summary["retentionWithheld"]) == Decimal("0.00")
+    assert Decimal(summary["retentionOutstanding"]) == Decimal("0.00")
 
 
 def _pay_setup(client, company, tag):
@@ -293,3 +296,8 @@ def test_prepare_advance_invoice_does_not_autoapprove_creator(client, db_session
     invoice = db_session.get(SupplierInvoice, response.json()["invoiceId"])
     assert invoice.status == "DRAFT"
     assert invoice.accrual_document_id is None
+    assert response.json()["advanceInstallmentId"] == str(invoice.contract_installment_id)
+
+    persisted = client.get(f"/api/ap/supplier-invoices/{invoice.id}")
+    assert persisted.status_code == 200, persisted.text
+    assert persisted.json()["contractInstallmentId"] == response.json()["advanceInstallmentId"]

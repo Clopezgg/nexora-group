@@ -188,6 +188,42 @@ def test_csrf_guard_rejects_a_mismatched_origin(client):
     assert response.json()["error"]["code"] == "NXR-AUTH-001"
 
 
+def test_session_cookie_uses_first_party_samesite_lax_in_production(monkeypatch, client):
+    """NX-AUD-024 (F3.10): NEXORA se despliega first-party -- Static Web
+    Apps vincula el Container App y el navegador llama /api/* en su MISMO
+    origen. La cookie de sesión nunca debe emitirse con SameSite=None
+    (diseño cross-site que ITP bloquea); sigue siendo Secure + HttpOnly
+    con SameSite=Lax en producción."""
+    from app.core.config import Settings
+    import app.api.routes.auth as auth_routes
+
+    prod_settings = Settings(
+        app_env="production",
+        secret_key="s" * 40,
+        edit_access_required=False,
+        frontend_url="https://app.example.com",
+        edit_access_token_salt="edit-salt",
+        edit_access_token_digest="edit-digest",
+        session_cookie_name="nexora_session",
+    )
+    monkeypatch.setattr(auth_routes, "get_settings", lambda: prod_settings)
+
+    response = client.post(
+        "/api/auth/login",
+        json={"email": BOOTSTRAP_ADMIN_EMAIL, "password": BOOTSTRAP_ADMIN_PASSWORD},
+    )
+    assert response.status_code == 200, response.text
+
+    set_cookie = response.headers.get("set-cookie", "")
+    session_cookie = next(
+        (part for part in set_cookie.split(",") if "nexora_session=" in part), ""
+    )
+    assert "SameSite=None" not in session_cookie
+    assert "SameSite=lax" in session_cookie
+    assert "HttpOnly" in session_cookie
+    assert "Secure" in session_cookie
+
+
 def test_csrf_guard_allows_the_configured_frontend_origin(client):
     response = client.post(
         "/api/auth/login",

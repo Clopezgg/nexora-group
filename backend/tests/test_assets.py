@@ -1,3 +1,5 @@
+import uuid
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -5,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.models.accounting import AccountingDocument, JournalLine
-from app.models.asset import FixedAsset
+from app.models.asset import DepreciationEntry, FixedAsset
+from app.services import asset_service
 from app.models.permission import UserCompanyAccess, UserProjectAccess
 from tests.helpers import (
     create_account,
@@ -29,6 +32,12 @@ def _setup_asset_company(client):
 
 
 def _create_asset(client, *, company, expense, accumulated, cost="12000.00", useful_life=12, salvage="0.00"):
+    asset_account = create_account(
+        client, company_id=company["id"], code="1500", name="Activos fijos", account_type="ASSET"
+    )
+    acquisition_offset = create_account(
+        client, company_id=company["id"], code="2200", name="Contrapartida adquisición", account_type="LIABILITY"
+    )
     response = client.post(
         "/api/assets",
         json={
@@ -43,10 +52,25 @@ def _create_asset(client, *, company, expense, accumulated, cost="12000.00", use
             "scope": "GENERAL",
             "depreciationExpenseAccountId": expense["id"],
             "accumulatedDepreciationAccountId": accumulated["id"],
+            "assetAccountId": asset_account["id"],
+            "acquisitionOffsetAccountId": acquisition_offset["id"],
         },
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def test_manual_asset_creation_posts_its_accounting_origin(client, db_session):
+    login_admin(client)
+    company, expense, accumulated = _setup_asset_company(client)
+    asset = _create_asset(client, company=company, expense=expense, accumulated=accumulated)
+
+    assert asset["capitalizationAccountId"] is not None
+    assert asset["capitalizationDocumentId"] is not None
+    document = db_session.get(AccountingDocument, asset["capitalizationDocumentId"])
+    assert document is not None
+    assert document.status == "POSTED"
+    assert document.document_type_code == "CAP"
 
 
 def test_generate_depreciation_entry_posts_balanced_dep_document(client):
@@ -414,3 +438,52 @@ def test_company_access_blocks_cross_company_asset(client, db_session):
 
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_manual_asset_rolls_back_when_capitalization_posting_fails(
+    client, db_session, monkeypatch
+):
+    login_admin(client)
+    company, expense, accumulated = _setup_asset_company(client)
+    asset_account = create_account(
+        client, company_id=company["id"], code="1500", name="Activo", account_type="ASSET"
+    )
+    offset = create_account(
+        client, company_id=company["id"], code="2200", name="Contrapartida", account_type="LIABILITY"
+    )
+
+    def fail_posting(*args, **kwargs):
+        raise RuntimeError("injected capitalization failure")
+
+    monkeypatch.setattr("app.services.asset_service.posting_service.post_manual", fail_posting)
+    with pytest.raises(RuntimeError, match="injected capitalization failure"):
+        asset_service.create_fixed_asset(
+            db_session,
+            company_id=uuid.UUID(company["id"]), category="Equipo", name="Activo atómico",
+            acquisition_date=date(2026, 1, 1), cost=Decimal("100"), currency_code="HNL",
+            useful_life_months=12, salvage_value=Decimal("0"), location=None,
+            responsible=None, scope="GENERAL", project_id=None, cost_center_id=None,
+            depreciation_expense_account_id=uuid.UUID(expense["id"]),
+            accumulated_depreciation_account_id=uuid.UUID(accumulated["id"]),
+            asset_account_id=uuid.UUID(asset_account["id"]), acquisition_offset_account_id=uuid.UUID(offset["id"]),
+        )
+
+    assert list(db_session.execute(select(FixedAsset)).scalars()) == []
+
+
+def test_depreciation_rolls_back_subledger_when_posting_fails(client, db_session, monkeypatch):
+    login_admin(client)
+    company, expense, accumulated = _setup_asset_company(client)
+    asset = _create_asset(client, company=company, expense=expense, accumulated=accumulated)
+
+    def fail_posting(*args, **kwargs):
+        raise RuntimeError("injected depreciation failure")
+
+    monkeypatch.setattr("app.services.asset_service.posting_service.post_manual", fail_posting)
+    with pytest.raises(RuntimeError, match="injected depreciation failure"):
+        asset_service.generate_depreciation_entry(
+            db_session, asset_id=uuid.UUID(asset["id"]), period_start=date(2026, 1, 1),
+            period_end=date(2026, 1, 31), post=True,
+        )
+
+    assert list(db_session.execute(select(DepreciationEntry)).scalars()) == []

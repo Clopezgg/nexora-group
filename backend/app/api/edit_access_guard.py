@@ -22,6 +22,16 @@ _PROTECTED_COMMANDS = {
     "hard-close", "execute", "baseline", "submit", "reject", "response",
     "decision", "status",
 }
+_PROTECTED_POST_PATHS = {
+    "/api/treasury/remittances",
+    "/api/treasury/general-expenses",
+    "/api/treasury/cash-closings",
+    "/api/procurement/goods-receipts",
+    "/api/procurement/service-entries",
+    "/api/procurement/three-way-match",
+    "/api/assets/bulk-depreciate",
+}
+_PROTECTED_POST_PREFIXES = ("/api/assets/from-supplier-invoice/",)
 
 
 def _requires_protected_edit(method: str, path: str) -> bool:
@@ -35,6 +45,8 @@ def _requires_protected_edit(method: str, path: str) -> bool:
         return path not in _EXEMPT_PATHS
     if method != "POST":
         return False
+    if path in _PROTECTED_POST_PATHS or path.startswith(_PROTECTED_POST_PREFIXES):
+        return True
     parts = [part for part in path.split("/") if part]
     return bool(parts and parts[-1].lower() in _PROTECTED_COMMANDS)
 

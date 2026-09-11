@@ -89,6 +89,46 @@ def test_schedule_over_contract_value_is_422(client):
     assert r.status_code == 422, r.text
 
 
+def test_custom_schedule_below_contract_value_is_rejected_as_incomplete(client):
+    """Un plan operativo no puede agotar sus cuotas y dejar saldo sin obligación."""
+    login_admin(client)
+    company = create_company(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    contract = _contract(
+        client,
+        company["id"],
+        supplier["id"],
+        value="1500000.00",
+        number="CTR-API-INCOMPLETE",
+    )
+
+    response = client.post(
+        "/api/contract-payments/schedules",
+        json={
+            "supplierContractId": contract["id"],
+            "scheduleType": "CUSTOM",
+            "installments": [
+                {
+                    "periodYear": 2026,
+                    "periodMonth": 8,
+                    "dueDate": "2026-08-31",
+                    "scheduledAmount": "700000.00",
+                },
+                {
+                    "periodYear": 2026,
+                    "periodMonth": 9,
+                    "dueDate": "2026-09-30",
+                    "scheduledAmount": "700000.00",
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert "valor contractual" in response.text.lower()
+    assert client.get(f"/api/contract-payments/by-contract/{contract['id']}").status_code == 404
+
+
 def test_summary_and_fifo_preview(client):
     login_admin(client)
     company = create_company(client)

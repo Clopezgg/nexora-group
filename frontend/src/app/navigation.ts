@@ -70,6 +70,7 @@ export const navGroups: NavGroup[] = [
       { path: '/abastecimiento/comparativos', label: 'Comparativos', icon: 'scale', requiredAny: read('procurement.quotation:read') },
       { path: '/abastecimiento/ordenes-de-compra', label: 'Órdenes de compra', icon: 'package', requiredAny: read('procurement.purchase_order:read') },
       { path: '/abastecimiento/recepciones', label: 'Recepciones', icon: 'truck', requiredAny: read('procurement.goods_receipt:read') },
+      { path: '/abastecimiento/entradas-de-servicio', label: 'Entradas de servicio', icon: 'clipboard', requiredAny: read('procurement.service_entry:read') },
       { path: '/abastecimiento/inventario', label: 'Inventario', icon: 'grid', requiredAny: read('inventory.stock:read', 'inventory.item:read') },
       { path: '/abastecimiento/almacenes', label: 'Almacenes', icon: 'warehouse', requiredAny: read('inventory.warehouse:read') },
       { path: '/abastecimiento/proveedores', label: 'Proveedores y Contratistas', icon: 'users', requiredAny: read('procurement.supplier:read') },

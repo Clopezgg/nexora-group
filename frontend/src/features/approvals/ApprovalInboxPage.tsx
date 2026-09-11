@@ -62,7 +62,7 @@ function DecideControl({
 
 export function ApprovalInboxPage() {
   const { activeCompany, activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
-  const currency = activeCompany?.functionalCurrencyCode ?? 'HNL'
+  const currency = activeCompany?.functionalCurrencyCode
   const queryClient = useQueryClient()
   const handleMutationError = useMutationError()
   const [moduleFilter, setModuleFilter] = useState('')
@@ -110,7 +110,7 @@ export function ApprovalInboxPage() {
       header: 'Prioridad',
       render: (row) => <Badge tone={PRIORITY_TONE[row.priority]}>{PRIORITY_LABEL[row.priority]}</Badge>,
     },
-    { key: 'amount', header: 'Monto', numeric: true, render: (row) => (row.amount == null ? '—' : formatMoney(row.amount, currency)) },
+    { key: 'amount', header: 'Monto', numeric: true, render: (row) => (row.amount == null || !currency ? '—' : formatMoney(row.amount, currency)) },
     { key: 'requestedBy', header: 'Solicitado por', render: (row) => row.requestedBy },
     { key: 'createdAt', header: 'Fecha', render: (row) => new Date(row.createdAt).toLocaleString('es-HN') },
     {

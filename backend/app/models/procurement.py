@@ -1,8 +1,8 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, Numeric, String
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,6 +27,7 @@ PO_STATUSES = (
     "CLOSED",
     "CANCELLED",
 )
+PO_FULFILLMENT_TYPES = ("GOODS", "SERVICE")
 THREE_WAY_MATCH_STATUSES = ("MATCHED", "EXCEPTION")
 
 
@@ -101,6 +102,11 @@ class RfqSupplier(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """RFQ enviado a un supplier específico (una RFQ puede ir a varios)."""
 
     __tablename__ = "rfq_suppliers"
+    __table_args__ = (
+        UniqueConstraint(
+            "request_for_quotation_id", "supplier_id", name="uq_rfq_suppliers_invitation"
+        ),
+    )
 
     request_for_quotation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("requests_for_quotation.id", ondelete="CASCADE"), nullable=False
@@ -161,6 +167,11 @@ class PurchaseOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "status IN ('DRAFT','APPROVAL_PENDING','APPROVED','SENT','PARTIALLY_RECEIVED','RECEIVED','CLOSED','CANCELLED')",
             name="ck_purchase_orders_status_valid",
         ),
+        CheckConstraint(
+            "fulfillment_type IN ('GOODS','SERVICE')",
+            name="ck_purchase_orders_fulfillment_type_valid",
+        ),
+        UniqueConstraint("supplier_quotation_id", name="uq_purchase_orders_supplier_quotation"),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -182,6 +193,7 @@ class PurchaseOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("supplier_contracts.id", ondelete="RESTRICT"), nullable=True
     )
     currency_code: Mapped[str] = mapped_column(String(3), ForeignKey("currencies.code"), nullable=False)
+    fulfillment_type: Mapped[str] = mapped_column(String(16), nullable=False, default="GOODS")
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="DRAFT")
 
 
@@ -249,10 +261,11 @@ class ServiceEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "service_entries"
     __table_args__ = (
         CheckConstraint(
-            "progress_percentage >= 0 AND progress_percentage <= 100",
+            "progress_percentage > 0 AND progress_percentage <= 100",
             name="ck_service_entries_progress_valid",
         ),
-        CheckConstraint("accepted_value >= 0", name="ck_service_entries_value_non_negative"),
+        CheckConstraint("accepted_value > 0", name="ck_service_entries_value_positive"),
+        CheckConstraint("period_start <= period_end", name="ck_service_entries_period_valid"),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -268,6 +281,9 @@ class ServiceEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     accepted_value: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     approved_by_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    evidence_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("evidence.id", ondelete="RESTRICT"), nullable=True
     )
 
 
@@ -296,6 +312,23 @@ class ThreeWayMatchResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "amount_tolerance_pct >= 0 AND amount_tolerance_pct <= 100",
             name="ck_twm_amount_tolerance_valid",
         ),
+        CheckConstraint(
+            "match_kind = 'LEGACY_PREVIEW' OR "
+            "(match_kind = 'FINANCIAL' AND supplier_invoice_id IS NOT NULL)",
+            name="ck_twm_financial_invoice_required",
+        ),
+        CheckConstraint(
+            "(override_reason IS NULL AND overridden_by_user_id IS NULL AND overridden_at IS NULL) OR "
+            "(status = 'EXCEPTION' AND override_reason IS NOT NULL "
+            "AND overridden_by_user_id IS NOT NULL AND overridden_at IS NOT NULL)",
+            name="ck_twm_override_complete",
+        ),
+        Index(
+            "uq_twm_financial_supplier_invoice",
+            "supplier_invoice_id",
+            unique=True,
+            postgresql_where=text("match_kind = 'FINANCIAL'"),
+        ),
     )
 
     purchase_order_id: Mapped[uuid.UUID] = mapped_column(
@@ -304,11 +337,22 @@ class ThreeWayMatchResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     supplier_invoice_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("supplier_invoices.id", ondelete="SET NULL"), nullable=True
     )
+    match_kind: Mapped[str] = mapped_column(String(20), nullable=False, default="FINANCIAL")
     supplier_invoice_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     supplier_invoice_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     received_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     ordered_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    receipt_basis: Mapped[str] = mapped_column(String(24), nullable=False, default="GOODS_RECEIPT")
+    accepted_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=Decimal("0"))
     quantity_tolerance_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     amount_tolerance_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     exceptions: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    override_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    overridden_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    overridden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    override_evidence_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("evidence.id", ondelete="RESTRICT"), nullable=True
+    )

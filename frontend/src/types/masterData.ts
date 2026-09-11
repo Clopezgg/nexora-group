@@ -22,6 +22,11 @@ export interface Company {
   logoEvidenceId?: string | null
   signatureEvidenceId?: string | null
   supplierAdvanceAccountId?: string | null
+  assetDisposalGainAccountId?: string | null
+  assetDisposalLossAccountId?: string | null
+  inventoryAccountId?: string | null
+  inventoryAdjustmentGainAccountId?: string | null
+  inventoryAdjustmentLossAccountId?: string | null
 }
 
 export interface Account {

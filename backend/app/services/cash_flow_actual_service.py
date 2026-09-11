@@ -32,6 +32,7 @@ from app.core.business_time import business_today
 from app.models.accounting import AccountingDocument, JournalLine
 from app.models.chart_of_accounts import Account
 from app.models.treasury import TreasuryAccount
+from app.models.company import Company
 from app.services import treasury_service
 from app.services.transaction_inspector_service import _resolve_source_event
 
@@ -280,10 +281,14 @@ def series(
         date_from, date_to = date_to, date_from
     gran = resolve_granularity(date_from, date_to, granularity)
 
+    company = db.get(Company, company_id)
+    if company is None or not company.functional_currency_code:
+        raise ValueError("La compañía no tiene moneda funcional configurada")
+
     accounts = db.execute(
         select(TreasuryAccount).where(TreasuryAccount.company_id == company_id)
     ).scalars().all()
-    currency = accounts[0].currency_code if accounts else "HNL"
+    currency = company.functional_currency_code
     cash_gl_ids = {a.gl_account_id for a in accounts}
 
     closing_balance = _q(

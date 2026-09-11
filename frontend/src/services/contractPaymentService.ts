@@ -51,6 +51,10 @@ export interface ContractPaymentSummary {
   advancePaid: string
   advanceRemaining: string
   retentionOutstanding: string
+  retentionWithheld: string
+  retentionReleased: string
+  retentionPaid: string
+  retentionAvailableToRelease: string
 }
 
 export interface SchedulePlanSnapshotRow {
@@ -171,6 +175,14 @@ export const contractPaymentService = {
       `/contract-payments/schedules/${encodeURIComponent(scheduleId)}/summary${qs}`,
     )
   },
+
+  authorizeRetentionRelease: (
+    scheduleId: string,
+    body: { amount: string; dueDate: string; reason: string; evidenceId?: string },
+  ) => apiFetch<ContractSchedule>(
+    `/contract-payments/schedules/${encodeURIComponent(scheduleId)}/retention-releases`,
+    { method: 'POST', body: JSON.stringify(body) },
+  ),
 
   fifoPreview: (scheduleId: string, amount: string, asOf?: string) =>
     apiFetch<FifoPreviewItem[]>(

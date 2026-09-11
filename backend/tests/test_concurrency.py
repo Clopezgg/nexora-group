@@ -18,6 +18,7 @@ from app.core.database import SessionLocal
 from app.domain.errors import (
     IdempotencyConflictError,
     InsufficientStockError,
+    InvalidFinancialReferenceError,
     InvalidInvoiceStateError,
     InvalidProcurementStateError,
     OverpaymentError,
@@ -343,6 +344,57 @@ def test_concurrent_goods_receipts_never_over_receive_beyond_ordered_quantity(cl
     assert Decimal(total_received) == Decimal("90.0000"), (
         f"over-received beyond the 100.0000 ordered: {total_received}"
     )
+
+
+def test_concurrent_service_entries_never_over_accept_purchase_order(client, db_session):
+    """The PO row serializes cumulative service acceptance, so two 60%
+    certificates cannot both consume the same remaining order value."""
+    login_admin(client)
+    company = create_company(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    order_response = client.post(
+        "/api/procurement/purchase-orders",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "currencyCode": "HNL",
+            "fulfillmentType": "SERVICE",
+            "lines": [{"description": "Servicio", "quantity": "1", "unitPrice": "1000"}],
+        },
+    )
+    assert order_response.status_code == 201, order_response.text
+    order = order_response.json()
+    assert client.post(f"/api/procurement/purchase-orders/{order['id']}/approve").status_code == 200
+    assert client.post(f"/api/procurement/purchase-orders/{order['id']}/send").status_code == 200
+    actor_id = uuid.UUID(client.get("/api/auth/me").json()["id"])
+    company_id = uuid.UUID(company["id"])
+    order_id = uuid.UUID(order["id"])
+    db_session.commit()
+
+    def _accept(start_day: int) -> str:
+        db = SessionLocal()
+        try:
+            procurement_service.record_service_entry(
+                db,
+                company_id=company_id,
+                purchase_order_id=order_id,
+                period_start=date(2026, 8, start_day),
+                period_end=date(2026, 8, start_day + 4),
+                progress_percentage=Decimal("60"),
+                accepted_value=Decimal("600"),
+                approved_by_id=actor_id,
+            )
+            return "accepted"
+        except InvalidFinancialReferenceError:
+            db.rollback()
+            return "rejected"
+        finally:
+            db.close()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(_accept, (1, 10)))
+
+    assert sorted(outcomes) == ["accepted", "rejected"]
 
 
 def test_concurrent_stock_issues_never_over_issue_beyond_on_hand_quantity(client, db_session):

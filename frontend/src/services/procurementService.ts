@@ -5,9 +5,11 @@ import type {
   Quotation,
   Requisition,
   Rfq,
+  ServiceEntry,
   Supplier,
   SupplierContract,
   SupplierContractCategory,
+  ThreeWayMatch,
 } from '../types/procurement'
 
 export const procurementService = {
@@ -99,6 +101,7 @@ export const procurementService = {
     companyId: string
     supplierId: string
     currencyCode: string
+    fulfillmentType?: 'GOODS' | 'SERVICE'
     lines: { description: string; quantity: string; unitPrice: string }[]
   }) => apiFetch<PurchaseOrder>('/procurement/purchase-orders', { method: 'POST', body: JSON.stringify(payload) }),
   approvePurchaseOrder: (id: string) =>
@@ -143,4 +146,26 @@ export const procurementService = {
     receivedAt: string
     lines: { purchaseOrderLineId: string; quantityReceived: string }[]
   }) => apiFetch<GoodsReceipt>('/procurement/goods-receipts', { method: 'POST', body: JSON.stringify(payload) }),
+  listServiceEntries: (companyId: string) =>
+    apiFetch<ServiceEntry[]>(`/procurement/service-entries?company_id=${encodeURIComponent(companyId)}`),
+  createServiceEntry: (payload: {
+    purchaseOrderId: string
+    periodStart: string
+    periodEnd: string
+    progressPercentage: string
+    acceptedValue: string
+    evidenceId?: string
+  }) => apiFetch<ServiceEntry>('/procurement/service-entries', { method: 'POST', body: JSON.stringify(payload) }),
+  listThreeWayMatches: (companyId: string) =>
+    apiFetch<ThreeWayMatch[]>(`/procurement/three-way-match?company_id=${encodeURIComponent(companyId)}`),
+  runThreeWayMatch: (payload: {
+    purchaseOrderId: string
+    supplierInvoiceId: string
+    supplierInvoiceQuantity: string
+  }) => apiFetch<ThreeWayMatch>('/procurement/three-way-match', { method: 'POST', body: JSON.stringify(payload) }),
+  overrideThreeWayMatch: (id: string, reason: string, evidenceId?: string) =>
+    apiFetch<ThreeWayMatch>(`/procurement/three-way-match/${id}/override`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, evidenceId }),
+    }),
 }

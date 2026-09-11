@@ -66,7 +66,7 @@ export function TreasuryPage() {
   const [openModal, setOpenModal] = useState<ModalKind>(null)
   const [remittanceOffset, setRemittanceOffset] = useState(0)
 
-  const { companies, activeCompanyId, setActiveCompanyId, isLoading: companiesLoading, isError: companiesError, refetch: refetchCompanies } = useActiveCompany()
+  const { companies, activeCompany, activeCompanyId, setActiveCompanyId, isLoading: companiesLoading, isError: companiesError, refetch: refetchCompanies } = useActiveCompany()
 
   const accountsQuery = useQuery({
     queryKey: ['master-data', 'accounts', activeCompanyId],
@@ -153,6 +153,9 @@ export function TreasuryPage() {
       </div>
     )
   }
+  if (!activeCompany?.functionalCurrencyCode) {
+    return <EmptyState icon="bank" title="Selecciona una compañía" description="Selecciona una compañía con moneda funcional para operar Tesorería." />
+  }
 
   const glAccounts = accountsQuery.data ?? []
   const treasuryAccounts = treasuryAccountsQuery.data ?? []
@@ -214,8 +217,9 @@ export function TreasuryPage() {
     totals.set(account.currencyCode, (totals.get(account.currencyCode) ?? 0) + account.balance)
     return totals
   }, new Map())
-  const hnlBalance = balancesByCurrency.get('HNL') ?? 0
-  const secondaryBalances = [...balancesByCurrency.entries()].filter(([currency]) => currency !== 'HNL')
+  const functionalCurrency = activeCompany.functionalCurrencyCode
+  const functionalBalance = balancesByCurrency.get(functionalCurrency) ?? 0
+  const secondaryBalances = [...balancesByCurrency.entries()].filter(([currency]) => currency !== functionalCurrency)
   const remittanceCounterAccounts = glAccounts.filter(
     (account) =>
       account.isPostable &&
@@ -245,7 +249,7 @@ export function TreasuryPage() {
       </header>
 
       <div className="nx-treasury__grid">
-        <StatCard label="Saldo total HNL" value={formatMoney(hnlBalance)} />
+        <StatCard label={`Saldo total ${functionalCurrency}`} value={formatMoney(functionalBalance, functionalCurrency)} />
         <StatCard label="Cuentas de tesorería" value={treasuryAccounts.length} />
         {secondaryBalances.map(([currency, balance]) => (
           <StatCard key={currency} label={`Saldo ${currency}`} value={formatMoney(balance, currency)} />
@@ -337,6 +341,7 @@ export function TreasuryPage() {
       {openModal === 'account' && activeCompanyId ? (
         <TreasuryAccountModal
           companyId={activeCompanyId}
+          functionalCurrencyCode={functionalCurrency}
           glAccounts={availableTreasuryGlAccounts}
           onClose={() => setOpenModal(null)}
         />
@@ -344,6 +349,7 @@ export function TreasuryPage() {
       {openModal === 'remittance' && activeCompanyId ? (
         <RemittanceModal
           companyId={activeCompanyId}
+          functionalCurrencyCode={functionalCurrency}
           treasuryAccounts={treasuryAccounts}
           counterAccounts={remittanceCounterAccounts}
           onClose={() => setOpenModal(null)}
@@ -371,17 +377,19 @@ export function TreasuryPage() {
 
 function TreasuryAccountModal({
   companyId,
+  functionalCurrencyCode,
   glAccounts,
   onClose,
 }: {
   companyId: string
+  functionalCurrencyCode: string
   glAccounts: Account[]
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [kind, setKind] = useState<TreasuryAccount['kind']>('BANK')
-  const [currencyCode, setCurrencyCode] = useState('HNL')
+  const [currencyCode, setCurrencyCode] = useState(functionalCurrencyCode)
   const [glAccountId, setGlAccountId] = useState(glAccounts[0]?.id ?? '')
   const [institution, setInstitution] = useState('')
   const [accountReference, setAccountReference] = useState('')
@@ -505,11 +513,13 @@ function TreasuryAccountModal({
 
 function RemittanceModal({
   companyId,
+  functionalCurrencyCode,
   treasuryAccounts,
   counterAccounts,
   onClose,
 }: {
   companyId: string
+  functionalCurrencyCode: string
   treasuryAccounts: TreasuryAccount[]
   counterAccounts: Account[]
   onClose: () => void
@@ -539,7 +549,7 @@ function RemittanceModal({
   const selectedTreasuryAccount = treasuryAccounts.find(
     (account) => account.id === effectiveTreasuryAccountId,
   )
-  const selectedCurrency = selectedTreasuryAccount?.currencyCode ?? 'HNL'
+  const selectedCurrency = selectedTreasuryAccount?.currencyCode ?? functionalCurrencyCode
   const sender = senderOption === OTHER_REMITTANCE_SENDER ? customSender.trim() : senderOption
   const eligibleCounterAccounts = useMemo(
     () => counterAccounts.filter(
@@ -597,7 +607,7 @@ function RemittanceModal({
               reference: reference || null,
               currencyCode: selectedCurrency,
               originalAmount: String(amount ?? 0),
-              fxRate: String(selectedCurrency === 'HNL' ? 1 : fxRate),
+              fxRate: String(selectedCurrency === functionalCurrencyCode ? 1 : fxRate),
               remittanceDate,
               notes: notes || null,
             },
@@ -729,9 +739,9 @@ function RemittanceModal({
           <option value="OTHER">Otro</option>
         </Select>
         <MoneyInput label={`Monto (${selectedCurrency})`} value={amount} onChange={setAmount} />
-        {selectedCurrency !== 'HNL' ? (
+        {selectedCurrency !== functionalCurrencyCode ? (
           <label className="nx-field">
-            <span className="nx-field__label">Tipo de cambio a HNL</span>
+            <span className="nx-field__label">Tipo de cambio a {functionalCurrencyCode}</span>
             <input
               className="nx-input"
               type="number"
@@ -770,7 +780,7 @@ function RemittanceModal({
             !remittanceDate ||
             !amount ||
             amount <= 0 ||
-            (selectedCurrency !== 'HNL' && fxRate <= 0)
+            (selectedCurrency !== functionalCurrencyCode && fxRate <= 0)
           }
         >
           Registrar remesa

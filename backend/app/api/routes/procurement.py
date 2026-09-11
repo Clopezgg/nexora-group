@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
+from app.models.procurement import ThreeWayMatchResult
 from app.repositories import procurement_repository
 from app.schemas.procurement import (
     GoodsReceiptCreateRequest,
@@ -23,6 +24,7 @@ from app.schemas.procurement import (
     RfqResponse,
     ServiceEntryCreateRequest,
     ServiceEntryResponse,
+    ThreeWayMatchOverrideRequest,
     ThreeWayMatchRequest,
     ThreeWayMatchResponse,
 )
@@ -315,7 +317,9 @@ def _purchase_order_response(db: Session, order) -> PurchaseOrderResponse:
         supplier_id=order.supplier_id,
         project_id=order.project_id,
         supplier_quotation_id=order.supplier_quotation_id,
+        supplier_contract_id=order.supplier_contract_id,
         currency_code=order.currency_code,
+        fulfillment_type=order.fulfillment_type,
         status=order.status,
         lines=[PurchaseOrderLineResponse.model_validate(line, from_attributes=True) for line in lines],
     )
@@ -381,6 +385,7 @@ def create_purchase_order(
         project_id=payload.project_id,
         supplier_contract_id=payload.supplier_contract_id,
         currency_code=payload.currency_code,
+        fulfillment_type=payload.fulfillment_type,
         lines=[line.model_dump() for line in payload.lines],
         commit=False,
     )
@@ -606,6 +611,7 @@ def create_service_entry(
         progress_percentage=payload.progress_percentage,
         accepted_value=payload.accepted_value,
         approved_by_id=user.id,
+        evidence_id=payload.evidence_id,
         commit=False,
     )
     audit_service.record(
@@ -621,11 +627,65 @@ def create_service_entry(
             "entryNumber": entry.entry_number,
             "purchaseOrderId": str(payload.purchase_order_id),
             "progressPercentage": str(payload.progress_percentage),
+            "acceptedValue": str(payload.accepted_value),
+            "periodStart": payload.period_start.isoformat(),
+            "periodEnd": payload.period_end.isoformat(),
+            "evidenceId": str(payload.evidence_id) if payload.evidence_id else None,
         },
         correlation_id=correlation_id,
     )
     db.commit()
     return ServiceEntryResponse.model_validate(entry, from_attributes=True)
+
+
+@router.get("/service-entries", response_model=list[ServiceEntryResponse])
+def list_service_entries(
+    company_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("procurement.service_entry", "read")),
+):
+    assert_company_access(
+        db, user_id=user.id, resource="procurement.service_entry", action="read", company_id=company_id
+    )
+    entries = procurement_repository.list_service_entries(db, company_id=company_id)
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="procurement.service_entry", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        entries = [
+            entry for entry in entries
+            if (order := procurement_repository.get_purchase_order(db, entry.purchase_order_id)) is not None
+            and (order.project_id is None or order.project_id in allowed_set)
+        ]
+    return [ServiceEntryResponse.model_validate(entry, from_attributes=True) for entry in entries]
+
+
+@router.get("/three-way-match", response_model=list[ThreeWayMatchResponse])
+def list_three_way_matches(
+    company_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("procurement.three_way_match", "read")),
+):
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="procurement.three_way_match",
+        action="read",
+        company_id=company_id,
+    )
+    results = procurement_repository.list_financial_three_way_matches(db, company_id=company_id)
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="procurement.three_way_match", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        results = [
+            result for result in results
+            if (order := procurement_repository.get_purchase_order(db, result.purchase_order_id)) is not None
+            and (order.project_id is None or order.project_id in allowed_set)
+        ]
+    return [ThreeWayMatchResponse.model_validate(result, from_attributes=True) for result in results]
 
 
 @router.post("/three-way-match", response_model=ThreeWayMatchResponse, status_code=201)
@@ -651,7 +711,6 @@ def run_three_way_match(
         db,
         purchase_order_id=payload.purchase_order_id,
         supplier_invoice_id=payload.supplier_invoice_id,
-        supplier_invoice_amount=payload.supplier_invoice_amount,
         supplier_invoice_quantity=payload.supplier_invoice_quantity,
         quantity_tolerance_pct=payload.quantity_tolerance_pct,
         amount_tolerance_pct=payload.amount_tolerance_pct,
@@ -669,9 +728,69 @@ def run_three_way_match(
         after={
             "resultId": str(result.id),
             "purchaseOrderId": str(payload.purchase_order_id),
+            "supplierInvoiceId": str(payload.supplier_invoice_id),
+            "supplierInvoiceAmount": str(result.supplier_invoice_amount),
             "matchStatus": result.status,
+            "exceptions": result.exceptions,
         },
         correlation_id=correlation_id,
     )
     db.commit()
+    return ThreeWayMatchResponse.model_validate(result, from_attributes=True)
+
+
+@router.post("/three-way-match/{result_id}/override", response_model=ThreeWayMatchResponse)
+def override_three_way_match_exception(
+    result_id: uuid.UUID,
+    payload: ThreeWayMatchOverrideRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("procurement.three_way_match", "override")),
+    correlation_id: str = Depends(get_correlation_id),
+):
+    result = db.get(ThreeWayMatchResult, result_id)
+    if result is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Three-way match no encontrado")
+    order = procurement_repository.get_purchase_order(db, result.purchase_order_id)
+    if order is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="procurement.three_way_match",
+        action="override",
+        company_id=order.company_id,
+    )
+    before = {"status": result.status, "overrideReason": result.override_reason}
+    result = procurement_service.override_three_way_match_exception(
+        db,
+        result_id=result_id,
+        actor_user_id=user.id,
+        reason=payload.reason,
+        evidence_id=payload.evidence_id,
+        commit=False,
+    )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="procurement.three_way_match.override",
+        entity_type="procurement.three_way_match",
+        entity_id=result.id,
+        company_id=order.company_id,
+        project_id=order.project_id,
+        before=before,
+        after={
+            "status": result.status,
+            "overrideReason": result.override_reason,
+            "overriddenByUserId": str(result.overridden_by_user_id),
+            "overriddenAt": result.overridden_at.isoformat(),
+            "overrideEvidenceId": str(result.override_evidence_id) if result.override_evidence_id else None,
+        },
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    db.refresh(result)
     return ThreeWayMatchResponse.model_validate(result, from_attributes=True)

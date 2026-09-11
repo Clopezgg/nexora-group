@@ -2,6 +2,8 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
+from pydantic import Field
+
 from app.schemas.base import CamelModel
 
 
@@ -66,6 +68,7 @@ class StockIssueToProjectRequest(CamelModel):
     warehouse_id: uuid.UUID
     project_id: uuid.UUID
     quantity: Decimal
+    effective_date: date | None = None
     # Optional only so tenant/project authorization runs before the business
     # validation; the service rejects requests that omit either account.
     cost_of_goods_account_id: uuid.UUID | None = None
@@ -114,7 +117,7 @@ class PhysicalCountCreateRequest(CamelModel):
     company_id: uuid.UUID
     warehouse_id: uuid.UUID
     count_date: date
-    lines: list[PhysicalCountLineRequest]
+    lines: list[PhysicalCountLineRequest] = Field(min_length=1)
 
 
 class PhysicalCountResponse(CamelModel):

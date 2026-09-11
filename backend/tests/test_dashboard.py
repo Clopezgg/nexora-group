@@ -78,6 +78,47 @@ def test_dashboard_money_fields_serialize_as_decimal_safe_strings_not_float(clie
     assert body["treasuryBalance"] == "50000.00"
 
 
+def test_company_dashboard_uses_its_functional_currency_instead_of_hnl(client):
+    """A USD company must never get a zeroed HNL dashboard while its USD ledger has cash."""
+    _login(client)
+    company = create_company(client, name="Nexora USD", currency="USD")
+    bank_gl = create_account(
+        client, company_id=company["id"], code="1100", name="USD Bank", account_type="ASSET"
+    )
+    equity = create_account(
+        client, company_id=company["id"], code="3100", name="USD Equity", account_type="EQUITY"
+    )
+    bank = client.post(
+        "/api/treasury/accounts",
+        json={
+            "companyId": company["id"],
+            "name": "USD Bank",
+            "kind": "BANK",
+            "currencyCode": "USD",
+            "glAccountId": bank_gl["id"],
+        },
+    )
+    assert bank.status_code == 201, bank.text
+    remittance = client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": bank.json()["id"],
+            "counterAccountId": equity["id"],
+            "sender": "USD owner",
+            "currencyCode": "USD",
+            "originalAmount": "125.50",
+            "remittanceDate": str(business_today()),
+        },
+    )
+    assert remittance.status_code == 201, remittance.text
+
+    response = client.get(f"/api/dashboard/summary?companyId={company['id']}")
+    assert response.status_code == 200, response.text
+    assert response.json()["currency"] == "USD"
+    assert response.json()["treasuryBalance"] == "125.50"
+
+
 def test_dashboard_active_projects_never_counts_another_companys_projects(client, db_session):
     """INV-COMP-001: `active_projects` no puede filtrarse cross-company --
     un usuario sin scope ANY solo debe ver el conteo real de las

@@ -10,6 +10,7 @@ from app.models.accounting import AccountingDocument
 from app.models.ap import SupplierInvoice
 from app.models.asset import ASSET_DISPOSAL_STATUSES, ASSET_STATUSES, DepreciationEntry, FixedAsset
 from app.models.chart_of_accounts import Account
+from app.models.company import Company
 from app.repositories import asset_repository
 from app.services import posting_service
 from app.services.financial_validation_service import (
@@ -75,11 +76,21 @@ def create_fixed_asset(
     cost_center_id: uuid.UUID | None,
     depreciation_expense_account_id: uuid.UUID,
     accumulated_depreciation_account_id: uuid.UUID,
+    asset_account_id: uuid.UUID | None = None,
+    acquisition_offset_account_id: uuid.UUID | None = None,
+    post_acquisition: bool = True,
     commit: bool = True,
 ) -> FixedAsset:
     assert_operation_scope(scope, project_id)
     assert_project_belongs_to_company(db, project_id=project_id, company_id=company_id)
     assert_cost_center_belongs_to_company(db, cost_center_id=cost_center_id, company_id=company_id)
+    company = db.get(Company, company_id)
+    if company is None or not company.functional_currency_code:
+        raise InvalidAssetStateError("La compañía no tiene moneda funcional configurada")
+    if currency_code != company.functional_currency_code:
+        raise InvalidAssetStateError(
+            "No existe una política FX autoritativa para capitalizar el activo en otra moneda"
+        )
     _assert_account_type(
         db,
         account_id=depreciation_expense_account_id,
@@ -112,6 +123,59 @@ def create_fixed_asset(
         depreciation_expense_account_id=depreciation_expense_account_id,
         accumulated_depreciation_account_id=accumulated_depreciation_account_id,
     )
+    if post_acquisition:
+        if asset_account_id is None or acquisition_offset_account_id is None:
+            raise InvalidAssetStateError(
+                "El alta manual exige cuenta de activo y contrapartida contable"
+            )
+        _assert_account_type(
+            db,
+            account_id=asset_account_id,
+            company_id=company_id,
+            expected_type="ASSET",
+            field_name="asset_account_id",
+        )
+        assert_account_belongs_to_company(
+            db,
+            account_id=acquisition_offset_account_id,
+            company_id=company_id,
+            field_name="acquisition_offset_account_id",
+        )
+        try:
+            capitalization = posting_service.post_manual(
+                db,
+                company_id=company_id,
+                document_type_code="CAP",
+                scope=scope,
+                project_id=project_id,
+                currency_code=currency_code,
+                effective_date=acquisition_date,
+                lines=[
+                    posting_service.JournalLineInput(
+                        account_id=asset_account_id,
+                        debit_amount=cost,
+                        description=f"Alta manual activo {name}",
+                        project_id=project_id,
+                        cost_center_id=cost_center_id,
+                    ),
+                    posting_service.JournalLineInput(
+                        account_id=acquisition_offset_account_id,
+                        credit_amount=cost,
+                        description=f"Contrapartida alta manual activo {name}",
+                        project_id=project_id,
+                        cost_center_id=cost_center_id,
+                    ),
+                ],
+                description=f"Alta manual activo {name}",
+                source_type="fixed_asset",
+                source_id=asset.id,
+                commit=False,
+            )
+        except Exception:
+            db.rollback()
+            raise
+        asset.capitalization_account_id = asset_account_id
+        asset.capitalization_document_id = capitalization.id
     if commit:
         db.commit()
         db.refresh(asset)
@@ -186,6 +250,7 @@ def capitalize_supplier_invoice_as_asset(
         cost_center_id=invoice.cost_center_id,
         depreciation_expense_account_id=depreciation_expense_account_id,
         accumulated_depreciation_account_id=accumulated_depreciation_account_id,
+        post_acquisition=False,
         commit=False,
     )
     asset.supplier_invoice_id = invoice.id
@@ -342,6 +407,9 @@ def dispose_asset(
     accumulated_depr = _accumulated_depreciation_total(db, asset_id=asset_id)
     book_value = asset.cost - accumulated_depr
     gain_loss = proceeds - book_value
+    company = db.get(Company, asset.company_id)
+    if company is None:
+        raise InvalidAssetStateError("La compañía del activo no existe")
 
     lines = []
 
@@ -395,10 +463,20 @@ def dispose_asset(
 
     # Gain/Loss plug (Dr if loss, Cr if gain)
     if gain_loss < 0:
-        # Loss: debit the loss account (use depreciation_expense_account as loss proxy)
+        if company.asset_disposal_loss_account_id is None:
+            raise InvalidAssetStateError(
+                "Configura la cuenta de pérdida por disposición de activos antes de la baja"
+            )
+        _assert_account_type(
+            db,
+            account_id=company.asset_disposal_loss_account_id,
+            company_id=asset.company_id,
+            expected_type="EXPENSE",
+            field_name="asset_disposal_loss_account_id",
+        )
         lines.append(
             posting_service.JournalLineInput(
-                account_id=asset.depreciation_expense_account_id,
+                account_id=company.asset_disposal_loss_account_id,
                 debit_amount=abs(gain_loss),
                 description=f"Pérdida por disposición {asset.name}",
                 project_id=asset.project_id,
@@ -406,10 +484,20 @@ def dispose_asset(
             )
         )
     elif gain_loss > 0:
-        # Gain: credit the gain account (use accumulated_depreciation_account as gain proxy)
+        if company.asset_disposal_gain_account_id is None:
+            raise InvalidAssetStateError(
+                "Configura la cuenta de ganancia por disposición de activos antes de la baja"
+            )
+        _assert_account_type(
+            db,
+            account_id=company.asset_disposal_gain_account_id,
+            company_id=asset.company_id,
+            expected_type="REVENUE",
+            field_name="asset_disposal_gain_account_id",
+        )
         lines.append(
             posting_service.JournalLineInput(
-                account_id=asset.accumulated_depreciation_account_id,
+                account_id=company.asset_disposal_gain_account_id,
                 credit_amount=gain_loss,
                 description=f"Ganancia por disposición {asset.name}",
                 project_id=asset.project_id,
@@ -500,35 +588,39 @@ def generate_depreciation_entry(
     )
 
     if post:
-        document = posting_service.post_manual(
-            db,
-            company_id=asset.company_id,
-            document_type_code="DEP",
-            scope=asset.scope,
-            project_id=asset.project_id,
-            currency_code=asset.currency_code,
-            effective_date=period_end,
-            lines=[
-                posting_service.JournalLineInput(
-                    account_id=asset.depreciation_expense_account_id,
-                    debit_amount=amount,
-                    description=f"Depreciación {asset.name} {period_start.isoformat()}",
-                    project_id=asset.project_id,
-                    cost_center_id=asset.cost_center_id,
-                ),
-                posting_service.JournalLineInput(
-                    account_id=asset.accumulated_depreciation_account_id,
-                    credit_amount=amount,
-                    description=f"Depreciación acumulada {asset.name} {period_start.isoformat()}",
-                    project_id=asset.project_id,
-                    cost_center_id=asset.cost_center_id,
-                ),
-            ],
-            source_type="DepreciationEntry",
-            source_id=entry.id,
-            commit=False,
-        )
-        entry.accounting_document_id = document.id
+        try:
+            document = posting_service.post_manual(
+                db,
+                company_id=asset.company_id,
+                document_type_code="DEP",
+                scope=asset.scope,
+                project_id=asset.project_id,
+                currency_code=asset.currency_code,
+                effective_date=period_end,
+                lines=[
+                    posting_service.JournalLineInput(
+                        account_id=asset.depreciation_expense_account_id,
+                        debit_amount=amount,
+                        description=f"Depreciación {asset.name} {period_start.isoformat()}",
+                        project_id=asset.project_id,
+                        cost_center_id=asset.cost_center_id,
+                    ),
+                    posting_service.JournalLineInput(
+                        account_id=asset.accumulated_depreciation_account_id,
+                        credit_amount=amount,
+                        description=f"Depreciación acumulada {asset.name} {period_start.isoformat()}",
+                        project_id=asset.project_id,
+                        cost_center_id=asset.cost_center_id,
+                    ),
+                ],
+                source_type="DepreciationEntry",
+                source_id=entry.id,
+                commit=False,
+            )
+            entry.accounting_document_id = document.id
+        except Exception:
+            db.rollback()
+            raise
 
     if commit:
         db.commit()

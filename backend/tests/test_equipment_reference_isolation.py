@@ -25,6 +25,20 @@ def _create_asset(client, *, company_id: str) -> dict:
         name="Depreciación acumulada equipo",
         account_type="ASSET",
     )
+    asset_acct = create_account(
+        client,
+        company_id=company_id,
+        code="EQ-ASSET",
+        name="Activo fijo equipo",
+        account_type="ASSET",
+    )
+    offset_acct = create_account(
+        client,
+        company_id=company_id,
+        code="EQ-OFFSET",
+        name="Contrapartida alta equipo",
+        account_type="LIABILITY",
+    )
     response = client.post(
         "/api/assets",
         json={
@@ -39,6 +53,8 @@ def _create_asset(client, *, company_id: str) -> dict:
             "scope": "GENERAL",
             "depreciationExpenseAccountId": expense["id"],
             "accumulatedDepreciationAccountId": accumulated["id"],
+            "assetAccountId": asset_acct["id"],
+            "acquisitionOffsetAccountId": offset_acct["id"],
         },
     )
     assert response.status_code == 201, response.text

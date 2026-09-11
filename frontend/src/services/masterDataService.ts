@@ -31,6 +31,11 @@ export interface CompanyProfileInput {
   defaultThemeId?: string
   defaultDensity?: string
   supplierAdvanceAccountId?: string
+  assetDisposalGainAccountId?: string
+  assetDisposalLossAccountId?: string
+  inventoryAccountId?: string
+  inventoryAdjustmentGainAccountId?: string
+  inventoryAdjustmentLossAccountId?: string
 }
 
 export const masterDataService = {

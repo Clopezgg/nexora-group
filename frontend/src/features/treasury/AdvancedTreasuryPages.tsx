@@ -94,18 +94,21 @@ export function BankReconciliationPage() {
   })
 
   const accountNames = new Map((accountsQuery.data ?? []).map((account) => [account.id, account.name]))
+  const accountCurrencies = new Map((accountsQuery.data ?? []).map((account) => [account.id, account.currencyCode]))
+  const statementCurrencies = new Map(statements.map((statement) => [statement.id, accountCurrencies.get(statement.treasuryAccountId)]))
+  const selectedCurrency = statementCurrencies.get(effectiveStatementId)
   const statementColumns: TableColumn<BankStatement>[] = [
     { key: 'date', header: 'Fecha', render: (row) => row.statementDate },
     { key: 'account', header: 'Cuenta', render: (row) => accountNames.get(row.treasuryAccountId) ?? 'Cuenta bancaria' },
-    { key: 'opening', header: 'Inicial', render: (row) => formatMoney(row.openingBalance, 'HNL') },
-    { key: 'closing', header: 'Final', render: (row) => formatMoney(row.closingBalance, 'HNL') },
+    { key: 'opening', header: 'Inicial', render: (row) => formatMoney(row.openingBalance, accountCurrencies.get(row.treasuryAccountId)) },
+    { key: 'closing', header: 'Final', render: (row) => formatMoney(row.closingBalance, accountCurrencies.get(row.treasuryAccountId)) },
     { key: 'ref', header: 'Referencia', render: (row) => row.reference ?? '—' },
     { key: 'actions', header: 'Acciones', render: (row) => <Button variant="secondary" onClick={() => setSelectedStatementId(row.id)}>Abrir</Button> },
   ]
   const lineColumns: TableColumn<BankStatementLine>[] = [
     { key: 'date', header: 'Fecha', render: (row) => row.lineDate },
     { key: 'description', header: 'Descripción', render: (row) => row.description },
-    { key: 'amount', header: 'Monto', render: (row) => formatMoney(row.amount, 'HNL') },
+    { key: 'amount', header: 'Monto', render: (row) => formatMoney(row.amount, selectedCurrency) },
     { key: 'status', header: 'Estado', render: (row) => <Badge>{statusLabel(row.status)}</Badge> },
     {
       key: 'actions',
@@ -136,7 +139,7 @@ export function BankReconciliationPage() {
         ) : null}
         {createStatementOpen && activeCompanyId ? <CreateStatementModal accounts={accountsQuery.data ?? []} onClose={() => setCreateStatementOpen(false)} onCreated={() => queryClient.invalidateQueries({ queryKey: ['treasury', 'bank-statements', activeCompanyId] })} /> : null}
         {addLineOpen && effectiveStatementId ? <AddStatementLineModal statementId={effectiveStatementId} onClose={() => setAddLineOpen(false)} onCreated={() => queryClient.invalidateQueries({ queryKey: ['treasury', 'bank-statement-lines', effectiveStatementId] })} /> : null}
-        {matchLine ? <MatchLineModal line={matchLine} onClose={() => setMatchLine(null)} onMatched={() => queryClient.invalidateQueries({ queryKey: ['treasury', 'bank-statement-lines', effectiveStatementId] })} /> : null}
+        {matchLine ? <MatchLineModal line={matchLine} currencyCode={selectedCurrency} onClose={() => setMatchLine(null)} onMatched={() => queryClient.invalidateQueries({ queryKey: ['treasury', 'bank-statement-lines', effectiveStatementId] })} /> : null}
       </div>
     </CompanyGuard>
   )
@@ -184,7 +187,7 @@ function AddStatementLineModal({ statementId, onClose, onCreated }: { statementI
   </form></Modal>
 }
 
-function MatchLineModal({ line, onClose, onMatched }: { line: BankStatementLine; onClose: () => void; onMatched: () => void }) {
+function MatchLineModal({ line, currencyCode, onClose, onMatched }: { line: BankStatementLine; currencyCode?: string; onClose: () => void; onMatched: () => void }) {
   const handleMutationError = useMutationError()
   const candidatesQuery = useQuery({ queryKey: ['treasury', 'reconciliation-candidates', line.id], queryFn: () => treasuryService.listReconciliationCandidates(line.id) })
   const [candidate, setCandidate] = useState<ReconciliationCandidate | null>(null)
@@ -197,12 +200,12 @@ function MatchLineModal({ line, onClose, onMatched }: { line: BankStatementLine;
   const columns: TableColumn<ReconciliationCandidate>[] = [
     { key: 'document', header: 'Documento', render: (row) => `${row.documentTypeCode} · ${row.documentNumber}` },
     { key: 'description', header: 'Descripción', render: (row) => row.description ?? '—' },
-    { key: 'available', header: 'Disponible', render: (row) => formatMoney(row.availableAmount, 'HNL') },
+    { key: 'available', header: 'Disponible', render: (row) => formatMoney(row.availableAmount, currencyCode) },
     { key: 'exact', header: 'Matching', render: (row) => row.exactMatch ? <Badge tone="success">Exacto</Badge> : <Badge>Parcial</Badge> },
     { key: 'action', header: 'Acción', render: (row) => <Button variant={candidate?.accountingDocumentId === row.accountingDocumentId ? 'primary' : 'secondary'} onClick={() => { setCandidate(row); setAmount(Math.min(Math.abs(line.amount), row.availableAmount)) }}>Seleccionar</Button> },
   ]
   return <Modal open title="Conciliar línea" onClose={onClose}>
-    <p className="nx-field__hint">Línea: {line.description} · {formatMoney(line.amount, 'HNL')}</p>
+    <p className="nx-field__hint">Línea: {line.description} · {formatMoney(line.amount, currencyCode)}</p>
     {candidatesQuery.isLoading ? <LoadingState label="Buscando movimientos compatibles…" /> : candidatesQuery.isError ? <ErrorState description="No se pudieron cargar candidatos." onRetry={() => candidatesQuery.refetch()} /> : <Table columns={columns} rows={candidatesQuery.data ?? []} getRowKey={(row) => row.accountingDocumentId} emptyMessage="No hay movimientos contables compatibles disponibles." />}
     {candidate ? <div className="nx-treasury__form"><MoneyInput label="Monto a conciliar" value={amount} onChange={setAmount} /><Button loading={match.isPending} disabled={!amount || amount <= 0 || amount > Math.abs(line.amount) || amount > candidate.availableAmount} onClick={() => match.mutate()}>Confirmar match</Button></div> : null}
   </Modal>
@@ -219,12 +222,13 @@ export function CashClosingsPage() {
   const closingsQuery = useQuery({ queryKey: ['treasury', 'cash-closings', activeCompanyId], queryFn: () => treasuryService.listCashClosings(activeCompanyId as string), enabled: Boolean(activeCompanyId) })
   const glAccountsQuery = useQuery({ queryKey: ['master-data', 'accounts', activeCompanyId], queryFn: () => masterDataService.listAccounts(activeCompanyId as string), enabled: Boolean(activeCompanyId) })
   const accountNames = new Map((accountsQuery.data ?? []).map((account) => [account.id, account.name]))
+  const accountCurrencies = new Map((accountsQuery.data ?? []).map((account) => [account.id, account.currencyCode]))
   const columns: TableColumn<CashClosing>[] = [
     { key: 'date', header: 'Fecha', render: (row) => row.closingDate },
     { key: 'account', header: 'Cuenta', render: (row) => accountNames.get(row.treasuryAccountId) ?? 'Caja' },
-    { key: 'expected', header: 'Saldo sistema', render: (row) => formatMoney(row.expectedAmount, 'HNL') },
-    { key: 'counted', header: 'Saldo contado', render: (row) => formatMoney(row.countedAmount, 'HNL') },
-    { key: 'difference', header: 'Diferencia', render: (row) => formatMoney(row.differenceAmount, 'HNL') },
+    { key: 'expected', header: 'Saldo sistema', render: (row) => formatMoney(row.expectedAmount, accountCurrencies.get(row.treasuryAccountId)) },
+    { key: 'counted', header: 'Saldo contado', render: (row) => formatMoney(row.countedAmount, accountCurrencies.get(row.treasuryAccountId)) },
+    { key: 'difference', header: 'Diferencia', render: (row) => formatMoney(row.differenceAmount, accountCurrencies.get(row.treasuryAccountId)) },
     { key: 'status', header: 'Estado', render: (row) => <Badge>{statusLabel(row.status)}</Badge> },
     { key: 'actions', header: 'Acciones', render: (row) => row.status === 'DRAFT' ? <Button onClick={() => setApproveClosing(row)}>Aprobar</Button> : <span className="nx-field__hint">Aprobado</span> },
   ]
@@ -234,7 +238,7 @@ export function CashClosingsPage() {
     <Card title="Operación"><Button onClick={() => setCreateOpen(true)}>Nuevo cierre</Button></Card>
     {closingsQuery.isLoading ? <LoadingState label="Cargando cierres…" /> : closingsQuery.isError ? <ErrorState description="No se pudieron cargar los cierres." onRetry={() => closingsQuery.refetch()} /> : <Table columns={columns} rows={closingsQuery.data ?? []} getRowKey={(row) => row.id} emptyMessage="Todavía no hay cierres de caja." />}
     {createOpen ? <CreateCashClosingModal accounts={(accountsQuery.data ?? []).filter((account) => account.status === 'ACTIVE')} onClose={() => setCreateOpen(false)} onCreated={() => queryClient.invalidateQueries({ queryKey: ['treasury', 'cash-closings', activeCompanyId] })} /> : null}
-    {approveClosing ? <ApproveCashClosingModal closing={approveClosing} differenceAccounts={(glAccountsQuery.data ?? []).filter((account) => account.isPostable)} onClose={() => setApproveClosing(null)} onApproved={() => queryClient.invalidateQueries({ queryKey: ['treasury', 'cash-closings', activeCompanyId] })} onError={handleMutationError} /> : null}
+    {approveClosing ? <ApproveCashClosingModal closing={approveClosing} currencyCode={accountCurrencies.get(approveClosing.treasuryAccountId)} differenceAccounts={(glAccountsQuery.data ?? []).filter((account) => account.isPostable)} onClose={() => setApproveClosing(null)} onApproved={() => queryClient.invalidateQueries({ queryKey: ['treasury', 'cash-closings', activeCompanyId] })} onError={handleMutationError} /> : null}
   </div></CompanyGuard>
 }
 
@@ -255,14 +259,14 @@ function CreateCashClosingModal({ accounts, onClose, onCreated }: { accounts: Aw
     <Select label="Cuenta de caja" value={treasuryAccountId} onChange={(event) => setTreasuryAccountId(event.target.value)}>{cashAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</Select>
     <Input label="Fecha" type="date" value={closingDate} onChange={(event) => setClosingDate(event.target.value)} />
     <MoneyInput label="Saldo de apertura" value={openingAmount} onChange={setOpeningAmount} />
-    <p className="nx-field__hint">Saldo sistema actual: {formatMoney(selected?.balance ?? 0, selected?.currencyCode ?? 'HNL')}</p>
+    <p className="nx-field__hint">Saldo sistema actual: {formatMoney(selected?.balance ?? 0, selected?.currencyCode)}</p>
     <MoneyInput label="Saldo contado" value={countedAmount} onChange={setCountedAmount} />
     {cashAccounts.length === 0 ? <p className="nx-field__error">No hay cuentas CASH activas.</p> : null}
     <Button type="submit" loading={create.isPending} disabled={!treasuryAccountId || !closingDate || countedAmount === null || countedAmount < 0 || (openingAmount ?? 0) < 0}>Registrar cierre</Button>
   </form></Modal>
 }
 
-function ApproveCashClosingModal({ closing, differenceAccounts, onClose, onApproved, onError }: { closing: CashClosing; differenceAccounts: { id: string; name: string }[]; onClose: () => void; onApproved: () => void; onError: ReturnType<typeof useMutationError> }) {
+function ApproveCashClosingModal({ closing, currencyCode, differenceAccounts, onClose, onApproved, onError }: { closing: CashClosing; currencyCode?: string; differenceAccounts: { id: string; name: string }[]; onClose: () => void; onApproved: () => void; onError: ReturnType<typeof useMutationError> }) {
   const [differenceAccountId, setDifferenceAccountId] = useState('')
   const approve = useMutation({
     mutationFn: () => treasuryService.approveCashClosing(closing.id, differenceAccountId || undefined),
@@ -271,7 +275,7 @@ function ApproveCashClosingModal({ closing, differenceAccounts, onClose, onAppro
   })
   const requiresAccount = closing.differenceAmount !== 0
   return <Modal open title="Aprobar cierre de caja" onClose={onClose}><div className="nx-treasury__form">
-    <p>Diferencia: <strong>{formatMoney(closing.differenceAmount, 'HNL')}</strong></p>
+    <p>Diferencia: <strong>{formatMoney(closing.differenceAmount, currencyCode)}</strong></p>
     {requiresAccount ? <Select label="Cuenta contable para diferencia" value={differenceAccountId} onChange={(event) => setDifferenceAccountId(event.target.value)}><option value="">Selecciona cuenta postable…</option>{differenceAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</Select> : <p className="nx-field__hint">Sin diferencia: no se generará ajuste contable.</p>}
     <Button loading={approve.isPending} disabled={requiresAccount && !differenceAccountId} onClick={() => approve.mutate()}>Aprobar cierre</Button>
   </div></Modal>
@@ -292,6 +296,8 @@ export function FundRestrictionsPage() {
   const availabilityQuery = useQuery({ queryKey: ['treasury', 'availability', effectiveAccountId], queryFn: () => treasuryService.getAvailability(effectiveAccountId), enabled: Boolean(effectiveAccountId) })
   const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : []
   const accountNames = new Map(accounts.map((account) => [account.id, account.name]))
+  const accountCurrencies = new Map(accounts.map((account) => [account.id, account.currencyCode]))
+  const selectedCurrency = accountCurrencies.get(effectiveAccountId)
   const projectNames = new Map(projects.map((project) => [project.id, `${project.code ? `${project.code} — ` : ''}${project.name}`]))
   const release = useMutation({
     mutationFn: (restrictionId: string) => treasuryService.releaseFundRestriction(restrictionId),
@@ -304,7 +310,7 @@ export function FundRestrictionsPage() {
   })
   const columns: TableColumn<FundRestriction>[] = [
     { key: 'account', header: 'Cuenta', render: (row) => accountNames.get(row.treasuryAccountId) ?? 'Tesorería' },
-    { key: 'amount', header: 'Importe', render: (row) => formatMoney(row.amount, 'HNL') },
+    { key: 'amount', header: 'Importe', render: (row) => formatMoney(row.amount, accountCurrencies.get(row.treasuryAccountId)) },
     { key: 'project', header: 'Reservado para', render: (row) => row.restrictedForProjectId ? projectNames.get(row.restrictedForProjectId) ?? 'Proyecto' : 'Uso restringido general' },
     { key: 'reason', header: 'Motivo', render: (row) => row.description },
     { key: 'status', header: 'Estado', render: (row) => <Badge tone={row.active ? 'warning' : 'neutral'}>{row.active ? 'Activa' : 'Liberada'}</Badge> },
@@ -316,7 +322,7 @@ export function FundRestrictionsPage() {
     <CompanyHeader title="Restricciones de fondos" description="Reserva efectivo sin transferir su propiedad al proyecto y muestra el saldo realmente disponible para nuevas salidas." />
     <Card title="Disponibilidad">
       <Select label="Cuenta de Tesorería" value={effectiveAccountId} onChange={(event) => setSelectedAccountId(event.target.value)}>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</Select>
-      {availabilityQuery.isLoading ? <LoadingState label="Calculando disponibilidad…" /> : availability ? <div className="nx-dashboard__kpi-grid"><Card title="Saldo contable"><strong>{formatMoney(availability.balance, 'HNL')}</strong></Card><Card title="Restringido"><strong>{formatMoney(availability.reservedAmount, 'HNL')}</strong></Card><Card title="Disponible"><strong>{formatMoney(availability.availableAmount, 'HNL')}</strong></Card></div> : null}
+      {availabilityQuery.isLoading ? <LoadingState label="Calculando disponibilidad…" /> : availability ? <div className="nx-dashboard__kpi-grid"><Card title="Saldo contable"><strong>{formatMoney(availability.balance, selectedCurrency)}</strong></Card><Card title="Restringido"><strong>{formatMoney(availability.reservedAmount, selectedCurrency)}</strong></Card><Card title="Disponible"><strong>{formatMoney(availability.availableAmount, selectedCurrency)}</strong></Card></div> : null}
       <Button onClick={() => setCreateOpen(true)} disabled={accounts.length === 0}>Nueva restricción</Button>
     </Card>
     {restrictionsQuery.isLoading ? <LoadingState label="Cargando restricciones…" /> : restrictionsQuery.isError ? <ErrorState description="No se pudieron cargar las restricciones." onRetry={() => restrictionsQuery.refetch()} /> : <Table columns={columns} rows={restrictionsQuery.data ?? []} getRowKey={(row) => row.id} emptyMessage="No hay restricciones de fondos activas o históricas." />}

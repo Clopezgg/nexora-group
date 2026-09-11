@@ -1,6 +1,8 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
+
+from pydantic import Field, model_validator
 
 from app.schemas.base import CamelModel
 
@@ -111,6 +113,7 @@ class PurchaseOrderCreateRequest(CamelModel):
     project_id: uuid.UUID | None = None
     supplier_contract_id: uuid.UUID | None = None
     currency_code: str
+    fulfillment_type: str = "GOODS"
     lines: list[PurchaseOrderLineRequest]
 
 
@@ -139,6 +142,7 @@ class PurchaseOrderResponse(CamelModel):
     supplier_quotation_id: uuid.UUID | None
     supplier_contract_id: uuid.UUID | None = None
     currency_code: str
+    fulfillment_type: str
     status: str
     lines: list[PurchaseOrderLineResponse] = []
 
@@ -168,22 +172,32 @@ class ServiceEntryCreateRequest(CamelModel):
     purchase_order_id: uuid.UUID
     period_start: date
     period_end: date
-    progress_percentage: Decimal
-    accepted_value: Decimal
+    progress_percentage: Decimal = Field(gt=0, le=100)
+    accepted_value: Decimal = Field(gt=0)
+    evidence_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def validate_period(self):
+        if self.period_start > self.period_end:
+            raise ValueError("El inicio del período no puede ser posterior al fin")
+        return self
 
 
 class ServiceEntryResponse(CamelModel):
     id: uuid.UUID
     entry_number: str
     purchase_order_id: uuid.UUID
+    period_start: date
+    period_end: date
     progress_percentage: Decimal
     accepted_value: Decimal
+    approved_by_id: uuid.UUID
+    evidence_id: uuid.UUID | None = None
 
 
 class ThreeWayMatchRequest(CamelModel):
     purchase_order_id: uuid.UUID
-    supplier_invoice_id: uuid.UUID | None = None
-    supplier_invoice_amount: Decimal
+    supplier_invoice_id: uuid.UUID
     supplier_invoice_quantity: Decimal
     quantity_tolerance_pct: Decimal = Decimal("0")
     amount_tolerance_pct: Decimal = Decimal("0")
@@ -192,7 +206,22 @@ class ThreeWayMatchRequest(CamelModel):
 class ThreeWayMatchResponse(CamelModel):
     id: uuid.UUID
     purchase_order_id: uuid.UUID
+    supplier_invoice_id: uuid.UUID
+    supplier_invoice_amount: Decimal
+    supplier_invoice_quantity: Decimal
+    match_kind: str
     status: str
     ordered_amount: Decimal
     received_quantity: Decimal
+    receipt_basis: str
+    accepted_amount: Decimal
     exceptions: list = []
+    override_reason: str | None = None
+    overridden_by_user_id: uuid.UUID | None = None
+    overridden_at: datetime | None = None
+    override_evidence_id: uuid.UUID | None = None
+
+
+class ThreeWayMatchOverrideRequest(CamelModel):
+    reason: str
+    evidence_id: uuid.UUID | None = None

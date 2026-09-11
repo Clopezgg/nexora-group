@@ -51,6 +51,15 @@ function setSelectedCompanyId(value: string | null) {
   listeners.forEach((listener) => listener())
 }
 
+export function resolveActiveCompanyId(
+  selectedId: string | null,
+  companies: ReadonlyArray<{ id: string }>,
+): string | null {
+  if (selectedId && companies.some((company) => company.id === selectedId)) return selectedId
+  const [onlyCompany] = companies
+  return companies.length === 1 ? onlyCompany.id : null
+}
+
 /**
  * Selección global de compañía. Todos los consumidores comparten el mismo
  * TanStack Query cache y el mismo ID seleccionado, evitando que cada página
@@ -66,8 +75,7 @@ export function useActiveCompany() {
     () => (Array.isArray(companiesQuery.data) ? companiesQuery.data : []),
     [companiesQuery.data],
   )
-  const selectedExists = selectedId ? companies.some((company) => company.id === selectedId) : false
-  const activeCompanyId = selectedExists ? selectedId : companies[0]?.id ?? null
+  const activeCompanyId = resolveActiveCompanyId(selectedId, companies)
   const activeCompany = companies.find((company) => company.id === activeCompanyId) ?? null
 
   return {

@@ -91,6 +91,21 @@ def test_sensitive_business_commands_are_protected_across_modules():
     assert not _requires_protected_edit("POST", "/api/module")
 
 
+def test_financial_and_inventory_collection_commands_fail_closed():
+    """Collection-shaped URLs can still move cash, stock, or governed values."""
+    for path in (
+        "/api/treasury/remittances",
+        "/api/treasury/general-expenses",
+        "/api/treasury/cash-closings",
+        "/api/procurement/goods-receipts",
+        "/api/procurement/service-entries",
+        "/api/procurement/three-way-match",
+        "/api/assets/from-supplier-invoice/8c7f2d1d-7eca-4acd-a257-34e54a010001",
+        "/api/assets/bulk-depreciate",
+    ):
+        assert _requires_protected_edit("POST", path), path
+
+
 def test_edit_pin_verifies_only_against_the_configured_digest():
     """El PIN se compara SOLO contra el digest PBKDF2 configurado. Acepta
     tanto un PIN corto (p.ej. 6 dígitos) como un secreto largo."""

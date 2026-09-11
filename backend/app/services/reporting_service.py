@@ -555,7 +555,10 @@ def supplier_performance(db: Session, *, company_id: uuid.UUID) -> list[Supplier
         )
 
         match_statuses = db.execute(
-            select(ThreeWayMatchResult.status).where(ThreeWayMatchResult.purchase_order_id.in_(order_ids))
+            select(ThreeWayMatchResult.status).where(
+                ThreeWayMatchResult.purchase_order_id.in_(order_ids),
+                ThreeWayMatchResult.match_kind == "FINANCIAL",
+            )
         ).scalars().all()
         match_sample = len(match_statuses)
         match_clean_rate = (

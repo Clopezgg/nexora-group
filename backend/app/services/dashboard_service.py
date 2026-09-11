@@ -12,6 +12,7 @@ from app.models.ap import SupplierInvoice
 from app.models.approval_request import ApprovalRequest
 from app.models.ar import CustomerInvoice
 from app.models.chart_of_accounts import Account
+from app.models.company import Company
 from app.models.project import Project
 from app.models.treasury import TreasuryAccount
 from app.schemas.dashboard import CashFlowPointResponse, DashboardSummaryResponse, ScopeAmountResponse
@@ -72,6 +73,12 @@ def get_summary(
     today = datetime.now(BUSINESS_TZ).date()
     month_start = date(today.year, today.month, 1)
     month_starts = _month_starts(today)
+
+    currency_code = "HNL"
+    if company_id is not None:
+        company = db.get(Company, company_id)
+        if company is not None and company.functional_currency_code:
+            currency_code = company.functional_currency_code
 
     fiscal_year = None
     fiscal_period = None
@@ -149,7 +156,7 @@ def get_summary(
             .join(TreasuryAccount, TreasuryAccount.gl_account_id == JournalLine.account_id)
             .where(
                 AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
-                TreasuryAccount.currency_code == "HNL",
+                TreasuryAccount.currency_code == currency_code,
             )
         )
         balance_stmt = _apply_company_scope(balance_stmt, TreasuryAccount.company_id, company_ids)
@@ -185,7 +192,7 @@ def get_summary(
             .join(Account, Account.id == JournalLine.account_id)
             .where(
                 AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
-                AccountingDocument.currency_code == "HNL",
+                AccountingDocument.currency_code == currency_code,
                 econ_date >= metric_start,
                 econ_date <= metric_end,
                 Account.account_type.in_(("REVENUE", "EXPENSE")),
@@ -224,7 +231,7 @@ def get_summary(
             .join(Account, Account.id == JournalLine.account_id)
             .where(
                 AccountingDocument.status.in_(LEDGER_EFFECTIVE_STATUSES),
-                AccountingDocument.currency_code == "HNL",
+                AccountingDocument.currency_code == currency_code,
                 econ_date >= month_starts[0],
                 Account.account_type.in_(("REVENUE", "EXPENSE")),
             )
@@ -262,7 +269,7 @@ def get_summary(
                 0,
             ),
         ).where(
-            SupplierInvoice.currency_code == "HNL",
+            SupplierInvoice.currency_code == currency_code,
             SupplierInvoice.due_date < today,
             SupplierInvoice.status.in_(("REVIEW", "APPROVED", "SCHEDULED", "PARTIALLY_PAID")),
         )
@@ -280,7 +287,7 @@ def get_summary(
         receivable_stmt = select(
             func.coalesce(func.sum(CustomerInvoice.amount - CustomerInvoice.amount_collected), 0)
         ).where(
-            CustomerInvoice.currency_code == "HNL",
+            CustomerInvoice.currency_code == currency_code,
             CustomerInvoice.status.in_(("APPROVED", "PARTIALLY_COLLECTED")),
         )
         receivable_stmt = _apply_company_scope(receivable_stmt, CustomerInvoice.company_id, company_ids)
@@ -329,4 +336,5 @@ def get_summary(
         fiscal_period_status=fiscal_period.status if fiscal_period else None,
         fiscal_period_start=fiscal_period.start_date if fiscal_period else None,
         fiscal_period_end=fiscal_period.end_date if fiscal_period else None,
+        currency=currency_code,
     )

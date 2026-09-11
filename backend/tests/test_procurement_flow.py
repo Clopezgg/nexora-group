@@ -34,13 +34,16 @@ def _create_supplier(client, *, company_id: str) -> dict:
     return response.json()
 
 
-def _create_po(client, *, company_id: str, supplier_id: str, item_id: str) -> dict:
+def _create_po(
+    client, *, company_id: str, supplier_id: str, item_id: str, fulfillment_type: str = "GOODS"
+) -> dict:
     response = client.post(
         "/api/procurement/purchase-orders",
         json={
             "companyId": company_id,
             "supplierId": supplier_id,
             "currencyCode": "HNL",
+            "fulfillmentType": fulfillment_type,
             "lines": [
                 {"itemId": item_id, "description": "Cemento tipo I", "quantity": "100.0000", "unitPrice": "10.0000"}
             ],
@@ -51,6 +54,37 @@ def _create_po(client, *, company_id: str, supplier_id: str, item_id: str) -> di
     client.post(f"/api/procurement/purchase-orders/{order['id']}/approve")
     sent = client.post(f"/api/procurement/purchase-orders/{order['id']}/send")
     return sent.json()
+
+
+def _create_po_invoice(
+    client,
+    *,
+    company_id: str,
+    supplier_id: str,
+    po_id: str,
+    expense_account_id: str,
+    payable_account_id: str,
+    invoice_number: str,
+    amount: str,
+) -> dict:
+    response = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company_id,
+            "supplierId": supplier_id,
+            "invoiceNumber": invoice_number,
+            "scope": "GENERAL",
+            "expenseAccountId": expense_account_id,
+            "payableAccountId": payable_account_id,
+            "currencyCode": "HNL",
+            "amount": amount,
+            "invoiceDate": "2026-08-24",
+            "dueDate": "2026-09-24",
+            "purchaseOrderId": po_id,
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
 
 
 def test_requisition_to_purchase_order_end_to_end(client):
@@ -188,6 +222,8 @@ def test_three_way_match_matched_and_exception(client):
     warehouse = _create_warehouse(client, company_id=company["id"])
     po = _create_po(client, company_id=company["id"], supplier_id=supplier["id"], item_id=item["id"])
     po_line_id = po["lines"][0]["id"]
+    expense = create_account(client, company_id=company["id"], code="5200", name="Compras", account_type="EXPENSE")
+    payable = create_account(client, company_id=company["id"], code="2100", name="Proveedores", account_type="LIABILITY")
 
     client.post(
         "/api/procurement/goods-receipts",
@@ -199,22 +235,42 @@ def test_three_way_match_matched_and_exception(client):
         },
     )
 
+    matched_invoice = _create_po_invoice(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        po_id=po["id"],
+        expense_account_id=expense["id"],
+        payable_account_id=payable["id"],
+        invoice_number="TWM-MATCHED",
+        amount="1000.00",
+    )
     matched = client.post(
         "/api/procurement/three-way-match",
         json={
             "purchaseOrderId": po["id"],
-            "supplierInvoiceAmount": "1000.00",
+            "supplierInvoiceId": matched_invoice["id"],
             "supplierInvoiceQuantity": "100.0000",
         },
     ).json()
     assert matched["status"] == "MATCHED"
     assert matched["exceptions"] == []
 
+    exception_invoice = _create_po_invoice(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        po_id=po["id"],
+        expense_account_id=expense["id"],
+        payable_account_id=payable["id"],
+        invoice_number="TWM-EXCEPTION",
+        amount="1500.00",
+    )
     exception = client.post(
         "/api/procurement/three-way-match",
         json={
             "purchaseOrderId": po["id"],
-            "supplierInvoiceAmount": "1500.00",
+            "supplierInvoiceId": exception_invoice["id"],
             "supplierInvoiceQuantity": "100.0000",
         },
     ).json()
@@ -228,7 +284,9 @@ def test_service_entry_records_progress(client):
     company = create_company(client)
     supplier = _create_supplier(client, company_id=company["id"])
     item = _create_item(client, company_id=company["id"])
-    po = _create_po(client, company_id=company["id"], supplier_id=supplier["id"], item_id=item["id"])
+    po = _create_po(
+        client, company_id=company["id"], supplier_id=supplier["id"], item_id=item["id"], fulfillment_type="SERVICE"
+    )
 
     entry = client.post(
         "/api/procurement/service-entries",
@@ -242,6 +300,154 @@ def test_service_entry_records_progress(client):
     )
     assert entry.status_code == 201, entry.text
     assert entry.json()["entryNumber"].startswith("SEN-")
+
+
+def test_purchase_order_fulfillment_mode_prevents_mixed_goods_and_service_receipts(client):
+    login_admin(client)
+    company = create_company(client, name="Fulfillment Mode")
+    supplier = _create_supplier(client, company_id=company["id"])
+    item = _create_item(client, company_id=company["id"], sku="MODE-001")
+    warehouse = _create_warehouse(client, company_id=company["id"], code="MODE-WH")
+    goods_po = _create_po(
+        client, company_id=company["id"], supplier_id=supplier["id"], item_id=item["id"]
+    )
+    service_on_goods = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": goods_po["id"],
+            "periodStart": "2026-08-01",
+            "periodEnd": "2026-08-31",
+            "progressPercentage": "10",
+            "acceptedValue": "100",
+        },
+    )
+    assert service_on_goods.status_code == 422, service_on_goods.text
+
+    service_po = _create_po(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        item_id=item["id"],
+        fulfillment_type="SERVICE",
+    )
+    goods_on_service = client.post(
+        "/api/procurement/goods-receipts",
+        json={
+            "purchaseOrderId": service_po["id"],
+            "warehouseId": warehouse["id"],
+            "receivedAt": "2026-08-31",
+            "lines": [{
+                "purchaseOrderLineId": service_po["lines"][0]["id"],
+                "quantityReceived": "1",
+            }],
+        },
+    )
+    assert goods_on_service.status_code == 422, goods_on_service.text
+
+
+def test_service_entry_rejects_invalid_period_overlap_and_accumulated_excess(client):
+    login_admin(client)
+    company = create_company(client, name="Service Entry Limits")
+    supplier = _create_supplier(client, company_id=company["id"])
+    item = _create_item(client, company_id=company["id"], sku="SERV-001")
+    po = _create_po(
+        client, company_id=company["id"], supplier_id=supplier["id"], item_id=item["id"], fulfillment_type="SERVICE"
+    )
+
+    invalid_period = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": po["id"],
+            "periodStart": "2026-08-31",
+            "periodEnd": "2026-08-01",
+            "progressPercentage": "10.00",
+            "acceptedValue": "100.00",
+        },
+    )
+    assert invalid_period.status_code == 422, invalid_period.text
+
+    first = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": po["id"],
+            "periodStart": "2026-08-01",
+            "periodEnd": "2026-08-15",
+            "progressPercentage": "60.00",
+            "acceptedValue": "600.00",
+        },
+    )
+    assert first.status_code == 201, first.text
+
+    overlap = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": po["id"],
+            "periodStart": "2026-08-10",
+            "periodEnd": "2026-08-20",
+            "progressPercentage": "10.00",
+            "acceptedValue": "100.00",
+        },
+    )
+    assert overlap.status_code == 422, overlap.text
+
+    excess = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": po["id"],
+            "periodStart": "2026-08-16",
+            "periodEnd": "2026-08-31",
+            "progressPercentage": "50.00",
+            "acceptedValue": "500.00",
+        },
+    )
+    assert excess.status_code == 422, excess.text
+
+
+def test_three_way_match_uses_accepted_service_value(client):
+    login_admin(client)
+    company = create_company(client, name="Service Entry Match")
+    supplier = _create_supplier(client, company_id=company["id"])
+    item = _create_item(client, company_id=company["id"], sku="SERV-002")
+    po = _create_po(
+        client, company_id=company["id"], supplier_id=supplier["id"], item_id=item["id"], fulfillment_type="SERVICE"
+    )
+    expense = create_account(client, company_id=company["id"], code="5201", name="Servicios", account_type="EXPENSE")
+    payable = create_account(client, company_id=company["id"], code="2101", name="Proveedores", account_type="LIABILITY")
+    entry = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": po["id"],
+            "periodStart": "2026-08-01",
+            "periodEnd": "2026-08-31",
+            "progressPercentage": "35.00",
+            "acceptedValue": "350.00",
+        },
+    )
+    assert entry.status_code == 201, entry.text
+    invoice = _create_po_invoice(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        po_id=po["id"],
+        expense_account_id=expense["id"],
+        payable_account_id=payable["id"],
+        invoice_number="SERVICE-MATCH",
+        amount="350.00",
+    )
+
+    response = client.post(
+        "/api/procurement/three-way-match",
+        json={
+            "purchaseOrderId": po["id"],
+            "supplierInvoiceId": invoice["id"],
+            "supplierInvoiceQuantity": "0.0000",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["status"] == "MATCHED"
+    assert response.json()["receiptBasis"] == "SERVICE_ENTRY"
+    assert response.json()["acceptedAmount"] == "350.00"
 
 
 def test_approving_purchase_order_creates_audit_log_entry(client, db_session):
@@ -535,3 +741,91 @@ def test_goods_receipt_creation_on_unknown_po_returns_404_not_500(client):
         },
     )
     assert response.status_code == 404, response.text
+
+
+def test_procurement_rejects_cross_company_supplier_item_and_requisition_references(client):
+    login_admin(client)
+    company_a = create_company(client, name="Procurement References A")
+    company_b = create_company(client, name="Procurement References B")
+    supplier_b = _create_supplier(client, company_id=company_b["id"])
+    item_b = _create_item(client, company_id=company_b["id"], sku="OTHER-ITEM")
+
+    wrong_supplier = client.post(
+        "/api/procurement/purchase-orders",
+        json={
+            "companyId": company_a["id"],
+            "supplierId": supplier_b["id"],
+            "currencyCode": "HNL",
+            "lines": [{"description": "Material", "quantity": "1", "unitPrice": "10"}],
+        },
+    )
+    assert wrong_supplier.status_code == 422, wrong_supplier.text
+
+    supplier_a = _create_supplier(client, company_id=company_a["id"])
+    wrong_item = client.post(
+        "/api/procurement/purchase-orders",
+        json={
+            "companyId": company_a["id"],
+            "supplierId": supplier_a["id"],
+            "currencyCode": "HNL",
+            "lines": [{"itemId": item_b["id"], "description": "Material", "quantity": "1", "unitPrice": "10"}],
+        },
+    )
+    assert wrong_item.status_code == 422, wrong_item.text
+
+    requisition_b = client.post(
+        "/api/procurement/requisitions",
+        json={"companyId": company_b["id"], "lines": [{"description": "Material", "quantity": "1"}]},
+    ).json()
+    wrong_requisition = client.post(
+        "/api/procurement/rfqs",
+        json={
+            "companyId": company_a["id"],
+            "purchaseRequisitionId": requisition_b["id"],
+            "supplierIds": [supplier_a["id"]],
+        },
+    )
+    assert wrong_requisition.status_code == 422, wrong_requisition.text
+
+
+def test_rfq_rejects_uninvited_quotation_and_quotation_cannot_create_two_orders(client):
+    login_admin(client)
+    company = create_company(client, name="RFQ Invitation Guard")
+    invited = _create_supplier(client, company_id=company["id"])
+    uninvited = client.post(
+        "/api/procurement/suppliers",
+        json={"companyId": company["id"], "legalName": "Proveedor no invitado"},
+    ).json()
+    rfq = client.post(
+        "/api/procurement/rfqs",
+        json={"companyId": company["id"], "supplierIds": [invited["id"]]},
+    ).json()
+
+    rejected = client.post(
+        f"/api/procurement/rfqs/{rfq['id']}/quotations",
+        json={
+            "supplierId": uninvited["id"],
+            "currencyCode": "HNL",
+            "lines": [{"description": "Material", "quantity": "1", "unitPrice": "10"}],
+        },
+    )
+    assert rejected.status_code == 422, rejected.text
+
+    quotation = client.post(
+        f"/api/procurement/rfqs/{rfq['id']}/quotations",
+        json={
+            "supplierId": invited["id"],
+            "currencyCode": "HNL",
+            "lines": [{"description": "Material", "quantity": "1", "unitPrice": "10"}],
+        },
+    ).json()
+    first = client.post(
+        "/api/procurement/purchase-orders/from-quotation",
+        json={"companyId": company["id"], "supplierQuotationId": quotation["id"]},
+    )
+    assert first.status_code == 201, first.text
+    duplicate = client.post(
+        "/api/procurement/purchase-orders/from-quotation",
+        json={"companyId": company["id"], "supplierQuotationId": quotation["id"]},
+    )
+    assert duplicate.status_code in {409, 422}, duplicate.text

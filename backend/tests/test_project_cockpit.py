@@ -80,3 +80,27 @@ def test_project_cockpit_without_budget_or_progress_is_fail_closed(client):
     assert body["earnedValue"] is None
     assert body["estimateAtCompletion"] is None
     assert body["projectedMargin"] is None
+
+
+def test_project_financial_views_use_company_currency_when_legacy_project_has_none(
+    client, db_session
+):
+    from app.models.project import Project
+
+    login_admin(client)
+    company = create_company(client, name="Cockpit USD", currency="USD")
+    project = client.post(
+        "/api/projects",
+        json={"companyId": company["id"], "name": "USD Project", "code": "USD-001"},
+    )
+    assert project.status_code == 201, project.text
+    persisted = db_session.get(Project, project.json()["id"])
+    assert persisted is not None and persisted.currency_code is None
+
+    cockpit = client.get(f"/api/projects/{project.json()['id']}/financial-cockpit")
+    summary = client.get(f"/api/projects/{project.json()['id']}/financial-summary")
+
+    assert cockpit.status_code == 200, cockpit.text
+    assert summary.status_code == 200, summary.text
+    assert cockpit.json()["currencyCode"] == "USD"
+    assert summary.json()["currencyCode"] == "USD"

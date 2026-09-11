@@ -17,6 +17,7 @@ from app.models.accounting import AccountingDocument
 from app.models.approval_request import ApprovalRequest
 from app.models.ap import SupplierInvoice
 from app.models.ar import CustomerInvoice
+from app.models.company import Company
 from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.models.treasury import TreasuryAccount
 from app.services import treasury_service
@@ -93,6 +94,10 @@ def _ar_open_totals(db: Session, company_id, as_of: date) -> tuple[Decimal, Deci
 def daily_status(db: Session, *, company_id, as_of: date | None = None) -> DailyStatus:
     as_of = as_of or business_today()
 
+    company = db.get(Company, company_id)
+    if company is None or not company.functional_currency_code:
+        raise ValueError("La compañía no tiene moneda funcional configurada")
+
     accounts = db.execute(
         select(TreasuryAccount).where(TreasuryAccount.company_id == company_id)
     ).scalars().all()
@@ -100,7 +105,7 @@ def daily_status(db: Session, *, company_id, as_of: date | None = None) -> Daily
         (treasury_service.treasury_account_balance(db, account) for account in accounts),
         Decimal("0"),
     )
-    currency = accounts[0].currency_code if accounts else "HNL"
+    currency = company.functional_currency_code
 
     postings_today = db.execute(
         select(func.count(AccountingDocument.id))

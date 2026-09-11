@@ -52,6 +52,11 @@ function CompanyProfileForm({ company }: { company: Company }) {
     website: company.website ?? '',
     voucherFooterText: company.voucherFooterText ?? '',
     supplierAdvanceAccountId: company.supplierAdvanceAccountId ?? '',
+    assetDisposalGainAccountId: company.assetDisposalGainAccountId ?? '',
+    assetDisposalLossAccountId: company.assetDisposalLossAccountId ?? '',
+    inventoryAccountId: company.inventoryAccountId ?? '',
+    inventoryAdjustmentGainAccountId: company.inventoryAdjustmentGainAccountId ?? '',
+    inventoryAdjustmentLossAccountId: company.inventoryAdjustmentLossAccountId ?? '',
   })
 
   const updateMutation = useMutation({
@@ -74,6 +79,11 @@ function CompanyProfileForm({ company }: { company: Company }) {
       website: form.website || undefined,
       voucherFooterText: form.voucherFooterText || undefined,
       supplierAdvanceAccountId: form.supplierAdvanceAccountId || undefined,
+      assetDisposalGainAccountId: form.assetDisposalGainAccountId || undefined,
+      assetDisposalLossAccountId: form.assetDisposalLossAccountId || undefined,
+      inventoryAccountId: form.inventoryAccountId || undefined,
+      inventoryAdjustmentGainAccountId: form.inventoryAdjustmentGainAccountId || undefined,
+      inventoryAdjustmentLossAccountId: form.inventoryAdjustmentLossAccountId || undefined,
     }),
     onSuccess: (updatedCompany: Company) => {
       queryClient.invalidateQueries({ queryKey: ['master-data', 'companies'] })
@@ -96,6 +106,11 @@ function CompanyProfileForm({ company }: { company: Company }) {
         website: updatedCompany.website ?? '',
         voucherFooterText: updatedCompany.voucherFooterText ?? '',
         supplierAdvanceAccountId: updatedCompany.supplierAdvanceAccountId ?? '',
+        assetDisposalGainAccountId: updatedCompany.assetDisposalGainAccountId ?? '',
+        assetDisposalLossAccountId: updatedCompany.assetDisposalLossAccountId ?? '',
+        inventoryAccountId: updatedCompany.inventoryAccountId ?? '',
+        inventoryAdjustmentGainAccountId: updatedCompany.inventoryAdjustmentGainAccountId ?? '',
+        inventoryAdjustmentLossAccountId: updatedCompany.inventoryAdjustmentLossAccountId ?? '',
       })
     },
   })
@@ -138,6 +153,51 @@ function CompanyProfileForm({ company }: { company: Company }) {
       <p className="nx-field__hint">
         Los anticipos se contabilizan como activo hasta su aplicación; no son gasto al pagarse.
       </p>
+      <Select
+        label="Cuenta de ganancia por disposición de activos"
+        value={form.assetDisposalGainAccountId}
+        onChange={(event) => setForm({ ...form, assetDisposalGainAccountId: event.target.value })}
+      >
+        <option value="">Sin configurar · las bajas con ganancia quedan bloqueadas</option>
+        {(advanceAccountsQuery.data ?? [])
+          .filter((account) => account.accountType === 'REVENUE' && account.isPostable)
+          .map((account) => (
+            <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+          ))}
+      </Select>
+      <Select
+        label="Cuenta de pérdida por disposición de activos"
+        value={form.assetDisposalLossAccountId}
+        onChange={(event) => setForm({ ...form, assetDisposalLossAccountId: event.target.value })}
+      >
+        <option value="">Sin configurar · las bajas con pérdida quedan bloqueadas</option>
+        {(advanceAccountsQuery.data ?? [])
+          .filter((account) => account.accountType === 'EXPENSE' && account.isPostable)
+          .map((account) => (
+            <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+          ))}
+      </Select>
+      <fieldset style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
+        <legend className="nx-field__label">Contabilidad de inventario</legend>
+        <Select label="Cuenta de inventario" value={form.inventoryAccountId} onChange={(event) => setForm({ ...form, inventoryAccountId: event.target.value })}>
+          <option value="">Sin configurar · conteos físicos bloqueados</option>
+          {(advanceAccountsQuery.data ?? []).filter((account) => account.accountType === 'ASSET' && account.isPostable).map((account) => (
+            <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+          ))}
+        </Select>
+        <Select label="Ganancia por ajuste de inventario" value={form.inventoryAdjustmentGainAccountId} onChange={(event) => setForm({ ...form, inventoryAdjustmentGainAccountId: event.target.value })}>
+          <option value="">Sin configurar · conteos físicos bloqueados</option>
+          {(advanceAccountsQuery.data ?? []).filter((account) => account.accountType === 'REVENUE' && account.isPostable).map((account) => (
+            <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+          ))}
+        </Select>
+        <Select label="Pérdida por ajuste de inventario" value={form.inventoryAdjustmentLossAccountId} onChange={(event) => setForm({ ...form, inventoryAdjustmentLossAccountId: event.target.value })}>
+          <option value="">Sin configurar · conteos físicos bloqueados</option>
+          {(advanceAccountsQuery.data ?? []).filter((account) => account.accountType === 'EXPENSE' && account.isPostable).map((account) => (
+            <option key={account.id} value={account.id}>{account.code} — {account.name}</option>
+          ))}
+        </Select>
+      </fieldset>
 
       <fieldset style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
         <legend className="nx-field__label">Documentos · datos impresos en el comprobante</legend>

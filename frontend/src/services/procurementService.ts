@@ -5,6 +5,7 @@ import type {
   Quotation,
   Requisition,
   Rfq,
+  ServiceEntry,
   Supplier,
   SupplierContract,
   SupplierContractCategory,
@@ -144,6 +145,16 @@ export const procurementService = {
     receivedAt: string
     lines: { purchaseOrderLineId: string; quantityReceived: string }[]
   }) => apiFetch<GoodsReceipt>('/procurement/goods-receipts', { method: 'POST', body: JSON.stringify(payload) }),
+  listServiceEntries: (companyId: string) =>
+    apiFetch<ServiceEntry[]>(`/procurement/service-entries?company_id=${encodeURIComponent(companyId)}`),
+  createServiceEntry: (payload: {
+    purchaseOrderId: string
+    periodStart: string
+    periodEnd: string
+    progressPercentage: string
+    acceptedValue: string
+    evidenceId?: string
+  }) => apiFetch<ServiceEntry>('/procurement/service-entries', { method: 'POST', body: JSON.stringify(payload) }),
   listThreeWayMatches: (companyId: string) =>
     apiFetch<ThreeWayMatch[]>(`/procurement/three-way-match?company_id=${encodeURIComponent(companyId)}`),
   runThreeWayMatch: (payload: {

@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.errors import (
@@ -427,11 +428,41 @@ def record_service_entry(
     progress_percentage: Decimal,
     accepted_value: Decimal,
     approved_by_id: uuid.UUID,
+    evidence_id: uuid.UUID | None = None,
     commit: bool = True,
 ) -> ServiceEntry:
-    order = procurement_repository.get_purchase_order(db, purchase_order_id)
+    order = db.execute(
+        select(PurchaseOrder).where(PurchaseOrder.id == purchase_order_id).with_for_update()
+    ).scalar_one_or_none()
     if order is None:
         raise ValueError(f"PurchaseOrder {purchase_order_id} no existe")
+    if order.company_id != company_id:
+        raise InvalidFinancialReferenceError("La entrada y la orden pertenecen a compañías distintas")
+    if order.status not in ("SENT", "APPROVED", "PARTIALLY_RECEIVED"):
+        raise InvalidFinancialReferenceError(
+            f"No se puede aceptar servicio para una PO en estado {order.status}"
+        )
+    if period_start > period_end:
+        raise InvalidFinancialReferenceError("El período de servicio es inválido")
+
+    entries = procurement_repository.list_service_entries_for_po(db, purchase_order_id)
+    if any(period_start <= entry.period_end and period_end >= entry.period_start for entry in entries):
+        raise InvalidFinancialReferenceError("El período se superpone con otra entrada de servicio")
+    total_progress = sum((entry.progress_percentage for entry in entries), Decimal("0"))
+    total_accepted = sum((entry.accepted_value for entry in entries), Decimal("0"))
+    if total_progress + progress_percentage > Decimal("100"):
+        raise InvalidFinancialReferenceError("El avance acumulado excede 100%")
+    order_total = _po_order_total(db, purchase_order_id)
+    if total_accepted + accepted_value > order_total:
+        raise InvalidFinancialReferenceError("El valor aceptado acumulado excede el valor de la orden")
+    if evidence_id is not None:
+        evidence = db.get(Evidence, evidence_id)
+        if evidence is None:
+            raise InvalidFinancialReferenceError("La evidencia de la entrada no existe")
+        if evidence.company_id != company_id:
+            raise InvalidFinancialReferenceError("La evidencia pertenece a otra compañía")
+        if evidence.entity_type not in {"PURCHASE_ORDER", "PO"} or evidence.entity_id != order.id:
+            raise InvalidFinancialReferenceError("La evidencia no está vinculada a esta orden")
     number = numbering_service.next_document_number(db, company_id=company_id, document_type_code="SEN")
     entry = procurement_repository.create_service_entry(
         db,
@@ -443,6 +474,7 @@ def record_service_entry(
         progress_percentage=progress_percentage,
         accepted_value=accepted_value,
         approved_by_id=approved_by_id,
+        evidence_id=evidence_id,
     )
     if commit:
         db.commit()
@@ -496,25 +528,40 @@ def run_three_way_match(
         Decimal("0"),
     )
     ordered_amount = _po_order_total(db, purchase_order_id)
+    service_entries = procurement_repository.list_service_entries_for_po(db, purchase_order_id)
+    accepted_service_amount = sum((entry.accepted_value for entry in service_entries), Decimal("0"))
+    if received_quantity > 0:
+        receipt_basis = "GOODS_RECEIPT"
+        accepted_amount = ordered_amount
+    elif accepted_service_amount > 0:
+        receipt_basis = "SERVICE_ENTRY"
+        accepted_amount = accepted_service_amount
+    else:
+        raise InvalidFinancialReferenceError(
+            "La orden no tiene recepción física ni entrada de servicio aceptada"
+        )
 
     exceptions: list[dict] = []
 
-    if ordered_amount == 0:
+    match_amount = accepted_amount
+    if match_amount == 0:
         amount_variance_pct = Decimal("100") if supplier_invoice_amount != 0 else Decimal("0")
     else:
-        amount_variance_pct = abs(supplier_invoice_amount - ordered_amount) / ordered_amount * 100
+        amount_variance_pct = abs(supplier_invoice_amount - match_amount) / match_amount * 100
     if amount_variance_pct > amount_tolerance_pct:
         exceptions.append(
             {
                 "type": "AMOUNT_MISMATCH",
-                "ordered_amount": str(ordered_amount),
+                "accepted_amount": str(match_amount),
                 "invoice_amount": str(supplier_invoice_amount),
                 "variance_pct": str(amount_variance_pct),
                 "tolerance_pct": str(amount_tolerance_pct),
             }
         )
 
-    if received_quantity == 0:
+    if receipt_basis == "SERVICE_ENTRY":
+        quantity_variance_pct = Decimal("0")
+    elif received_quantity == 0:
         quantity_variance_pct = Decimal("100") if supplier_invoice_quantity != 0 else Decimal("0")
     else:
         quantity_variance_pct = abs(supplier_invoice_quantity - received_quantity) / received_quantity * 100
@@ -537,6 +584,8 @@ def run_three_way_match(
         supplier_invoice_quantity=supplier_invoice_quantity,
         received_quantity=received_quantity,
         ordered_amount=ordered_amount,
+        receipt_basis=receipt_basis,
+        accepted_amount=accepted_amount,
         quantity_tolerance_pct=quantity_tolerance_pct,
         amount_tolerance_pct=amount_tolerance_pct,
         status="EXCEPTION" if exceptions else "MATCHED",

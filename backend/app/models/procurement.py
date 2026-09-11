@@ -249,10 +249,11 @@ class ServiceEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "service_entries"
     __table_args__ = (
         CheckConstraint(
-            "progress_percentage >= 0 AND progress_percentage <= 100",
+            "progress_percentage > 0 AND progress_percentage <= 100",
             name="ck_service_entries_progress_valid",
         ),
-        CheckConstraint("accepted_value >= 0", name="ck_service_entries_value_non_negative"),
+        CheckConstraint("accepted_value > 0", name="ck_service_entries_value_positive"),
+        CheckConstraint("period_start <= period_end", name="ck_service_entries_period_valid"),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -268,6 +269,9 @@ class ServiceEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     accepted_value: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     approved_by_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    evidence_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("evidence.id", ondelete="RESTRICT"), nullable=True
     )
 
 
@@ -326,6 +330,8 @@ class ThreeWayMatchResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     supplier_invoice_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     received_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     ordered_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    receipt_basis: Mapped[str] = mapped_column(String(24), nullable=False, default="GOODS_RECEIPT")
+    accepted_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=Decimal("0"))
     quantity_tolerance_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     amount_tolerance_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     status: Mapped[str] = mapped_column(String(16), nullable=False)

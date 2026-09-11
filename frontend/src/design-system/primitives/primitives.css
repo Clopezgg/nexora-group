@@ -944,3 +944,12 @@
   outline: 2px solid var(--nx-theme-accent, #1769d2);
   outline-offset: 1px;
 }
+
+.nx-file-picker {
+  display: grid;
+  gap: var(--nx-space-2);
+  padding: var(--nx-space-3);
+  border: 1px dashed var(--nx-color-border, #dbe3ec);
+  border-radius: var(--nx-radius-sm, 6px);
+  background: var(--nx-theme-surface-2, #f7f9fb);
+}

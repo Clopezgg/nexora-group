@@ -297,6 +297,107 @@ def test_service_entry_records_progress(client):
     assert entry.json()["entryNumber"].startswith("SEN-")
 
 
+def test_service_entry_rejects_invalid_period_overlap_and_accumulated_excess(client):
+    login_admin(client)
+    company = create_company(client, name="Service Entry Limits")
+    supplier = _create_supplier(client, company_id=company["id"])
+    item = _create_item(client, company_id=company["id"], sku="SERV-001")
+    po = _create_po(client, company_id=company["id"], supplier_id=supplier["id"], item_id=item["id"])
+
+    invalid_period = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": po["id"],
+            "periodStart": "2026-08-31",
+            "periodEnd": "2026-08-01",
+            "progressPercentage": "10.00",
+            "acceptedValue": "100.00",
+        },
+    )
+    assert invalid_period.status_code == 422, invalid_period.text
+
+    first = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": po["id"],
+            "periodStart": "2026-08-01",
+            "periodEnd": "2026-08-15",
+            "progressPercentage": "60.00",
+            "acceptedValue": "600.00",
+        },
+    )
+    assert first.status_code == 201, first.text
+
+    overlap = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": po["id"],
+            "periodStart": "2026-08-10",
+            "periodEnd": "2026-08-20",
+            "progressPercentage": "10.00",
+            "acceptedValue": "100.00",
+        },
+    )
+    assert overlap.status_code == 422, overlap.text
+
+    excess = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": po["id"],
+            "periodStart": "2026-08-16",
+            "periodEnd": "2026-08-31",
+            "progressPercentage": "50.00",
+            "acceptedValue": "500.00",
+        },
+    )
+    assert excess.status_code == 422, excess.text
+
+
+def test_three_way_match_uses_accepted_service_value(client):
+    login_admin(client)
+    company = create_company(client, name="Service Entry Match")
+    supplier = _create_supplier(client, company_id=company["id"])
+    item = _create_item(client, company_id=company["id"], sku="SERV-002")
+    po = _create_po(client, company_id=company["id"], supplier_id=supplier["id"], item_id=item["id"])
+    expense = create_account(client, company_id=company["id"], code="5201", name="Servicios", account_type="EXPENSE")
+    payable = create_account(client, company_id=company["id"], code="2101", name="Proveedores", account_type="LIABILITY")
+    entry = client.post(
+        "/api/procurement/service-entries",
+        json={
+            "purchaseOrderId": po["id"],
+            "periodStart": "2026-08-01",
+            "periodEnd": "2026-08-31",
+            "progressPercentage": "35.00",
+            "acceptedValue": "350.00",
+        },
+    )
+    assert entry.status_code == 201, entry.text
+    invoice = _create_po_invoice(
+        client,
+        company_id=company["id"],
+        supplier_id=supplier["id"],
+        po_id=po["id"],
+        expense_account_id=expense["id"],
+        payable_account_id=payable["id"],
+        invoice_number="SERVICE-MATCH",
+        amount="350.00",
+    )
+
+    response = client.post(
+        "/api/procurement/three-way-match",
+        json={
+            "purchaseOrderId": po["id"],
+            "supplierInvoiceId": invoice["id"],
+            "supplierInvoiceQuantity": "0.0000",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["status"] == "MATCHED"
+    assert response.json()["receiptBasis"] == "SERVICE_ENTRY"
+    assert response.json()["acceptedAmount"] == "350.00"
+
+
 def test_approving_purchase_order_creates_audit_log_entry(client, db_session):
     login_admin(client)
     company = create_company(client)

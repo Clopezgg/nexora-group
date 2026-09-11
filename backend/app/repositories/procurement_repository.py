@@ -360,6 +360,7 @@ def create_service_entry(
     progress_percentage: Decimal,
     accepted_value: Decimal,
     approved_by_id: uuid.UUID,
+    evidence_id: uuid.UUID | None,
 ) -> ServiceEntry:
     entry = ServiceEntry(
         company_id=company_id,
@@ -370,6 +371,7 @@ def create_service_entry(
         progress_percentage=progress_percentage,
         accepted_value=accepted_value,
         approved_by_id=approved_by_id,
+        evidence_id=evidence_id,
     )
     db.add(entry)
     db.flush()
@@ -378,6 +380,15 @@ def create_service_entry(
 
 def list_service_entries_for_po(db: Session, po_id: uuid.UUID) -> list[ServiceEntry]:
     stmt = select(ServiceEntry).where(ServiceEntry.purchase_order_id == po_id)
+    return list(db.execute(stmt).scalars())
+
+
+def list_service_entries(db: Session, *, company_id: uuid.UUID) -> list[ServiceEntry]:
+    stmt = (
+        select(ServiceEntry)
+        .where(ServiceEntry.company_id == company_id)
+        .order_by(ServiceEntry.period_end.desc(), ServiceEntry.created_at.desc())
+    )
     return list(db.execute(stmt).scalars())
 
 
@@ -390,6 +401,8 @@ def create_three_way_match_result(
     supplier_invoice_quantity: Decimal,
     received_quantity: Decimal,
     ordered_amount: Decimal,
+    receipt_basis: str,
+    accepted_amount: Decimal,
     quantity_tolerance_pct: Decimal,
     amount_tolerance_pct: Decimal,
     status: str,
@@ -403,6 +416,8 @@ def create_three_way_match_result(
         supplier_invoice_quantity=supplier_invoice_quantity,
         received_quantity=received_quantity,
         ordered_amount=ordered_amount,
+        receipt_basis=receipt_basis,
+        accepted_amount=accepted_amount,
         quantity_tolerance_pct=quantity_tolerance_pct,
         amount_tolerance_pct=amount_tolerance_pct,
         status=status,

@@ -86,6 +86,9 @@ const IMPLEMENTED_ROUTES: Record<string, LazyRoute> = {
   '/abastecimiento/recepciones': async () => ({
     Component: (await import('../features/procurement/GoodsReceiptsPage')).GoodsReceiptsPage,
   }),
+  '/abastecimiento/entradas-de-servicio': async () => ({
+    Component: (await import('../features/procurement/ServiceEntriesPage')).ServiceEntriesPage,
+  }),
   '/abastecimiento/inventario': async () => ({
     Component: (await import('../features/inventory/InventoryPage')).InventoryPage,
   }),

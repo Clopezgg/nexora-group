@@ -149,6 +149,18 @@ export interface GoodsReceipt {
   receivedAt: string
 }
 
+export interface ServiceEntry {
+  id: string
+  entryNumber: string
+  purchaseOrderId: string
+  periodStart: string
+  periodEnd: string
+  progressPercentage: string
+  acceptedValue: string
+  approvedById: string
+  evidenceId: string | null
+}
+
 export interface ThreeWayMatch {
   id: string
   purchaseOrderId: string
@@ -159,6 +171,8 @@ export interface ThreeWayMatch {
   status: 'MATCHED' | 'EXCEPTION'
   orderedAmount: string
   receivedQuantity: string
+  receiptBasis: 'GOODS_RECEIPT' | 'SERVICE_ENTRY'
+  acceptedAmount: string
   exceptions: Array<Record<string, string>>
   overrideReason: string | null
   overriddenByUserId: string | null

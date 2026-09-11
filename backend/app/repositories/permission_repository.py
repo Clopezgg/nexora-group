@@ -571,6 +571,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("reports.supplier_performance", "read", SCOPE_OWN),
         ("procurement.purchase_order", "approve", SCOPE_OWN),
         ("procurement.goods_receipt", "read", SCOPE_OWN),
+        ("procurement.service_entry", "create", SCOPE_OWN),
         ("procurement.service_entry", "read", SCOPE_OWN),
         ("procurement.three_way_match", "create", SCOPE_OWN),
         ("procurement.three_way_match", "read", SCOPE_OWN),

@@ -608,6 +608,7 @@ def create_service_entry(
         progress_percentage=payload.progress_percentage,
         accepted_value=payload.accepted_value,
         approved_by_id=user.id,
+        evidence_id=payload.evidence_id,
         commit=False,
     )
     audit_service.record(
@@ -623,11 +624,38 @@ def create_service_entry(
             "entryNumber": entry.entry_number,
             "purchaseOrderId": str(payload.purchase_order_id),
             "progressPercentage": str(payload.progress_percentage),
+            "acceptedValue": str(payload.accepted_value),
+            "periodStart": payload.period_start.isoformat(),
+            "periodEnd": payload.period_end.isoformat(),
+            "evidenceId": str(payload.evidence_id) if payload.evidence_id else None,
         },
         correlation_id=correlation_id,
     )
     db.commit()
     return ServiceEntryResponse.model_validate(entry, from_attributes=True)
+
+
+@router.get("/service-entries", response_model=list[ServiceEntryResponse])
+def list_service_entries(
+    company_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("procurement.service_entry", "read")),
+):
+    assert_company_access(
+        db, user_id=user.id, resource="procurement.service_entry", action="read", company_id=company_id
+    )
+    entries = procurement_repository.list_service_entries(db, company_id=company_id)
+    allowed = accessible_project_ids(
+        db, user_id=user.id, resource="procurement.service_entry", action="read"
+    )
+    if allowed is not None:
+        allowed_set = set(allowed)
+        entries = [
+            entry for entry in entries
+            if (order := procurement_repository.get_purchase_order(db, entry.purchase_order_id)) is not None
+            and (order.project_id is None or order.project_id in allowed_set)
+        ]
+    return [ServiceEntryResponse.model_validate(entry, from_attributes=True) for entry in entries]
 
 
 @router.get("/three-way-match", response_model=list[ThreeWayMatchResponse])

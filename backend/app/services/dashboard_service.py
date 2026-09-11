@@ -82,11 +82,15 @@ def get_summary(
     month_start = date(today.year, today.month, 1)
     month_starts = _month_starts(today)
 
-    currency_code = "HNL"
     if company_id is not None:
         company = db.get(Company, company_id)
-        if company is not None and company.functional_currency_code:
-            currency_code = company.functional_currency_code
+    else:
+        # Fallback to the first available company for central views
+        company = db.execute(select(Company).limit(1)).scalar_one_or_none()
+
+    currency_code = "HNL" # Temporary fallback if absolutely empty DB
+    if company is not None and company.functional_currency_code:
+        currency_code = company.functional_currency_code
 
     fiscal_year = None
     fiscal_period = None

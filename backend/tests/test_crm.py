@@ -1,8 +1,14 @@
 from sqlalchemy import select
 
-from app.models.crm import Customer, Opportunity, SalesContract
+from app.models.crm import Customer, Opportunity
 from app.models.permission import UserCompanyAccess
-from tests.helpers import create_account, create_company, create_user_with_role, login_admin, login_as
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_user_with_role,
+    login_admin,
+    login_as,
+)
 
 
 def _create_lead(client, *, company_id: str, name: str = "Constructora Prospecto") -> dict:

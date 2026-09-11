@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from app.models.company import Company
 from app.models.fiscal import FiscalPeriod, FiscalYear
 
-
 _ALLOWED_PERIOD_TRANSITIONS: dict[str, set[str]] = {
     "OPEN": {"SOFT_CLOSED", "CLOSED"},
     "SOFT_CLOSED": {"OPEN", "CLOSED"},

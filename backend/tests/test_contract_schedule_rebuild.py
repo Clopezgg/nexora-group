@@ -8,7 +8,13 @@ bloqueado si ya hay pagos aplicados.
 from decimal import Decimal
 
 from app.services import contract_payment_service as cps
-from tests.helpers import create_account, create_company, create_supplier, create_treasury_account, login_admin
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_supplier,
+    create_treasury_account,
+    login_admin,
+)
 from tests.test_contract_payment_control import _contract, _monthly_plan
 
 

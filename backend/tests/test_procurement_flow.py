@@ -4,7 +4,13 @@ from sqlalchemy import select
 
 from app.models.audit import AuditLog
 from app.models.permission import UserCompanyAccess
-from tests.helpers import create_account, create_company, create_user_with_role, login_admin, login_as
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_user_with_role,
+    login_admin,
+    login_as,
+)
 
 
 def _create_item(client, *, company_id: str, sku: str = "CEM-001") -> dict:

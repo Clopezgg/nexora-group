@@ -19,8 +19,8 @@ from sqlalchemy.orm import Session
 
 from app.models.accounting import JournalLine
 from app.models.chart_of_accounts import Account
-from app.models.crm import SalesContract
 from app.models.company import Company
+from app.models.crm import SalesContract
 from app.models.progress import ProgressRecord
 from app.models.project import Project
 from app.services import budget_service

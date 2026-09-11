@@ -29,7 +29,11 @@ from app.schemas.reporting import (
     TrialBalanceReportResponse,
     TrialBalanceRowResponse,
 )
-from app.services import contract_payment_service, report_export_service, reporting_service
+from app.services import (
+    contract_payment_service,
+    report_export_service,
+    reporting_service,
+)
 from app.services.permission_service import assert_company_access, require_permission
 
 router = APIRouter(prefix="/reports", tags=["reports"])

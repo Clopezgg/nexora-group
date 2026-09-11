@@ -20,7 +20,11 @@ from app.schemas.workforce import (
     WorkerResponse,
 )
 from app.services import audit_service, workforce_service
-from app.services.permission_service import accessible_project_ids, assert_company_access, require_permission
+from app.services.permission_service import (
+    accessible_project_ids,
+    assert_company_access,
+    require_permission,
+)
 
 router = APIRouter(prefix="/workforce", tags=["workforce"])
 

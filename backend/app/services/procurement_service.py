@@ -10,8 +10,8 @@ from app.domain.errors import (
     InvalidProcurementStateError,
     ProcurementCurrencyMismatchError,
 )
-from app.models.company import Company
 from app.models.ap import SupplierInvoice
+from app.models.company import Company
 from app.models.evidence import Evidence
 from app.models.item import Item
 from app.models.procurement import (

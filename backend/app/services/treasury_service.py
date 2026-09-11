@@ -10,7 +10,11 @@ from app.domain.errors import (
     InvalidInvoiceStateError,
     InvalidTransferError,
 )
-from app.models.accounting import AccountingDocument, JournalLine, LEDGER_EFFECTIVE_STATUSES
+from app.models.accounting import (
+    LEDGER_EFFECTIVE_STATUSES,
+    AccountingDocument,
+    JournalLine,
+)
 from app.models.chart_of_accounts import Account
 from app.models.treasury import (
     BankStatement,

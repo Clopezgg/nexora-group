@@ -18,11 +18,11 @@ from decimal import ROUND_DOWN, Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.business_time import business_today
 from app.domain.errors import (
     InvalidFinancialReferenceError,
     OverpaymentError,
 )
-from app.core.business_time import business_today
 from app.models.contract_payment import (
     ContractPaymentAllocation,
     ContractPaymentInstallment,

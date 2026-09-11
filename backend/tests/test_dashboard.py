@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import timedelta
 
 from app.core.business_time import business_today
 from app.models.permission import UserCompanyAccess, UserProjectAccess

@@ -9,12 +9,10 @@ Caso de aceptación: contrato tipo 10101960.
 from datetime import date
 from decimal import Decimal
 
-import pytest
-
-from app.services import contract_payment_service as cps
-from app.services.contract_payment_service import build_contract_plan
 from app.models.ap import SupplierInvoice
 from app.models.company import Company
+from app.services import contract_payment_service as cps
+from app.services.contract_payment_service import build_contract_plan
 from tests.helpers import (
     create_account,
     create_company,

@@ -1,4 +1,3 @@
-import uuid
 
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL
 from tests.helpers import create_company, login_admin
@@ -115,8 +114,9 @@ def test_audit_api_filters_by_entity_type(client, db_session):
 def test_audit_entry_records_actor_user_id(client, db_session):
     """E2E (NXR-REQ-0090): verify the audit entry records the real actor
     user ID (the admin who performed the mutation)."""
-    from app.models.user import User
     from sqlalchemy import select
+
+    from app.models.user import User
 
     login_admin(client)
     company = create_company(client, name="Actor Audit Co")
@@ -172,8 +172,9 @@ def test_audit_rolls_back_on_write_failure(client, db_session, monkeypatch):
     with pytest.raises(RuntimeError, match="audit unavailable"):
         client.post("/api/master-data/companies", json=payload)
 
-    from app.models.company import Company
     from sqlalchemy import select
+
+    from app.models.company import Company
 
     db_session.expire_all()
     rows = db_session.execute(

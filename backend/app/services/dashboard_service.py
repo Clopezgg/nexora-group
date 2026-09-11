@@ -7,7 +7,11 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import case, extract, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.accounting import LEDGER_EFFECTIVE_STATUSES, AccountingDocument, JournalLine
+from app.models.accounting import (
+    LEDGER_EFFECTIVE_STATUSES,
+    AccountingDocument,
+    JournalLine,
+)
 from app.models.ap import SupplierInvoice
 from app.models.approval_request import ApprovalRequest
 from app.models.ar import CustomerInvoice
@@ -15,7 +19,11 @@ from app.models.chart_of_accounts import Account
 from app.models.company import Company
 from app.models.project import Project
 from app.models.treasury import TreasuryAccount
-from app.schemas.dashboard import CashFlowPointResponse, DashboardSummaryResponse, ScopeAmountResponse
+from app.schemas.dashboard import (
+    CashFlowPointResponse,
+    DashboardSummaryResponse,
+    ScopeAmountResponse,
+)
 from app.services import fiscal_service, permission_service
 
 BUSINESS_TZ = ZoneInfo("America/Tegucigalpa")

@@ -33,7 +33,7 @@ def test_company_document_profile_persists(client):
     assert body["phone"] == "+504 2200-0000"
     assert body["voucherFooterText"] == "Documento generado por NEXORA GROUP."
 
-    again = client.get(f"/api/master-data/companies").json()
+    again = client.get("/api/master-data/companies").json()
     row = next(c for c in again if c["id"] == company["id"])
     assert row["addressLine2"] == "Piso 4"
     assert row["stateDepartment"] == "Francisco Morazán"

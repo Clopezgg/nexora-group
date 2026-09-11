@@ -1,4 +1,9 @@
-from tests.helpers import create_account, create_company, create_treasury_account, login_admin
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_treasury_account,
+    login_admin,
+)
 
 
 def _setup_financial_accounts(client):

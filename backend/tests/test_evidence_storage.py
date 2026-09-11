@@ -1,8 +1,7 @@
 import pytest
-
-from app.core.config import Settings
 from azure.core.exceptions import ResourceNotFoundError
 
+from app.core.config import Settings
 from app.integrations.azure_blob import (
     EvidenceStorageNotConfigured,
     delete_blob_if_exists,

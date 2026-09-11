@@ -2,9 +2,9 @@ import uuid
 from datetime import date
 
 from sqlalchemy import (
+    DDL,
     CheckConstraint,
     Date,
-    DDL,
     ForeignKey,
     ForeignKeyConstraint,
     Integer,

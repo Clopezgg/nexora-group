@@ -4,8 +4,8 @@ from decimal import Decimal
 from app.models.accounting import AccountingDocument
 from app.models.ap import SupplierPayment
 from app.models.ar import CustomerReceipt
-from app.models.permission import UserCompanyAccess
 from app.models.cost_center import CostCenter
+from app.models.permission import UserCompanyAccess
 from app.models.project import Project
 from tests.helpers import (
     create_account,
@@ -532,8 +532,9 @@ def test_approving_supplier_invoice_creates_audit_log_entry(client, db_session):
 
     client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
 
-    from app.models.audit import AuditLog
     from sqlalchemy import select
+
+    from app.models.audit import AuditLog
 
     rows = db_session.execute(
         select(AuditLog).where(
@@ -571,8 +572,9 @@ def test_paying_supplier_invoice_creates_audit_log_entry(client, db_session):
         json={"treasuryAccountId": bank["id"], "amount": "100.00", "paymentDate": "2026-01-20"},
     ).json()
 
-    from app.models.audit import AuditLog
     from sqlalchemy import select
+
+    from app.models.audit import AuditLog
 
     rows = db_session.execute(
         select(AuditLog).where(
@@ -712,8 +714,9 @@ def test_submitter_cannot_decide_their_own_invoice_approval(client, db_session):
         client, company_id=company["id"], expense_id=expense["id"], payable_id=payable["id"],
         supplier_id=supplier["id"], number="SUB-004",
     )
-    from app.models.user import User
     from sqlalchemy import select as sa_select
+
+    from app.models.user import User
     from tests.conftest import BOOTSTRAP_ADMIN_EMAIL
 
     admin = db_session.execute(sa_select(User).where(User.email == BOOTSTRAP_ADMIN_EMAIL)).scalar_one()

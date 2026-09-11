@@ -13,8 +13,12 @@ from app.models.treasury import Remittance
 from app.schemas.ap import SupplierPaymentCreateRequest
 from app.schemas.ar import CustomerReceiptCreateRequest
 from app.schemas.treasury import TreasuryTransferCreateRequest
-
-from tests.helpers import create_account, create_company, create_treasury_account, login_admin
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_treasury_account,
+    login_admin,
+)
 
 
 def test_project_model_has_no_balance_column_or_field():

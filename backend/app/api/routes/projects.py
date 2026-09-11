@@ -33,8 +33,12 @@ from app.schemas.project_control import (
     WBSNodeResponse,
 )
 from app.schemas.project_setup import ProjectSetupRequest, ProjectSetupRunResponse
-from app.services import audit_service, budget_service, forecast_service, project_setup_service
-from app.services.project_setup_service import ProjectSetupStepError
+from app.services import (
+    audit_service,
+    budget_service,
+    forecast_service,
+    project_setup_service,
+)
 from app.services.financial_validation_service import assert_evidence_belongs_to_company
 from app.services.permission_service import (
     accessible_project_ids,
@@ -84,13 +88,13 @@ def create_setup_run(
         db.commit()
         db.refresh(run)
         return _setup_response(db, run)
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
         run = project_setup_service.get_by_key(db, company_id=payload.project.company_id, key=idempotency_key)
         if run is None:
             raise
         if run.payload != body or run.activate != payload.activate:
-            raise HTTPException(status_code=409, detail="La Idempotency-Key ya corresponde a otra configuración de proyecto")
+            raise HTTPException(status_code=409, detail="La Idempotency-Key ya corresponde a otra configuración de proyecto") from exc
         return _setup_response(db, run)
 
 

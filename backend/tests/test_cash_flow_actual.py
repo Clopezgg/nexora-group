@@ -10,8 +10,6 @@ FLOW / TREASURY DIRECTION, §12-§14, §20 bloque CASH).
 
 from decimal import Decimal
 
-from sqlalchemy import select
-
 from tests.helpers import (
     create_account,
     create_company,

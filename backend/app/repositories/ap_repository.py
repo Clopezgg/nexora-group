@@ -85,7 +85,11 @@ def project_advance_total(db: Session, *, company_id: uuid.UUID, project_id: uui
     configurada de la compañía para este proyecto — cubre tanto el accrual de
     una factura ASSET como una reclasificación contable (§7). Más las facturas
     ASSET devengadas cuyo débito NO es esa cuenta (para no doble contar)."""
-    from app.models.accounting import LEDGER_EFFECTIVE_STATUSES, AccountingDocument, JournalLine
+    from app.models.accounting import (
+        LEDGER_EFFECTIVE_STATUSES,
+        AccountingDocument,
+        JournalLine,
+    )
 
     company = db.get(Company, company_id)
     if company is None:

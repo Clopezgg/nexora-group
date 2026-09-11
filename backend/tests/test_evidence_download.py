@@ -8,7 +8,6 @@ from app.services import evidence_service
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL
 from tests.helpers import create_company, login_admin
 
-
 PDF_CONTENT = b"%PDF-1.7\nprivate-evidence-content"
 
 

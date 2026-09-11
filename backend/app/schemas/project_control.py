@@ -7,7 +7,6 @@ from pydantic import Field, model_validator
 
 from app.schemas.base import CamelModel
 
-
 PROJECT_STATUS_VALUES = Literal[
     "PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CLOSED", "CANCELLED", "ARCHIVED"
 ]

@@ -11,8 +11,8 @@ from app.models.company import Company
 from app.models.fiscal import FiscalPeriod, FiscalYear
 from app.services.fiscal_service import transition_period_status
 from app.services.posting_service import (
-    _assert_fiscal_period_open,
     FiscalPeriodClosedError,
+    _assert_fiscal_period_open,
 )
 
 
@@ -132,7 +132,9 @@ def test_stale_hard_close_cannot_issue_a_second_closure_manifest(db_session):
 def test_period_generation_serializes_before_checking_existing_periods(db_session):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Event
+
     from sqlalchemy import func, select
+
     from app.services.fiscal_service import create_year, generate_monthly_periods
 
     company = Company(name="Calendar generation concurrency")

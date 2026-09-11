@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Exportaciones financieras reales XLSX/PDF.
 
 ORDEN MAESTRA DE CIERRE FINAL §19: los archivos son documentos nativos
@@ -7,6 +5,8 @@ ORDEN MAESTRA DE CIERRE FINAL §19: los archivos son documentos nativos
 genéricos para que todos los estados financieros compartan la misma fuente de
 datos que sus endpoints JSON; no recalculan contabilidad en paralelo.
 """
+
+from __future__ import annotations
 
 import io
 from datetime import UTC, date, datetime
@@ -17,7 +17,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, landscape
+from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle

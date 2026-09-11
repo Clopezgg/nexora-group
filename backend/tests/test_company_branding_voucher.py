@@ -8,7 +8,12 @@ from app.models.evidence import Evidence
 from app.models.user import User
 from app.models.voucher_issuance import VoucherIssuance
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL
-from tests.helpers import create_account, create_company, create_treasury_account, login_admin
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_treasury_account,
+    login_admin,
+)
 
 
 def _png() -> bytes:

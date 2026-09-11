@@ -11,7 +11,11 @@ from app.domain.errors import InvalidFinancialReferenceError
 from app.models.evidence import Evidence
 from app.models.project_setup import ProjectSetupRun
 from app.models.supplier import Supplier
-from app.repositories import project_control_repository, project_repository, supplier_repository
+from app.repositories import (
+    project_control_repository,
+    project_repository,
+    supplier_repository,
+)
 from app.services import (
     audit_service,
     budget_service,
@@ -135,7 +139,7 @@ def execute(db: Session, *, run: ProjectSetupRun, correlation_id: str) -> Projec
             audit_service.record(db, actor_user_id=run.requested_by, action="contract.payment_schedule.create", entity_type="contract.payment_schedule", entity_id=schedule.id, company_id=run.company_id, project_id=project.id, before=None, after={"contractNumber": contract.contract_number, "setupRunId": str(run.id)}, correlation_id=correlation_id)
 
     for evidence in staged_evidence(db, run.id):
-        document = _at_step("DOCUMENTS", lambda: document_service.create_document(db, company_id=run.company_id, scope="PROJECT", project_id=project.id, category="OTHER", title=evidence.original_filename, description="Documento inicial cargado en la configuración reanudable del proyecto.", evidence_id=evidence.id, uploaded_by=run.requested_by, commit=False))
+        document = _at_step("DOCUMENTS", lambda evidence=evidence: document_service.create_document(db, company_id=run.company_id, scope="PROJECT", project_id=project.id, category="OTHER", title=evidence.original_filename, description="Documento inicial cargado en la configuración reanudable del proyecto.", evidence_id=evidence.id, uploaded_by=run.requested_by, commit=False))
         evidence.entity_type = "PROJECT"
         evidence.entity_id = project.id
         audit_service.record(db, actor_user_id=run.requested_by, action="document.document.create", entity_type="document.document", entity_id=document.id, company_id=run.company_id, project_id=project.id, before=None, after={"title": document.title, "setupRunId": str(run.id)}, correlation_id=correlation_id)

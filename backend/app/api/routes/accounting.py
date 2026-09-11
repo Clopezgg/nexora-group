@@ -9,15 +9,19 @@ from app.api.deps_correlation import get_correlation_id
 from app.models.accounting import AccountingDocument, JournalLine
 from app.schemas.accounting import (
     JournalEntryCreateRequest,
-    JournalEntryReverseRequest,
     JournalEntryResponse,
+    JournalEntryReverseRequest,
     JournalLineResponse,
 )
 from app.schemas.reconciliation import (
     ReconciliationLineResponse,
     SubledgerGlReconciliationResponse,
 )
-from app.services import audit_service, posting_service, subledger_reconciliation_service
+from app.services import (
+    audit_service,
+    posting_service,
+    subledger_reconciliation_service,
+)
 from app.services.permission_service import (
     accessible_project_ids,
     assert_company_access,
@@ -322,7 +326,10 @@ def document_lookup(
 ):
     """Centro de Control por Número de Documento (§31/§32). Busca un número en
     todos los dominios y devuelve exact-match primero con acciones permitidas."""
-    from app.schemas.transaction_inspector import DocumentLookupHit, DocumentLookupResponse
+    from app.schemas.transaction_inspector import (
+        DocumentLookupHit,
+        DocumentLookupResponse,
+    )
     from app.services import document_lookup_service
 
     if user_has_any_company_scope(

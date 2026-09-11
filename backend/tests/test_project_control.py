@@ -6,7 +6,12 @@ from sqlalchemy import select
 from app.models.budget import Budget
 from app.models.procurement import PurchaseOrder
 from app.models.project import Project
-from tests.helpers import create_account, create_company, create_treasury_account, login_admin
+from tests.helpers import (
+    create_account,
+    create_company,
+    create_treasury_account,
+    login_admin,
+)
 
 # Forbidden substrings for a money/balance column on Project -- INV-TRE-002:
 # Project jamás posee efectivo. Ver docs/PROJECTS_WBS.md.

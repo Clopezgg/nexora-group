@@ -7,10 +7,10 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
+from app.api.edit_access_guard import _requires_protected_edit
 from app.core.config import Settings, get_settings
 from app.models.edit_access import EditAccessEvent
 from app.services import edit_access_service
-from app.api.edit_access_guard import _requires_protected_edit
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
 
 

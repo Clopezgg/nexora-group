@@ -3,21 +3,35 @@ import time
 import uuid
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
 from app.models.accounting import AccountingDocument
+from app.models.ap import SupplierInvoice
 from app.models.change_order import ChangeOrder
-from app.models.evidence import Evidence
-from app.models.procurement import GoodsReceipt, PurchaseOrder, ServiceEntry, ThreeWayMatchResult
 from app.models.contract_payment import ContractPaymentSchedule
+from app.models.evidence import Evidence
+from app.models.procurement import (
+    GoodsReceipt,
+    PurchaseOrder,
+    ServiceEntry,
+    ThreeWayMatchResult,
+)
 from app.models.progress import ProgressRecord
 from app.models.project import Project
 from app.models.project_setup import ProjectSetupRun
-from app.models.ap import SupplierInvoice
 from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
 from app.models.rfi import RequestForInformation
 from app.models.safety import SafetyIncident, SafetyObservation

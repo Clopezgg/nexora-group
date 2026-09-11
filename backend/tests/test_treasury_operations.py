@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app.models.accounting import AccountingDocument
 from app.models.audit import AuditLog
+from app.models.permission import UserCompanyAccess
 from app.models.treasury import (
     BankStatementLine,
     FundRestriction,
@@ -12,7 +13,6 @@ from app.models.treasury import (
     ReconciliationMatch,
     TreasuryTransfer,
 )
-from app.models.permission import UserCompanyAccess
 from tests.helpers import (
     create_account,
     create_company,

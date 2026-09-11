@@ -3,7 +3,10 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.domain.errors import InvalidQualityStateError, NonConformanceRequiresCorrectiveActionError
+from app.domain.errors import (
+    InvalidQualityStateError,
+    NonConformanceRequiresCorrectiveActionError,
+)
 from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
 from app.repositories import quality_repository
 from app.services.financial_validation_service import (

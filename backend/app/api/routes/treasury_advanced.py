@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.api.deps_correlation import get_correlation_id
 from app.domain.errors import InvalidFinancialReferenceError
-from app.schemas.treasury import BankStatementLineResponse, CashClosingResponse, FundRestrictionResponse
+from app.schemas.treasury import (
+    BankStatementLineResponse,
+    CashClosingResponse,
+    FundRestrictionResponse,
+)
 from app.schemas.treasury_advanced import (
     BankStatementResponse,
     ReconciliationCandidateResponse,

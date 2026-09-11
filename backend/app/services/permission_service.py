@@ -19,21 +19,6 @@ from app.models.crm import SalesContract
 from app.models.document import Document
 from app.models.equipment import Equipment, MaintenanceOrder
 from app.models.inventory import PhysicalCount
-from app.models.procurement import (
-    GoodsReceipt,
-    PurchaseOrder,
-    PurchaseRequisition,
-    RequestForQuotation,
-    ServiceEntry,
-    SupplierQuotation,
-)
-from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
-from app.models.rfi import RequestForInformation
-from app.models.safety import SafetyIncident, SafetyObservation
-from app.models.site_report import DailySiteReport
-from app.models.submittal import Submittal
-from app.models.treasury import FundRestriction
-from app.models.warehouse import Warehouse
 from app.models.permission import (
     SCOPE_ANY,
     SCOPE_NONE,
@@ -43,10 +28,25 @@ from app.models.permission import (
     UserCompanyAccess,
     UserProjectAccess,
 )
+from app.models.procurement import (
+    GoodsReceipt,
+    PurchaseOrder,
+    PurchaseRequisition,
+    RequestForQuotation,
+    ServiceEntry,
+    SupplierQuotation,
+)
 from app.models.project import Project
+from app.models.quality import CorrectiveAction, NonConformance, QualityInspection
+from app.models.rfi import RequestForInformation
 from app.models.role import Role
+from app.models.safety import SafetyIncident, SafetyObservation
+from app.models.site_report import DailySiteReport
+from app.models.submittal import Submittal
+from app.models.treasury import FundRestriction
 from app.models.user import User
 from app.models.user_role import UserRole
+from app.models.warehouse import Warehouse
 from app.models.workforce import Crew, TimeEntry
 
 """Motor central de RBAC con aislamiento de compañía y proyecto.

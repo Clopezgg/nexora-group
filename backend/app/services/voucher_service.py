@@ -36,7 +36,11 @@ from app.core.config import get_settings
 from app.core.money import format_money
 from app.domain.errors import VoucherNotOutflowError
 from app.models.accounting import AccountingDocument, JournalLine
-from app.models.ap import SupplierInvoice, SupplierInvoicePaymentPlanItem, SupplierPayment
+from app.models.ap import (
+    SupplierInvoice,
+    SupplierInvoicePaymentPlanItem,
+    SupplierPayment,
+)
 from app.models.chart_of_accounts import Account
 from app.models.company import Company
 from app.models.evidence import Evidence

@@ -13,7 +13,8 @@ describe('formatMoney', () => {
   })
 
   it('fails closed when currency is blank instead of inventing HNL', () => {
-    expect(() => formatMoney(10, '')).toThrow(/moneda ISO explícito/i)
+    expect(formatMoney(10, '')).toBe('—')
+    expect(formatMoney(10)).toBe('—')
   })
 
   it('formats negatives without dropping the sign', () => {
@@ -30,5 +31,9 @@ describe('formatMoneyCompact', () => {
 
   it('keeps the negative sign', () => {
     expect(formatMoneyCompact(-1_500_000, 'HNL')).toMatch(/^-L\s1\.5M$/)
+  })
+
+  it('does not invent a currency for compact display', () => {
+    expect(formatMoneyCompact(1_000)).toBe('—')
   })
 })

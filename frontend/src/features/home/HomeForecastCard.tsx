@@ -31,7 +31,7 @@ export function HomeForecastCard({ companyId }: { companyId: string }) {
     range,
     granularity,
   })
-  const currency = summary?.currencyCode ?? 'HNL'
+  const currency = summary?.currencyCode
 
   return (
     <Card title="Flujo de caja">
@@ -53,6 +53,14 @@ export function HomeForecastCard({ companyId }: { companyId: string }) {
           <button type="button" className="nx-linkbutton" onClick={refetch}>
             Reintentar
           </button>
+        </div>
+      ) : !currency ? (
+        <div className="nx-home__forecast-empty">
+          <EmptyState
+            icon="warning"
+            title="La compañía activa no tiene una moneda funcional disponible"
+          />
+          <Link to="/control/configuracion">Revisar configuración de la compañía →</Link>
         </div>
       ) : !hasMovement ? (
         <div className="nx-home__forecast-empty">

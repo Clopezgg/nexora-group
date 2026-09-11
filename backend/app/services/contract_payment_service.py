@@ -70,6 +70,9 @@ class InstallmentSummary:
     # Numeración visible SOLO entre cuotas REGULAR (§6): "Cuota 1 de 7".
     regular_number: int | None = None
     regular_count: int | None = None
+    payable_now: bool = False
+    payment_blocked_reason: str | None = None
+    contract_balance_after: Decimal = _ZERO
 
 
 @dataclass(frozen=True)
@@ -702,10 +705,14 @@ def installment_summaries(
     regular_count = len(regular_rows)
     regular_number_by_id = {r.id: i + 1 for i, r in enumerate(regular_rows)}
     out: list[InstallmentSummary] = []
+    schedule = db.get(ContractPaymentSchedule, schedule_id)
+    contract = db.get(SupplierContract, schedule.supplier_contract_id) if schedule else None
+    running_paid = _ZERO
     for r in rows:
         paid = paid_map.get(r.id, _ZERO)
         net = _q(r.net_due)
         kind = getattr(r, "installment_kind", "REGULAR")
+        running_paid += paid
         out.append(
             InstallmentSummary(
                 installment_id=r.id,
@@ -726,6 +733,20 @@ def installment_summaries(
                 status=_status_for(r, paid, as_of=as_of),
                 regular_number=regular_number_by_id.get(r.id),
                 regular_count=regular_count if kind == "REGULAR" else None,
+                payable_now=(
+                    paid < net and _status_for(r, paid, as_of=as_of) not in {"CANCELLED", "UPCOMING"}
+                    and is_installment_payable(r, business_date=as_of)
+                ),
+                payment_blocked_reason=(
+                    "La cuota ya está pagada."
+                    if paid >= net
+                    else "La cuota está cancelada."
+                    if r.status == "CANCELLED"
+                    else "El período contractual todavía es futuro."
+                    if not is_installment_payable(r, business_date=as_of)
+                    else None
+                ),
+                contract_balance_after=_q(max((contract.value if contract else _ZERO) - running_paid, _ZERO)),
             )
         )
     return out

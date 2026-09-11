@@ -18,6 +18,9 @@ export interface ContractInstallment {
   status: string
   regularNumber: number | null
   regularCount: number | null
+  payableNow: boolean
+  paymentBlockedReason: string | null
+  contractBalanceAfter: string
 }
 
 export interface ContractSchedule {

@@ -51,17 +51,18 @@ export function ContractPaymentLedgerPage() {
     )
   }
 
-  const installmentColumns: TableColumn<ContractInstallment>[] = [
+  const installmentColumns = (): TableColumn<ContractInstallment>[] => [
     { key: 'sequence', header: '#', render: (row) => row.sequence },
     { key: 'periodLabel', header: 'Período contractual', render: (row) => row.periodLabel },
     { key: 'dueDate', header: 'Vence', render: (row) => row.dueDate },
     { key: 'netDue', header: 'Neto', render: (row) => formatMoney(row.netDue, currency) },
     { key: 'paid', header: 'Pagado', render: (row) => formatMoney(row.paid, currency) },
-    { key: 'remaining', header: 'Saldo', render: (row) => formatMoney(row.remaining, currency) },
+    { key: 'remaining', header: 'Pendiente cuota', render: (row) => formatMoney(row.remaining, currency) },
+    { key: 'contractBalanceAfter', header: 'Saldo contractual', render: (row) => formatMoney(row.contractBalanceAfter, currency) },
     {
       key: 'status',
       header: 'Estado',
-      render: (row) => <Badge tone={STATUS_TONE[row.status] ?? 'neutral'}>{row.status}</Badge>,
+      render: (row) => <Badge tone={STATUS_TONE[row.status] ?? 'neutral'}>{statusLabel(row.status)}</Badge>,
     },
   ]
 
@@ -152,7 +153,7 @@ export function ContractPaymentLedgerPage() {
 
                 <h3 className="nx-field__label">Cuotas</h3>
                 <Table
-                  columns={installmentColumns}
+                  columns={installmentColumns()}
                   rows={entry.installments}
                   getRowKey={(row) => row.installmentId}
                   emptyMessage="Sin cuotas."
@@ -172,4 +173,8 @@ export function ContractPaymentLedgerPage() {
       ) : null}
     </div>
   )
+}
+
+function statusLabel(status: string) {
+  return ({ PAID: 'Pagada', PARTIALLY_PAID: 'Parcialmente pagada', DUE: 'Vigente', OVERDUE: 'Vencida', UPCOMING: 'Próxima', CANCELLED: 'Cancelada' } as Record<string, string>)[status] ?? status
 }

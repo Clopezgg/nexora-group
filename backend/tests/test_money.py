@@ -28,6 +28,11 @@ def test_format_money_never_returns_bare_number():
     assert "," in out and "." in out
 
 
+def test_format_money_rejects_blank_currency_instead_of_defaulting_to_hnl():
+    with pytest.raises(ValueError, match="moneda ISO explícito"):
+        format_money("10.00", "")
+
+
 def test_approval_verification_code_is_deterministic():
     from datetime import date
 

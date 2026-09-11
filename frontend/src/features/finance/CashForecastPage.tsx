@@ -97,7 +97,7 @@ export function CashForecastPage() {
           />
         </header>
         <EmptyState
-          icon="building"
+          icon="briefcase"
           title="Selecciona una compañía"
           description="Los importes financieros no se agregan entre compañías de forma implícita."
         />

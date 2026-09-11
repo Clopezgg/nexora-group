@@ -78,6 +78,11 @@ class SupplierInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     supplier_contract_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("supplier_contracts.id", ondelete="RESTRICT"), nullable=True
     )
+    contract_installment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contract_payment_installments.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     purchase_order_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("purchase_orders.id", ondelete="RESTRICT"), nullable=True
     )

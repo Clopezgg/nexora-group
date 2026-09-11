@@ -61,6 +61,7 @@ def create_supplier_invoice(
     due_date: date,
     description: str | None,
     supplier_contract_id: uuid.UUID | None = None,
+    contract_installment_id: uuid.UUID | None = None,
     purchase_order_id: uuid.UUID | None = None,
     commit: bool = True,
 ) -> SupplierInvoice:
@@ -104,6 +105,25 @@ def create_supplier_invoice(
             raise InvalidFinancialReferenceError(
                 "La moneda de la factura no coincide con la del contrato"
             )
+    if contract_installment_id is not None:
+        from app.models.contract_payment import ContractPaymentInstallment, ContractPaymentSchedule
+
+        installment = db.get(ContractPaymentInstallment, contract_installment_id)
+        if installment is None:
+            raise InvalidFinancialReferenceError("contract_installment_id no existe")
+        schedule = db.get(ContractPaymentSchedule, installment.schedule_id)
+        if schedule is None or schedule.company_id != company_id:
+            raise InvalidFinancialReferenceError(
+                "contract_installment_id no existe o pertenece a otra compañía"
+            )
+        if supplier_contract_id is None or schedule.supplier_contract_id != supplier_contract_id:
+            raise InvalidFinancialReferenceError(
+                "La cuota no pertenece al contrato de la factura"
+            )
+        if schedule.currency_code != currency_code:
+            raise InvalidFinancialReferenceError(
+                "La moneda de la factura no coincide con la de la cuota contractual"
+            )
     if purchase_order_id is not None:
         from app.models.procurement import PurchaseOrder
 
@@ -146,6 +166,7 @@ def create_supplier_invoice(
         due_date=due_date,
         description=description,
         supplier_contract_id=supplier_contract_id,
+        contract_installment_id=contract_installment_id,
         purchase_order_id=purchase_order_id,
         status="DRAFT",
     )

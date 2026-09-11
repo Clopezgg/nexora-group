@@ -346,6 +346,9 @@ def test_project_scope_blocks_indirect_procurement_ids_in_path_and_nested_body(c
     assert requisition.status_code == 201, requisition.text
     requisition_id = requisition.json()["id"]
 
+    approve = client.post(f"/api/procurement/requisitions/{requisition_id}/approve")
+    assert approve.status_code == 200, approve.text
+
     rfq = client.post(
         "/api/procurement/rfqs",
         json={

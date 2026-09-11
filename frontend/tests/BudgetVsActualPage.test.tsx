@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderApp } from './testUtils'
 
-function stubFetch(context: { activeProjectId: string | null; activeProjectName: string | null }, summary: unknown) {
+const DEFAULT_COMPANY = [{ id: 'c1', name: 'Nexora SA', functionalCurrencyCode: 'HNL' }]
+
+function stubFetch(context: { activeProjectId: string | null; activeProjectName: string | null }, summary: unknown, companies: ReadonlyArray<{ id: string; functionalCurrencyCode: string | null }> = DEFAULT_COMPANY) {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockImplementation((input: RequestInfo | URL) => {
@@ -22,7 +24,7 @@ function stubFetch(context: { activeProjectId: string | null; activeProjectName:
         return Promise.resolve({ ok: true, status: 200, json: async () => summary } as Response)
       }
       if (url.includes('/master-data/companies')) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => [] } as Response)
+        return Promise.resolve({ ok: true, status: 200, json: async () => companies } as Response)
       }
       return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response)
     }),

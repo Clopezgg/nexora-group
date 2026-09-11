@@ -146,3 +146,52 @@ Full serial regression started against `nexora_test_nexora_group`, log `/tmp/nex
 > - Pendiente real para Fase 3 cierre: desplegar el SHA final de `main`
 >   (`c7818a3f`) y verificar smoke de producción de ESE SHA. Requiere confirmación
 >   explícita puntual (AGENTS.md §11) antes de ejecutar el deploy.
+
+## Iteración 20 (2026-09-11) — integración de los dos streams huérfanos (PR #132)
+
+Estado inicial detectado: `origin/main` en `5a564d0a` (PR #131) pero `main`
+local 7 commits por delante (stream A: source accounting/contratos/TWM) y rama
+divergente `fix/nexora-absolute-final-closure` con 6 commits (stream B:
+fail-closed FX, moneda funcional, inventario/activos/GL). Ninguno estaba en
+`origin/main`. Se preservó TODO el trabajo y se integró por rama limpia
+`work/integrate-absolute-final-closure-33f6`:
+
+- **Stream A (local main, 7 commits):** `9177d710..33f6dd40` — financial source
+  accounting, contrato schedule/retention, service acceptance + procurement
+  matching, fail-closed en referencias de procurement, migraciones idempotentes
+  + revisión huérfana recreada. Backend suite completa verificada en `main`
+  local: **658 passed** (`/tmp/pytest_main_full.log`).
+- **Stream B (fix branch, 6 commits):** `6603df22` — inventario/activos GL
+  canónico, rollback subledger ante fallo, moneda funcional derivada de la
+  compañía activa (sin asumir HNL), fail-closed FX sin política autoritativa.
+- **Merge** limpio (sin conflictos): `7c86b4f3`. Suite del merge: **665 passed,
+  4 failed** — todas en `test_asset_disposal.py` por el nuevo fail-closed de
+  moneda funcional del stream B vs fixture del stream A.
+- **Regresiones corregidas:** fixture `_create_test_setup` de asset disposal
+  configura `functional_currency_code="HNL"` en la Company (FK de currency
+  satisfecha con flush previo); `frontend/tests/BudgetVsActualPage.test.tsx`
+  mockea la compañía activa con `functionalCurrencyCode: 'HNL'` (stream B quitó
+  el default HNL de `reportMoney.ts`).
+- **NX-AUD-024 (F3.10) en producción:** la arquitectura real es first-party
+  (`az staticwebapp backends link`); la cookie de sesión se emite con
+  `SameSite=Lax` en TODOS los entornos (antes `SameSite=None` en producción).
+  Se mantienen `HttpOnly`+`Secure`+guard de `Origin`. Nuevo test
+  `test_session_cookie_uses_first_party_samesite_lax_in_production`.
+- **Verificación final sobre el SHA del merge:**
+  - Backend `pytest tests/ -q`: **670 passed, 0 failed** en 14m01s
+    (`/tmp/pytest_merged_full2.log`).
+  - Frontend: `tsc` ✓ · `eslint .` ✓ · `vitest run` **249 passed** ✓ ·
+    `npm run build` ✓.
+  - Alembic: único head `f2c3d4e5f6a7`; `upgrade head` limpio e idempotente
+    sobre PostgreSQL real (DB aislada, luego descartada).
+  - Auditorías: `pip-audit` limpio · `npm audit --audit-level=high` 0 ·
+    `ruff check --select E9,F63,F7,F82` limpio.
+- **PR #132** merge a `origin/main` → **`55b8b3eb`**. CI de rama 5/5 gates
+  verdes (backend, frontend, e2e, Compile Azure Bicep, Docker Compose smoke)
+  + `Bicep what-if` success y `Deploy infra + apps` **skipped** (gated).
+- **Pendiente inalterado (F3.16):** desplegar Azure real del nuevo SHA
+  (`55b8b3eb`) con smoke de producción. Requiere confirmación explícita
+  puntual (AGENTS.md §11; suscripción activa = tenant UNAH). Producción sigue
+  en `a3cc6136` (PR #121) hasta una autorización puntual.
+- Artefacto local preservado sin tocar: log de terminal `-a` (untracked, fuera
+  de Git).

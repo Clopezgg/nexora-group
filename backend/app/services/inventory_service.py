@@ -5,8 +5,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.domain.errors import InsufficientStockError
+from app.models.company import Company
 from app.models.inventory import PhysicalCount, StockLedgerEntry
 from app.repositories import inventory_repository
+from app.services.financial_validation_service import assert_account_belongs_to_company
 
 """Stock Ledger append-only (orden maestra §54, docs/INVENTORY.md). Todo
 movimiento pasa por aquí -- nunca se inserta un StockLedgerEntry a mano
@@ -174,6 +176,26 @@ def issue_to_project(
       Cr  Inventory                  (costo promedio * cantidad)
     Si las cuentas no se proporcionan, solo registra el movimiento de
     stock (compatibilidad con flujos existentes)."""
+    if cost_of_goods_account_id is None or inventory_account_id is None:
+        raise ValueError(
+            "El consumo de inventario requiere cuentas configuradas de costo e inventario"
+        )
+    company = db.get(Company, company_id)
+    if company is None or not company.functional_currency_code:
+        raise ValueError("La compañía debe tener moneda funcional configurada")
+    cost_account = assert_account_belongs_to_company(
+        db, account_id=cost_of_goods_account_id, company_id=company_id,
+        field_name="cost_of_goods_account_id",
+    )
+    inventory_account = assert_account_belongs_to_company(
+        db, account_id=inventory_account_id, company_id=company_id,
+        field_name="inventory_account_id",
+    )
+    if cost_account.account_type != "EXPENSE":
+        raise ValueError("cost_of_goods_account_id debe ser una cuenta EXPENSE")
+    if inventory_account.account_type != "ASSET":
+        raise ValueError("inventory_account_id debe ser una cuenta ASSET")
+
     entry = _issue(
         db,
         company_id=company_id,
@@ -202,7 +224,7 @@ def issue_to_project(
                 document_type_code="INV",
                 scope="PROJECT",
                 project_id=project_id,
-                currency_code="HNL",
+                currency_code=company.functional_currency_code,
                 effective_date=business_today(),
                 lines=[
                     posting_service.JournalLineInput(

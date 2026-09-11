@@ -264,15 +264,20 @@ def issue_to_project(
         warehouse_ids=(payload.warehouse_id,),
         project_id=payload.project_id,
     )
-    entry = inventory_service.issue_to_project(
-        db,
-        company_id=payload.company_id,
-        item_id=payload.item_id,
-        warehouse_id=payload.warehouse_id,
-        project_id=payload.project_id,
-        quantity=payload.quantity,
-        commit=False,
-    )
+    try:
+        entry = inventory_service.issue_to_project(
+            db,
+            company_id=payload.company_id,
+            item_id=payload.item_id,
+            warehouse_id=payload.warehouse_id,
+            project_id=payload.project_id,
+            quantity=payload.quantity,
+            cost_of_goods_account_id=payload.cost_of_goods_account_id,
+            inventory_account_id=payload.inventory_account_id,
+            commit=False,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     audit_service.record(
         db,
         actor_user_id=user.id,

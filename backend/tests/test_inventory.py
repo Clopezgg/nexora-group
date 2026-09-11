@@ -53,7 +53,7 @@ def test_receive_stock_sets_moving_average(client):
     assert float(second["resultingAvgCost"]) == 12.0
 
 
-def test_issue_to_project_reduces_warehouse_stock(client, db_session):
+def test_issue_to_project_fails_closed_without_gl_accounts(client, db_session):
     """INV-INV-002. Fase 0/1 todavía no expone un endpoint de creación de
     Project (lo construye Track B en paralelo) -- se inserta directo vía
     ORM, que es lo único disponible hoy para tener un Project real."""
@@ -77,14 +77,13 @@ def test_issue_to_project_reduces_warehouse_stock(client, db_session):
         json={"companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
               "projectId": str(project.id), "quantity": "30.0000"},
     )
-    assert issued.status_code == 201, issued.text
-    assert float(issued.json()["resultingQtyOnHand"]) == 70.0
-    assert issued.json()["projectId"] == str(project.id)
+    assert issued.status_code == 422, issued.text
+    assert "cuentas configuradas" in issued.json()["detail"]
 
     position = client.get(
         "/api/inventory/stock/position", params={"item_id": item["id"], "warehouse_id": warehouse["id"]}
     ).json()
-    assert float(position["quantityOnHand"]) == 70.0
+    assert float(position["quantityOnHand"]) == 100.0
 
 
 def test_inventory_actuals_are_derived_from_project_issues(client, db_session):
@@ -122,7 +121,7 @@ def test_inventory_actuals_are_derived_from_project_issues(client, db_session):
             "quantity": "8.0000",
         },
     )
-    assert issue.status_code == 201, issue.text
+    assert issue.status_code == 422, issue.text
     transfer = client.post(
         "/api/inventory/stock/transfer",
         json={
@@ -139,7 +138,9 @@ def test_inventory_actuals_are_derived_from_project_issues(client, db_session):
         db_session, company_id=uuid.UUID(company["id"])
     )
 
-    assert actuals == {project.id: Decimal("80.00")}
+    # The route fails closed before writing stock when the company has not
+    # supplied the authoritative GL accounts.
+    assert actuals == {}
 
 
 def test_stock_receive_rejects_foreign_item_or_warehouse_without_ledger_entry(client, db_session):

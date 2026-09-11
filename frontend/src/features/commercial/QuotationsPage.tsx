@@ -21,7 +21,7 @@ import { projectService } from '../../services/projectService'
 import type { Opportunity, Quotation } from '../../types/crm'
 
 export function QuotationsPage() {
-  const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const { activeCompany, activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
   const [modalOpen, setModalOpen] = useState(false)
   const queryClient = useQueryClient()
 
@@ -127,6 +127,7 @@ export function QuotationsPage() {
       {modalOpen && activeCompanyId ? (
         <CreateQuotationModal
           companyId={activeCompanyId}
+          currencyCode={activeCompany?.functionalCurrencyCode ?? ''}
           opportunities={opportunities}
           onClose={() => setModalOpen(false)}
           onCreated={invalidate}
@@ -138,11 +139,13 @@ export function QuotationsPage() {
 
 function CreateQuotationModal({
   companyId,
+  currencyCode,
   opportunities,
   onClose,
   onCreated,
 }: {
   companyId: string
+  currencyCode: string
   opportunities: Opportunity[]
   onClose: () => void
   onCreated: () => void
@@ -169,7 +172,7 @@ function CreateQuotationModal({
         projectId: projectId ?? undefined,
         quotationNumber,
         amount: String(amount ?? 0),
-        currencyCode: 'HNL',
+        currencyCode,
       }),
     onSuccess: () => {
       onCreated()

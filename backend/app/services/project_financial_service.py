@@ -14,6 +14,7 @@ from app.models.contract_payment import (
     ContractPaymentSchedule,
 )
 from app.models.crm import SalesContract
+from app.models.company import Company
 from app.models.supplier import SupplierContract
 from app.repositories import budget_repository, project_control_repository, project_repository
 from app.services import budget_service, commitment_service, forecast_service
@@ -179,7 +180,12 @@ def get_summary(db: Session, *, project_id: uuid.UUID) -> ProjectFinancialSummar
         if recognized_revenue > 0:
             actual_margin_percent = (actual_profit / recognized_revenue) * Decimal("100")
 
-    currency_code = project.currency_code or "HNL"
+    company = db.get(Company, project.company_id)
+    currency_code = project.currency_code or (
+        company.functional_currency_code if company is not None else None
+    )
+    if not currency_code:
+        raise ValueError("El proyecto y su compañía no tienen moneda configurada")
     commitment = commitment_service.compute_breakdown(
         db, company_id=project.company_id, project_id=project_id
     )

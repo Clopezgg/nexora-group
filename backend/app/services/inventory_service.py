@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import text
@@ -168,6 +169,7 @@ def issue_to_project(
     quantity: Decimal,
     cost_of_goods_account_id: uuid.UUID | None = None,
     inventory_account_id: uuid.UUID | None = None,
+    effective_date: date | None = None,
     commit: bool = True,
 ) -> StockLedgerEntry:
     """INV-INV-002: reduce warehouse stock y reconoce el costo (al costo
@@ -197,28 +199,20 @@ def issue_to_project(
     if inventory_account.account_type != "ASSET":
         raise ValueError("inventory_account_id debe ser una cuenta ASSET")
 
-    entry = _issue(
-        db,
-        company_id=company_id,
-        item_id=item_id,
-        warehouse_id=warehouse_id,
-        quantity=quantity,
-        movement_type="ISSUE",
-        project_id=project_id,
-        source_type="project_issue",
-        source_id=project_id,
-    )
-
-    if cost_of_goods_account_id is not None and inventory_account_id is not None:
-        from app.services import posting_service
-
-        _, avg_cost = _current_position(
-            db, company_id=company_id, item_id=item_id, warehouse_id=warehouse_id
+    try:
+        entry = _issue(
+            db,
+            company_id=company_id,
+            item_id=item_id,
+            warehouse_id=warehouse_id,
+            quantity=quantity,
+            movement_type="ISSUE",
+            project_id=project_id,
+            source_type="project_issue",
+            source_id=project_id,
         )
-        total_cost = (quantity * avg_cost).quantize(Decimal("0.01"))
+        total_cost = (quantity * entry.unit_cost).quantize(Decimal("0.01"))
         if total_cost > 0:
-            from app.core.business_time import business_today
-
             posting_service.post_manual(
                 db,
                 company_id=company_id,
@@ -226,32 +220,35 @@ def issue_to_project(
                 scope="PROJECT",
                 project_id=project_id,
                 currency_code=company.functional_currency_code,
-                effective_date=business_today(),
+                effective_date=effective_date,
                 lines=[
                     posting_service.JournalLineInput(
                         account_id=cost_of_goods_account_id,
                         debit_amount=total_cost,
-                        description=f"Consumo inventario a proyecto",
+                        description="Consumo inventario a proyecto",
                         project_id=project_id,
                     ),
                     posting_service.JournalLineInput(
                         account_id=inventory_account_id,
                         credit_amount=total_cost,
-                        description=f"Baja inventario por consumo",
+                        description="Baja inventario por consumo",
                         project_id=project_id,
                     ),
                 ],
-                description=f"Consumo inventario a proyecto",
+                description="Consumo inventario a proyecto",
                 source_type="inventory",
                 source_id=entry.id,
                 commit=False,
             )
 
-    if commit:
-        db.commit()
-        db.refresh(entry)
-    else:
-        db.flush()
+        if commit:
+            db.commit()
+            db.refresh(entry)
+        else:
+            db.flush()
+    except Exception:
+        db.rollback()
+        raise
     return entry
 
 
@@ -406,81 +403,85 @@ def apply_physical_count(
         raise ValueError("inventory_adjustment_gain_account_id debe ser REVENUE")
     if loss_account.account_type != "EXPENSE":
         raise ValueError("inventory_adjustment_loss_account_id debe ser EXPENSE")
-    lines = inventory_repository.list_physical_count_lines(db, physical_count_id)
-    journal_lines: list[posting_service.JournalLineInput] = []
-    for line in lines:
-        variance = line.counted_quantity - line.expected_quantity
-        if variance == 0:
-            continue
-        qty_before, avg_cost = _current_position(
-            db, company_id=count.company_id, item_id=line.item_id, warehouse_id=count.warehouse_id
-        )
-        new_qty = qty_before + variance
-        value = (abs(variance) * avg_cost).quantize(Decimal("0.01"))
-        if value > 0 and variance > 0:
-            journal_lines.extend(
-                [
-                    posting_service.JournalLineInput(
-                        account_id=inventory_account.id,
-                        debit_amount=value,
-                        description="Incremento por conteo físico",
-                    ),
-                    posting_service.JournalLineInput(
-                        account_id=gain_account.id,
-                        credit_amount=value,
-                        description="Ganancia por ajuste de inventario",
-                    ),
-                ]
+    try:
+        lines = inventory_repository.list_physical_count_lines(db, physical_count_id)
+        journal_lines: list[posting_service.JournalLineInput] = []
+        for line in lines:
+            variance = line.counted_quantity - line.expected_quantity
+            if variance == 0:
+                continue
+            qty_before, avg_cost = _current_position(
+                db, company_id=count.company_id, item_id=line.item_id, warehouse_id=count.warehouse_id
             )
-        elif value > 0:
-            journal_lines.extend(
-                [
-                    posting_service.JournalLineInput(
-                        account_id=loss_account.id,
-                        debit_amount=value,
-                        description="Pérdida por ajuste de inventario",
-                    ),
-                    posting_service.JournalLineInput(
-                        account_id=inventory_account.id,
-                        credit_amount=value,
-                        description="Disminución por conteo físico",
-                    ),
-                ]
+            new_qty = qty_before + variance
+            value = (abs(variance) * avg_cost).quantize(Decimal("0.01"))
+            if value > 0 and variance > 0:
+                journal_lines.extend(
+                    [
+                        posting_service.JournalLineInput(
+                            account_id=inventory_account.id,
+                            debit_amount=value,
+                            description="Incremento por conteo físico",
+                        ),
+                        posting_service.JournalLineInput(
+                            account_id=gain_account.id,
+                            credit_amount=value,
+                            description="Ganancia por ajuste de inventario",
+                        ),
+                    ]
+                )
+            elif value > 0:
+                journal_lines.extend(
+                    [
+                        posting_service.JournalLineInput(
+                            account_id=loss_account.id,
+                            debit_amount=value,
+                            description="Pérdida por ajuste de inventario",
+                        ),
+                        posting_service.JournalLineInput(
+                            account_id=inventory_account.id,
+                            credit_amount=value,
+                            description="Disminución por conteo físico",
+                        ),
+                    ]
+                )
+            inventory_repository.append_ledger_entry(
+                db,
+                company_id=count.company_id,
+                item_id=line.item_id,
+                warehouse_id=count.warehouse_id,
+                movement_type="PHYSICAL_COUNT",
+                quantity=abs(variance),
+                unit_cost=avg_cost,
+                resulting_qty_on_hand=new_qty,
+                resulting_avg_cost=avg_cost,
+                source_type="physical_count",
+                source_id=physical_count_id,
+                notes=f"Ajuste por conteo físico: esperado={line.expected_quantity}, contado={line.counted_quantity}",
             )
-        inventory_repository.append_ledger_entry(
-            db,
-            company_id=count.company_id,
-            item_id=line.item_id,
-            warehouse_id=count.warehouse_id,
-            movement_type="PHYSICAL_COUNT",
-            quantity=abs(variance),
-            unit_cost=avg_cost,
-            resulting_qty_on_hand=new_qty,
-            resulting_avg_cost=avg_cost,
-            source_type="physical_count",
-            source_id=physical_count_id,
-            notes=f"Ajuste por conteo físico: esperado={line.expected_quantity}, contado={line.counted_quantity}",
-        )
-    if journal_lines:
-        posting_service.post_manual(
-            db,
-            company_id=count.company_id,
-            document_type_code="INV",
-            scope="GENERAL",
-            project_id=None,
-            currency_code=company.functional_currency_code,
-            effective_date=count.count_date,
-            lines=journal_lines,
-            description=f"Ajuste por conteo físico {count.id}",
-            source_type="physical_count",
-            source_id=count.id,
-            commit=False,
-        )
-    count.status = "APPROVED"
-    count.approved_by_id = approved_by_id
-    if commit:
-        db.commit()
-        db.refresh(count)
-    else:
-        db.flush()
+        if journal_lines:
+            posting_service.post_manual(
+                db,
+                company_id=count.company_id,
+                document_type_code="INV",
+                scope="GENERAL",
+                project_id=None,
+                currency_code=company.functional_currency_code,
+                effective_date=count.count_date,
+                lines=journal_lines,
+                description=f"Ajuste por conteo físico {count.id}",
+                source_type="physical_count",
+                source_id=count.id,
+                commit=False,
+            )
+        count.status = "APPROVED"
+        count.approved_by_id = approved_by_id
+        if commit:
+            db.commit()
+            db.refresh(count)
+        else:
+            db.flush()
+    except Exception:
+        db.rollback()
+        raise
     return count

@@ -11,6 +11,7 @@ import './ProjectWizard.css'
 
 interface WizardProps {
   companyId: string
+  functionalCurrencyCode: string
   customers: Array<{ id: string; legalName: string }>
   users: Array<{ id: string; fullName: string }>
   costCenters: Array<{ id: string; code: string; name: string }>
@@ -31,7 +32,7 @@ const STEPS = [
 ] as const
 
 const EMPTY = {
-  name: '', code: '', customerId: '', currencyCode: 'HNL', description: '',
+  name: '', code: '', customerId: '', currencyCode: '', description: '',
   addressLine1: '', addressLine2: '', city: '', stateDepartment: '', country: 'HN', locationReference: '',
   plannedStart: '', plannedEnd: '', costCenterId: '', managerUserId: '',
   wbsCode: '', wbsName: '',
@@ -52,9 +53,9 @@ function isPositiveMoney(value: string) {
   return amount !== null && amount > 0n
 }
 
-export function ProjectWizard({ companyId, customers, users, costCenters, suppliers, onCreated }: WizardProps) {
+export function ProjectWizard({ companyId, functionalCurrencyCode, customers, users, costCenters, suppliers, onCreated }: WizardProps) {
   const [step, setStep] = useState(0)
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState({ ...EMPTY, currencyCode: functionalCurrencyCode })
   const [files, setFiles] = useState<File[]>([])
   const [setupRunId, setSetupRunId] = useState<string | null>(null)
   const set = (patch: Partial<typeof EMPTY>) => setForm((prev) => ({ ...prev, ...patch }))
@@ -121,9 +122,7 @@ export function ProjectWizard({ companyId, customers, users, costCenters, suppli
             <option value="">Sin cliente asignado todavía</option>
             {customers.map((c) => <option key={c.id} value={c.id}>{c.legalName}</option>)}
           </Select>
-          <Select label="Moneda" value={form.currencyCode} onChange={(e) => set({ currencyCode: e.target.value })}>
-            <option value="HNL">HNL — Lempira hondureño</option><option value="USD">USD — Dólar estadounidense</option>
-          </Select>
+          <Input label="Moneda funcional" value={form.currencyCode} readOnly />
           <Textarea label="Descripción" value={form.description} onChange={(e) => set({ description: e.target.value })} />
         </> : null}
 

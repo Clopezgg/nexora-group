@@ -19,7 +19,7 @@ import { formatMoney } from '../../utils/currency'
  * delivery_days/payment_terms/valid_until -- los criterios de comparación
  * más allá del precio (ver el fix en el mismo slice). */
 export function BidComparisonPage() {
-  const { activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
+  const { activeCompany, activeCompanyId, isLoading: loadingCompanies } = useActiveCompany()
   const queryClient = useQueryClient()
   const handleMutationError = useMutationError()
   const [selectedRfqId, setSelectedRfqId] = useState<string | null>(null)
@@ -178,6 +178,7 @@ export function BidComparisonPage() {
         <NewQuotationModal
           open={quoteModalOpen}
           rfqId={selectedRfqId}
+          currencyCode={activeCompany?.functionalCurrencyCode ?? ''}
           suppliers={suppliers}
           onClose={() => setQuoteModalOpen(false)}
           onCreated={() => queryClient.invalidateQueries({ queryKey: ['procurement', 'quotations', selectedRfqId] })}
@@ -243,19 +244,21 @@ function NewRfqModal({
 function NewQuotationModal({
   open,
   rfqId,
+  currencyCode,
   suppliers,
   onClose,
   onCreated,
 }: {
   open: boolean
   rfqId: string
+  currencyCode: string
   suppliers: { id: string; legalName: string }[]
   onClose: () => void
   onCreated: () => void
 }) {
   const [form, setForm] = useState({
     supplierId: '',
-    currencyCode: 'HNL',
+    currencyCode,
     deliveryDays: '',
     paymentTerms: '',
     description: '',
@@ -276,7 +279,7 @@ function NewQuotationModal({
     onSuccess: () => {
       onCreated()
       onClose()
-      setForm({ supplierId: '', currencyCode: 'HNL', deliveryDays: '', paymentTerms: '', description: '', quantity: '', unitPrice: '' })
+      setForm({ supplierId: '', currencyCode, deliveryDays: '', paymentTerms: '', description: '', quantity: '', unitPrice: '' })
     },
     onError: (error) => handleMutationError(error, 'Registrar cotización'),
   })

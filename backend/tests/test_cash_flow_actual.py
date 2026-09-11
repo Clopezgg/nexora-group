@@ -20,6 +20,21 @@ from tests.helpers import (
 )
 
 
+def test_cash_flow_actual_uses_company_currency_without_treasury_accounts(client):
+    login_admin(client)
+    company = create_company(client, currency="USD")
+
+    actual = client.get(f"/api/financial-control/cash-flow-actual?companyId={company['id']}")
+    series = client.get(
+        f"/api/financial-control/cash-flow-actual/series?companyId={company['id']}"
+    )
+
+    assert actual.status_code == 200, actual.text
+    assert series.status_code == 200, series.text
+    assert actual.json()["currencyCode"] == "USD"
+    assert series.json()["currencyCode"] == "USD"
+
+
 def _company_with_bank(client):
     company = create_company(client)
     bank_gl = create_account(client, company_id=company["id"], code="1110", name="Banco", account_type="ASSET")

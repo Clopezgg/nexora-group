@@ -262,6 +262,7 @@ export function ContractPaymentLedgerPage() {
       {prepare && activeCompanyId ? (
         <CreateSupplierInvoiceModal
           companyId={activeCompanyId}
+          functionalCurrencyCode={currency ?? prepare.entry.currencyCode}
           expenseAccounts={(accountsQuery.data ?? []).filter(
             (account) => account.accountType === 'EXPENSE' || account.accountType === 'ASSET',
           )}

@@ -12,6 +12,7 @@ from app.domain.errors import (
     FiscalPeriodClosedError,
     ImmutableDocumentError,
     InvalidOperationScopeError,
+    InvalidFinancialReferenceError,
     UnbalancedJournalEntryError,
 )
 from app.models.accounting import (
@@ -22,6 +23,7 @@ from app.models.accounting import (
     TaxLine,
 )
 from app.models.fiscal import FiscalPeriod, FiscalYear
+from app.models.company import Company
 from app.services import numbering_service
 from app.services.financial_validation_service import (
     assert_account_belongs_to_company,
@@ -222,6 +224,17 @@ def post_manual(
     caller; este servicio no captura esas excepciones)."""
     _validate_scope(scope, project_id)
     _validate_balance(lines)
+    company = db.get(Company, company_id)
+    if company is None or not company.functional_currency_code:
+        raise InvalidFinancialReferenceError(
+            "La compañía no tiene moneda funcional configurada"
+        )
+    if currency_code != company.functional_currency_code:
+        raise InvalidFinancialReferenceError(
+            "El Posting Engine requiere importes de línea en la moneda funcional "
+            f"{company.functional_currency_code}; no existe una política FX autoritativa "
+            f"para contabilizar {currency_code}"
+        )
     _validate_financial_references(
         db,
         company_id=company_id,

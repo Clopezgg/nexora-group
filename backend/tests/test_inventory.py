@@ -1,10 +1,12 @@
 import uuid
+from datetime import date
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
 
-from app.models.inventory import StockLedgerEntry
+from app.models.accounting import AccountingDocument, AccountingSourceLink, JournalLine
+from app.models.inventory import PhysicalCount, StockLedgerEntry
 from app.models.permission import UserCompanyAccess
 from app.repositories import inventory_repository
 from app.services import inventory_service
@@ -397,8 +399,6 @@ def test_physical_count_creates_adjustment_for_variance(
     ).json()
     assert float(position["quantityOnHand"]) == float(expected_quantity)
 
-    from app.models.accounting import AccountingDocument, AccountingSourceLink, JournalLine
-
     link = db_session.execute(
         select(AccountingSourceLink).where(
             AccountingSourceLink.source_type == "physical_count",
@@ -536,3 +536,191 @@ def test_physical_count_approval_requires_access_to_its_company(client, db_sessi
     response = client.post(f"/api/inventory/physical-counts/{count['id']}/approve")
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "NXR-PERM-001"
+
+
+def test_physical_count_rejects_foreign_warehouse_and_item(client, db_session):
+    login_admin(client)
+    company_a, item_a, warehouse_a = _setup(client)
+    _company_b, item_b, warehouse_b = _setup(client)
+
+    foreign_warehouse = client.post(
+        "/api/inventory/physical-counts",
+        json={
+            "companyId": company_a["id"],
+            "warehouseId": warehouse_b["id"],
+            "countDate": "2026-08-24",
+            "lines": [{"itemId": item_a["id"], "expectedQuantity": "0", "countedQuantity": "0"}],
+        },
+    )
+    foreign_item = client.post(
+        "/api/inventory/physical-counts",
+        json={
+            "companyId": company_a["id"],
+            "warehouseId": warehouse_a["id"],
+            "countDate": "2026-08-24",
+            "lines": [{"itemId": item_b["id"], "expectedQuantity": "0", "countedQuantity": "0"}],
+        },
+    )
+
+    assert foreign_warehouse.status_code == 403
+    assert foreign_item.status_code == 403
+    assert list(db_session.execute(select(PhysicalCount)).scalars()) == []
+
+
+def test_zero_variance_physical_count_approves_without_stock_or_gl_entry(client, db_session):
+    login_admin(client)
+    company, item, warehouse = _setup(client)
+    inventory_account = create_account(
+        client, company_id=company["id"], code="1400", name="Inventario", account_type="ASSET"
+    )
+    gain_account = create_account(
+        client, company_id=company["id"], code="4700", name="Ganancia", account_type="REVENUE"
+    )
+    loss_account = create_account(
+        client, company_id=company["id"], code="6700", name="Pérdida", account_type="EXPENSE"
+    )
+    from app.models.company import Company
+
+    company_row = db_session.get(Company, company["id"])
+    company_row.inventory_account_id = inventory_account["id"]
+    company_row.inventory_adjustment_gain_account_id = gain_account["id"]
+    company_row.inventory_adjustment_loss_account_id = loss_account["id"]
+    db_session.commit()
+    client.post(
+        "/api/inventory/stock/receive",
+        json={"companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
+              "quantity": "5", "unitCost": "4"},
+    )
+    count = client.post(
+        "/api/inventory/physical-counts",
+        json={
+            "companyId": company["id"], "warehouseId": warehouse["id"], "countDate": "2026-08-24",
+            "lines": [{"itemId": item["id"], "expectedQuantity": "999", "countedQuantity": "5"}],
+        },
+    ).json()
+
+    response = client.post(f"/api/inventory/physical-counts/{count['id']}/approve")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "APPROVED"
+    movements = list(
+        db_session.execute(
+            select(StockLedgerEntry).where(StockLedgerEntry.source_id == uuid.UUID(count["id"]))
+        ).scalars()
+    )
+    links = list(
+        db_session.execute(
+            select(AccountingSourceLink).where(AccountingSourceLink.source_id == uuid.UUID(count["id"]))
+        ).scalars()
+    )
+    assert movements == []
+    assert links == []
+
+
+def test_physical_count_rolls_back_stock_when_posting_engine_fails(
+    client, db_session, monkeypatch
+):
+    login_admin(client)
+    company, item, warehouse = _setup(client)
+    inventory_account = create_account(
+        client, company_id=company["id"], code="1400", name="Inventario", account_type="ASSET"
+    )
+    gain_account = create_account(
+        client, company_id=company["id"], code="4700", name="Ganancia", account_type="REVENUE"
+    )
+    loss_account = create_account(
+        client, company_id=company["id"], code="6700", name="Pérdida", account_type="EXPENSE"
+    )
+    from app.models.company import Company
+
+    company_row = db_session.get(Company, company["id"])
+    company_row.inventory_account_id = inventory_account["id"]
+    company_row.inventory_adjustment_gain_account_id = gain_account["id"]
+    company_row.inventory_adjustment_loss_account_id = loss_account["id"]
+    db_session.commit()
+    client.post(
+        "/api/inventory/stock/receive",
+        json={"companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
+              "quantity": "5", "unitCost": "4"},
+    )
+    count = client.post(
+        "/api/inventory/physical-counts",
+        json={
+            "companyId": company["id"], "warehouseId": warehouse["id"], "countDate": "2026-08-24",
+            "lines": [{"itemId": item["id"], "expectedQuantity": "5", "countedQuantity": "3"}],
+        },
+    ).json()
+
+    def fail_posting(*args, **kwargs):
+        raise RuntimeError("injected posting failure")
+
+    monkeypatch.setattr("app.services.inventory_service.posting_service.post_manual", fail_posting)
+    with pytest.raises(RuntimeError, match="injected posting failure"):
+        inventory_service.apply_physical_count(
+            db_session,
+            physical_count_id=uuid.UUID(count["id"]),
+            approved_by_id=uuid.uuid4(),
+        )
+
+    assert list(
+        db_session.execute(
+            select(StockLedgerEntry).where(StockLedgerEntry.source_id == uuid.UUID(count["id"]))
+        ).scalars()
+    ) == []
+    db_session.expire_all()
+    assert db_session.get(PhysicalCount, uuid.UUID(count["id"])).status == "COUNTED"
+
+
+def test_project_issue_uses_explicit_effective_date_and_rejects_other_project_warehouse(
+    client, db_session
+):
+    login_admin(client)
+    company, item, _warehouse = _setup(client)
+    from app.models.project import Project
+
+    project_a = Project(company_id=company["id"], name="Proyecto A", status="ACTIVE")
+    project_b = Project(company_id=company["id"], name="Proyecto B", status="ACTIVE")
+    db_session.add_all([project_a, project_b])
+    db_session.commit()
+    warehouse = client.post(
+        "/api/inventory/warehouses",
+        json={"companyId": company["id"], "projectId": str(project_a.id), "code": "A-PROJ", "name": "Proyecto A"},
+    ).json()
+    expense = create_account(
+        client, company_id=company["id"], code="6100", name="Costo proyecto", account_type="EXPENSE"
+    )
+    inventory = create_account(
+        client, company_id=company["id"], code="1400", name="Inventario", account_type="ASSET"
+    )
+    client.post(
+        "/api/inventory/stock/receive",
+        json={"companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
+              "quantity": "5", "unitCost": "4"},
+    )
+
+    rejected = client.post(
+        "/api/inventory/stock/issue-to-project",
+        json={
+            "companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
+            "projectId": str(project_b.id), "quantity": "1", "effectiveDate": "2026-08-20",
+            "costOfGoodsAccountId": expense["id"], "inventoryAccountId": inventory["id"],
+        },
+    )
+    assert rejected.status_code == 403
+
+    issued = client.post(
+        "/api/inventory/stock/issue-to-project",
+        json={
+            "companyId": company["id"], "itemId": item["id"], "warehouseId": warehouse["id"],
+            "projectId": str(project_a.id), "quantity": "1", "effectiveDate": "2026-08-20",
+            "costOfGoodsAccountId": expense["id"], "inventoryAccountId": inventory["id"],
+        },
+    )
+    assert issued.status_code == 201, issued.text
+    link = db_session.execute(
+        select(AccountingSourceLink).where(
+            AccountingSourceLink.source_type == "inventory",
+            AccountingSourceLink.source_id == uuid.UUID(issued.json()["id"]),
+        )
+    ).scalar_one()
+    assert db_session.get(AccountingDocument, link.accounting_document_id).effective_date == date(2026, 8, 20)

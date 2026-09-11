@@ -80,6 +80,26 @@ def test_unbalanced_journal_entry_is_rejected(client):
     assert response.json()["error"]["code"] == "NXR-ACCOUNTING-001"
 
 
+def test_posting_rejects_foreign_currency_without_functional_line_amounts(client, db_session):
+    login_admin(client)
+    company, debit_account, credit_account = _setup_company_and_accounts(client)
+
+    _assert_financial_reference_rejected(
+        client,
+        db_session,
+        {
+            "companyId": company["id"],
+            "scope": "GENERAL",
+            "currencyCode": "USD",
+            "fxRate": "24.75",
+            "lines": [
+                {"accountId": debit_account["id"], "debitAmount": "100.00"},
+                {"accountId": credit_account["id"], "creditAmount": "100.00"},
+            ],
+        },
+    )
+
+
 def test_project_scope_without_project_id_is_rejected(client):
     """INV-OPS-003."""
     login_admin(client)

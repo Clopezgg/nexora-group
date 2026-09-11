@@ -195,7 +195,7 @@ export function ProjectContractsTab({ companyId, projectId }: { companyId: strin
       {planContract ? (
         <ContractPaymentPlanModal
           contract={planContract}
-          currencyCode={planContract.currencyCode ?? 'HNL'}
+          currencyCode={planContract.currencyCode ?? ''}
           onClose={() => {
             setPlanContract(null)
             queryClient.invalidateQueries({ queryKey: ['contract-payments'] })
@@ -206,6 +206,7 @@ export function ProjectContractsTab({ companyId, projectId }: { companyId: strin
       {obligationContract ? (
         <CreateSupplierInvoiceModal
           companyId={companyId}
+          functionalCurrencyCode={obligationContract.currencyCode ?? ''}
           expenseAccounts={expenseAccounts}
           payableAccounts={payableAccounts}
           suppliers={(suppliersQuery.data ?? []).map((s) => ({ id: s.id, legalName: s.legalName }))}

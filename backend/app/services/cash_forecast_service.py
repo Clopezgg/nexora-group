@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.business_time import business_today
 from app.models.ap import SupplierInvoice, SupplierInvoicePaymentPlanItem
 from app.models.ar import CustomerInvoice
+from app.models.company import Company
 from app.models.treasury import TreasuryAccount
 from app.services import treasury_service
 
@@ -116,13 +117,17 @@ def _ar_inflows_by_due(db: Session, company_id) -> list[tuple[date, Decimal]]:
 def forecast(db: Session, *, company_id, as_of: date | None = None) -> CashForecast:
     as_of = as_of or business_today()
 
+    company = db.get(Company, company_id)
+    if company is None or not company.functional_currency_code:
+        raise ValueError("La compañía no tiene moneda funcional configurada")
+
     accounts = db.execute(
         select(TreasuryAccount).where(TreasuryAccount.company_id == company_id)
     ).scalars().all()
     opening = sum(
         (treasury_service.treasury_account_balance(db, a) for a in accounts), Decimal("0")
     )
-    currency = accounts[0].currency_code if accounts else "HNL"
+    currency = company.functional_currency_code
 
     ap_events = _ap_outflows_by_due(db, company_id)
     ar_events = _ar_inflows_by_due(db, company_id)

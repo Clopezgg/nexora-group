@@ -38,17 +38,20 @@ def _assert_stock_resources_belong_to_company(
     db: Session,
     *,
     company_id: uuid.UUID,
-    item_id: uuid.UUID,
+    item_id: uuid.UUID | None,
     warehouse_ids: tuple[uuid.UUID, ...],
     project_id: uuid.UUID | None = None,
 ) -> None:
-    item = inventory_repository.get_item(db, item_id)
-    if item is None or item.company_id != company_id:
-        raise NotAuthorizedError("El ítem no pertenece a la compañía de la operación")
+    if item_id is not None:
+        item = inventory_repository.get_item(db, item_id)
+        if item is None or item.company_id != company_id:
+            raise NotAuthorizedError("El ítem no pertenece a la compañía de la operación")
     for warehouse_id in warehouse_ids:
         warehouse = inventory_repository.get_warehouse(db, warehouse_id)
         if warehouse is None or warehouse.company_id != company_id:
             raise NotAuthorizedError("El almacén no pertenece a la compañía de la operación")
+        if project_id is not None and warehouse.project_id not in (None, project_id):
+            raise NotAuthorizedError("El almacén pertenece a otro proyecto")
     if project_id is not None:
         project = db.get(Project, project_id)
         if project is None or project.company_id != company_id:
@@ -272,6 +275,7 @@ def issue_to_project(
             warehouse_id=payload.warehouse_id,
             project_id=payload.project_id,
             quantity=payload.quantity,
+            effective_date=payload.effective_date,
             cost_of_goods_account_id=payload.cost_of_goods_account_id,
             inventory_account_id=payload.inventory_account_id,
             commit=False,
@@ -408,6 +412,19 @@ def create_physical_count(
     assert_company_access(
         db, user_id=user.id, resource="inventory.physical_count", action="create", company_id=payload.company_id
     )
+    _assert_stock_resources_belong_to_company(
+        db,
+        company_id=payload.company_id,
+        item_id=None,
+        warehouse_ids=(payload.warehouse_id,),
+    )
+    for line in payload.lines:
+        _assert_stock_resources_belong_to_company(
+            db,
+            company_id=payload.company_id,
+            item_id=line.item_id,
+            warehouse_ids=(payload.warehouse_id,),
+        )
     count = inventory_repository.create_physical_count(
         db, company_id=payload.company_id, warehouse_id=payload.warehouse_id, count_date=payload.count_date
     )

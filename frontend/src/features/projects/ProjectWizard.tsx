@@ -11,6 +11,7 @@ import './ProjectWizard.css'
 
 interface WizardProps {
   companyId: string
+  functionalCurrencyCode: string | null
   customers: Array<{ id: string; legalName: string }>
   users: Array<{ id: string; fullName: string }>
   costCenters: Array<{ id: string; code: string; name: string }>
@@ -52,9 +53,9 @@ function isPositiveMoney(value: string) {
   return amount !== null && amount > 0n
 }
 
-export function ProjectWizard({ companyId, customers, users, costCenters, suppliers, onCreated }: WizardProps) {
+export function ProjectWizard({ companyId, functionalCurrencyCode, customers, users, costCenters, suppliers, onCreated }: WizardProps) {
   const [step, setStep] = useState(0)
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState({ ...EMPTY, currencyCode: functionalCurrencyCode ?? '' })
   const [files, setFiles] = useState<File[]>([])
   const [setupRunId, setSetupRunId] = useState<string | null>(null)
   const set = (patch: Partial<typeof EMPTY>) => setForm((prev) => ({ ...prev, ...patch }))

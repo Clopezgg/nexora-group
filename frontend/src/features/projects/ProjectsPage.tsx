@@ -112,7 +112,9 @@ export function ProjectsPage() {
       {wizardOpen ? (
         <Card title="Nuevo proyecto — configuración operacional">
           <ProjectWizard
+            key={activeCompanyId}
             companyId={activeCompanyId}
+            functionalCurrencyCode={activeCompany.functionalCurrencyCode}
             customers={customers}
             users={users}
             costCenters={costCenters}

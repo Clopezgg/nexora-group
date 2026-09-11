@@ -151,9 +151,9 @@ function BudgetAndForecast({ projectId }: { projectId: string }) {
       <p className="nx-field__hint"><strong>Este presupuesto representa el COSTO previsto/autorizado de ejecución, no el precio contratado al cliente.</strong> El valor de venta vive en Comercial → Contratos.</p>
       {wbsNodes.length === 0 ? <EmptyState icon="project" title="Crea primero la WBS" description="NEXORA evita congelar accidentalmente todo el presupuesto como “Sin WBS asignado”. Define la estructura WBS y vuelve aquí." /> : <>
         <BudgetLineEditor lines={baselineLines} onChange={setBaselineLines} wbs={wbsNodes} economicCategories={categoriesQuery.data ?? []} costCenters={costCentersQuery.data ?? []} periods={periodsQuery.data ?? []} requireWbs />
-        <p><strong>Total BASELINE de costos: {formatMoney(baselineTotal, 'HNL')}</strong></p>
+        <p><strong>Total BASELINE de costos: {formatMoney(baselineTotal, functionalCurrencyCode)}</strong></p>
         <Textarea label="Notas del BASELINE" value={notes} onChange={(event) => setNotes(event.target.value)} />
-        <Button disabled={!baselineValid || createBaseline.isPending} loading={createBaseline.isPending} onClick={() => window.confirm(`¿Congelar BASELINE de costos por ${formatMoney(baselineTotal, 'HNL')}? No se sobrescribirá; cambios posteriores requerirán una revisión.`) && createBaseline.mutate()}>Congelar BASELINE</Button>
+        <Button disabled={!baselineValid || createBaseline.isPending} loading={createBaseline.isPending} onClick={() => window.confirm(`¿Congelar BASELINE de costos por ${formatMoney(baselineTotal, functionalCurrencyCode)}? No se sobrescribirá; cambios posteriores requerirán una revisión.`) && createBaseline.mutate()}>Congelar BASELINE</Button>
         {createBaseline.isError ? <p className="nx-field__error" role="alert">{(createBaseline.error as Error).message}</p> : null}
       </>}
     </Card> : null}

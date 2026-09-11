@@ -89,6 +89,37 @@ def test_schedule_over_contract_value_is_422(client):
     assert r.status_code == 422, r.text
 
 
+def test_custom_schedule_under_contract_value_is_422(client):
+    """Un plan CUSTOM ejecutable no puede dejar saldo contractual huérfano."""
+    login_admin(client)
+    company = create_company(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    contract = _contract(
+        client,
+        company["id"],
+        supplier["id"],
+        value="100000.00",
+        number="CTR-API-CUSTOM-UNDER",
+    )
+
+    r = client.post(
+        "/api/contract-payments/schedules",
+        json={
+            "supplierContractId": contract["id"],
+            "scheduleType": "CUSTOM",
+            "installments": [
+                {
+                    "periodYear": 2026,
+                    "periodMonth": 8,
+                    "dueDate": "2026-08-31",
+                    "scheduledAmount": "60000.00",
+                },
+            ],
+        },
+    )
+    assert r.status_code == 422, r.text
+
+
 def test_summary_and_fifo_preview(client):
     login_admin(client)
     company = create_company(client)

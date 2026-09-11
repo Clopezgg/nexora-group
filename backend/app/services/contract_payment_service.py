@@ -341,6 +341,11 @@ def create_schedule(
             "El total del plan supera el valor contractual "
             f"({total} > {contract.value})."
         )
+    if schedule_type == "CUSTOM" and total != _q(contract.value):
+        raise InvalidFinancialReferenceError(
+            "El plan CUSTOM debe programar exactamente el valor contractual "
+            f"({total} != {contract.value}); no se permite saldo sin obligación futura."
+        )
 
     # El plan define el modo de pago del contrato (§6): crear un
     # MONTHLY/CUSTOM schedule promueve el contrato desde LUMP_SUM.

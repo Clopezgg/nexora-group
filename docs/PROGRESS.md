@@ -4688,3 +4688,26 @@ commits de `main` local (stream A: source accounting/contratos/TWM guards,
 - **NEXORA Document Design System**: Se validó que el pipeline `HEIC→JPEG derivado` (`pillow-heif`, `Pillow`) ya se encuentra íntegramente implementado en `evidence_service.py::_derive_display_jpeg`, cerrado así el requerimiento §14 (`DEFERRED-FINAL-019`).
 - **Tests**: Pytest completo en ejecución final de comprobación.
 - **Siguiente paso imperativo**: Despliegue Azure real del SHA `55b8b3eb` + smoke de producción. Requerirá confirmación explícita puntual del usuario según el precepto §11 (suscripción tenant UNAH). La auditoría visual en navegadores a 390/430/768/1024/1440 requiere acceso humano, ya que excede los recursos automatizados del agente.
+
+### 2026-09-12 — Iteración 22 · certificación final PR #135
+
+- Recuperado el estado real sobre `origin/main@212c4a99` y PR #135; el E2E
+  rojo `34648272753` se diagnosticó desde logs, report, traces y capturas.
+- Corregidos: carrera al persistir tema, overflow SAP a 360 px, aborts de
+  navegación WebKit, moneda implícita/ausente en vistas financieras y
+  clipping del estado de Protected Edit en móvil.
+- Rama huérfana `e2408300` clasificada por cambio. Se portaron los constraints
+  SQLAlchemy válidos de Supplier/FixedAsset y el `disposal_date` económico de
+  reversión; se rechazaron dos migraciones redundantes/destructivas. Alembic
+  conserva exactamente un head: `f2c3d4e5f6a7`.
+- Gate backend local: compileall, Ruff, pip-audit 0, fresh upgrade y **677
+  passed**. Gate frontend: npm audit 0, typecheck, lint, **250 passed** y
+  build/PWA. Bicep compila. Docker smoke pasa en CI del HEAD.
+- Playwright local: Chromium/Firefox/WebKit críticos verdes; matriz SAP GUI
+  4 variantes × 7 anchos verde. El recorrido con upload requiere el Blob
+  configurado del CI (local fail-closed con `EVIDENCE_BACKEND=none`).
+- QA visual: inspección real de capturas de las cuatro variantes en desktop,
+  tablet y móvil; se corrigió y recapturó el defecto móvil encontrado.
+
+El merge/deploy/smoke del SHA final siguen siendo gates de release y se
+registran por sus identificadores exactos, no se anticipan en este documento.

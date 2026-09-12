@@ -1,5 +1,23 @@
 # NEXORA GROUP — Production Readiness Gate (Definición Absoluta de 100%)
 
+## Certificación de cierre PR #135 — 2026-09-12
+
+El código del cierre se certificó localmente con 677 pruebas backend sobre
+PostgreSQL real, 250 pruebas frontend, compileall, Ruff completo, pip-audit,
+npm audit, typecheck, lint, build/PWA, migración desde base limpia con un solo
+head (`f2c3d4e5f6a7`), Bicep y matriz visual SAP GUI 4 variantes × 7 anchos.
+La rama huérfana `fix/schema-sync-and-asset-disposal-date` fue auditada:
+se portaron sus constraints de modelo y la semántica válida de
+`disposal_date`; sus migraciones duplicadas/destructivas no se integraron.
+
+La evidencia definitiva del release no se atribuye a estos resultados
+locales: requiere CI verde del HEAD exacto del PR, merge, CI del SHA exacto de
+`main`, deployment real (no solo what-if), coincidencia de imagen/revisión y
+smoke autenticado de producción. Los identificadores finales se conservan en
+GitHub Actions y en el reporte de cierre de la ejecución que realiza el
+deployment, evitando incorporar a Git una afirmación circular sobre el propio
+commit antes de desplegarlo.
+
 ## Live production evidence — 2026-08-27
 
 The earlier Azure authorization/provisioning blocker is no longer current.

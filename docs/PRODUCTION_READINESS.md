@@ -51,19 +51,15 @@ archivo + `CLAUDE.md` + `docs/MASTER_PLAN.md` +
 `docs/REQUIREMENTS_TRACEABILITY.md` son la fuente de verdad — no se
 reinterpreta esta orden desde cero.
 
-**Estado actual (2026-08-26):** 113/124 requisitos completos (110
+**Snapshot histórico (2026-08-26):** 113/124 requisitos completos (110
 IMPLEMENTED + 3 VERIFIED). 11 requisitos restantes: 8 IN_PROGRESS
 (Azure infrastructure, BLOCKED por §11.1), 1 NOT_STARTED (OIDC), 2
 BLOCKED_EXTERNAL (production). Ver `docs/REQUIREMENTS_TRACEABILITY.md`
 para el detalle fila por fila.
 
-**No aplicar todavía.** Esta orden gobierna la fase 90-100% (feature
-freeze → certificación de producción). Mientras el sistema esté en
-Build Width First (completando tracks funcionales, actualmente
-construyendo Track G), estos gates NO son trabajo activo — son la
-definición de destino. Ejecutarlos prematuramente sobre un sistema
-todavía incompleto sería desperdiciar el trabajo (p.ej. un load test
-antes de que existan los módulos que se van a cargar).
+**Nota histórica.** Este bloque describía la transición desde Build Width
+First hacia feature freeze. El repositorio ya alcanzó la fase de
+certificación; los gates siguientes son ahora obligatorios y activos.
 
 **Regla no negociable:** ninguna de las frases "implementation
 complete", "code complete", "feature complete", "all modules merged",

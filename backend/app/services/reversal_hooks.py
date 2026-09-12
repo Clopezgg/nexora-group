@@ -24,19 +24,22 @@ def register_default_reversal_hooks() -> None:
 
     posting_service.register_reversal_hook(
         "supplier_invoice",
-        lambda db, source_id, document_type_code: ap_service.apply_accrual_reversal(
+        lambda db, source_id, document_type_code, _effective_date: ap_service.apply_accrual_reversal(
             db, invoice_id=source_id, document_type_code=document_type_code
         ),
     )
     posting_service.register_reversal_hook(
         "customer_invoice",
-        lambda db, source_id, document_type_code: ar_service.apply_invoice_reversal(
+        lambda db, source_id, document_type_code, _effective_date: ar_service.apply_invoice_reversal(
             db, invoice_id=source_id, document_type_code=document_type_code
         ),
     )
     posting_service.register_reversal_hook(
         "fixed_asset",
-        lambda db, source_id, document_type_code: asset_service.apply_capitalization_reversal(
-            db, asset_id=source_id, document_type_code=document_type_code
+        lambda db, source_id, document_type_code, effective_date: asset_service.apply_capitalization_reversal(
+            db,
+            asset_id=source_id,
+            document_type_code=document_type_code,
+            effective_date=effective_date,
         ),
     )

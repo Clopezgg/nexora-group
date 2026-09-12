@@ -47,6 +47,10 @@ async function ensureCompany(page: Page): Promise<{ id: string; functionalCurren
 }
 
 async function expectOperationalRoute(page: Page, path: string) {
+  // WebKit reports fetches aborted by a navigation as page errors. Finish the
+  // current screen's authoritative requests before navigating so the journey
+  // tests the application rather than canceling its own in-flight queries.
+  await page.waitForLoadState('networkidle')
   const pageErrors: string[] = []
   const onPageError = (error: Error) => pageErrors.push(String(error))
   page.on('pageerror', onPageError)
@@ -55,6 +59,7 @@ async function expectOperationalRoute(page: Page, path: string) {
     expect(response?.status(), `${path}: HTTP`).toBeLessThan(500)
     await expect(page.locator('.nx-app-shell')).toBeVisible({ timeout: 15_000 })
     await expect(page.locator('main')).toBeVisible()
+    await page.waitForLoadState('networkidle')
     await expect(page.locator('body')).not.toContainText('Application error')
     expect(pageErrors, `${path}: page errors`).toEqual([])
   } finally {

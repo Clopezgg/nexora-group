@@ -214,6 +214,9 @@ def test_approved_supplier_invoice_capitalizes_one_project_asset_through_gl(clie
     retired = client.get(f"/api/assets/{asset['id']}")
     assert retired.status_code == 200
     assert retired.json()["status"] == "RETIRED"
+    reversal_document = db_session.get(AccountingDocument, capitalization_reversal.json()["id"])
+    assert reversal_document is not None
+    assert retired.json()["disposalDate"] == reversal_document.effective_date.isoformat()
     assert retired.json()["supplierInvoiceId"] == invoice.json()["id"]
 
     accrual_reversal = client.post(

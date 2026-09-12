@@ -15,8 +15,9 @@ export function AccountsPayableWorkspace() {
   const [historyInvoice, setHistoryInvoice] = useState<SupplierInvoice | null>(null)
   const [planInvoice, setPlanInvoice] = useState<SupplierInvoice | null>(null)
 
-  const { companies, activeCompanyId: selectedCompanyId, setActiveCompanyId, isLoading: companiesLoading } = useActiveCompany()
+  const { companies, activeCompany, activeCompanyId: selectedCompanyId, setActiveCompanyId, isLoading: companiesLoading } = useActiveCompany()
   const activeCompanyId = selectedCompanyId ?? ''
+  const currencyCode = activeCompany?.functionalCurrencyCode ?? null
 
   const invoicesQuery = useQuery({
     queryKey: ['ap', 'supplier-invoices', activeCompanyId],
@@ -40,7 +41,7 @@ export function AccountsPayableWorkspace() {
     { key: 'invoice', header: 'Factura', render: (row) => row.invoiceNumber },
     { key: 'supplier', header: 'Proveedor', render: (row) => row.supplierName ?? '—' },
     { key: 'due', header: 'Vence', render: (row) => row.dueDate },
-    { key: 'remaining', header: 'A pagar', render: (row) => formatMoney(Number(row.remaining)) },
+    { key: 'remaining', header: 'A pagar', render: (row) => formatMoney(row.remaining, currencyCode) },
     {
       key: 'flag',
       header: '',
@@ -64,7 +65,7 @@ export function AccountsPayableWorkspace() {
             <div className="nx-treasury__actions">
               <Badge>
                 {proposalQuery.data.items.length} factura(s) · total{' '}
-                {formatMoney(Number(proposalQuery.data.total ?? 0))}
+                {formatMoney(proposalQuery.data.total ?? '0', currencyCode)}
               </Badge>
             </div>
             <Table

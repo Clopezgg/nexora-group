@@ -41,13 +41,13 @@ function flattenTree(nodes: WBSNode[]): WBSNode[] {
   return result
 }
 
-function metric(value: string | null, currency = 'HNL') {
-  return value === null ? '—' : formatMoney(Number(value), currency)
+function metric(value: string | null, currency?: string | null) {
+  return value === null ? '—' : formatMoney(value, currency)
 }
 
 function WBSManager({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient()
-  const { activeCompanyId } = useActiveCompany()
+  const { activeCompany, activeCompanyId } = useActiveCompany()
   const [form, setForm] = useState(EMPTY_FORM)
   const [editing, setEditing] = useState<WBSNode | null>(null)
   const [editForm, setEditForm] = useState<WBSInput>({})
@@ -100,10 +100,10 @@ function WBSManager({ projectId }: { projectId: string }) {
     { key: 'dates', header: 'Plan', render: (row) => row.plannedStart || row.plannedFinish ? `${row.plannedStart ?? '—'} → ${row.plannedFinish ?? '—'}` : '—' },
     { key: 'status', header: 'Estado', render: (row) => <Badge>{statusLabel(row.status)}</Badge> },
     { key: 'progress', header: 'Avance', render: (row) => `${Number(row.progressPercent).toFixed(1)}%` },
-    { key: 'budget', header: 'Presupuesto', render: (row) => metric(financialByNode.get(row.id)?.authorized ?? '0') },
-    { key: 'committed', header: 'Comprometido', render: (row) => metric(financialByNode.get(row.id)?.committed ?? null) },
-    { key: 'actual', header: 'Costo real', render: (row) => metric(financialByNode.get(row.id)?.actualCost ?? null) },
-    { key: 'variance', header: 'Variación', render: (row) => metric(financialByNode.get(row.id)?.variance ?? null) },
+    { key: 'budget', header: 'Presupuesto', render: (row) => metric(financialByNode.get(row.id)?.authorized ?? '0', activeCompany?.functionalCurrencyCode) },
+    { key: 'committed', header: 'Comprometido', render: (row) => metric(financialByNode.get(row.id)?.committed ?? null, activeCompany?.functionalCurrencyCode) },
+    { key: 'actual', header: 'Costo real', render: (row) => metric(financialByNode.get(row.id)?.actualCost ?? null, activeCompany?.functionalCurrencyCode) },
+    { key: 'variance', header: 'Variación', render: (row) => metric(financialByNode.get(row.id)?.variance ?? null, activeCompany?.functionalCurrencyCode) },
     { key: 'actions', header: '', render: (row) => <Button variant="secondary" onClick={() => beginEdit(row)}>Editar</Button> },
   ]
 

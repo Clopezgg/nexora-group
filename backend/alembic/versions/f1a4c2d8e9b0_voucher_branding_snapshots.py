@@ -13,9 +13,10 @@ avoid a voucher/evidence lifecycle coupling; the snapshot is historical.
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "f1a4c2d8e9b0"
 down_revision: Union[str, None] = "e7f2a9c14d58"

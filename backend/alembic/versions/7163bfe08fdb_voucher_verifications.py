@@ -13,8 +13,9 @@ vez que se generan.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "7163bfe08fdb"
 down_revision: Union[str, None] = "ef13ec9e4f2d"

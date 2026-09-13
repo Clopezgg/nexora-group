@@ -18,6 +18,7 @@ texto libre `address` (una migración de dato real, sin inventar nada).
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "c4f6a8b20d55"

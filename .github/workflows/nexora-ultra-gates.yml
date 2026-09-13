@@ -162,6 +162,11 @@ jobs:
         working-directory: backend
         run: alembic upgrade head
 
+      - name: Create test database for worktree slug
+        run: |
+          SLUG=$(python3 -c "import re,os; print(re.sub(r'[^a-z0-9]+','_',os.path.basename(os.path.dirname(os.path.join('${{ github.workspace }}','backend'))).lower()).strip('_') or 'default')")
+          PGPASSWORD=nexora createdb -h localhost -U nexora -O nexora "nexora_test_${SLUG}" || true
+
       - name: Property + posting invariants
         working-directory: backend
         run: |
@@ -303,6 +308,13 @@ jobs:
       - name: Migrate
         working-directory: backend
         run: alembic upgrade head
+
+      - name: Configure Protected Edit capability (test-only harness)
+        run: |
+          SALT="$(python3 -c 'import base64,os; print(base64.urlsafe_b64encode(os.urandom(16)).decode("ascii"))')"
+          DIGEST="$(python3 -c 'import base64,hashlib,os,sys; salt=base64.urlsafe_b64decode(sys.argv[1]); print(base64.urlsafe_b64encode(hashlib.pbkdf2_hmac("sha256", b"ultra-contract-ci-pin", salt, 250000)).decode("ascii"))' "$SALT")"
+          echo "EDIT_ACCESS_TOKEN_SALT=$SALT" >> "$GITHUB_ENV"
+          echo "EDIT_ACCESS_TOKEN_DIGEST=$DIGEST" >> "$GITHUB_ENV"
 
       - name: Start real FastAPI
         working-directory: backend

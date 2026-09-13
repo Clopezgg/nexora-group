@@ -159,26 +159,14 @@ export function ThemeSettingsCard({
   const families = useMemo(() => {
     return THEME_FAMILY_ORDER.filter((family) => presets.some((preset) => preset.family === family))
   }, [presets])
+  // A family confirmation updates the global preview immediately. During the
+  // transition, derive the variant from the new active family so the selector
+  // cannot render the previous family's value or options for one frame.
+  const activeFamily = getThemePreset(activeThemeId).family
   const draftFamily = getThemePreset(draftTheme).family
-  const familyPresets = presets.filter((preset) => preset.family === draftFamily)
-
-  // A family confirmation updates the global preview immediately. Keep the
-  // local draft aligned when that transition crosses families so the variant
-  // selector cannot briefly render the previous family's options. The realign
-  // runs during render while guarded against repeating (React's documented
-  // "adjust state during render") instead of a synchronous setState in an
-  // effect, keeping react-hooks/set-state-in-effect satisfied.
-  const [lastSeenFamilyState, setLastSeenFamilyState] = useState({
-    theme: activeThemeId,
-    family: draftFamily,
-  })
-  if (
-    lastSeenFamilyState.theme !== activeThemeId ||
-    lastSeenFamilyState.family !== draftFamily
-  ) {
-    setLastSeenFamilyState({ theme: activeThemeId, family: draftFamily })
-    if (getThemePreset(activeThemeId).family !== draftFamily) setDraftTheme(activeThemeId)
-  }
+  const effectiveDraftTheme = activeFamily === draftFamily ? draftTheme : activeThemeId
+  const effectiveDraftFamily = getThemePreset(effectiveDraftTheme).family
+  const familyPresets = presets.filter((preset) => preset.family === effectiveDraftFamily)
 
   const applyPreview = (themeId: string, density: Density) => {
     setDraftTheme(themeId)
@@ -216,10 +204,10 @@ export function ThemeSettingsCard({
           <div className="nx-theme-settings__controls">
             <Select
               label="Familia"
-              value={draftFamily}
+              value={effectiveDraftFamily}
               onChange={(event) => {
                 const family = event.target.value as ThemeFamily
-                if (family === 'sap-gui' && draftFamily !== 'sap-gui') {
+                if (family === 'sap-gui' && effectiveDraftFamily !== 'sap-gui') {
                   setConfirmSapOpen(true)
                   return
                 }
@@ -230,7 +218,7 @@ export function ThemeSettingsCard({
               {families.map((family) => <option key={family} value={family}>{FAMILY_LABEL[family]}</option>)}
             </Select>
 
-            <Select label="Variante" value={draftTheme} onChange={(event) => applyPreview(event.target.value, draftDensity)}>
+            <Select label="Variante" value={effectiveDraftTheme} onChange={(event) => applyPreview(event.target.value, draftDensity)}>
               {familyPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
             </Select>
 
@@ -243,21 +231,21 @@ export function ThemeSettingsCard({
             </Select>
 
             <p className="nx-field__hint">
-              {getThemePreset(draftTheme).description}
-              {getThemePreset(draftTheme).contrast === 'high' ? ' · Alto contraste.' : ''}
+              {getThemePreset(effectiveDraftTheme).description}
+              {getThemePreset(effectiveDraftTheme).contrast === 'high' ? ' · Alto contraste.' : ''}
             </p>
-            {companyDefaultThemeId === draftTheme ? <Badge tone="neutral">Predeterminado de la compañía</Badge> : null}
+            {companyDefaultThemeId === effectiveDraftTheme ? <Badge tone="neutral">Predeterminado de la compañía</Badge> : null}
             {companyDefaultDensity ? <p className="nx-field__hint">Densidad predeterminada de la compañía: {companyDefaultDensity}</p> : null}
           </div>
 
           <div className="nx-theme-settings__preview">
             <span className="nx-theme-settings__preview-label">Vista previa estructural</span>
-            <ThemePreviewApp themeId={draftTheme} density={draftDensity} scale={uiScale} />
+            <ThemePreviewApp themeId={effectiveDraftTheme} density={draftDensity} scale={uiScale} />
           </div>
         </div>
 
         <div className="nx-treasury__actions">
-          <Button loading={isSaving} onClick={() => save(draftTheme, draftDensity)}>Guardar como mi preferencia</Button>
+          <Button loading={isSaving} onClick={() => save(effectiveDraftTheme, draftDensity)}>Guardar como mi preferencia</Button>
           <Button variant="secondary" onClick={() => { void save(null, null) }}>Volver a heredar</Button>
           <Button variant="secondary" onClick={cancelPreview}>Cancelar vista previa</Button>
           {isAdmin && companyId ? (

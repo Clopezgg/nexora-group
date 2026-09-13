@@ -109,8 +109,8 @@ test('cross-browser critical compatibility', async ({ page }) => {
       await page.getByRole('button', { name: 'Cambiar a SAP GUI', exact: true }).click()
     }
     await page.getByLabel('Variante', { exact: true }).selectOption(variant)
-    await page.getByRole('button', { name: 'Guardar como mi preferencia' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant)
+    await page.getByRole('button', { name: 'Guardar como mi preferencia' }).click()
     await page.waitForLoadState('networkidle')
     await page.reload()
     await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant)

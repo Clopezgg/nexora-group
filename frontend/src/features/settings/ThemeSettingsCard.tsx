@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Badge, Button, Card, Modal, Select } from '../../design-system'
 import { useAuth } from '../../features/auth/auth-context'
@@ -164,10 +164,21 @@ export function ThemeSettingsCard({
 
   // A family confirmation updates the global preview immediately. Keep the
   // local draft aligned when that transition crosses families so the variant
-  // selector cannot briefly render the previous family's options.
-  useEffect(() => {
+  // selector cannot briefly render the previous family's options. The realign
+  // runs during render while guarded against repeating (React's documented
+  // "adjust state during render") instead of a synchronous setState in an
+  // effect, keeping react-hooks/set-state-in-effect satisfied.
+  const [lastSeenFamilyState, setLastSeenFamilyState] = useState({
+    theme: activeThemeId,
+    family: draftFamily,
+  })
+  if (
+    lastSeenFamilyState.theme !== activeThemeId ||
+    lastSeenFamilyState.family !== draftFamily
+  ) {
+    setLastSeenFamilyState({ theme: activeThemeId, family: draftFamily })
     if (getThemePreset(activeThemeId).family !== draftFamily) setDraftTheme(activeThemeId)
-  }, [activeThemeId, draftFamily])
+  }
 
   const applyPreview = (themeId: string, density: Density) => {
     setDraftTheme(themeId)

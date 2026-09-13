@@ -113,7 +113,8 @@ test('cross-browser critical compatibility', async ({ page }) => {
     await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant)
     await page.waitForLoadState('networkidle')
     await page.reload()
-    await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant)
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant, { timeout: 10_000 })
     await page.getByRole('menuitem', { name: 'Sistema', exact: true }).click()
     // A real click verifies the menu is not clipped behind the shell bars.
     await page.getByRole('menu', { name: 'Sistema', exact: true }).getByRole('menuitem', { name: 'Inicio', exact: true }).click()

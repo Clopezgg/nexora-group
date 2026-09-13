@@ -101,6 +101,37 @@ test('cross-browser critical compatibility', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Desbloquear', exact: true }).click()
   await expect(dialog).not.toBeVisible()
 
+  for (const variant of ['sap-gui-signature', 'sap-gui-tradeshow', 'sap-gui-horizon', 'sap-gui-horizon-dark']) {
+    await page.goto('/control/configuracion')
+    await page.waitForLoadState('networkidle')
+    if (await page.locator('html').getAttribute('data-nx-family') !== 'sap-gui') {
+      await page.getByLabel('Familia', { exact: true }).selectOption('sap-gui')
+      await page.getByRole('button', { name: 'Cambiar a SAP GUI', exact: true }).click()
+    }
+    await page.getByLabel('Variante', { exact: true }).selectOption(variant)
+    await page.getByRole('button', { name: 'Guardar como mi preferencia' }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant)
+    await page.waitForLoadState('networkidle')
+    await page.reload()
+    await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant)
+    await page.getByRole('menuitem', { name: 'Sistema', exact: true }).click()
+    // A real click verifies the menu is not clipped behind the shell bars.
+    await page.getByRole('menu', { name: 'Sistema', exact: true }).getByRole('menuitem', { name: 'Inicio', exact: true }).click()
+    await expect(page).toHaveURL(/\/inicio/)
+    await expectOperationalRoute(page, '/finanzas/contabilidad')
+    await expectOperationalRoute(page, '/proyectos/cockpit')
+    await expectOperationalRoute(page, '/abastecimiento/inventario')
+    await page.getByRole('button', { name: 'Edición habilitada' }).click()
+    await page.getByRole('button', { name: 'Edición protegida' }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).not.toBeVisible()
+    await page.getByRole('button', { name: 'Edición protegida' }).click()
+    await page.getByLabel('Token de seguridad').fill(process.env.E2E_EDIT_ACCESS_TOKEN!)
+    await page.getByRole('button', { name: 'Desbloquear', exact: true }).click()
+    await expect(page.getByRole('dialog')).not.toBeVisible()
+  }
+
   await page.getByRole('button', { name: 'Cerrar sesión' }).click()
   await expect(page).toHaveURL(/\/login/, { timeout: 10_000 })
 })

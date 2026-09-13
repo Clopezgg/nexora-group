@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
 /**
@@ -73,20 +74,7 @@ async function unlockProtectedEdit(page: Page) {
 }
 
 async function ensureCompany(page: Page) {
-  const existing = await page.request.get('/api/master-data/companies')
-  expect(existing.ok(), await existing.text()).toBeTruthy()
-  const companies = (await existing.json()) as Array<{
-    id: string
-    functionalCurrencyCode: string | null
-  }>
-  const configured = companies.find((company) => Boolean(company.functionalCurrencyCode))
-  if (configured) {
-    await page.evaluate((companyId) => {
-      window.localStorage.setItem('nexora.activeCompanyId', companyId)
-    }, configured.id)
-    return
-  }
-
+  // Own company: other journeys may already have an accounting catalog.
   const capability = await page.evaluate(() =>
     window.sessionStorage.getItem('nexora.edit-access.capability'),
   )
@@ -100,6 +88,30 @@ async function ensureCompany(page: Page) {
   await page.evaluate((companyId) => {
     window.localStorage.setItem('nexora.activeCompanyId', companyId)
   }, company.id)
+}
+
+// Real test records in the isolated E2E database; no intercepted API data.
+async function seedRepresentativeData(page: Page) {
+  const { companyId, capability } = await page.evaluate(() => ({
+    companyId: localStorage.getItem('nexora.activeCompanyId'),
+    capability: sessionStorage.getItem('nexora.edit-access.capability'),
+  }))
+  const post = async (path: string, data: Record<string, unknown>) => {
+    const response = await page.request.post(path, {
+      headers: { 'X-Nexora-Edit-Access': capability! }, data: { companyId, ...data },
+    })
+    expect(response.ok(), await response.text()).toBeTruthy()
+  }
+  await post('/api/projects', { code: 'SAP-QA', name: 'Proyecto de verificación visual', currencyCode: 'HNL' })
+  for (const [code, name, accountType] of [
+    ['1101', 'Bancos', 'ASSET'], ['1102', 'Inventario de materiales', 'ASSET'],
+    ['2101', 'Proveedores', 'LIABILITY'], ['3101', 'Capital', 'EQUITY'],
+    ['4101', 'Ingresos de construcción', 'REVENUE'], ['5101', 'Costo de materiales', 'EXPENSE'],
+  ]) await post('/api/master-data/accounts', { code, name, accountType, isPostable: true })
+  await post('/api/inventory/warehouses', { code: 'QA', name: 'Almacén de verificación' })
+  for (const [sku, name] of [['MAT-001', 'Cemento'], ['MAT-002', 'Acero de refuerzo'], ['MAT-003', 'Agregado']]) {
+    await post('/api/inventory/items', { sku, name, uom: 'unidad' })
+  }
 }
 
 async function setTheme(page: Page, themeId: string) {
@@ -155,6 +167,23 @@ async function captureRoute(
       overflow.scrollWidth,
       `${variant} ${viewport.name} ${path}: sin overflow de documento`,
     ).toBeLessThanOrEqual(overflow.clientWidth + 1)
+    await page.waitForLoadState('networkidle')
+    if (path === '/proyectos/cockpit') {
+      await page.getByLabel('Proyecto', { exact: true }).selectOption({ label: 'SAP-QA · Proyecto de verificación visual' })
+      await expect(page.getByText('Presupuesto (BAC)', { exact: true })).toBeVisible()
+      await page.waitForLoadState('networkidle')
+    }
+    if (viewport.width === 1440 && ['contabilidad', 'cockpit', 'inventario'].includes(name)) {
+      const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()
+      expect(accessibility.violations, JSON.stringify(accessibility.violations.map(({ id, nodes }) => ({ id, targets: nodes.map(({ target }) => target) })))).toEqual([])
+    }
+    if (viewport.width <= 640) {
+      const overlapping = await page.locator('.nx-table--responsive tbody').evaluateAll((bodies) => bodies.some((body) => {
+        const rows = Array.from(body.querySelectorAll('tr'))
+        return rows.some((row, index) => index > 0 && row.getBoundingClientRect().top < rows[index - 1].getBoundingClientRect().bottom)
+      }))
+      expect(overlapping, 'stacked mobile records must not overlap').toBe(false)
+    }
     await page.screenshot({
       path: `e2e/visual/sap-${variant}-${viewport.name}-${name}.png`,
       fullPage: true,
@@ -174,13 +203,19 @@ test('SAP GUI visual acceptance matrix', async ({ page }) => {
   await login(page)
   await unlockProtectedEdit(page)
   await ensureCompany(page)
+  await seedRepresentativeData(page)
   await page.reload()
+
+  // Explicit iteration mode; the default acceptance matrix remains complete.
+  const representative = process.env.SAP_REPRESENTATIVE === '1'
+  const viewports = representative ? VIEWPORTS.filter(({ name }) => ['1440', '768', '390'].includes(name)) : VIEWPORTS
+  const routes = representative ? PAGES.filter(({ name }) => ['contabilidad', 'cockpit', 'inventario'].includes(name)) : PAGES
 
   for (const variant of VARIANTS) {
     await setTheme(page, variant)
-    for (const viewport of VIEWPORTS) {
+    for (const viewport of viewports) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
-      for (const { path, name } of PAGES) {
+      for (const { path, name } of routes) {
         await captureRoute(page, variant, viewport, path, name)
       }
     }

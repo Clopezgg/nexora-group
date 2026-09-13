@@ -55,7 +55,9 @@ test('SAP GUI confirmation, variants and representative routes use one global sh
   await login(page)
   await unlockProtectedEdit(page)
   await ensureCompany(page.request)
+  await setTheme(page, 'nexora-horizon-light')
   await page.goto('/control/configuracion')
+  await page.waitForLoadState('networkidle')
 
   await page.getByLabel('Familia').selectOption('sap-gui')
   await expect(page.getByRole('dialog', { name: 'Cambiar a SAP GUI' })).toBeVisible()
@@ -204,6 +206,7 @@ test('all four SAP GUI variants render representative routes with real chrome', 
 
     for (const route of REPRESENTATIVE_ROUTES) {
       await page.goto(route)
+      await expect(page.locator('html')).toHaveAttribute('data-nx-theme', id)
       await expect(page.locator('main')).toBeVisible()
       await expect(page.getByRole('menubar', { name: 'Barra de menús SAP GUI' })).toBeVisible()
       await expect(page.getByRole('toolbar', { name: 'Barra de herramientas SAP GUI' })).toBeVisible()
@@ -218,6 +221,8 @@ test('all four SAP GUI variants render representative routes with real chrome', 
 
     // Axe por variante en una ruta financiera densa.
     await page.goto('/finanzas/cuentas-por-pagar')
+    await expect(page.locator('html')).toHaveAttribute('data-nx-theme', id)
+    await page.waitForLoadState('networkidle')
     const accessibility = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
       .analyze()
@@ -273,4 +278,24 @@ test('a modern family never mounts SAP GUI chrome', async ({ page }) => {
   await setTheme(page, 'quartz-light')
   await expect(page.getByRole('menubar', { name: 'Barra de menús SAP GUI' })).toHaveCount(0)
   await expect(page.getByRole('status', { name: 'Contexto SAP GUI' })).toHaveCount(0)
+})
+
+
+test('SAP menus and command results remain clickable outside compact bars', async ({ page }) => {
+  await login(page)
+  await unlockProtectedEdit(page)
+  await ensureCompany(page.request)
+  for (const theme of SAP_VARIANTS) {
+    await setTheme(page, theme.id)
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.getByRole('menuitem', { name: 'Sistema', exact: true }).click()
+      await page.getByRole('menu', { name: 'Sistema', exact: true }).getByRole('menuitem', { name: 'Inicio', exact: true }).click()
+      await expect(page).toHaveURL(/\/inicio/)
+      const command = page.getByRole('combobox', { name: 'Comando: buscar módulo, documento o acción' })
+      await command.fill('Inventario')
+      await page.getByRole('listbox', { name: 'Resultados del comando' }).getByRole('button', { name: /Inventario/ }).click()
+      await expect(page).toHaveURL(/\/abastecimiento\/inventario/)
+    }
+  }
 })

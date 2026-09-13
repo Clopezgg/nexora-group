@@ -947,3 +947,83 @@
   :root[data-nx-family='sap-gui'] body .nx-sap-toolbar button { min-width: 40px; min-height: 40px; }
   :root[data-nx-family='sap-gui'] body .nx-sap-commandbar__nav { min-width: 40px; min-height: 40px; }
 }
+
+/* Workstation composition: contiguous bars, bounded command field, real screen. */
+:root[data-nx-family='sap-gui'] body .nx-app-shell {
+  grid-template-columns: var(--sap-sidebar-width) minmax(0, 1fr);
+  grid-template-rows: var(--sap-title-height) var(--sap-menu-height) var(--sap-command-height) minmax(0, 1fr) var(--sap-status-height);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-commandrow { overflow: visible; position: relative; z-index: 30; }
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar { flex: 0 1 430px; }
+:root[data-nx-family='sap-gui'] body .nx-sap-toolbar { height: auto; }
+:root[data-nx-family='sap-gui'] body .nx-sap-toolbar button { height: var(--sap-toolbar-height); }
+:root[data-nx-family='sap-gui'] body .nx-sap-menubar { overflow: visible; position: relative; z-index: 40; }
+:root[data-nx-family='sap-gui'] body .nx-sap-menu__list { max-height: min(65dvh, 520px); overflow-y: auto; }
+:root[data-nx-family='sap-gui'] body .nx-app-shell__content {
+  padding: 0;
+  margin: 5px;
+  box-shadow: none;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-screen__header {
+  align-items: center;
+  min-height: 30px;
+  margin: 0;
+  padding: 4px 9px;
+  background: linear-gradient(var(--nx-color-surface-raised), var(--nx-color-surface-sunken));
+  border-bottom: 1px solid var(--nx-color-border-strong);
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-screen__title { font-size: 13px; }
+:root[data-nx-family='sap-gui'] body .nx-sap-screen__context { margin-left: auto; }
+:root[data-nx-family='sap-gui'] body .nx-sap-screen__workarea { padding: 9px; }
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] body .nx-sap-screen__header {
+  color: #fff;
+  background: linear-gradient(#365c86, #21386b);
+}
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] body .nx-sap-screen__header span { color: inherit; }
+:root[data-nx-family='sap-gui'][data-nx-menubar='classic-modern'] body .nx-sap-screen__header {
+  background: var(--nx-color-surface-raised);
+  border-bottom: 1px solid var(--nx-color-border);
+  min-height: 34px;
+}
+:root[data-nx-family='sap-gui'][data-nx-menubar='classic-modern'] body .nx-sap-tree .nx-sidebar__group-label {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--nx-color-border);
+  min-height: 28px;
+}
+:root[data-nx-family='sap-gui'] body .nx-sap-tree .nx-sidebar__list { border-left: 1px dotted var(--nx-color-border-strong); margin-left: 10px; padding-left: 5px; }
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] body .nx-sap-tree .nx-sidebar__link { color: var(--nx-shell-sidebar-text); }
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] body .nx-sap-tree .nx-sidebar__link:hover { color: var(--nx-color-text); }
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-sap-titlebar { background: #0a1118; }
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-sap-statusbar { background: #101922; }
+:root[data-nx-family='sap-gui'] body .nx-sap-toolbar button:disabled,
+:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__nav:disabled { opacity: .45; cursor: default; }
+@media (max-width: 1024px) {
+  :root[data-nx-family='sap-gui'] body .nx-app-shell { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  :root[data-nx-family='sap-gui'] body .nx-app-shell { grid-template-rows: 26px 40px auto minmax(0, 1fr) 28px; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-menubar > .nx-sap-menu { flex: 1; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-menubar button { min-height: 40px; padding-inline: 7px; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-menu__list { position: fixed; top: 66px; left: 5px; right: 5px; max-width: none; min-width: 0; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar { flex-basis: 100%; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar__ok,
+  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar__field input { height: 40px; min-width: 0; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar__ok { min-width: 40px; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-toolbar { padding-block: 2px; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-screen__workarea { padding: 7px; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-tree :is(.nx-sidebar__group-label, .nx-sidebar__link) { min-height: 40px; }
+}
+@media (max-width: 760px) {
+  :root[data-nx-family='sap-gui'] body .nx-topbar {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  :root[data-nx-family='sap-gui'] body .nx-topbar__left { flex: 1 1 100%; min-width: 0; }
+  :root[data-nx-family='sap-gui'] body .nx-topbar__context { flex: 1; min-width: 0; }
+  :root[data-nx-family='sap-gui'] body .nx-topbar__context .nx-select { min-width: 0; width: 100%; }
+  :root[data-nx-family='sap-gui'] body .nx-topbar__right { flex: 1 1 100%; justify-content: flex-end; }
+  :root[data-nx-family='sap-gui'] body .nx-sap-toolbar { justify-content: flex-start; }
+}
+/* Context controls sit below command/menu popups and below modal overlays. */
+:root[data-nx-family='sap-gui'] body .nx-topbar { z-index: 20; }

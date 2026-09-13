@@ -7,8 +7,9 @@ Create Date: 2026-08-29
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "a26d4f8b91c3"
 down_revision: Union[str, None] = "f17c9a4e2d81"

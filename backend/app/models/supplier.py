@@ -52,6 +52,16 @@ SUPPLIER_CONTRACT_CATEGORY_LABELS_ES = {
 
 class Supplier(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "suppliers"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('ACTIVE','INACTIVE','BLOCKED','ARCHIVED')",
+            name="ck_suppliers_status",
+        ),
+        CheckConstraint(
+            "party_role IN ('SUPPLIER','CONTRACTOR','BOTH')",
+            name="ck_suppliers_party_role",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False

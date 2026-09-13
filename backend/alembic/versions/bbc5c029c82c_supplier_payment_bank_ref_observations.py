@@ -11,6 +11,7 @@ nullable, sin backfill. No destructiva.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "bbc5c029c82c"

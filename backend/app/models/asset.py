@@ -46,6 +46,18 @@ class FixedAsset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "OR (scope = 'PROJECT' AND project_id IS NOT NULL)",
             name="ck_fixed_assets_operation_scope",
         ),
+        CheckConstraint(
+            "COALESCE(accumulated_depreciation, 0) >= 0",
+            name="ck_fixed_assets_accumulated_depreciation_non_negative",
+        ),
+        CheckConstraint(
+            "(status NOT IN ('DISPOSED','RETIRED')) OR disposal_date IS NOT NULL",
+            name="ck_fixed_assets_disposal_date",
+        ),
+        CheckConstraint(
+            "COALESCE(disposal_proceeds, 0) >= 0",
+            name="ck_fixed_assets_disposal_proceeds_non_negative",
+        ),
         UniqueConstraint("supplier_invoice_id", name="uq_fixed_assets_supplier_invoice_id"),
         UniqueConstraint(
             "capitalization_document_id",

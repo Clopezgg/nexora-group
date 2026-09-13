@@ -21,6 +21,7 @@ from app.services import (
     project_financial_service,
     project_lifecycle_service,
 )
+from app.services.project_close_blockers import check_close_blockers
 from app.services.permission_service import (
     assert_company_access,
     require_permission,
@@ -147,6 +148,15 @@ def transition_project_status(
     has_lifecycle = user_has_permission(
         db, user_id=user.id, resource="project.lifecycle", action="manage"
     )
+    if payload.status in ("COMPLETED", "CLOSED"):
+        blockers = check_close_blockers(
+            db, project_id=project.id, target_status=payload.status
+        )
+        if blockers.is_blocked:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="No se puede cerrar el proyecto: " + "; ".join(blockers.blockers),
+            )
     try:
         result = project_lifecycle_service.apply_transition(
             project=project,

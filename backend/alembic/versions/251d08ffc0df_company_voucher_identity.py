@@ -12,6 +12,7 @@ hardcodea en el generador de PDF.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "251d08ffc0df"

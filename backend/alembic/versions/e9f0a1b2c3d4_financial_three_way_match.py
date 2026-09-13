@@ -1,8 +1,9 @@
 """Make financial three-way matches invoice-authoritative and overridable."""
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "e9f0a1b2c3d4"
 down_revision = "d8e9f0a1b2c3"

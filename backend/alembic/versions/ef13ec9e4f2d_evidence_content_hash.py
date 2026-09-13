@@ -12,6 +12,7 @@ tolerar filas historicas anteriores a esta migracion sin backfill costoso.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "ef13ec9e4f2d"

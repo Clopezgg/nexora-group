@@ -1,0 +1,18 @@
+# Convergence manifest
+
+Semantic audit for convergence through PR #140. Rescue snapshots are classified by content, not ancestry alone.
+
+| SOURCE_BRANCH | SOURCE_COMMIT | VALID_CHANGES_PORTED | TARGET_COMMIT | DISCARDED_FILES | REASON |
+|---|---|---|---|---|---|
+| `coderabbitai/chat/f72696e` | `54e5ad6d`, `e81389fc` | Dashboard request synchronization; full-journey page errors; SAP anatomy, Axe, overflow and interaction assertions | `9072a653` | none | Valid E2E hardening; PR #143 merged into #140 and closed |
+| `backup/rescue-nexora-group-20260913-095459-1` | `5ba44a7c` | Missing SQLAlchemy `CheckConstraint` declarations synchronized with existing migration `b0a1c2d3e4f5` | `aaef2d1a`, `d758baa2` | `-a`; snapshot noise; duplicate files | Only model metadata was absent; database constraints already existed, so no duplicate migration |
+| `backup/rescue-nexora-sap-1to1-final-20260913-095459-18` | `1f032c27` | Keyboard-accessible navigation/menubar/toolbar; regression tests; measured SAP theme anatomy; reconciliation documentation | `d758baa2`, pending final SAP commit | `.artifacts/**`, `backend/.venv/**`, SAP reference BMP/GIF/PNG, contact sheets, raw dumps, temporary patches/scripts, weaker CI workflow | Product-only semantic port; proprietary/generated/reference material excluded |
+| `backup/rescue-nexora-final-certification-20260829-20260913-095459-4` | `9c0f4595` | none | already present before #140 | Historical evidence/document implementations | Current code already authorizes context before storage reads, rejects cross-project access, supports range/download headers, raw blob fetch and object URL revocation with newer tests |
+| `backup/rescue-nexora-final-closeout-20260913-095459-5` | `5bec8737` | `supabase/.temp/` ignore rule only | pending final SAP commit | `supabase/.temp/cli-latest`, `supabase/.temp/linked-project.json` | Local CLI cache/link state is not product code |
+| `fix/nexora-final-closure-20260910` | `7c94510b`..`54522222` | none | already present before #140 | Historical/superseded implementations | Contract-installment controls, physical-count GL posting, company currency inheritance and tests exist in newer integrated form; migrations must not be duplicated |
+| `feat/cpc-5-contract-voucher-pdf` | `7079ac61` | none | patch-equivalent already present | none | `git cherry` reports patch already applied |
+| `fix/nexora-phase1-core-foundations` | `5cca7b6d` | none | patch-equivalent already present | none | `git cherry` reports patch already applied |
+| `fix/nexora-soft-closed-phase1-complete` | `f2f2b367` | none | patch-equivalent already present | none | `git cherry` reports patch already applied |
+| `work/nexora-absolute-final-closeout-20260906` | `c09c7ada`..`7adb2860` | none | `6503c1a7` and later integrated revisions | recovery certification notes and superseded XLSX implementation | Trial-balance XLSX, dependency and tests exist in current tree; recovery documents are historical noise |
+| `work/nexora-final-product-closeout-20260903` | `909d3ae7`, `2874374f` | none | `e9938328` and later integrated revisions | superseded implementations | Build metadata, Decimal-safe dashboard, voucher wording and AP aging exist in current tree |
+| `backup/nexora-final-certification-20260911-140314`, `backup/opencode-handoff-20260912-211229`, `docs/iteration20-closure-record`, `fix/iteration-14-invariant-and-theme-fixes`, `fix/nexora-absolute-final-closure`, `fix/db-check-constraints-drift`, `fix/schema-sync-and-asset-disposal-date`, `work/integrate-absolute-final-closure-33f6` | branch tips | none | `origin/main` | none | Every listed tip is an ancestor of `origin/main`; no unique product delta remains |

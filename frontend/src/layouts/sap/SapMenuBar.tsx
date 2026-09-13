@@ -144,28 +144,34 @@ export function SapMenuBar({ groups, onOpenSearch, onOpenNav }: SapMenuBarProps)
   const activeEntries = menus.find((menu) => menu.id === openMenu)?.entries ?? []
 
   const onBarKeyDown = (event: React.KeyboardEvent) => {
+    if (event.defaultPrevented) return
     const buttons = Array.from(barRef.current?.querySelectorAll<HTMLElement>('[data-menu-button]') ?? [])
-    const current = buttons.findIndex((button) => button === document.activeElement)
-    if (event.key === 'ArrowRight') {
+    const directIndex = buttons.findIndex((button) => button === document.activeElement)
+    const current = directIndex >= 0 ? directIndex : menus.findIndex((menu) => menu.id === openMenu)
+    const focusEntry = (index: number) => {
+      setFocusIndex(index)
+      requestAnimationFrame(() => {
+        barRef.current?.querySelector<HTMLElement>(`[data-menu-item="${index}"]`)?.focus()
+      })
+    }
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' ||
+        (directIndex >= 0 && (event.key === 'Home' || event.key === 'End'))) {
       event.preventDefault()
-      const next = buttons[(current + 1 + buttons.length) % buttons.length]
+      const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 :
+        (current + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length
+      const next = buttons[nextIndex]
       next?.focus()
-      if (openMenu && next) setOpenMenu(next.dataset.menuButton ?? null)
-    } else if (event.key === 'ArrowLeft') {
-      event.preventDefault()
-      const prev = buttons[(current - 1 + buttons.length) % buttons.length]
-      prev?.focus()
-      if (openMenu && prev) setOpenMenu(prev.dataset.menuButton ?? null)
-    } else if ((event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') && current >= 0) {
-      const id = buttons[current]?.dataset.menuButton
-      if (id && openMenu !== id) {
-        event.preventDefault()
-        setOpenMenu(id)
-        setFocusIndex(0)
-        requestAnimationFrame(() => {
-          barRef.current?.querySelector<HTMLElement>(`[data-menu-item="0"]`)?.focus()
-        })
+      if (openMenu && next) {
+        setOpenMenu(next.dataset.menuButton ?? null)
+        if (directIndex < 0) focusEntry(0)
       }
+    } else if (directIndex >= 0 && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
+      event.preventDefault()
+      const menu = menus[directIndex]
+      setOpenMenu(menu.id)
+      focusEntry(event.key === 'ArrowUp' ? menu.entries.length - 1 : 0)
+    } else if (event.key === 'Tab') {
+      setOpenMenu(null)
     }
   }
 

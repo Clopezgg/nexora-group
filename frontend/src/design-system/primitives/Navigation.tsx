@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 export interface BreadcrumbItem {
@@ -87,6 +87,7 @@ export interface TabItem {
   key: string
   label: string
   content: ReactNode
+  disabled?: boolean
 }
 
 export function Tabs({
@@ -101,8 +102,15 @@ export function Tabs({
   activeKey?: string
   onChange?: (key: string) => void
 }) {
-  const [internalActive, setInternalActive] = useState(defaultKey ?? items[0]?.key)
-  const active = activeKey ?? internalActive
+  const instanceId = useId()
+  const tabRefs = useRef(new Map<string, HTMLButtonElement>())
+  const enabledItems = items.filter((item) => !item.disabled)
+  const [internalActive, setInternalActive] = useState(defaultKey ?? enabledItems[0]?.key)
+  const requestedActive = activeKey ?? internalActive
+  const active = enabledItems.some((item) => item.key === requestedActive)
+    ? requestedActive
+    : enabledItems[0]?.key
+  const tabId = (key: string) => `${instanceId}-tab-${key}`
   const setActive = (key: string) => {
     if (activeKey === undefined) setInternalActive(key)
     onChange?.(key)
@@ -119,6 +127,14 @@ export function Tabs({
           <button
             key={item.key}
             role="tab"
+            id={tabId(item.key)}
+            ref={(node) => {
+              if (node) tabRefs.current.set(item.key, node)
+              else tabRefs.current.delete(item.key)
+            }}
+            aria-controls={`${instanceId}-panel`}
+            tabIndex={active === item.key ? 0 : -1}
+            disabled={item.disabled}
             type="button"
             aria-selected={active === item.key}
             className={['nx-tabs__tab', active === item.key ? 'nx-tabs__tab--active' : '']
@@ -126,12 +142,45 @@ export function Tabs({
               .join(' ')}
             style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}
             onClick={() => setActive(item.key)}
+            onKeyDown={(event) => {
+              const index = enabledItems.findIndex((tab) => tab.key === item.key)
+              let nextIndex: number
+              switch (event.key) {
+                case 'ArrowRight':
+                  nextIndex = (index + 1) % enabledItems.length
+                  break
+                case 'ArrowLeft':
+                  nextIndex = (index - 1 + enabledItems.length) % enabledItems.length
+                  break
+                case 'Home':
+                  nextIndex = 0
+                  break
+                case 'End':
+                  nextIndex = enabledItems.length - 1
+                  break
+                default:
+                  return
+              }
+              event.preventDefault()
+              const next = enabledItems[nextIndex]
+              if (next) {
+                setActive(next.key)
+                tabRefs.current.get(next.key)?.focus()
+              }
+            }}
           >
             {item.label}
           </button>
         ))}
       </div>
-      <div className="nx-tabs__panel" role="tabpanel" style={{ minWidth: 0, maxWidth: '100%' }}>
+      <div
+        className="nx-tabs__panel"
+        role="tabpanel"
+        id={`${instanceId}-panel`}
+        aria-labelledby={active ? tabId(active) : undefined}
+        tabIndex={0}
+        style={{ minWidth: 0, maxWidth: '100%' }}
+      >
         {activeItem?.content}
       </div>
     </div>

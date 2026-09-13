@@ -1,0 +1,424 @@
+diff --git a/frontend/src/features/settings/ThemeSettingsCard.tsx b/frontend/src/features/settings/ThemeSettingsCard.tsx
+index 927cf3b9..01029966 100644
+--- a/frontend/src/features/settings/ThemeSettingsCard.tsx
++++ b/frontend/src/features/settings/ThemeSettingsCard.tsx
+@@ -159,8 +159,14 @@ export function ThemeSettingsCard({
+   const families = useMemo(() => {
+     return THEME_FAMILY_ORDER.filter((family) => presets.some((preset) => preset.family === family))
+   }, [presets])
++  // A family confirmation updates the global preview immediately. During the
++  // transition, derive the variant from the new active family so the selector
++  // cannot render the previous family's value or options for one frame.
++  const activeFamily = getThemePreset(activeThemeId).family
+   const draftFamily = getThemePreset(draftTheme).family
+-  const familyPresets = presets.filter((preset) => preset.family === draftFamily)
++  const effectiveDraftTheme = activeFamily === draftFamily ? draftTheme : activeThemeId
++  const effectiveDraftFamily = getThemePreset(effectiveDraftTheme).family
++  const familyPresets = presets.filter((preset) => preset.family === effectiveDraftFamily)
+ 
+   const applyPreview = (themeId: string, density: Density) => {
+     setDraftTheme(themeId)
+@@ -198,10 +204,10 @@ export function ThemeSettingsCard({
+           <div className="nx-theme-settings__controls">
+             <Select
+               label="Familia"
+-              value={draftFamily}
++              value={effectiveDraftFamily}
+               onChange={(event) => {
+                 const family = event.target.value as ThemeFamily
+-                if (family === 'sap-gui' && draftFamily !== 'sap-gui') {
++                if (family === 'sap-gui' && effectiveDraftFamily !== 'sap-gui') {
+                   setConfirmSapOpen(true)
+                   return
+                 }
+@@ -212,7 +218,7 @@ export function ThemeSettingsCard({
+               {families.map((family) => <option key={family} value={family}>{FAMILY_LABEL[family]}</option>)}
+             </Select>
+ 
+-            <Select label="Variante" value={draftTheme} onChange={(event) => applyPreview(event.target.value, draftDensity)}>
++            <Select label="Variante" value={effectiveDraftTheme} onChange={(event) => applyPreview(event.target.value, draftDensity)}>
+               {familyPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
+             </Select>
+ 
+@@ -225,21 +231,21 @@ export function ThemeSettingsCard({
+             </Select>
+ 
+             <p className="nx-field__hint">
+-              {getThemePreset(draftTheme).description}
+-              {getThemePreset(draftTheme).contrast === 'high' ? ' · Alto contraste.' : ''}
++              {getThemePreset(effectiveDraftTheme).description}
++              {getThemePreset(effectiveDraftTheme).contrast === 'high' ? ' · Alto contraste.' : ''}
+             </p>
+-            {companyDefaultThemeId === draftTheme ? <Badge tone="neutral">Predeterminado de la compañía</Badge> : null}
++            {companyDefaultThemeId === effectiveDraftTheme ? <Badge tone="neutral">Predeterminado de la compañía</Badge> : null}
+             {companyDefaultDensity ? <p className="nx-field__hint">Densidad predeterminada de la compañía: {companyDefaultDensity}</p> : null}
+           </div>
+ 
+           <div className="nx-theme-settings__preview">
+             <span className="nx-theme-settings__preview-label">Vista previa estructural</span>
+-            <ThemePreviewApp themeId={draftTheme} density={draftDensity} scale={uiScale} />
++            <ThemePreviewApp themeId={effectiveDraftTheme} density={draftDensity} scale={uiScale} />
+           </div>
+         </div>
+ 
+         <div className="nx-treasury__actions">
+-          <Button loading={isSaving} onClick={() => save(draftTheme, draftDensity)}>Guardar como mi preferencia</Button>
++          <Button loading={isSaving} onClick={() => save(effectiveDraftTheme, draftDensity)}>Guardar como mi preferencia</Button>
+           <Button variant="secondary" onClick={() => { void save(null, null) }}>Volver a heredar</Button>
+           <Button variant="secondary" onClick={cancelPreview}>Cancelar vista previa</Button>
+           {isAdmin && companyId ? (
+diff --git a/frontend/src/layouts/AppLayout.css b/frontend/src/layouts/AppLayout.css
+index 92c24142..873fb59e 100644
+--- a/frontend/src/layouts/AppLayout.css
++++ b/frontend/src/layouts/AppLayout.css
+@@ -550,7 +550,7 @@
+ }
+ @media (max-width: 760px) {
+   :root[data-nx-family='sap-gui'] body .nx-app-shell {
+-    grid-template-rows: 30px 30px minmax(0, 1fr) 28px;
++    grid-template-rows: 30px 30px auto minmax(0, 1fr) 28px;
+   }
+   :root[data-nx-family='sap-gui'] body .nx-sap-titlebar { padding: 0 6px; }
+   :root[data-nx-family='sap-gui'] body .nx-sap-titlebar span { display: none; }
+@@ -559,9 +559,24 @@
+   :root[data-nx-family='sap-gui'] body .nx-topbar__left,
+   :root[data-nx-family='sap-gui'] body .nx-topbar__right { width: auto; order: initial; flex: none; }
+   :root[data-nx-family='sap-gui'] body .nx-topbar .nx-icon-button { min-width: 40px; min-height: 40px; }
++  :root[data-nx-family='sap-gui'] body .nx-topbar .nx-edit-access {
++    width: 40px;
++    min-width: 40px;
++    padding: 0;
++    justify-content: center;
++    font-size: 0;
++  }
+   :root[data-nx-family='sap-gui'] body .nx-app-shell__content { padding: 8px; }
+   :root[data-nx-family='sap-gui'] body .nx-sap-statusbar span:nth-child(n+3) { display: none; }
+   :root[data-nx-family='sap-gui'] body .nx-bottom-nav { display: none; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-commandrow { flex-wrap: wrap; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar,
++  :root[data-nx-family='sap-gui'] body .nx-sap-toolbar { width: 100%; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-toolbar {
++    justify-content: flex-end;
++    border-top: 1px solid var(--nx-color-border);
++    border-left: 0;
++  }
+ }
+ 
+ /* ---------------------------------------------------------------------------
+@@ -932,3 +947,83 @@
+   :root[data-nx-family='sap-gui'] body .nx-sap-toolbar button { min-width: 40px; min-height: 40px; }
+   :root[data-nx-family='sap-gui'] body .nx-sap-commandbar__nav { min-width: 40px; min-height: 40px; }
+ }
++
++/* Workstation composition: contiguous bars, bounded command field, real screen. */
++:root[data-nx-family='sap-gui'] body .nx-app-shell {
++  grid-template-columns: var(--sap-sidebar-width) minmax(0, 1fr);
++  grid-template-rows: var(--sap-title-height) var(--sap-menu-height) var(--sap-command-height) minmax(0, 1fr) var(--sap-status-height);
++}
++:root[data-nx-family='sap-gui'] body .nx-sap-commandrow { overflow: visible; position: relative; z-index: 30; }
++:root[data-nx-family='sap-gui'] body .nx-sap-commandbar { flex: 0 1 430px; }
++:root[data-nx-family='sap-gui'] body .nx-sap-toolbar { height: auto; }
++:root[data-nx-family='sap-gui'] body .nx-sap-toolbar button { height: var(--sap-toolbar-height); }
++:root[data-nx-family='sap-gui'] body .nx-sap-menubar { overflow: visible; position: relative; z-index: 40; }
++:root[data-nx-family='sap-gui'] body .nx-sap-menu__list { max-height: min(65dvh, 520px); overflow-y: auto; }
++:root[data-nx-family='sap-gui'] body .nx-app-shell__content {
++  padding: 0;
++  margin: 5px;
++  box-shadow: none;
++}
++:root[data-nx-family='sap-gui'] body .nx-sap-screen__header {
++  align-items: center;
++  min-height: 30px;
++  margin: 0;
++  padding: 4px 9px;
++  background: linear-gradient(var(--nx-color-surface-raised), var(--nx-color-surface-sunken));
++  border-bottom: 1px solid var(--nx-color-border-strong);
++}
++:root[data-nx-family='sap-gui'] body .nx-sap-screen__title { font-size: 13px; }
++:root[data-nx-family='sap-gui'] body .nx-sap-screen__context { margin-left: auto; }
++:root[data-nx-family='sap-gui'] body .nx-sap-screen__workarea { padding: 9px; }
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] body .nx-sap-screen__header {
++  color: #fff;
++  background: linear-gradient(#365c86, #21386b);
++}
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] body .nx-sap-screen__header span { color: inherit; }
++:root[data-nx-family='sap-gui'][data-nx-menubar='classic-modern'] body .nx-sap-screen__header {
++  background: var(--nx-color-surface-raised);
++  border-bottom: 1px solid var(--nx-color-border);
++  min-height: 34px;
++}
++:root[data-nx-family='sap-gui'][data-nx-menubar='classic-modern'] body .nx-sap-tree .nx-sidebar__group-label {
++  background: transparent;
++  border: 0;
++  border-bottom: 1px solid var(--nx-color-border);
++  min-height: 28px;
++}
++:root[data-nx-family='sap-gui'] body .nx-sap-tree .nx-sidebar__list { border-left: 1px dotted var(--nx-color-border-strong); margin-left: 10px; padding-left: 5px; }
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] body .nx-sap-tree .nx-sidebar__link { color: var(--nx-shell-sidebar-text); }
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] body .nx-sap-tree .nx-sidebar__link:hover { color: var(--nx-color-text); }
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-sap-titlebar { background: #0a1118; }
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-sap-statusbar { background: #101922; }
++:root[data-nx-family='sap-gui'] body .nx-sap-toolbar button:disabled,
++:root[data-nx-family='sap-gui'] body .nx-sap-commandbar__nav:disabled { opacity: .45; cursor: default; }
++@media (max-width: 1024px) {
++  :root[data-nx-family='sap-gui'] body .nx-app-shell { grid-template-columns: minmax(0, 1fr); }
++}
++@media (max-width: 760px) {
++  :root[data-nx-family='sap-gui'] body .nx-app-shell { grid-template-rows: 26px 40px auto minmax(0, 1fr) 28px; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-menubar > .nx-sap-menu { flex: 1; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-menubar button { min-height: 40px; padding-inline: 7px; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-menu__list { position: fixed; top: 66px; left: 5px; right: 5px; max-width: none; min-width: 0; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar { flex-basis: 100%; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar__ok,
++  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar__field input { height: 40px; min-width: 0; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-commandbar__ok { min-width: 40px; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-toolbar { padding-block: 2px; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-screen__workarea { padding: 7px; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-tree :is(.nx-sidebar__group-label, .nx-sidebar__link) { min-height: 40px; }
++}
++@media (max-width: 760px) {
++  :root[data-nx-family='sap-gui'] body .nx-topbar {
++    flex-wrap: wrap;
++    overflow: visible;
++  }
++  :root[data-nx-family='sap-gui'] body .nx-topbar__left { flex: 1 1 100%; min-width: 0; }
++  :root[data-nx-family='sap-gui'] body .nx-topbar__context { flex: 1; min-width: 0; }
++  :root[data-nx-family='sap-gui'] body .nx-topbar__context .nx-select { min-width: 0; width: 100%; }
++  :root[data-nx-family='sap-gui'] body .nx-topbar__right { flex: 1 1 100%; justify-content: flex-end; }
++  :root[data-nx-family='sap-gui'] body .nx-sap-toolbar { justify-content: flex-start; }
++}
++/* Context controls sit below command/menu popups and below modal overlays. */
++:root[data-nx-family='sap-gui'] body .nx-topbar { z-index: 20; }
+diff --git a/frontend/src/theme/ThemeProvider.tsx b/frontend/src/theme/ThemeProvider.tsx
+index c4532a6a..7797c2d9 100644
+--- a/frontend/src/theme/ThemeProvider.tsx
++++ b/frontend/src/theme/ThemeProvider.tsx
+@@ -103,9 +103,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
+   const saveMutation = useMutation({
+     mutationFn: (body: { themeId: string | null; density: Density | null }) =>
+       preferencesService.update(body),
+-    onSuccess: () => {
+-      setPreviewState(null)
+-      queryClient.invalidateQueries({ queryKey: ['me', 'preferences'] })
++    onSuccess: (saved, requested) => {
++      // Publish the authoritative response before dropping the preview so the
++      // UI never flashes back to stale cached preferences. If the user has
++      // already selected another preview while this request was in flight,
++      // preserve that newer intent instead of overwriting it.
++      queryClient.setQueryData(['me', 'preferences'], saved)
++      setPreviewState((current) =>
++        current?.themeId === requested.themeId && current.density === requested.density
++          ? null
++          : current,
++      )
+     },
+   })
+ 
+diff --git a/frontend/src/theme/themes.css b/frontend/src/theme/themes.css
+index 62974017..607d6937 100644
+--- a/frontend/src/theme/themes.css
++++ b/frontend/src/theme/themes.css
+@@ -1139,3 +1139,203 @@
+ :root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-state__title {
+   color: #e0e0e0;
+ }
++
++/* SAP workstation metrics. One scale for shell and business controls. */
++:root[data-nx-family='sap-gui'] {
++  --sap-title-height: 26px;
++  --sap-menu-height: 25px;
++  --sap-command-height: 34px;
++  --sap-toolbar-height: 26px;
++  --sap-status-height: 24px;
++  --sap-field-height: 28px;
++  --sap-button-height: 28px;
++  --sap-row-height: 26px;
++  --sap-tab-height: 28px;
++  --sap-panel-header-height: 26px;
++  --sap-sidebar-width: 224px;
++  --sap-space: 6px;
++  --sap-border: 1px;
++}
++:root[data-nx-family='sap-gui'][data-nx-menubar='classic-modern'] {
++  --sap-title-height: 28px;
++  --sap-field-height: 30px;
++  --sap-button-height: 30px;
++  --sap-row-height: 30px;
++  --sap-tab-height: 32px;
++  --sap-space: 8px;
++}
++:root[data-nx-family='sap-gui'][data-nx-density='finance-dense'] {
++  --sap-field-height: 26px;
++  --sap-button-height: 26px;
++  --sap-row-height: 24px;
++  --sap-space: 4px;
++}
++:root[data-nx-family='sap-gui'] body .nx-app-shell__content h1 {
++  margin: 0 0 var(--sap-space);
++  padding: 4px 0;
++  min-height: var(--sap-panel-header-height);
++  background: none;
++  color: var(--nx-color-text);
++  border: 0;
++  font-size: 16px;
++}
++:root[data-nx-family='sap-gui'] body .nx-page__header {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  justify-content: space-between;
++  gap: var(--sap-space);
++  padding-bottom: var(--sap-space);
++  border-bottom: var(--sap-border) solid var(--nx-color-border);
++}
++:root[data-nx-family='sap-gui'] body .nx-page__header p { margin: 2px 0; }
++:root[data-nx-family='sap-gui'] body .nx-stack { gap: var(--sap-space); }
++:root[data-nx-family='sap-gui'] body .nx-card { margin-block: var(--sap-space); }
++:root[data-nx-family='sap-gui'] body .nx-card__title {
++  display: flex;
++  align-items: center;
++  min-height: var(--sap-panel-header-height);
++  margin: -9px -9px 8px;
++  padding: 3px 8px;
++  border-bottom: 1px solid var(--nx-color-border);
++  background: var(--nx-color-surface-sunken);
++}
++:root[data-nx-family='sap-gui'][data-nx-panel='titled-box'] body .nx-card__title {
++  display: table;
++  min-height: 0;
++  margin: -17px 0 6px;
++  padding: 0 5px;
++  background: var(--nx-color-surface);
++  border: 0;
++}
++:root[data-nx-family='sap-gui'][data-nx-panel='titled-box'] body .nx-card { margin-top: 14px; }
++:root[data-nx-family='sap-gui'][data-nx-panel='banded-box'] body .nx-card {
++  border-top-width: 1px;
++  box-shadow: inset 1px 1px #fff, 1px 1px 0 var(--nx-color-border);
++}
++:root[data-nx-family='sap-gui'][data-nx-panel='banded-box'] body .nx-card__title {
++  color: #fff;
++  background: linear-gradient(#365c86, #21386b);
++  border-bottom-color: #172e50;
++}
++:root[data-nx-family='sap-gui'] body :is(.nx-input, .nx-select) {
++  height: var(--sap-field-height);
++  min-height: var(--sap-field-height);
++}
++:root[data-nx-family='sap-gui'] body .nx-button {
++  height: auto;
++  min-height: var(--sap-button-height);
++}
++:root[data-nx-family='sap-gui'] body .nx-tabs__tab {
++  min-height: var(--sap-tab-height);
++  flex-shrink: 0;
++}
++:root[data-nx-family='sap-gui'] body .nx-tabs__list { align-items: end; padding-top: 4px; }
++:root[data-nx-family='sap-gui'][data-nx-tabs='raised-folder'] body .nx-tabs__tab {
++  border-radius: 5px 5px 0 0;
++  margin-top: 3px;
++  background: linear-gradient(#edf4fa, #a8b8c7);
++  box-shadow: inset 1px 1px #fff;
++  border-color: #6289ae;
++  color: #172e50;
++}
++:root[data-nx-family='sap-gui'][data-nx-tabs='raised-folder'] body .nx-tabs__tab--active {
++  min-height: calc(var(--sap-tab-height) + 4px);
++  margin-top: 0;
++  border-top: 3px solid #21386b;
++  border-bottom-color: var(--nx-color-surface);
++  background: var(--nx-color-surface);
++  box-shadow: 2px -1px 0 #8e9eab;
++}
++:root[data-nx-family='sap-gui'][data-nx-tabs='modern-folder'] body .nx-tabs__tab--active {
++  border-top: 2px solid var(--nx-color-accent);
++  border-bottom-color: var(--nx-color-surface);
++  background: var(--nx-color-surface);
++  box-shadow: inset 0 -2px var(--nx-color-accent);
++}
++:root[data-nx-family='sap-gui'] body .nx-table :is(th, td) {
++  height: var(--sap-row-height);
++  padding: 3px 7px;
++  font-variant-numeric: tabular-nums;
++}
++:root[data-nx-family='sap-gui'][data-nx-table='banded-grid'] body .nx-table th {
++  background: linear-gradient(#365c86, #21386b);
++  color: #fff;
++}
++:root[data-nx-family='sap-gui'] body .nx-fcc-grid {
++  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
++  gap: var(--sap-space);
++}
++:root[data-nx-family='sap-gui'] body :is(.nx-fcc-kpi__label, .nx-fcc-kpi__hint, .nx-fcc-kpi__severity) {
++  color: var(--nx-color-text-muted);
++  font-size: 11px;
++  margin: 2px 0;
++}
++:root[data-nx-family='sap-gui'] body .nx-fcc-kpi__value {
++  color: var(--nx-color-text);
++  font-size: 19px;
++  margin: 4px 0;
++}
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body :is(.nx-topbar .nx-icon-button, .nx-card__title) {
++  background: var(--nx-color-surface-raised);
++  color: var(--nx-color-text);
++  box-shadow: none;
++}
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-button:hover:not(:disabled) {
++  background: #29425d;
++  color: #e6edf5;
++}
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-button:disabled {
++  background: #202d3d;
++  color: #8e9fb3;
++  border-color: #43566e;
++  opacity: 1;
++  filter: none;
++}
++:root[data-nx-family='sap-gui'] body :is(button, input, select, textarea, [tabindex]):focus-visible {
++  outline: 2px solid var(--nx-focus-ring, var(--nx-color-accent));
++  outline-offset: 2px;
++}
++@media (min-width: 761px) {
++  :root[data-nx-family='sap-gui'] body .nx-form-grid {
++    display: grid;
++    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
++    align-items: end;
++    gap: var(--sap-space);
++  }
++  :root[data-nx-family='sap-gui'] body .nx-form-grid > .nx-button { justify-self: start; }
++}
++@media (max-width: 760px) {
++  :root[data-nx-family='sap-gui'] {
++    --sap-menu-height: 40px;
++    --sap-field-height: 40px;
++    --sap-button-height: 40px;
++    --sap-tab-height: 40px;
++  }
++  :root[data-nx-family='sap-gui'][data-nx-menubar] body :is(.nx-input, .nx-select, .nx-button, .nx-tabs__tab) { min-height: 40px; }
++  :root[data-nx-family='sap-gui'] body .nx-page__header { align-items: stretch; }
++  :root[data-nx-family='sap-gui'] body .nx-badge { border-radius: 2px; }
++}
++/* Responsive records must grow with their cells; desktop row density cannot
++   constrain a stacked record to a single row and overlap adjacent records. */
++:root[data-nx-family='sap-gui'] body .nx-table tbody tr { height: var(--sap-row-height); }
++@media (max-width: 640px) {
++  :root[data-nx-family='sap-gui'] body .nx-table--responsive tbody tr { height: auto; padding: 5px 7px; }
++  :root[data-nx-family='sap-gui'] body .nx-table--responsive tbody td {
++    height: auto;
++    min-height: 28px;
++    border: 0;
++    border-bottom: 1px solid var(--nx-color-border);
++    align-items: baseline;
++    flex-wrap: wrap;
++    overflow-wrap: anywhere;
++  }
++}
++:root[data-nx-family='sap-gui'] body .nx-combobox { width: min(100%, 280px); }
++:root[data-nx-family='sap-gui'] body .nx-combobox__control,
++:root[data-nx-family='sap-gui'] body .nx-combobox__control .nx-input { width: 100%; min-width: 0; }
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] body .nx-badge--neutral {
++  color: #c9d6e4;
++  background: #26364a;
++  border-color: #61758e;
++}

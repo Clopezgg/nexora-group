@@ -1,0 +1,429 @@
+
+### SAP-Signature / Main Screen
+group-container | Group | 1044×795 | Positioning:{'left': '30', 'top': '9'}
+line | Line | 707×8 | Positioning:{'left': '683', 'top': '387'} | Border:{'topColor': '#133375', 'topStyle': 'solid', 'leftWidth': '8', 'topWidth': '8', 'rightWidth': '1', 'bottomWidth': '1'}
+group-container | Group | 1024×780 | Positioning:{'left': '13', 'top': '0'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 1024×780 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#fefeff'} | Border:{'radius': '1', 'topColor': '#b6c1cd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 1024×1 | Positioning:{'left': '0', 'top': '52'} | Border:{'topColor': '#c3ccd7', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 1024×1 | Positioning:{'left': '-1', 'top': '31'} | Border:{'topColor': '#c3ccd7', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '200', 'top': '116'}
+item-group |  | 813×622 | Positioning:{'left': '200', 'top': '116'} | Background:{'type': 'color', 'value': '#eaf1f6'} | Border:{'radius': '0', 'topColor': '#d6dbe5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 980×30 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'gradient', 'firstColor': '#d8e3ed', 'secondColor': '#adc5db', 'orientation': 'vertical', 'double': 'false'} | Border:{'radius': '0', 'topColor': '#a8b8c7', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '30'}
+item-group |  | 980×28 | Positioning:{'left': '0', 'top': '30'} | Background:{'type': 'color', 'value': '#cfdde8'} | Border:{'radius': '0', 'topColor': '#eaf1f6', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+group-container | Group | 107×84 | Positioning:{'left': '0', 'top': '33'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '20'}
+item-group |  | 107×64 | Positioning:{'left': '0', 'top': '20'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '108', 'top': '53'}
+item-group |  | 85×62 | Positioning:{'left': '108', 'top': '53'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 61×1 | Positioning:{'left': '76', 'top': '82'} | Border:{'topColor': '#c3ccd7', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '194', 'top': '53'}
+item-group |  | 85×62 | Positioning:{'left': '194', 'top': '53'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 61×1 | Positioning:{'left': '162', 'top': '82'} | Border:{'topColor': '#c3ccd7', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '281', 'top': '53'}
+item-group |  | 742×62 | Positioning:{'left': '281', 'top': '53'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 61×1 | Positioning:{'left': '249', 'top': '82'} | Border:{'topColor': '#c3ccd7', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '1', 'top': '3'}
+item-group |  | 1021×12 | Positioning:{'left': '1', 'top': '3'} | Background:{'type': 'gradient', 'firstColor': '#cad6e8', 'secondColor': '#ffffff', 'orientation': 'vertical', 'double': 'false'} | Border:{'radius': '42', 'topColor': '#000000', 'topStyle': 'solid', 'leftWidth': '0', 'topWidth': '0', 'rightWidth': '0', 'bottomWidth': '0'}
+group-container | Group | 211×720 | Positioning:{'left': '0', 'top': '29'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '6', 'top': '115'}
+item-group |  | 201×573 | Positioning:{'left': '6', 'top': '115'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 204×27 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 200×1 | Positioning:{'left': '8', 'top': '29'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 200×1 | Positioning:{'left': '12', 'top': '33'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 209×1 | Positioning:{'left': '-1', 'top': '0'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 209×1 | Positioning:{'left': '-1', 'top': '1'} | Border:{'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '27'}
+item-group |  | 204×27 | Positioning:{'left': '0', 'top': '27'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 200×1 | Positioning:{'left': '8', 'top': '29'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 200×1 | Positioning:{'left': '12', 'top': '33'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 209×1 | Positioning:{'left': '-1', 'top': '0'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 209×1 | Positioning:{'left': '-1', 'top': '1'} | Border:{'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '54'}
+item-group |  | 204×27 | Positioning:{'left': '0', 'top': '54'} | Background:{'type': 'color', 'value': '#4d8adb'} | Border:{'radius': '0', 'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 200×1 | Positioning:{'left': '8', 'top': '29'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 200×1 | Positioning:{'left': '12', 'top': '33'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 218×1 | Positioning:{'left': '-1', 'top': '0'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 218×1 | Positioning:{'left': '-1', 'top': '1'} | Border:{'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '81'}
+item-group |  | 204×27 | Positioning:{'left': '0', 'top': '81'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 200×1 | Positioning:{'left': '8', 'top': '29'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 200×1 | Positioning:{'left': '12', 'top': '33'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 209×1 | Positioning:{'left': '-1', 'top': '0'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 209×1 | Positioning:{'left': '-1', 'top': '1'} | Border:{'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '35', 'top': '770'}
+item-group |  | 996×25 | Positioning:{'left': '35', 'top': '770'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '40', 'top': '0'}
+item-group |  | 889×17 | Positioning:{'left': '40', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+
+### SAP-Signature / Screen
+group-container | Group | 1024×803 | Positioning:{'left': '24', 'top': '225'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '8'}
+item-group |  | 1024×780 | Positioning:{'left': '0', 'top': '8'} | Background:{'type': 'color', 'value': '#fefeff'} | Border:{'radius': '1', 'topColor': '#b6c1cd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 1024×1 | Positioning:{'left': '-1', 'top': '45'} | Border:{'topColor': '#c3ccd7', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '-1', 'top': '47'}
+item-group |  | 1024×29 | Positioning:{'left': '-1', 'top': '47'} | Background:{'type': 'gradient', 'firstColor': '#f4f6fa', 'secondColor': '#ffffff', 'orientation': 'vertical', 'double': 'false'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '51', 'top': '4'}
+item-group |  | 156×20 | Positioning:{'left': '51', 'top': '4'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '29', 'topColor': '#97a3b2', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+attribute-form | Input | 178×18 | Positioning:{'left': '1', 'top': '0'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#97a3b2', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+line | Line | 1024×1 | Positioning:{'left': '-1', 'top': '75'} | Border:{'topColor': '#c3ccd7', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '-1', 'top': '77'}
+item-group |  | 1024×18 | Positioning:{'left': '-1', 'top': '77'} | Background:{'type': 'gradient', 'firstColor': '#f4f6fa', 'secondColor': '#ffffff', 'orientation': 'vertical', 'double': 'false'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '17', 'top': '105'}
+item-group |  | 980×632 | Positioning:{'left': '17', 'top': '105'} | Background:{'type': 'color', 'value': '#eaf1f6'} | Border:{'radius': '0', 'topColor': '#d6dbe5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 980×30 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'gradient', 'firstColor': '#d8e3ed', 'secondColor': '#adc5db', 'orientation': 'vertical', 'double': 'false'} | Border:{'radius': '0', 'topColor': '#a8b8c7', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '30'}
+item-group |  | 980×28 | Positioning:{'left': '0', 'top': '30'} | Background:{'type': 'color', 'value': '#cfdde8'} | Border:{'radius': '0', 'topColor': '#eaf1f6', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '28', 'top': '778'}
+item-group |  | 996×25 | Positioning:{'left': '28', 'top': '778'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '40', 'top': '0'}
+item-group |  | 889×17 | Positioning:{'left': '40', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 859×4 | Positioning:{'left': '16', 'top': '5'} | Border:{'topColor': '#1d3876', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '4', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '1', 'top': '11'}
+item-group |  | 1021×12 | Positioning:{'left': '1', 'top': '11'} | Background:{'type': 'gradient', 'firstColor': '#cad6e8', 'secondColor': '#ffffff', 'orientation': 'vertical', 'double': 'false'} | Border:{'radius': '42', 'topColor': '#000000', 'topStyle': 'solid', 'leftWidth': '0', 'topWidth': '0', 'rightWidth': '0', 'bottomWidth': '0'}
+
+### SAP-Signature / Label
+label | Text | 73×21 | Positioning:{'left': '78', 'top': '94'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#b6b9ba', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Signature / Blue field
+group-container | Group | 164×18 | Positioning:{'left': '0', 'top': '0'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 164×18 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'gradient', 'firstColor': '#cad1d6', 'secondColor': '#dfebf5', 'orientation': 'vertical', 'double': 'false'} | Border:{'radius': '30', 'topColor': '#a8a8a9', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+attribute-form | Input | 159×14 | Positioning:{'left': '3', 'top': '2'} | Background:{'type': 'color', 'value': '#dfebf5'} | Border:{'radius': '0', 'topColor': '#c8c8c8', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 159×14 | Positioning:{'left': '3', 'top': '2'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#c8c8c8', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Signature / Field
+group-container | Group | 164×18 | Positioning:{'left': '0', 'top': '0'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 164×18 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'gradient', 'firstColor': '#cad1d6', 'secondColor': '#dfebf5', 'orientation': 'vertical', 'double': 'false'} | Border:{'radius': '30', 'topColor': '#a8a8a9', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+attribute-form | Input | 159×14 | Positioning:{'left': '3', 'top': '2'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#c8c8c8', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 159×14 | Positioning:{'left': '3', 'top': '2'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#c8c8c8', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Signature / Text
+label | Text | 84×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Signature / Titled Box
+group-container | Group | 312×181 | Positioning:{'left': '0', 'top': '0'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '24'}
+item-group |  | 312×157 | Positioning:{'left': '0', 'top': '24'} | Background:{'type': 'color', 'value': '#dfebf5'} | Border:{'radius': '0', 'topColor': '#668db5', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+group-container | Group | 312×25 | Positioning:{'left': '0', 'top': '0'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 312×25 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#dfebf5'} | Border:{'radius': '34', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '1', 'top': '2'}
+item-group |  | 310×22 | Positioning:{'left': '1', 'top': '2'} | Background:{'type': 'color', 'value': '#c0d6ea'} | Border:{'radius': '0', 'topColor': '#668db5', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 300×16 | Positioning:{'left': '7', 'top': '3'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Signature / Tabs
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 498×300 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+group-container | Group | 130×21 | Positioning:{'left': '273', 'top': '10'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#dee9f3'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#c2d8eb'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#64707c'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+group-container | Group | 130×21 | Positioning:{'left': '151', 'top': '10'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#dee9f3'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#c2d8eb'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#64707c'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '15', 'top': '30'}
+item-group |  | 475×5 | Positioning:{'left': '15', 'top': '30'} | Background:{'type': 'color', 'value': '#8cb1da'} | Border:{'radius': '100', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '15', 'top': '34'}
+item-group |  | 475×251 | Positioning:{'left': '15', 'top': '34'} | Background:{'type': 'color', 'value': '#dfebf5'} | Border:{'radius': '0', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+group-container | Group | 130×21 | Positioning:{'left': '28', 'top': '10'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#bdd4e9'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#8cb1da'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 16×16 | Positioning:{'left': '417', 'top': '13'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 16×16 | Positioning:{'left': '438', 'top': '13'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 16×16 | Positioning:{'left': '468', 'top': '13'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+item-group |  | 500×300 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+group-container | Group | 130×21 | Positioning:{'left': '28', 'top': '10'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#dee9f3'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#c2d8eb'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Courier New CE', 'weight': '400'} | Text:{'color': '#64707c'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+group-container | Group | 130×21 | Positioning:{'left': '273', 'top': '10'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#dee9f3'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#c2d8eb'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Courier New CE', 'weight': '400'} | Text:{'color': '#64707c'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '15', 'top': '30'}
+item-group |  | 475×5 | Positioning:{'left': '15', 'top': '30'} | Background:{'type': 'color', 'value': '#8cb1da'} | Border:{'radius': '100', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '15', 'top': '34'}
+item-group |  | 475×251 | Positioning:{'left': '15', 'top': '34'} | Background:{'type': 'color', 'value': '#dfebf5'} | Border:{'radius': '0', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+group-container | Group | 130×21 | Positioning:{'left': '151', 'top': '10'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#bdd4e9'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#8cb1da'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Courier New CE', 'weight': '700'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 16×16 | Positioning:{'left': '417', 'top': '13'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 16×16 | Positioning:{'left': '438', 'top': '13'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 16×16 | Positioning:{'left': '468', 'top': '13'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+item-group |  | 499×300 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+group-container | Group | 130×21 | Positioning:{'left': '28', 'top': '10'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#dee9f3'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#c2d8eb'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Courier New CE', 'weight': '400'} | Text:{'color': '#64707c'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+group-container | Group | 130×21 | Positioning:{'left': '152', 'top': '10'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#dee9f3'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#c2d8eb'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Courier New CE', 'weight': '400'} | Text:{'color': '#64707c'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '15', 'top': '30'}
+item-group |  | 475×5 | Positioning:{'left': '15', 'top': '30'} | Background:{'type': 'color', 'value': '#8cb1da'} | Border:{'radius': '100', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '15', 'top': '34'}
+item-group |  | 475×251 | Positioning:{'left': '15', 'top': '34'} | Background:{'type': 'color', 'value': '#dfebf5'} | Border:{'radius': '0', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+group-container | Group | 130×21 | Positioning:{'left': '273', 'top': '10'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#bdd4e9'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#8cb1da'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Courier New CE', 'weight': '700'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 16×16 | Positioning:{'left': '417', 'top': '13'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 16×16 | Positioning:{'left': '438', 'top': '13'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 16×16 | Positioning:{'left': '468', 'top': '13'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+
+### SAP-Signature / Button
+button | Button | 62×18 | Positioning:{'left': '725', 'top': '989'} | Background:{'type': 'gradient', 'firstColor': '#fefcef', 'secondColor': '#feee9e', 'orientation': 'vertical', 'double': 'false'} | Border:{'radius': '25', 'topColor': '#636467', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Signature / Left bar
+group-container | Group | 211×720 | Positioning:{'left': '46', 'top': '24'}
+image | Image | 211×720 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '6', 'top': '115'}
+item-group |  | 201×573 | Positioning:{'left': '6', 'top': '115'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+
+### SAP-Signature / Item
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 204×27 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#466dbd'} | Border:{'radius': '0', 'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 67×16 | Positioning:{'left': '22', 'top': '4'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#ffffff'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+line | Line | 200×1 | Positioning:{'left': '8', 'top': '29'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 200×1 | Positioning:{'left': '12', 'top': '33'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 209×1 | Positioning:{'left': '-1', 'top': '0'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 209×1 | Positioning:{'left': '-1', 'top': '1'} | Border:{'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+
+### SAP-Signature / Sel Item
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 204×27 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#4d8adb'} | Border:{'radius': '0', 'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 67×16 | Positioning:{'left': '22', 'top': '4'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#ffffff'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+line | Line | 200×1 | Positioning:{'left': '8', 'top': '29'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 200×1 | Positioning:{'left': '12', 'top': '33'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 218×1 | Positioning:{'left': '-1', 'top': '0'} | Border:{'topColor': '#182a53', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 218×1 | Positioning:{'left': '-1', 'top': '1'} | Border:{'topColor': '#466dbd', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+
+### SAP-Signature / Tab
+group-container | Group | 130×21 | Positioning:{'left': '0', 'top': '0'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#dee9f3'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#c2d8eb'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#64707c'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Signature / Sel Tab
+group-container | Group | 130×21 | Positioning:{'left': '0', 'top': '0'}
+image | Image | 21×21 | Positioning:{'left': '0', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '20', 'top': '0'}
+item-group |  | 110×21 | Positioning:{'left': '20', 'top': '0'} | Background:{'type': 'color', 'value': '#bdd4e9'} | Border:{'radius': '33', 'topColor': '#668db5', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 180×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#8cb1da'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 104×16 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Signature / Home toolbar
+group-container | Group | 107×84 | Positioning:{'left': '217', 'top': '92'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '20'}
+item-group |  | 107×64 | Positioning:{'left': '0', 'top': '20'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 60×20 | Positioning:{'left': '23', 'top': '38'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '8.0', 'height': '14', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#21386b'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 76×65 | Positioning:{'left': '14', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+
+### SAP-Signature / Tool item
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '66', 'top': '287'}
+item-group |  | 85×62 | Positioning:{'left': '66', 'top': '287'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 40×12 | Positioning:{'left': '21', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 33×29 | Positioning:{'left': '25', 'top': '12'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 60×20 | Positioning:{'left': '11', 'top': '41'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '8.0', 'height': '14', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#21386b'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Signature / Box
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '69', 'top': '19'}
+item-group |  | 182×102 | Positioning:{'left': '69', 'top': '19'} | Background:{'type': 'color', 'value': '#cbd4e1'} | Border:{'radius': '0', 'topColor': '#6289ae', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 58×18 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#e5eaf0'} | Border:{'radius': '0', 'topColor': '#6289ae', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Tradeshow / Label
+label | Text | 120×19 | Positioning:{'left': '186', 'top': '487'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#8e9eab', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Tradeshow / Field
+attribute-form | Input | 118×18 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#939aa2', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '12', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Tradeshow / Button
+label | Text | 83×23 | Positioning:{'left': '1017', 'top': '415'} | Background:{'type': 'color', 'value': '#f2e1af'} | Border:{'radius': '0', 'topColor': '#666666', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '2', 'bottomWidth': '2'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+
+### SAP-Tradeshow / Box
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 318×82 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#cbd4e1'} | Border:{'radius': '0', 'topColor': '#8e9eab', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 1119×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 84×20 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#abced9'} | Border:{'radius': '0', 'topColor': '#8e9eab', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '13', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 20×20 | Positioning:{'left': '84', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+
+### SAP-Tradeshow / Select
+group-container | Group | 172×22 | Positioning:{'left': '139', 'top': '140'}
+attribute-form | Input | 163×18 | Positioning:{'left': '0', 'top': '2'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#939aa2', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 10×22 | Positioning:{'left': '162', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+
+### SAP-Tradeshow / Tabs
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '641', 'top': '238'}
+item-group |  | 523×328 | Positioning:{'left': '641', 'top': '238'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '384', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '309', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '1', 'top': '22'}
+item-group |  | 474×279 | Positioning:{'left': '1', 'top': '22'} | Background:{'type': 'color', 'value': '#cbd4e1'} | Border:{'radius': '0', 'topColor': '#265b8f', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '2', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '82', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '233', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '405', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '330', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '29', 'top': '1'} | Background:{'type': 'color', 'value': '#265b8f'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#ffffff'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '255', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '158', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '179', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '104', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '8', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+item-group |  | 523×328 | Positioning:{'left': '641', 'top': '238'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '309', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '405', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '384', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '330', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '255', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '233', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '179', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '158', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '29', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '83', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '104', 'top': '1'} | Background:{'type': 'color', 'value': '#265b8f'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#ffffff'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '8', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '1', 'top': '22'}
+item-group |  | 474×279 | Positioning:{'left': '1', 'top': '22'} | Background:{'type': 'color', 'value': '#cbd4e1'} | Border:{'radius': '0', 'topColor': '#265b8f', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '2', 'rightWidth': '1', 'bottomWidth': '1'}
+item-group |  | 523×328 | Positioning:{'left': '641', 'top': '238'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '309', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '405', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '384', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '330', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '255', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '233', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '179', 'top': '1'} | Background:{'type': 'color', 'value': '#265b8f'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#ffffff'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '83', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '29', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '104', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '8', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '158', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '1', 'top': '22'}
+item-group |  | 474×279 | Positioning:{'left': '1', 'top': '22'} | Background:{'type': 'color', 'value': '#cbd4e1'} | Border:{'radius': '0', 'topColor': '#265b8f', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '2', 'rightWidth': '1', 'bottomWidth': '1'}
+item-group |  | 523×328 | Positioning:{'left': '641', 'top': '238'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '309', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '405', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '384', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '330', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '255', 'top': '1'} | Background:{'type': 'color', 'value': '#265b8f'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#ffffff'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '158', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '179', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '83', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '29', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '104', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '8', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '235', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '1', 'top': '22'}
+item-group |  | 474×279 | Positioning:{'left': '1', 'top': '22'} | Background:{'type': 'color', 'value': '#cbd4e1'} | Border:{'radius': '0', 'topColor': '#265b8f', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '2', 'rightWidth': '1', 'bottomWidth': '1'}
+item-group |  | 523×328 | Positioning:{'left': '641', 'top': '238'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '233', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '405', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '384', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '330', 'top': '1'} | Background:{'type': 'color', 'value': '#265b8f'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#ffffff'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '255', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '158', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '179', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '83', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '29', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '104', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '8', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '309', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '1', 'top': '22'}
+item-group |  | 474×279 | Positioning:{'left': '1', 'top': '22'} | Background:{'type': 'color', 'value': '#cbd4e1'} | Border:{'radius': '0', 'topColor': '#265b8f', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '2', 'rightWidth': '1', 'bottomWidth': '1'}
+item-group |  | 523×328 | Positioning:{'left': '641', 'top': '238'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '233', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '405', 'top': '1'} | Background:{'type': 'color', 'value': '#265b8f'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#ffffff'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '309', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '330', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '255', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '158', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '179', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '83', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×22 | Positioning:{'left': '29', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+label | Text | 59×22 | Positioning:{'left': '104', 'top': '1'} | Background:{'type': 'color', 'value': '#87abd6'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '9.0', 'height': '15', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '8', 'top': '0'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+image | Image | 22×22 | Positioning:{'left': '384', 'top': '1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '1', 'top': '22'}
+item-group |  | 474×279 | Positioning:{'left': '1', 'top': '22'} | Background:{'type': 'color', 'value': '#cbd4e1'} | Border:{'radius': '0', 'topColor': '#265b8f', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '2', 'rightWidth': '1', 'bottomWidth': '1'}
+
+### SAP-Tradeshow / Tree
+navigation-component | Tree | 200×300 | Positioning:{'left': '47', 'top': '119'} | Background:{'type': 'color', 'value': '#aeceda'} | Border:{'topColor': '#92aab7', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+navigation-component | Tree_node | 198×16 | Positioning:{'left': '52', 'top': '124'} | Background:{'type': 'transparent'} | Border:{'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'}
+navigation-component | Tree_node | 185×16 | Positioning:{'left': '52', 'top': '124'} | Background:{'type': 'transparent'} | Border:{'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'}
+navigation-component | Tree_node | 172×16 | Positioning:{'left': '52', 'top': '124'} | Background:{'type': 'transparent'} | Border:{'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'}
+navigation-component | Tree_node | 185×16 | Positioning:{'left': '52', 'top': '124'} | Background:{'type': 'transparent'} | Border:{'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'}
+
+### SAP-Tradeshow / Screen
+group-container | Group | 1031×690 | Positioning:{'left': '84', 'top': '15'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '6', 'top': '36'}
+item-group |  | 1024×30 | Positioning:{'left': '6', 'top': '36'} | Background:{'type': 'color', 'value': '#cbd5e1'} | Border:{'radius': '0', 'topColor': '#ffffff', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+attribute-form | Input | 134×18 | Positioning:{'left': '46', 'top': '6'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#c8c8c8', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '8.0', 'height': '14', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+line | Line | 34×6 | Positioning:{'left': '-17', 'top': '12'} | Border:{'topColor': '#004461', 'topStyle': 'solid', 'leftWidth': '6', 'topWidth': '6', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 1024×1 | Positioning:{'left': '6', 'top': '65'} | Border:{'topColor': '#404040', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 1024×1 | Positioning:{'left': '6', 'top': '66'} | Border:{'topColor': '#a6a6a6', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+line | Line | 1024×1 | Positioning:{'left': '6', 'top': '67'} | Border:{'topColor': '#d9d9d9', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '6', 'top': '0'}
+item-group |  | 897×37 | Positioning:{'left': '6', 'top': '0'} | Background:{'type': 'color', 'value': '#d9e5f3'} | Border:{'radius': '0', 'topColor': '#cea065', 'topStyle': 'none', 'leftWidth': '2', 'topWidth': '2', 'rightWidth': '2', 'bottomWidth': '2'}
+line | Line | 34×6 | Positioning:{'left': '-17', 'top': '17'} | Border:{'topColor': '#004461', 'topStyle': 'solid', 'leftWidth': '6', 'topWidth': '6', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '6', 'top': '68'}
+item-group |  | 1024×29 | Positioning:{'left': '6', 'top': '68'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#265b8f', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '98'}
+item-group |  | 1031×32 | Positioning:{'left': '0', 'top': '98'} | Background:{'type': 'color', 'value': '#cbd5e1'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '6', 'top': '129'}
+item-group |  | 1024×561 | Positioning:{'left': '6', 'top': '129'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+
+### SAP-Tradeshow / Dialog
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '290', 'top': '40'}
+item-group |  | 488×307 | Positioning:{'left': '290', 'top': '40'} | Background:{'type': 'color', 'value': '#cbd4e1'} | Border:{'radius': '0', 'topColor': '#333348', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '0', 'top': '0'}
+item-group |  | 487×19 | Positioning:{'left': '0', 'top': '0'} | Background:{'type': 'color', 'value': '#ffffff'} | Border:{'radius': '0', 'topColor': '#ff9900', 'topStyle': 'none', 'leftWidth': '2', 'topWidth': '2', 'rightWidth': '2', 'bottomWidth': '2'}
+line | Line | 34×6 | Positioning:{'left': '-17', 'top': '7'} | Border:{'topColor': '#004461', 'topStyle': 'solid', 'leftWidth': '6', 'topWidth': '6', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 40×16 | Positioning:{'left': '31', 'top': '1'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 15×11 | Positioning:{'left': '11', 'top': '3'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '8', 'top': '279'}
+item-group |  | 473×21 | Positioning:{'left': '8', 'top': '279'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#6289ae', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 40×15 | Positioning:{'left': '7', 'top': '1'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '10.0', 'height': '16', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#000000'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+tabbedBox | Dynamic_Panel | 0×0 | Positioning:{'left': '8', 'top': '46'}
+item-group |  | 473×228 | Positioning:{'left': '8', 'top': '46'} | Background:{'type': 'transparent'} | Border:{'radius': '0', 'topColor': '#265b8f', 'topStyle': 'solid', 'leftWidth': '1', 'topWidth': '2', 'rightWidth': '1', 'bottomWidth': '1'}
+label | Text | 59×21 | Positioning:{'left': '39', 'top': '25'} | Background:{'type': 'color', 'value': '#265b8f'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'} | Font:{'size': '8.0', 'height': '14', 'family': 'Arial', 'weight': '400'} | Text:{'color': '#ffffff'} | Padding:{'top': '0', 'left': '0', 'bottom': '0', 'right': '0'}
+image | Image | 22×22 | Positioning:{'left': '18', 'top': '25'} | Border:{'radius': '0', 'topColor': '#000000', 'topStyle': 'none', 'leftWidth': '1', 'topWidth': '1', 'rightWidth': '1', 'bottomWidth': '1'}

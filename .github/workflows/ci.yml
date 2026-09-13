@@ -171,9 +171,19 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-      - name: Install Playwright Chromium
+      - name: Install Playwright browsers
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox webkit
       - name: Run critical journeys and accessibility E2E
         working-directory: frontend
         run: npm run test:e2e
+      - name: Upload browser and SAP visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sap-browser-evidence
+          path: |
+            frontend/e2e/visual/
+            frontend/test-results/
+            frontend/e2e-report/
+          retention-days: 7

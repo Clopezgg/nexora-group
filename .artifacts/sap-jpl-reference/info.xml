@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<info>
+  <name>SAP</name>
+  <description>Prototype your SAP screens with this library either for Tradeshow and Signature themes.</description>
+  <uuid>aee7efb1-160a-4eb2-b4c5-99dff14922f6</uuid>
+  <type>CUSTOM</type>
+  <shared>false</shared>
+  <sharedInfo />
+</info>
+

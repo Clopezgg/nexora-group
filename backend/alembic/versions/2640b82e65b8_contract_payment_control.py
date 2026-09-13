@@ -13,8 +13,9 @@ alguien lo cree).
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "2640b82e65b8"
 down_revision: Union[str, None] = "7163bfe08fdb"

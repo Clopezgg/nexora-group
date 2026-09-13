@@ -11,8 +11,9 @@ el servicio, el plan se reemplaza de forma atómica).
 from typing import Sequence, Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "33941de1b1ae"
 down_revision: Union[str, None] = "251d08ffc0df"

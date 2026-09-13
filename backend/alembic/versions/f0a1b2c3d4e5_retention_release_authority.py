@@ -1,8 +1,9 @@
 """Persist formal authorization metadata for contractual retention releases."""
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "f0a1b2c3d4e5"
 down_revision = "e9f0a1b2c3d4"

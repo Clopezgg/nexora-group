@@ -1,8 +1,9 @@
 """Link contractual invoices and configure asset disposal accounts."""
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "d8e9f0a1b2c3"
 down_revision = "c7d8e9f0a1b2"

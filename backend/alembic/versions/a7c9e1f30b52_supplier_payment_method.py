@@ -13,6 +13,7 @@ para TRANSFER/DEPOSIT/CHECK antes de contabilizar.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "a7c9e1f30b52"

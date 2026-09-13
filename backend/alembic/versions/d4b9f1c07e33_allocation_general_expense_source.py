@@ -12,6 +12,7 @@ se añade `general_expense_id`; exactamente una de las dos fuentes está puesta.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "d4b9f1c07e33"

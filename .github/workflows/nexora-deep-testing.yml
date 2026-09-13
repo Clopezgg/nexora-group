@@ -1,0 +1,85 @@
+name: NEXORA Deep Financial Testing
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 8 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexora-deep-financial-testing
+  cancel-in-progress: false
+
+jobs:
+
+  mutation-financial-core:
+    name: Financial Mutation Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nexora
+          POSTGRES_PASSWORD: nexora
+          POSTGRES_DB: nexora_mutation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexora -d nexora_mutation"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://nexora:nexora@localhost:5432/nexora_mutation
+      BOOTSTRAP_ADMIN_EMAIL: admin@nexora.group
+      BOOTSTRAP_ADMIN_PASSWORD: NexoraMutationCI123!
+      FRONTEND_URL: http://localhost:5173
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install application and Mutmut
+        working-directory: backend
+        run: |
+          pip install -r requirements-dev.txt
+          pip install "mutmut>=3.6,<4"
+
+      - name: Prepare database
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Run mutation analysis
+        working-directory: backend
+        shell: bash
+        run: |
+          set +e
+
+          mutmut run
+          MUTMUT_STATUS=$?
+
+          mutmut export-cicd-stats > mutation-stats.json 2>/dev/null || true
+
+          echo "Mutmut exit status: $MUTMUT_STATUS"
+
+          # This workflow is initially diagnostic rather than a merge gate.
+          # Surviving mutants must be reviewed and converted into tests.
+          exit 0
+
+      - name: Upload mutation statistics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: nexora-financial-mutation-stats
+          path: backend/mutation-stats.json
+          if-no-files-found: ignore

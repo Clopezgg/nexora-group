@@ -31,4 +31,3 @@ Project Cockpit (`/proyectos/cockpit`), Inventory (`/abastecimiento/inventario`)
 The test database is isolated and populated through real APIs. Financial test
 records never enter production. Acceptance requires opening all 36 primary
 images, not just recording a Playwright pass.
-

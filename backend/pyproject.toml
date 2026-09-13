@@ -10,3 +10,17 @@ ignore = ["B008"]
 "app/core/database.py" = ["F403"]
 "tests/conftest.py" = ["E402"]
 "tests/**" = ["E741", "F841"]
+
+
+[tool.mutmut]
+source_paths = ["app/"]
+pytest_add_cli_args_test_selection = [
+    "tests/test_posting_engine.py",
+    "tests/test_financial_properties.py",
+]
+only_mutate = [
+    "app/services/posting_service.py",
+    "app/services/closing_service.py",
+]
+max_stack_depth = 8
+mutate_only_covered_lines = true

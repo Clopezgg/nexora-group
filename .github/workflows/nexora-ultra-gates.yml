@@ -1,0 +1,678 @@
+name: NEXORA Ultra Certification
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexora-ultra-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ==========================================================
+  # 1. RISK CLASSIFICATION
+  # ==========================================================
+
+  classify:
+    name: NEXORA Risk Classifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    outputs:
+      financial: ${{ steps.risk.outputs.financial }}
+      auth: ${{ steps.risk.outputs.auth }}
+      migration: ${{ steps.risk.outputs.migration }}
+      api: ${{ steps.risk.outputs.api }}
+      infra: ${{ steps.risk.outputs.infra }}
+      frontend: ${{ steps.risk.outputs.frontend }}
+      critical: ${{ steps.risk.outputs.critical }}
+      risk_level: ${{ steps.risk.outputs.risk_level }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Resolve diff
+        id: refs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            BEFORE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              BEFORE="$(git rev-parse "${HEAD}^" 2>/dev/null || echo "$HEAD")"
+            fi
+
+            echo "base=$BEFORE" >> "$GITHUB_OUTPUT"
+            echo "head=$HEAD" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Classify change risk
+        id: risk
+        run: |
+          python3 .github/nexora-guardians/classify_changes.py \
+            "${{ steps.refs.outputs.base }}" \
+            "${{ steps.refs.outputs.head }}"
+
+
+  # ==========================================================
+  # 2. STATIC DOMAIN GUARDIAN
+  # ==========================================================
+
+  domain-guardian:
+    name: NEXORA Domain Guardian
+    needs: classify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Resolve refs
+        id: refs
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            HEAD="${{ github.sha }}"
+            BASE="$(git rev-parse "${HEAD}^" 2>/dev/null || echo "$HEAD")"
+            echo "base=$BASE" >> "$GITHUB_OUTPUT"
+            echo "head=$HEAD" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enforce Nexora invariants
+        run: |
+          python3 .github/nexora-guardians/domain_guard.py \
+            "${{ steps.refs.outputs.base }}" \
+            "${{ steps.refs.outputs.head }}"
+
+
+  # ==========================================================
+  # 3. FINANCIAL GUARDIAN
+  # ==========================================================
+
+  financial-guardian:
+    name: NEXORA Financial Guardian
+    needs: classify
+
+    if: >-
+      needs.classify.outputs.financial == 'true' ||
+      needs.classify.outputs.critical == 'true'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nexora
+          POSTGRES_PASSWORD: nexora
+          POSTGRES_DB: nexora_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexora -d nexora_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://nexora:nexora@localhost:5432/nexora_test
+      BOOTSTRAP_ADMIN_EMAIL: admin@nexora.group
+      BOOTSTRAP_ADMIN_PASSWORD: NexoraUltraCI123!
+      FRONTEND_URL: http://localhost:5173
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install backend
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Fresh schema
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Create test database for worktree slug
+        run: |
+          SLUG=$(python3 -c "import re,os; print(re.sub(r'[^a-z0-9]+','_',os.path.basename(os.path.dirname(os.path.join('${{ github.workspace }}','backend'))).lower()).strip('_') or 'default')")
+          PGPASSWORD=nexora createdb -h localhost -U nexora -O nexora "nexora_test_${SLUG}" || true
+
+      - name: Property + posting invariants
+        working-directory: backend
+        run: |
+          pytest -q \
+            tests/test_financial_properties.py \
+            tests/test_posting_engine.py \
+            --cov=app.services.posting_service \
+            --cov-report=term-missing \
+            --cov-fail-under=75
+
+
+  # ==========================================================
+  # 4. DATABASE MIGRATION GUARDIAN
+  # ==========================================================
+
+  migration-guardian:
+    name: NEXORA Migration Guardian
+    needs: classify
+
+    if: >-
+      needs.classify.outputs.migration == 'true' ||
+      needs.classify.outputs.critical == 'true'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nexora
+          POSTGRES_PASSWORD: nexora
+          POSTGRES_DB: nexora_ultra_migration
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexora -d nexora_ultra_migration"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://nexora:nexora@localhost:5432/nexora_ultra_migration
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install backend
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Require one Alembic head
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          HEADS="$(alembic heads)"
+          echo "$HEADS"
+
+          COUNT="$(printf '%s\n' "$HEADS" | grep -c '(head)' || true)"
+
+          if [ "$COUNT" -ne 1 ]; then
+            echo "Expected exactly one Alembic head, got $COUNT"
+            exit 1
+          fi
+
+      - name: Fresh upgrade
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Detect model/migration drift
+        working-directory: backend
+        run: alembic check
+
+      - name: Latest migration round trip
+        working-directory: backend
+        run: |
+          alembic downgrade -1
+          alembic upgrade head
+
+
+  # ==========================================================
+  # 5. API FUZZ / CONTRACT
+  # ==========================================================
+
+  api-contract:
+    name: NEXORA API Contract Guardian
+    needs: classify
+
+    if: >-
+      needs.classify.outputs.api == 'true' ||
+      needs.classify.outputs.critical == 'true'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nexora
+          POSTGRES_PASSWORD: nexora
+          POSTGRES_DB: nexora_contract
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexora -d nexora_contract"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://nexora:nexora@localhost:5432/nexora_contract
+      BOOTSTRAP_ADMIN_EMAIL: admin@nexora.group
+      BOOTSTRAP_ADMIN_PASSWORD: NexoraUltraCI123!
+      FRONTEND_URL: http://localhost:5173
+      SECRET_KEY: ultra-contract-ci-secret-key-not-production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install application + Schemathesis
+        working-directory: backend
+        run: |
+          pip install -r requirements-dev.txt
+          pip install "schemathesis>=4,<5"
+
+      - name: Migrate
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Configure Protected Edit capability (test-only harness)
+        run: |
+          SALT="$(python3 -c 'import base64,os; print(base64.urlsafe_b64encode(os.urandom(16)).decode("ascii"))')"
+          DIGEST="$(python3 -c 'import base64,hashlib,os,sys; salt=base64.urlsafe_b64decode(sys.argv[1]); print(base64.urlsafe_b64encode(hashlib.pbkdf2_hmac("sha256", b"ultra-contract-ci-pin", salt, 250000)).decode("ascii"))' "$SALT")"
+          echo "EDIT_ACCESS_TOKEN_SALT=$SALT" >> "$GITHUB_ENV"
+          echo "EDIT_ACCESS_TOKEN_DIGEST=$DIGEST" >> "$GITHUB_ENV"
+
+      - name: Start real FastAPI
+        working-directory: backend
+        run: |
+          nohup uvicorn app.main:app \
+            --host 127.0.0.1 \
+            --port 8000 \
+            > /tmp/nexora-api.log 2>&1 &
+
+          echo $! > /tmp/nexora-api.pid
+
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8000/openapi.json >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          cat /tmp/nexora-api.log
+          exit 1
+
+      - name: Property-based OpenAPI fuzzing
+        working-directory: backend
+        run: |
+          schemathesis run \
+            http://127.0.0.1:8000/openapi.json \
+            --checks not_a_server_error \
+            --max-time 300 \
+            --max-failures 5
+
+
+  # ==========================================================
+  # 6. TRIVY
+  # ==========================================================
+
+  trivy:
+    name: NEXORA Trivy Security
+    needs: classify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Vulnerability + misconfiguration scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+
+  # ==========================================================
+  # 7. CHECKOV
+  #
+  # Progressive enforcement:
+  #
+  # - Existing IaC debt on the PR base is recorded dynamically.
+  # - Existing findings remain visible as baseline-skipped.
+  # - NEW findings fail this job.
+  #
+  # This prevents greenwashing while allowing gradual remediation
+  # of legacy Azure policies that require architectural/cost changes.
+  # ==========================================================
+
+  checkov:
+    name: NEXORA IaC Guardian
+    needs: classify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned Checkov
+        run: pip install "checkov==3.3.17"
+
+      - name: Resolve security baseline commit
+        id: refs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+
+            if [ -z "$BASE" ] ||
+               [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              BASE="$(git rev-parse "${{ github.sha }}^" 2>/dev/null || echo "${{ github.sha }}")"
+            fi
+          fi
+
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          echo "Security baseline commit: $BASE"
+
+      - name: Build baseline from existing main debt
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf /tmp/nexora-checkov-base
+
+          git worktree add \
+            --detach \
+            /tmp/nexora-checkov-base \
+            "${{ steps.refs.outputs.base }}"
+
+          pushd /tmp/nexora-checkov-base >/dev/null
+
+          # Findings already present in the base branch are not silently
+          # declared safe. They become explicit legacy baseline debt.
+          #
+          # --create-baseline may return non-zero because findings exist.
+          # That is expected while creating the baseline.
+          checkov \
+            -d . \
+            --framework bicep github_actions dockerfile \
+            --create-baseline \
+            --compact \
+            --quiet || true
+
+          test -s .checkov.baseline
+
+          cp .checkov.baseline /tmp/nexora-checkov.baseline
+
+          popd >/dev/null
+
+          echo "Existing security debt baseline generated."
+
+      - name: Fail only on NEW IaC / workflow regressions
+        run: |
+          set -euo pipefail
+
+          checkov \
+            -d . \
+            --framework bicep github_actions dockerfile \
+            --baseline /tmp/nexora-checkov.baseline \
+            --output-baseline-as-skipped \
+            --compact \
+            --quiet
+
+  # ==========================================================
+  # 8. SBOM
+  # ==========================================================
+
+  sbom:
+    name: NEXORA SBOM
+    needs: classify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Generate SPDX SBOM with Syft
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: nexora-sbom.spdx.json
+
+
+  # ==========================================================
+  # 9. OWASP ZAP — only API/critical changes
+  # ==========================================================
+
+  zap:
+    name: NEXORA Runtime Security
+    needs: classify
+
+    if: >-
+      needs.classify.outputs.api == 'true' ||
+      needs.classify.outputs.critical == 'true'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nexora
+          POSTGRES_PASSWORD: nexora
+          POSTGRES_DB: nexora_zap
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexora -d nexora_zap"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://nexora:nexora@localhost:5432/nexora_zap
+      BOOTSTRAP_ADMIN_EMAIL: admin@nexora.group
+      BOOTSTRAP_ADMIN_PASSWORD: NexoraUltraCI123!
+      FRONTEND_URL: http://localhost:5173
+      SECRET_KEY: ultra-zap-ci-secret-key-not-production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install backend
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Migrate
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Start backend
+        working-directory: backend
+        run: |
+          nohup uvicorn app.main:app \
+            --host 127.0.0.1 \
+            --port 8000 \
+            > /tmp/nexora-zap.log 2>&1 &
+
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8000/api/healthz >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          cat /tmp/nexora-zap.log
+          exit 1
+
+      - name: OWASP ZAP baseline
+        run: |
+          docker run --rm \
+            --network host \
+            -v "$PWD:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t http://127.0.0.1:8000 \
+              -I \
+              -m 3 \
+              -T 60 \
+              -J zap-report.json \
+              -w zap-report.md
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: nexora-zap-report
+          path: |
+            zap-report.json
+            zap-report.md
+          if-no-files-found: ignore
+
+
+  # ==========================================================
+  # 10. FINAL CERTIFICATION GATE
+  # ==========================================================
+
+  final-certification:
+    name: NEXORA Final Certification
+
+    if: always()
+
+    needs:
+      - classify
+      - domain-guardian
+      - financial-guardian
+      - migration-guardian
+      - api-contract
+      - trivy
+      - checkov
+      - sbom
+      - zap
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Evaluate all applicable gates
+        env:
+          RISK: ${{ needs.classify.outputs.risk_level }}
+
+          DOMAIN: ${{ needs.domain-guardian.result }}
+          FINANCE: ${{ needs.financial-guardian.result }}
+          MIGRATION: ${{ needs.migration-guardian.result }}
+          API: ${{ needs.api-contract.result }}
+          TRIVY: ${{ needs.trivy.result }}
+          CHECKOV: ${{ needs.checkov.result }}
+          SBOM: ${{ needs.sbom.result }}
+          ZAP: ${{ needs.zap.result }}
+
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "# NEXORA FINAL CERTIFICATION" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo "**Risk level:** ${RISK}/4" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo "| Gate | Result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+
+          FAIL=0
+
+          evaluate() {
+            NAME="$1"
+            VALUE="$2"
+
+            echo "| $NAME | $VALUE |" >> "$GITHUB_STEP_SUMMARY"
+
+            case "$VALUE" in
+              success|skipped)
+                ;;
+              *)
+                FAIL=1
+                ;;
+            esac
+          }
+
+          evaluate "Domain Guardian" "$DOMAIN"
+          evaluate "Financial Guardian" "$FINANCE"
+          evaluate "Migration Guardian" "$MIGRATION"
+          evaluate "API Contract" "$API"
+          evaluate "Trivy" "$TRIVY"
+          evaluate "Checkov" "$CHECKOV"
+          evaluate "SBOM" "$SBOM"
+          evaluate "OWASP ZAP" "$ZAP"
+
+          echo >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "## ❌ NOT CERTIFIED" >> "$GITHUB_STEP_SUMMARY"
+            echo "One or more applicable gates failed." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "## ✅ CERTIFIED FOR MERGE" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo "**Certification score: 100 / 100 applicable gates passed**" \
+            >> "$GITHUB_STEP_SUMMARY"

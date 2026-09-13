@@ -1,7 +1,6 @@
 """Tests for project close blockers (F2.19)."""
 import uuid
 
-import pytest
 from sqlalchemy.orm import Session
 
 from app.models.company import Company
@@ -83,7 +82,6 @@ def test_completed_blocked_by_open_milestone(db_session: Session):
 
 
 def test_completed_blocked_by_open_rfi(db_session: Session):
-    from app.models.rfi import RequestForInformation
     from app.models.user import User
 
     project = _make_project(db_session)
@@ -108,7 +106,6 @@ def test_completed_blocked_by_open_rfi(db_session: Session):
 
 
 def test_completed_blocked_by_open_ncr(db_session: Session):
-    from app.models.quality import NonConformance
     from app.models.user import User
 
     project = _make_project(db_session)
@@ -131,7 +128,6 @@ def test_completed_blocked_by_open_ncr(db_session: Session):
 
 
 def test_completed_blocked_by_open_safety_incident(db_session: Session):
-    from app.models.safety import SafetyIncident
 
     project = _make_project(db_session)
     si = SafetyIncident(

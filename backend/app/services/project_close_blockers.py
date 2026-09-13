@@ -30,7 +30,6 @@ from sqlalchemy.orm import Session
 from app.models.ap import SupplierInvoice
 from app.models.planning import Milestone, Task
 from app.models.procurement import PurchaseOrder
-from app.models.project import Project
 from app.models.quality import NonConformance
 from app.models.rfi import RequestForInformation
 from app.models.safety import SafetyIncident

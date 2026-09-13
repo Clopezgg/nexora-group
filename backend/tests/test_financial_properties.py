@@ -4,7 +4,8 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from app.domain.errors import (
     InvalidOperationScopeError,
@@ -15,7 +16,6 @@ from app.services.posting_service import (
     _validate_balance,
     _validate_scope,
 )
-
 
 money = st.decimals(
     min_value=Decimal("0.01"),

@@ -21,12 +21,12 @@ from app.services import (
     project_financial_service,
     project_lifecycle_service,
 )
-from app.services.project_close_blockers import check_close_blockers
 from app.services.permission_service import (
     assert_company_access,
     require_permission,
     user_has_permission,
 )
+from app.services.project_close_blockers import check_close_blockers
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 

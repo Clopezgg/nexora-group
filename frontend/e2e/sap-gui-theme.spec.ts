@@ -20,7 +20,10 @@ async function ensureCompany(request: APIRequestContext) {
 
 function formatViolations(results: Awaited<ReturnType<AxeBuilder['analyze']>>) {
   return results.violations
-    .map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`)
+    .map(
+      (violation) =>
+        `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`,
+    )
     .join('\n')
 }
 
@@ -41,7 +44,10 @@ async function setTheme(page: Page, themeId: string) {
     sessionStorage.setItem('nexora.edit-access.expires-at', String(result.expiresAt))
     return { ok: true, status: response.status, body: '' }
   }, process.env.E2E_EDIT_ACCESS_TOKEN)
-  expect(refreshed.ok, `renovar Protected Edit -> ${refreshed.status}: ${refreshed.body}`).toBeTruthy()
+  expect(
+    refreshed.ok,
+    `renovar Protected Edit -> ${refreshed.status}: ${refreshed.body}`,
+  ).toBeTruthy()
   const result = await page.evaluate(async (id) => {
     const capability = window.sessionStorage.getItem('nexora.edit-access.capability')
     const response = await fetch('/api/me/preferences', {
@@ -68,7 +74,9 @@ async function unlockProtectedEdit(page: Page) {
   await expect(dialog).not.toBeVisible()
 }
 
-test('SAP GUI confirmation, variants and representative routes use one global shell', async ({ page }) => {
+test('SAP GUI confirmation, variants and representative routes use one global shell', async ({
+  page,
+}) => {
   await login(page)
   await unlockProtectedEdit(page)
   await ensureCompany(page.request)
@@ -143,10 +151,46 @@ test('SAP GUI confirmation, variants and representative routes use one global sh
 })
 
 const SAP_VARIANTS = [
-  { id: 'sap-gui-signature', variant: 'signature', anatomy: 'sap-gui-signature' },
-  { id: 'sap-gui-tradeshow', variant: 'tradeshow', anatomy: 'sap-gui-tradeshow' },
-  { id: 'sap-gui-horizon', variant: 'horizon', anatomy: 'sap-gui-horizon' },
-  { id: 'sap-gui-horizon-dark', variant: 'horizon-dark', anatomy: 'sap-gui-horizon-dark' },
+  {
+    id: 'sap-gui-signature',
+    variant: 'signature',
+    anatomy: 'sap-gui-signature',
+    panel: 'titled-box',
+    button: 'beveled',
+    field: 'classic-blue',
+    table: 'grid',
+    dialog: 'window',
+  },
+  {
+    id: 'sap-gui-tradeshow',
+    variant: 'tradeshow',
+    anatomy: 'sap-gui-tradeshow',
+    panel: 'banded-box',
+    button: 'gradient',
+    field: 'tradeshow-blue',
+    table: 'banded-grid',
+    dialog: 'window-banded',
+  },
+  {
+    id: 'sap-gui-horizon',
+    variant: 'horizon',
+    anatomy: 'sap-gui-horizon',
+    panel: 'modern-titled-box',
+    button: 'horizon-tool',
+    field: 'horizon-compact',
+    table: 'enterprise-grid',
+    dialog: 'horizon-window',
+  },
+  {
+    id: 'sap-gui-horizon-dark',
+    variant: 'horizon-dark',
+    anatomy: 'sap-gui-horizon-dark',
+    panel: 'dark-titled-box',
+    button: 'horizon-dark-tool',
+    field: 'horizon-dark-compact',
+    table: 'enterprise-grid-dark',
+    dialog: 'horizon-window-dark',
+  },
 ] as const
 
 const REPRESENTATIVE_ROUTES = [
@@ -211,13 +255,25 @@ const FULL_ROUTE_INVENTORY = [
   '/control/auditoria',
 ]
 
-test('all four SAP GUI variants render representative routes with real chrome', async ({ page }) => {
+test('all four SAP GUI variants render representative routes with real chrome', async ({
+  page,
+}) => {
   await login(page)
   await unlockProtectedEdit(page)
   await ensureCompany(page.request)
 
-  for (const { id, variant, anatomy } of SAP_VARIANTS) {
+  for (const { id, variant, anatomy, panel, button, field, table, dialog } of SAP_VARIANTS) {
     await setTheme(page, id)
+    const root = page.locator('html')
+    await expect(root).toHaveAttribute('data-nx-family', 'sap-gui')
+    await expect(root).toHaveAttribute('data-nx-theme', id)
+    await expect(root).toHaveAttribute('data-nx-sap-variant', variant)
+    await expect(root).toHaveAttribute('data-nx-anatomy', anatomy)
+    await expect(root).toHaveAttribute('data-nx-panel', panel)
+    await expect(root).toHaveAttribute('data-nx-button', button)
+    await expect(root).toHaveAttribute('data-nx-field', field)
+    await expect(root).toHaveAttribute('data-nx-table', table)
+    await expect(root).toHaveAttribute('data-nx-dialog', dialog)
     await expect(page.locator('html')).toHaveAttribute('data-nx-family', 'sap-gui')
     await expect(page.locator('html')).toHaveAttribute('data-nx-sap-variant', variant)
     await expect(page.locator('html')).toHaveAttribute('data-nx-anatomy', anatomy)
@@ -227,14 +283,18 @@ test('all four SAP GUI variants render representative routes with real chrome', 
       await expect(page.locator('html')).toHaveAttribute('data-nx-theme', id)
       await expect(page.locator('main')).toBeVisible()
       await expect(page.getByRole('menubar', { name: 'Barra de menús SAP GUI' })).toBeVisible()
-      await expect(page.getByRole('toolbar', { name: 'Barra de herramientas SAP GUI' })).toBeVisible()
+      await expect(
+        page.getByRole('toolbar', { name: 'Barra de herramientas SAP GUI' }),
+      ).toBeVisible()
       await expect(page.getByRole('status', { name: 'Contexto SAP GUI' })).toBeVisible()
       await expect(page.locator('body')).not.toContainText('Application error')
       const viewport = await page.evaluate(() => ({
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth,
       }))
-      expect(viewport.scrollWidth, `${id} ${route}: sin overflow horizontal`).toBeLessThanOrEqual(viewport.clientWidth + 1)
+      expect(viewport.scrollWidth, `${id} ${route}: sin overflow horizontal`).toBeLessThanOrEqual(
+        viewport.clientWidth + 1,
+      )
     }
 
     // Axe por variante en una ruta financiera densa.
@@ -257,7 +317,9 @@ test('SAP GUI full route inventory: no crash, no overflow, chrome intact', async
   for (const route of FULL_ROUTE_INVENTORY) {
     await page.goto(route)
     await expect(page.locator('main'), `${route}: main visible`).toBeVisible()
-    await expect(page.locator('body'), `${route}: sin error de aplicación`).not.toContainText('Application error')
+    await expect(page.locator('body'), `${route}: sin error de aplicación`).not.toContainText(
+      'Application error',
+    )
     await expect(
       page.getByRole('menubar', { name: 'Barra de menús SAP GUI' }),
       `${route}: menubar SAP`,
@@ -270,7 +332,9 @@ test('SAP GUI full route inventory: no crash, no overflow, chrome intact', async
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
     }))
-    expect(viewport.scrollWidth, `${route}: sin overflow horizontal`).toBeLessThanOrEqual(viewport.clientWidth + 1)
+    expect(viewport.scrollWidth, `${route}: sin overflow horizontal`).toBeLessThanOrEqual(
+      viewport.clientWidth + 1,
+    )
   }
 })
 
@@ -298,7 +362,6 @@ test('a modern family never mounts SAP GUI chrome', async ({ page }) => {
   await expect(page.getByRole('status', { name: 'Contexto SAP GUI' })).toHaveCount(0)
 })
 
-
 test('SAP menus and command results remain clickable outside compact bars', async ({ page }) => {
   await login(page)
   await unlockProtectedEdit(page)
@@ -308,11 +371,19 @@ test('SAP menus and command results remain clickable outside compact bars', asyn
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 })
       await page.getByRole('menuitem', { name: 'Sistema', exact: true }).click()
-      await page.getByRole('menu', { name: 'Sistema', exact: true }).getByRole('menuitem', { name: 'Inicio', exact: true }).click()
+      await page
+        .getByRole('menu', { name: 'Sistema', exact: true })
+        .getByRole('menuitem', { name: 'Inicio', exact: true })
+        .click()
       await expect(page).toHaveURL(/\/inicio/)
-      const command = page.getByRole('combobox', { name: 'Comando: buscar módulo, documento o acción' })
+      const command = page.getByRole('combobox', {
+        name: 'Comando: buscar módulo, documento o acción',
+      })
       await command.fill('Inventario')
-      await page.getByRole('listbox', { name: 'Resultados del comando' }).getByRole('button', { name: /Inventario/ }).click()
+      await page
+        .getByRole('listbox', { name: 'Resultados del comando' })
+        .getByRole('button', { name: /Inventario/ })
+        .click()
       await expect(page).toHaveURL(/\/abastecimiento\/inventario/)
     }
   }

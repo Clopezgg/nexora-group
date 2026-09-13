@@ -47,38 +47,37 @@ async function ensureCompany(page: Page): Promise<{ id: string; functionalCurren
 }
 
 async function expectOperationalRoute(page: Page, path: string) {
-  // WebKit reports fetches aborted by a navigation as page errors. Finish the
-  // current screen's authoritative requests before navigating so the journey
-  // tests the application rather than canceling its own in-flight queries.
+  const response = await page.goto(path)
+  expect(response?.status(), `${path}: HTTP`).toBeLessThan(500)
+  await expect(page.locator('.nx-app-shell')).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator('main')).toBeVisible()
   await page.waitForLoadState('networkidle')
-  const pageErrors: string[] = []
-  const onPageError = (error: Error) => pageErrors.push(String(error))
-  page.on('pageerror', onPageError)
-  try {
-    const response = await page.goto(path)
-    expect(response?.status(), `${path}: HTTP`).toBeLessThan(500)
-    await expect(page.locator('.nx-app-shell')).toBeVisible({ timeout: 15_000 })
-    await expect(page.locator('main')).toBeVisible()
-    await page.waitForLoadState('networkidle')
-    await expect(page.locator('body')).not.toContainText('Application error')
-    expect(pageErrors, `${path}: page errors`).toEqual([])
-  } finally {
-    page.off('pageerror', onPageError)
-  }
+  await expect(page.locator('body')).not.toContainText('Application error')
 }
 
 test('cross-browser critical compatibility', async ({ page }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(String(error)))
+
   await login(page)
   const company = await ensureCompany(page)
 
   await page.evaluate((companyId) => {
     window.localStorage.setItem('nexora.activeCompanyId', companyId)
   }, company.id)
+  const dashboardResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return (
+      response.request().method() === 'GET' &&
+      url.pathname === '/api/dashboard/summary' &&
+      url.searchParams.get('companyId') === company.id
+    )
+  })
   await page.reload()
 
-  const dashboard = await page.request.get(
-    `/api/dashboard/summary?companyId=${encodeURIComponent(company.id)}`,
-  )
+  // Await the request owned by the mounted dashboard before any navigation
+  // can unmount it. A separate APIRequestContext call would not prove that.
+  const dashboard = await dashboardResponsePromise
   expect(dashboard.ok(), await dashboard.text()).toBeTruthy()
   const dashboardBody = (await dashboard.json()) as { currency: string }
   expect(dashboardBody.currency).toBe(company.functionalCurrencyCode)
@@ -101,10 +100,15 @@ test('cross-browser critical compatibility', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Desbloquear', exact: true }).click()
   await expect(dialog).not.toBeVisible()
 
-  for (const variant of ['sap-gui-signature', 'sap-gui-tradeshow', 'sap-gui-horizon', 'sap-gui-horizon-dark']) {
+  for (const variant of [
+    'sap-gui-signature',
+    'sap-gui-tradeshow',
+    'sap-gui-horizon',
+    'sap-gui-horizon-dark',
+  ]) {
     await page.goto('/control/configuracion')
     await page.waitForLoadState('networkidle')
-    if (await page.locator('html').getAttribute('data-nx-family') !== 'sap-gui') {
+    if ((await page.locator('html').getAttribute('data-nx-family')) !== 'sap-gui') {
       await page.getByLabel('Familia', { exact: true }).selectOption('sap-gui')
       await page.getByRole('button', { name: 'Cambiar a SAP GUI', exact: true }).click()
     }
@@ -116,7 +120,10 @@ test('cross-browser critical compatibility', async ({ page }) => {
     await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant)
     await page.getByRole('menuitem', { name: 'Sistema', exact: true }).click()
     // A real click verifies the menu is not clipped behind the shell bars.
-    await page.getByRole('menu', { name: 'Sistema', exact: true }).getByRole('menuitem', { name: 'Inicio', exact: true }).click()
+    await page
+      .getByRole('menu', { name: 'Sistema', exact: true })
+      .getByRole('menuitem', { name: 'Inicio', exact: true })
+      .click()
     await expect(page).toHaveURL(/\/inicio/)
     await expectOperationalRoute(page, '/finanzas/contabilidad')
     await expectOperationalRoute(page, '/proyectos/cockpit')
@@ -134,4 +141,5 @@ test('cross-browser critical compatibility', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Cerrar sesión' }).click()
   await expect(page).toHaveURL(/\/login/, { timeout: 10_000 })
+  expect(pageErrors).toEqual([])
 })

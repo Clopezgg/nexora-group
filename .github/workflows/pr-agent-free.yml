@@ -1,0 +1,358 @@
+name: Free AI PR Agent
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: free-ai-pr-agent-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+
+  review:
+
+    # No exponer GROQ_KEY a forks.
+    # Solamente revisamos PRs originados en el mismo repositorio.
+    if: >-
+      github.event.sender.type != 'Bot' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+
+      - name: PR-Agent review
+        id: pr_agent
+        uses: The-PR-Agent/pr-agent@f3b385ea2927247ddcff2fe252472380b9c8f5fc
+        env:
+
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GROQ.KEY: ${{ secrets.GROQ_KEY }}
+
+          # --------------------------------------------------
+          # MODELOS
+          # --------------------------------------------------
+
+          config.model: "groq/openai/gpt-oss-120b"
+          config.fallback_models: '["groq/qwen/qwen3.8-27b"]'
+
+          # Groq Free actualmente impone 8K TPM sobre estos
+          # modelos. 6500 resultó insuficiente en la primera
+          # prueba. 7600 usa prácticamente todo el presupuesto
+          # disponible sin fingir que Free permite 32K/128K TPM.
+          config.max_model_tokens: "7600"
+          config.max_output_tokens: "700"
+
+          # Respuesta siempre en español.
+          config.response_language: "es-ES"
+
+          # Añadir detalles del run.
+          config.output_run_details: "true"
+
+          # Si un modelo agota timeout, avanzar al fallback.
+          config.retry_same_model_on_timeout: "false"
+
+          # --------------------------------------------------
+          # AUTOMATIZACIÓN
+          # --------------------------------------------------
+
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "false"
+
+          # DESACTIVADO:
+          # /improve consume otra llamada gratuita y durante
+          # la prueba produjo fallos/comentarios vacíos.
+          github_action_config.auto_improve: "false"
+
+          # --------------------------------------------------
+          # COBERTURA
+          # --------------------------------------------------
+
+          pr_reviewer.enable_review_coverage_footer: "true"
+
+          # Cuando el diff no entra en una sola llamada,
+          # PR-Agent puede dividirlo y fusionar resultados.
+          pr_reviewer.enable_large_pr_chunking: "true"
+          pr_reviewer.max_number_of_calls: "3"
+
+          pr_reviewer.num_max_findings: "5"
+          pr_reviewer.require_security_review: "true"
+          pr_reviewer.require_tests_review: "true"
+
+          pr_reviewer.extra_instructions: >-
+            Responde exclusivamente en español.
+            Actúa como revisor senior de software empresarial.
+            Prioriza únicamente hallazgos accionables y sustentados:
+            bugs funcionales, autorización, RBAC, integridad de datos,
+            concurrencia, consistencia transaccional, condiciones de
+            carrera, fallos fail-open, migraciones, contratos API,
+            manejo de errores, regresiones, seguridad, efectos cross-file,
+            pérdida de datos y riesgos de despliegue.
+
+            No publiques observaciones meramente cosméticas.
+
+            IMPORTANTE SOBRE GITHUB SECRETS:
+            nunca informes que un secret de GitHub "no existe" únicamente
+            porque el workflow referencia secrets.NOMBRE y el valor no sea
+            visible desde el código. Los valores de GitHub Secrets son
+            deliberadamente opacos. Solo reporta un secret faltante cuando
+            exista evidencia de ejecución que demuestre que realmente falta,
+            por ejemplo un fallo de autenticación o una variable vacía
+            comprobada durante el workflow.
+
+            IMPORTANTE SOBRE COBERTURA:
+            si el presupuesto de contexto impide analizar una parte del diff,
+            no concluyas que todo está correcto. Declara explícitamente que
+            la revisión fue parcial y enumera todo archivo excluido.
+
+            Para cada hallazgo explica impacto, evidencia y una forma concreta
+            de verificarlo o reproducirlo.
+
+# ==========================================================
+# COBERTURA DETERMINISTA
+#
+# No dependemos únicamente de que el LLM diga qué revisó.
+# Se inspecciona el marcador estructurado de PR-Agent,
+# se comparan los archivos excluidos con el diff del PR
+# y se publica porcentaje de archivos/líneas modificadas.
+# ==========================================================
+
+  coverage:
+
+    needs: review
+
+    if: >-
+      always() &&
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+
+      - name: Calculate PR-Agent review coverage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import time
+          import urllib.request
+          import urllib.error
+
+          token = os.environ["GH_TOKEN"]
+          repo = os.environ["REPOSITORY"]
+          pr = os.environ["PR_NUMBER"]
+
+          api = "https://api.github.com"
+
+          def request(method, path, payload=None):
+              headers = {
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "nexora-pr-agent-coverage",
+              }
+
+              data = None
+              if payload is not None:
+                  data = json.dumps(payload).encode()
+
+              req = urllib.request.Request(
+                  api + path,
+                  data=data,
+                  headers=headers,
+                  method=method,
+              )
+
+              with urllib.request.urlopen(req) as r:
+                  raw = r.read().decode()
+                  return json.loads(raw) if raw else None
+
+          # PR-Agent publica su comentario antes de terminar el job.
+          time.sleep(4)
+
+          comments = request(
+              "GET",
+              f"/repos/{repo}/issues/{pr}/comments?per_page=100"
+          )
+
+          pr_agent_body = None
+
+          for comment in reversed(comments):
+              body = comment.get("body") or ""
+              if (
+                  "pr-agent:review:full" in body
+                  or "pr-agent-review-state:v1" in body
+              ):
+                  pr_agent_body = body
+                  break
+
+          excluded = []
+
+          if pr_agent_body:
+
+              marker = re.search(
+                  r"<!--\s*pr-agent-review-state:v1\s*(\{.*?\})\s*-->",
+                  pr_agent_body,
+                  re.S,
+              )
+
+              if marker:
+                  try:
+                      state = json.loads(marker.group(1))
+                      excluded = (
+                          state
+                          .get("last_run", {})
+                          .get("excluded_files", [])
+                          or []
+                      )
+                  except Exception:
+                      pass
+
+              # Fallback para versiones que solo imprimen footer.
+              if not excluded and "Review coverage" in pr_agent_body:
+                  section = pr_agent_body.split("Review coverage", 1)[1]
+
+                  for line in section.splitlines():
+                      m = re.match(r"\s*-\s*`([^`]+)`", line)
+                      if m:
+                          excluded.append(m.group(1))
+
+          # Obtener TODOS los archivos del PR.
+          files = []
+          page = 1
+
+          while True:
+              batch = request(
+                  "GET",
+                  f"/repos/{repo}/pulls/{pr}/files"
+                  f"?per_page=100&page={page}"
+              )
+
+              files.extend(batch)
+
+              if len(batch) < 100:
+                  break
+
+              page += 1
+
+          total_files = len(files)
+          excluded_set = set(excluded)
+
+          reviewed_files = [
+              f for f in files
+              if f.get("filename") not in excluded_set
+          ]
+
+          total_changes = sum(
+              int(f.get("changes") or 0)
+              for f in files
+          )
+
+          excluded_changes = sum(
+              int(f.get("changes") or 0)
+              for f in files
+              if f.get("filename") in excluded_set
+          )
+
+          reviewed_changes = max(
+              0,
+              total_changes - excluded_changes
+          )
+
+          if pr_agent_body is None:
+              file_pct = 0.0
+              change_pct = 0.0
+              status = "❌ No se encontró una revisión de PR-Agent."
+          else:
+              file_pct = (
+                  100.0 * len(reviewed_files) / total_files
+                  if total_files else 100.0
+              )
+
+              change_pct = (
+                  100.0 * reviewed_changes / total_changes
+                  if total_changes else 100.0
+              )
+
+              if excluded:
+                  status = "⚠️ Revisión parcial."
+              else:
+                  status = "✅ No se reportaron archivos excluidos."
+
+          marker = "<!-- nexora-pr-agent-coverage -->"
+
+          body = f"""\
+          {marker}
+          ## Cobertura de PR-Agent
+
+          {status}
+
+          | Métrica | Resultado |
+          |---|---:|
+          | Archivos modificados | {total_files} |
+          | Archivos analizados | {len(reviewed_files)} |
+          | Cobertura por archivos | **{file_pct:.1f}%** |
+          | Líneas/cambios del diff | {total_changes} |
+          | Cambios cubiertos | {reviewed_changes} |
+          | Cobertura aproximada del diff | **{change_pct:.1f}%** |
+
+          """
+
+          if excluded:
+              body += "\n### Archivos excluidos\n\n"
+              for filename in excluded:
+                  body += f"- `{filename}`\n"
+
+          body += (
+              "\n> Esta medición es determinista: se obtiene del estado "
+              "publicado por PR-Agent y del diff real de GitHub; no es una "
+              "estimación inventada por el modelo.\n"
+          )
+
+          # Evitar crear un comentario nuevo en cada synchronize.
+          existing = None
+
+          for comment in comments:
+              if marker in (comment.get("body") or ""):
+                  existing = comment
+                  break
+
+          if existing:
+              request(
+                  "PATCH",
+                  f"/repos/{repo}/issues/comments/{existing['id']}",
+                  {"body": body},
+              )
+          else:
+              request(
+                  "POST",
+                  f"/repos/{repo}/issues/{pr}/comments",
+                  {"body": body},
+              )
+
+          print(
+              f"File coverage={file_pct:.1f}% | "
+              f"Diff coverage={change_pct:.1f}% | "
+              f"Excluded={len(excluded)}"
+          )
+          PY

@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, ForeignKey, String
+from sqlalchemy import CheckConstraint, Date, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -32,6 +32,12 @@ PROJECT_STATUSES = (
 
 class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "projects"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PLANNING','ACTIVE','ON_HOLD','COMPLETED','CLOSED','CANCELLED','ARCHIVED')",
+            name="ck_projects_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False

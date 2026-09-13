@@ -2,7 +2,15 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Date, ForeignKey, Numeric, Sequence, String
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Numeric,
+    Sequence,
+    String,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -65,6 +73,12 @@ class StockLedgerEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class PhysicalCount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "physical_counts"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('DRAFT','COUNTED','APPROVED')",
+            name="ck_physical_counts_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
@@ -81,6 +95,16 @@ class PhysicalCount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class PhysicalCountLine(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "physical_count_lines"
+    __table_args__ = (
+        CheckConstraint(
+            "expected_quantity >= 0",
+            name="ck_physical_count_lines_expected_quantity_non_negative",
+        ),
+        CheckConstraint(
+            "counted_quantity >= 0",
+            name="ck_physical_count_lines_counted_quantity_non_negative",
+        ),
+    )
 
     physical_count_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("physical_counts.id", ondelete="CASCADE"), nullable=False

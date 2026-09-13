@@ -10,7 +10,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,6 +20,12 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 class VoucherIssuance(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "voucher_issuances"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('ISSUED','VOIDED')",
+            name="ck_voucher_issuances_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False

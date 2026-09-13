@@ -131,8 +131,14 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
     }
     await page.getByLabel('Variante', { exact: true }).selectOption(variant)
     await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant)
+    const preferenceResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PUT' &&
+        new URL(response.url()).pathname === '/api/me/preferences',
+    )
     await page.getByRole('button', { name: 'Guardar como mi preferencia' }).click()
-    await page.waitForLoadState('networkidle')
+    const preferenceResponse = await preferenceResponsePromise
+    expect(preferenceResponse.ok(), await preferenceResponse.text()).toBeTruthy()
     await page.reload()
     await page.waitForLoadState('networkidle')
     await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant, { timeout: 10_000 })

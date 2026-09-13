@@ -25,6 +25,23 @@ function formatViolations(results: Awaited<ReturnType<AxeBuilder['analyze']>>) {
 }
 
 async function setTheme(page: Page, themeId: string) {
+  // La matriz completa puede superar el TTL de Protected Edit. Renueva la
+  // capability con el PIN real antes de cada preferencia protegida, evitando
+  // que una corrida larga falle por expiración temporal.
+  const refreshed = await page.evaluate(async (token) => {
+    const response = await fetch('/api/edit-access/verify', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    if (!response.ok) return { ok: false, status: response.status, body: await response.text() }
+    const result = (await response.json()) as { capability: string; expiresAt: number }
+    sessionStorage.setItem('nexora.edit-access.capability', result.capability)
+    sessionStorage.setItem('nexora.edit-access.expires-at', String(result.expiresAt))
+    return { ok: true, status: response.status, body: '' }
+  }, process.env.E2E_EDIT_ACCESS_TOKEN)
+  expect(refreshed.ok, `renovar Protected Edit -> ${refreshed.status}: ${refreshed.body}`).toBeTruthy()
   const result = await page.evaluate(async (id) => {
     const capability = window.sessionStorage.getItem('nexora.edit-access.capability')
     const response = await fetch('/api/me/preferences', {
@@ -70,6 +87,7 @@ test('SAP GUI confirmation, variants and representative routes use one global sh
     .analyze()
   expect(accessibility.violations, formatViolations(accessibility)).toEqual([])
 
+  await expect(page.getByLabel('Variante')).toHaveValue('sap-gui-signature')
   await page.getByLabel('Variante').selectOption('sap-gui-tradeshow')
   await expect(page.getByRole('dialog', { name: 'Cambiar a SAP GUI' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Guardar como mi preferencia' }).click()

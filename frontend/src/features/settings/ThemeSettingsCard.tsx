@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Badge, Button, Card, Modal, Select } from '../../design-system'
 import { useAuth } from '../../features/auth/auth-context'
@@ -161,6 +161,13 @@ export function ThemeSettingsCard({
   }, [presets])
   const draftFamily = getThemePreset(draftTheme).family
   const familyPresets = presets.filter((preset) => preset.family === draftFamily)
+
+  // A family confirmation updates the global preview immediately. Keep the
+  // local draft aligned when that transition crosses families so the variant
+  // selector cannot briefly render the previous family's options.
+  useEffect(() => {
+    if (getThemePreset(activeThemeId).family !== draftFamily) setDraftTheme(activeThemeId)
+  }, [activeThemeId, draftFamily])
 
   const applyPreview = (themeId: string, density: Density) => {
     setDraftTheme(themeId)

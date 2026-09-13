@@ -115,6 +115,22 @@ async function seedRepresentativeData(page: Page) {
 }
 
 async function setTheme(page: Page, themeId: string) {
+  // The full visual matrix can outlive the finite Protected Edit capability.
+  // Re-verify with the real E2E PIN before each protected preference update.
+  const refreshed = await page.evaluate(async (token) => {
+    const response = await fetch('/api/edit-access/verify', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    if (!response.ok) return { ok: false, status: response.status, body: await response.text() }
+    const result = (await response.json()) as { capability: string; expiresAt: number }
+    sessionStorage.setItem('nexora.edit-access.capability', result.capability)
+    sessionStorage.setItem('nexora.edit-access.expires-at', String(result.expiresAt))
+    return { ok: true, status: response.status, body: '' }
+  }, process.env.E2E_EDIT_ACCESS_TOKEN)
+  expect(refreshed.ok, `renovar Protected Edit -> ${refreshed.status}: ${refreshed.body}`).toBeTruthy()
   const result = await page.evaluate(async (id) => {
     const capability = window.sessionStorage.getItem('nexora.edit-access.capability')
     const response = await fetch('/api/me/preferences', {

@@ -19,6 +19,15 @@ import {
   type ContractInstallment,
   type SchedulePlanSnapshot,
 } from '../../services/contractPaymentService'
+import { apService } from '../../services/apArService'
+import { masterDataService } from '../../services/masterDataService'
+import { procurementService } from '../../services/procurementService'
+import { treasuryService } from '../../services/treasuryService'
+import { useActiveCompany } from '../../hooks/useActiveCompany'
+import {
+  CreateSupplierInvoiceModal,
+  PaySupplierInvoiceButton,
+} from '../treasury/SupplierInvoiceFlows'
 import { formatMoney } from '../../utils/currency'
 import { businessTodayIso } from '../../utils/businessDate'
 import {
@@ -39,6 +48,9 @@ export function ContractPaymentPlanModal({ contract, currencyCode, onClose }: {
   const queryClient = useQueryClient()
   const nowMonth = businessTodayIso().slice(0, 7)
   const [form, setForm] = useState({ firstPeriod: nowMonth, regularMonths: '7', dueDay: '1' })
+  const [prepare, setPrepare] = useState<ContractInstallment | null>(null)
+
+  const { activeCompanyId } = useActiveCompany()
 
   const scheduleQuery = useQuery({
     queryKey: ['contract-payments', 'by-contract', contract.id],
@@ -51,6 +63,33 @@ export function ContractPaymentPlanModal({ contract, currencyCode, onClose }: {
     queryKey: ['contract-payments', 'summary', scheduleId],
     queryFn: () => contractPaymentService.summary(scheduleId as string),
     enabled: Boolean(scheduleId),
+  })
+
+  // Queries needed for payment actions
+  const invoicesQuery = useQuery({
+    queryKey: ['ap', 'supplier-invoices', activeCompanyId],
+    queryFn: () => apService.listInvoices(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const accountsQuery = useQuery({
+    queryKey: ['master-data', 'accounts', activeCompanyId],
+    queryFn: () => masterDataService.listAccounts(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const treasuryAccountsQuery = useQuery({
+    queryKey: ['treasury', 'accounts', activeCompanyId],
+    queryFn: () => treasuryService.listAccounts(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const contractsQuery = useQuery({
+    queryKey: ['procurement', 'contracts', activeCompanyId],
+    queryFn: () => procurementService.listContracts(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
+  })
+  const suppliersQuery = useQuery({
+    queryKey: ['procurement', 'suppliers', activeCompanyId],
+    queryFn: () => procurementService.listSuppliers(activeCompanyId as string),
+    enabled: Boolean(activeCompanyId),
   })
 
   const createMutation = useMutation({
@@ -72,6 +111,83 @@ export function ContractPaymentPlanModal({ contract, currencyCode, onClose }: {
   const notFound = scheduleQuery.error instanceof ApiError && scheduleQuery.error.status === 404
   const currency = scheduleQuery.data?.currencyCode ?? currencyCode
 
+  // Build a map of installmentId → active invoice (not CANCELLED)
+  const invoiceByInstallment = new Map(
+    (invoicesQuery.data ?? [])
+      .filter((inv) => inv.contractInstallmentId && inv.status !== 'CANCELLED')
+      .map((inv) => [inv.contractInstallmentId as string, inv]),
+  )
+
+  const invalidateAfterPayment = () => {
+    queryClient.invalidateQueries({ queryKey: ['ap', 'supplier-invoices'] })
+    queryClient.invalidateQueries({ queryKey: ['treasury', 'accounts'] })
+    queryClient.invalidateQueries({ queryKey: ['contract-payments'] })
+    queryClient.invalidateQueries({ queryKey: ['project'] })
+    queryClient.invalidateQueries({ queryKey: ['reports', 'contract-payment-ledger'] })
+    queryClient.invalidateQueries({ queryKey: ['contract-payment-ledger'] })
+    queryClient.invalidateQueries({ queryKey: ['procurement', 'contracts'] })
+  }
+
+  const actionColumn: TableColumn<ContractInstallment> = {
+    key: 'actions',
+    header: 'Acción',
+    render: (r) => {
+      // Backend is authority — never allow payment if payableNow=false
+      if (!r.payableNow) {
+        const isUpcoming = r.status === 'UPCOMING'
+        const reason = r.paymentBlockedReason
+        return (
+          <span
+            className="nx-field__hint"
+            title={reason ?? (isUpcoming ? 'Cuota futura — aún no pagable' : 'Pago bloqueado')}
+            aria-label={reason ?? (isUpcoming ? 'Cuota futura' : 'Bloqueada')}
+          >
+            {isUpcoming ? 'Próxima' : reason ? 'Bloqueada' : '—'}
+          </span>
+        )
+      }
+      if (r.status === 'PAID' || r.status === 'CANCELLED') return null
+
+      const invoice = invoiceByInstallment.get(r.installmentId)
+      if (invoice && ['APPROVED', 'SCHEDULED', 'PARTIALLY_PAID'].includes(invoice.status)) {
+        const invoiceRemaining = invoice.amount + invoice.taxAmount - invoice.amountPaid
+        return (
+          <div className="nx-treasury__actions">
+            <PaySupplierInvoiceButton
+              invoice={invoice}
+              companyId={activeCompanyId!}
+              treasuryAccounts={treasuryAccountsQuery.data ?? []}
+              remaining={invoiceRemaining}
+              selectedInstallmentId={r.installmentId}
+              label={`Pagar`}
+            />
+            <PaySupplierInvoiceButton
+              invoice={invoice}
+              companyId={activeCompanyId!}
+              treasuryAccounts={treasuryAccountsQuery.data ?? []}
+              remaining={invoiceRemaining}
+              selectedInstallmentId={r.installmentId}
+              label={`Liquidar`}
+              lockAmount
+            />
+          </div>
+        )
+      }
+
+      // No invoice yet — open CreateSupplierInvoiceModal pre-linked to this installment
+      return (
+        <div className="nx-treasury__actions">
+          <Button variant="ghost" onClick={() => setPrepare(r)}>
+            Pagar
+          </Button>
+          <Button variant="secondary" onClick={() => setPrepare(r)}>
+            Liquidar
+          </Button>
+        </div>
+      )
+    },
+  }
+
   const columns: TableColumn<ContractInstallment>[] = [
     {
       key: 'kind', header: 'Tipo', render: (r) => (
@@ -86,6 +202,7 @@ export function ContractPaymentPlanModal({ contract, currencyCode, onClose }: {
     { key: 'paid', header: 'Pagado', numeric: true, render: (r) => formatMoney(r.paid, currency) },
     { key: 'rem', header: 'Pendiente', numeric: true, render: (r) => formatMoney(r.remaining, currency) },
     { key: 'status', header: 'Estado', render: (r) => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'}>{contractInstallmentStatusLabel(r.status)}</Badge> },
+    actionColumn,
   ]
 
   return (
@@ -157,6 +274,32 @@ export function ContractPaymentPlanModal({ contract, currencyCode, onClose }: {
           ) : null}
         </>
       )}
+      {prepare && activeCompanyId ? (
+        <CreateSupplierInvoiceModal
+          companyId={activeCompanyId}
+          functionalCurrencyCode={currency}
+          expenseAccounts={(accountsQuery.data ?? []).filter(
+            (account) => account.accountType === 'EXPENSE' || account.accountType === 'ASSET',
+          )}
+          payableAccounts={(accountsQuery.data ?? []).filter(
+            (account) => account.accountType === 'LIABILITY',
+          )}
+          suppliers={suppliersQuery.data ?? []}
+          contracts={contractsQuery.data ?? []}
+          initialContractId={contract.id}
+          initialInstallment={{
+            installmentId: prepare.installmentId,
+            remaining: prepare.remaining,
+            dueDate: prepare.dueDate,
+            periodLabel: prepare.periodLabel,
+          }}
+          onClose={() => setPrepare(null)}
+          onCreated={() => {
+            setPrepare(null)
+            invalidateAfterPayment()
+          }}
+        />
+      ) : null}
     </Modal>
   )
 }

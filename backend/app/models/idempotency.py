@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import CheckConstraint, DateTime, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,6 +13,12 @@ IDEMPOTENCY_STATUSES = ("PENDING", "COMPLETED")
 
 class IdempotencyRecord(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "idempotency_records"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PENDING','COMPLETED')",
+            name="ck_idempotency_records_status_valid",
+        ),
+    )
 
     key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     command: Mapped[str] = mapped_column(String(128), nullable=False)

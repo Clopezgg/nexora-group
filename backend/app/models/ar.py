@@ -45,6 +45,10 @@ class CustomerInvoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "OR (scope = 'PROJECT' AND project_id IS NOT NULL)",
             name="ck_customer_invoices_operation_scope",
         ),
+        CheckConstraint(
+            "status IN ('DRAFT','APPROVED','PARTIALLY_COLLECTED','COLLECTED','CANCELLED')",
+            name="ck_customer_invoices_status_valid",
+        ),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(

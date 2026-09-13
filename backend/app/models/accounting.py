@@ -44,6 +44,10 @@ class AccountingDocument(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "OR (scope = 'PROJECT' AND project_id IS NOT NULL)",
             name="ck_accounting_documents_operation_scope",
         ),
+        CheckConstraint(
+            "status IN ('DRAFT','POSTED','REVERSED')",
+            name="ck_accounting_documents_status_valid",
+        ),
         UniqueConstraint(
             "company_id", "document_number", name="uq_accounting_documents_company_document_number"
         ),

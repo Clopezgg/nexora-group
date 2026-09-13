@@ -42,6 +42,10 @@ class ContractPaymentSchedule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("supplier_contract_id", name="uq_contract_payment_schedule_contract"),
         CheckConstraint("total_scheduled >= 0", name="ck_contract_payment_schedule_total"),
+        CheckConstraint(
+            "status IN ('ACTIVE','COMPLETED','CANCELLED')",
+            name="ck_contract_payment_schedules_status_valid",
+        ),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -80,6 +84,10 @@ class ContractPaymentInstallment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("retention_amount >= 0", name="ck_contract_installment_retention"),
         CheckConstraint("sequence >= 1", name="ck_contract_installment_sequence"),
         CheckConstraint("period_month BETWEEN 1 AND 12", name="ck_contract_installment_month"),
+        CheckConstraint(
+            "status IN ('UPCOMING','DUE','PARTIALLY_PAID','PAID','OVERDUE','CANCELLED')",
+            name="ck_contract_payment_installments_status_valid",
+        ),
     )
 
     schedule_id: Mapped[uuid.UUID] = mapped_column(

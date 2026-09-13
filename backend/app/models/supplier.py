@@ -115,6 +115,10 @@ class SupplierContract(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "advance_amount IS NULL OR (advance_amount >= 0 AND advance_amount <= value)",
             name="ck_supplier_contracts_advance_amount",
         ),
+        CheckConstraint(
+            "status IN ('DRAFT','ACTIVE','COMPLETED','TERMINATED')",
+            name="ck_supplier_contracts_status_valid",
+        ),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(

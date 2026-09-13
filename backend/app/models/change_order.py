@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,6 +18,12 @@ CHANGE_ORDER_STATUSES = ("DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "IMPLEMEN
 
 class ChangeOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "change_orders"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('DRAFT','SUBMITTED','APPROVED','REJECTED','IMPLEMENTED','CANCELLED')",
+            name="ck_change_orders_status_valid",
+        ),
+    )
 
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False

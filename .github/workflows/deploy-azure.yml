@@ -494,12 +494,18 @@ jobs:
           fi
           COMPANY_ID="$(jq -r '.[0].id' "$COMPANIES_JSON")"
 
+          COMPANY_CURRENCY="$(jq -r '.[0].functionalCurrencyCode // empty' "$COMPANIES_JSON")"
+          if [ -z "$COMPANY_CURRENCY" ] || [ "$COMPANY_CURRENCY" = "null" ]; then
+            echo "::error::First company does not have a functionalCurrencyCode configured. Cannot test dashboard."
+            exit 1
+          fi
+
           call_authed 'projects' 200 "/projects?company_id=$COMPANY_ID" >/dev/null
           ACCOUNTS_JSON="$(call_authed 'master-data/accounts' 200 "/master-data/accounts?companyId=$COMPANY_ID")"
           jq -e 'type == "array"' "$ACCOUNTS_JSON" >/dev/null
 
-          DASHBOARD_JSON="$(call_authed 'dashboard/summary' 200 '/dashboard/summary')"
-          jq -e '.currency == "HNL"' "$DASHBOARD_JSON" >/dev/null
+          DASHBOARD_JSON="$(call_authed 'dashboard/summary' 200 "/dashboard/summary?companyId=$COMPANY_ID")"
+          jq -e --arg currency "$COMPANY_CURRENCY" '.currency == $currency' "$DASHBOARD_JSON" >/dev/null
 
           # Fiscal period read (returns 200 with nulls when not configured).
           call_authed 'fiscal/periods/current' 200 "/fiscal/periods/current?companyId=$COMPANY_ID" >/dev/null
@@ -562,6 +568,6 @@ jobs:
             echo "- Backend revision: healthy, image = \`${{ github.sha }}\`"
             echo "- Direct HTTPS API + first-party \`$FRONTEND_URL/api\`: healthy"
             echo "- CORS + credentialed session cookie (Secure + HttpOnly + Path=/): verified"
-            echo "- auth/me, master-data/companies ($COMPANY_COUNT visible), projects, master-data/accounts, dashboard (HNL), fiscal/periods/current: HTTP 200"
+            echo "- auth/me, master-data/companies ($COMPANY_COUNT visible), projects, master-data/accounts, dashboard ($COMPANY_CURRENCY), fiscal/periods/current: HTTP 200"
             echo "- logout invalidates session; relogin succeeds"
           } >> "$GITHUB_STEP_SUMMARY"

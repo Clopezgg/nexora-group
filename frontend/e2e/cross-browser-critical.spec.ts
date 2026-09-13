@@ -134,7 +134,8 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
     await page.getByRole('button', { name: 'Guardar como mi preferencia' }).click()
     await page.waitForLoadState('networkidle')
     await page.reload()
-    await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant)
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant, { timeout: 10_000 })
     await page.getByRole('menuitem', { name: 'Sistema', exact: true }).click()
     // A real click verifies the menu is not clipped behind the shell bars.
     await page

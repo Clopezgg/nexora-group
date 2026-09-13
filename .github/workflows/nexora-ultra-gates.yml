@@ -327,7 +327,7 @@ jobs:
       - name: Property-based OpenAPI fuzzing
         working-directory: backend
         run: |
-          st run \
+          schemathesis run \
             http://127.0.0.1:8000/openapi.json \
             --checks not_a_server_error \
             --max-time 300 \
@@ -362,50 +362,102 @@ jobs:
 
   # ==========================================================
   # 7. CHECKOV
+  #
+  # Progressive enforcement:
+  #
+  # - Existing IaC debt on the PR base is recorded dynamically.
+  # - Existing findings remain visible as baseline-skipped.
+  # - NEW findings fail this job.
+  #
+  # This prevents greenwashing while allowing gradual remediation
+  # of legacy Azure policies that require architectural/cost changes.
   # ==========================================================
 
   checkov:
     name: NEXORA IaC Guardian
     needs: classify
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
 
       - name: Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.12"
 
-      - name: Install Checkov
-        run: pip install "checkov>=3,<4"
+      - name: Install pinned Checkov
+        run: pip install "checkov==3.3.17"
 
-      - name: Scan Azure Bicep
+      - name: Resolve security baseline commit
+        id: refs
+        shell: bash
         run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+
+            if [ -z "$BASE" ] ||
+               [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              BASE="$(git rev-parse "${{ github.sha }}^" 2>/dev/null || echo "${{ github.sha }}")"
+            fi
+          fi
+
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          echo "Security baseline commit: $BASE"
+
+      - name: Build baseline from existing main debt
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf /tmp/nexora-checkov-base
+
+          git worktree add \
+            --detach \
+            /tmp/nexora-checkov-base \
+            "${{ steps.refs.outputs.base }}"
+
+          pushd /tmp/nexora-checkov-base >/dev/null
+
+          # Findings already present in the base branch are not silently
+          # declared safe. They become explicit legacy baseline debt.
+          #
+          # --create-baseline may return non-zero because findings exist.
+          # That is expected while creating the baseline.
           checkov \
-            -d infra \
-            --framework bicep \
+            -d . \
+            --framework bicep github_actions dockerfile \
+            --create-baseline \
+            --compact \
+            --quiet || true
+
+          test -s .checkov.baseline
+
+          cp .checkov.baseline /tmp/nexora-checkov.baseline
+
+          popd >/dev/null
+
+          echo "Existing security debt baseline generated."
+
+      - name: Fail only on NEW IaC / workflow regressions
+        run: |
+          set -euo pipefail
+
+          checkov \
+            -d . \
+            --framework bicep github_actions dockerfile \
+            --baseline /tmp/nexora-checkov.baseline \
+            --output-baseline-as-skipped \
             --compact \
             --quiet
-
-      - name: Scan GitHub Actions
-        run: |
-          checkov \
-            -d .github/workflows \
-            --framework github_actions \
-            --compact \
-            --quiet
-
-      - name: Scan backend Dockerfile
-        run: |
-          checkov \
-            -f backend/Dockerfile \
-            --framework dockerfile \
-            --compact \
-            --quiet
-
 
   # ==========================================================
   # 8. SBOM

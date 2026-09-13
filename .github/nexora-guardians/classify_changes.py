@@ -79,7 +79,20 @@ api = contains(api_patterns)
 infra = contains(infra_patterns)
 frontend = contains(frontend_patterns)
 
-critical = financial or auth or migration
+certification_patterns = (
+    ".github/nexora-guardians/",
+    ".github/workflows/nexora-ultra-gates.yml",
+    ".github/workflows/nexora-deep-testing.yml",
+    "backend/tests/test_financial_properties.py",
+    "docs/NEXORA_CERTIFICATION.md",
+)
+
+certification = contains(certification_patterns)
+
+# Changes to the certification machinery itself are RISK 4.
+# A broken guardian must never certify its own installation without
+# executing the strongest available verification suite.
+critical = financial or auth or migration or certification
 
 if critical:
     risk = 4

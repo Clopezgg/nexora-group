@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,7 +16,13 @@ WAREHOUSE_STATUSES = ("ACTIVE", "INACTIVE")
 
 class Warehouse(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "warehouses"
-    __table_args__ = (UniqueConstraint("company_id", "code", name="uq_warehouses_company_code"),)
+    __table_args__ = (
+        UniqueConstraint("company_id", "code", name="uq_warehouses_company_code"),
+        CheckConstraint(
+            "status IN ('ACTIVE','INACTIVE')",
+            name="ck_warehouses_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False

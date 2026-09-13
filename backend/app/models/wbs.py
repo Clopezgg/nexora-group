@@ -1,7 +1,15 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,7 +24,13 @@ WBS_STATUSES = ("PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED")
 
 class WBSNode(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "wbs_nodes"
-    __table_args__ = (UniqueConstraint("project_id", "code", name="uq_wbs_nodes_project_code"),)
+    __table_args__ = (
+        UniqueConstraint("project_id", "code", name="uq_wbs_nodes_project_code"),
+        CheckConstraint(
+            "status IN ('PLANNING','ACTIVE','ON_HOLD','COMPLETED','CANCELLED')",
+            name="ck_wbs_nodes_status_valid",
+        ),
+    )
 
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False

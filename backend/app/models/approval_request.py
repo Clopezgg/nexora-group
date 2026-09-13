@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,6 +21,12 @@ probadas de cada dominio."""
 
 class ApprovalRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "approval_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PENDING','APPROVED','REJECTED','CANCELLED','EXPIRED')",
+            name="ck_approval_requests_status_valid",
+        ),
+    )
 
     policy_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("approval_policies.id", ondelete="SET NULL"), nullable=True

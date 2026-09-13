@@ -96,7 +96,13 @@ class Crew(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     necesita, no un módulo de RRHH completo")."""
 
     __tablename__ = "crews"
-    __table_args__ = (UniqueConstraint("company_id", "name", name="uq_crews_company_name"),)
+    __table_args__ = (
+        UniqueConstraint("company_id", "name", name="uq_crews_company_name"),
+        CheckConstraint(
+            "status IN ('ACTIVE','INACTIVE')",
+            name="ck_crews_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False

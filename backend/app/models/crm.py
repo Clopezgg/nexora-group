@@ -35,6 +35,12 @@ SALES_CONTRACT_STATUSES = ("ACTIVE", "BILLED", "CANCELLED")
 
 class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "customers"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('ACTIVE','INACTIVE','BLOCKED')",
+            name="ck_customers_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
@@ -51,6 +57,12 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "leads"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('NEW','QUALIFIED','CONVERTED','LOST')",
+            name="ck_leads_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
@@ -88,7 +100,13 @@ class Opportunity(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class Quotation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "quotations"
-    __table_args__ = (CheckConstraint("amount > 0", name="ck_quotations_amount_positive"),)
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_quotations_amount_positive"),
+        CheckConstraint(
+            "status IN ('DRAFT','SENT','ACCEPTED','REJECTED')",
+            name="ck_quotations_status_valid",
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False
@@ -121,6 +139,10 @@ class SalesContract(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "(scope IN ('CENTRAL','GENERAL') AND project_id IS NULL) "
             "OR (scope = 'PROJECT' AND project_id IS NOT NULL)",
             name="ck_sales_contracts_operation_scope",
+        ),
+        CheckConstraint(
+            "status IN ('ACTIVE','BILLED','CANCELLED')",
+            name="ck_sales_contracts_status_valid",
         ),
     )
 

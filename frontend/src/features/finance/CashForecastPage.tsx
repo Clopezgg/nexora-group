@@ -30,15 +30,28 @@ import {
 import './cashflow/cashflow.css'
 
 export function CashForecastPage() {
-  const { companies, activeCompanyId, setActiveCompanyId, isLoading, isError, refetch } =
-    useActiveCompany()
+  const {
+    companies,
+    activeCompany,
+    activeCompanyId,
+    setActiveCompanyId,
+    isLoading,
+    isError,
+    refetch,
+  } = useActiveCompany()
   const [mode, setMode] = useState<CashFlowMode>('REALIZADO')
   const [range, setRange] = useState<CashFlowRange>('3M')
   const [granularity, setGranularity] = useState<CashFlowGranularityOption>('auto')
   const [drill, setDrill] = useState<{ from: string; to: string; label: string } | null>(null)
 
-  const { rows, summary, hasMovement, isLoading: seriesLoading, isError: seriesError, refetch: seriesRefetch } =
-    useCashFlowSeries({ companyId: activeCompanyId, mode, range, granularity })
+  const {
+    rows,
+    summary,
+    hasMovement,
+    isLoading: seriesLoading,
+    isError: seriesError,
+    refetch: seriesRefetch,
+  } = useCashFlowSeries({ companyId: activeCompanyId, mode, range, granularity })
 
   const drillQuery = useQuery({
     queryKey: ['cash-flow-movements', activeCompanyId, drill?.from, drill?.to],
@@ -50,9 +63,6 @@ export function CashForecastPage() {
       }),
     enabled: Boolean(activeCompanyId && drill),
   })
-
-  const currency = summary?.currencyCode ?? 'HNL'
-  const money = (v: number) => formatMoney(v, currency)
 
   const openDrill = (row: CashFlowRow) => {
     if (row.period) {
@@ -72,68 +82,130 @@ export function CashForecastPage() {
       />
     )
   }
+  if (!activeCompanyId || !activeCompany) {
+    return (
+      <div>
+        <header className="nx-page__header">
+          <div>
+            <p className="nx-page__eyebrow">Tesorería</p>
+            <h1 className="nx-dashboard__title">Flujo de caja</h1>
+          </div>
+          <CompanySelector
+            options={companies.map((company) => ({ id: company.id, label: company.name }))}
+            value={activeCompanyId}
+            onChange={setActiveCompanyId}
+          />
+        </header>
+        <EmptyState
+          icon="briefcase"
+          title="Selecciona una compañía"
+          description="Los importes financieros no se agregan entre compañías de forma implícita."
+        />
+      </div>
+    )
+  }
+  if (!activeCompany.functionalCurrencyCode) {
+    return (
+      <EmptyState
+        icon="warning"
+        title="La compañía activa no tiene moneda funcional"
+        description="Configura la moneda funcional antes de consultar el flujo de caja."
+      />
+    )
+  }
+
+  const currency = activeCompany.functionalCurrencyCode
+  const money = (value: number) => formatMoney(value, currency)
+  const responseCurrencyMismatch =
+    summary != null && summary.currencyCode.toUpperCase() !== currency.toUpperCase()
 
   const periodColumns: TableColumn<CashFlowPeriod>[] = [
-    { key: 'label', header: 'Período', render: (p) => p.label },
-    { key: 'in', header: 'Entradas', render: (p) => money(p.inflows) },
-    { key: 'out', header: 'Salidas', render: (p) => money(p.outflows) },
+    { key: 'label', header: 'Período', render: (period) => period.label },
+    { key: 'in', header: 'Entradas', render: (period) => money(period.inflows) },
+    { key: 'out', header: 'Salidas', render: (period) => money(period.outflows) },
     {
       key: 'net',
       header: 'Neto',
-      render: (p) => (
-        <span style={{ color: p.net < 0 ? 'var(--nx-color-negative)' : 'var(--nx-color-positive)' }}>
-          {money(p.net)}
+      render: (period) => (
+        <span
+          style={{
+            color:
+              period.net < 0 ? 'var(--nx-color-negative)' : 'var(--nx-color-positive)',
+          }}
+        >
+          {money(period.net)}
         </span>
       ),
     },
     {
       key: 'bal',
       header: 'Saldo al cierre',
-      render: (p) => (
-        <span style={{ color: p.closingBalance < 0 ? 'var(--nx-color-negative)' : undefined, fontWeight: 600 }}>
-          {money(p.closingBalance)}
+      render: (period) => (
+        <span
+          style={{
+            color: period.closingBalance < 0 ? 'var(--nx-color-negative)' : undefined,
+            fontWeight: 600,
+          }}
+        >
+          {money(period.closingBalance)}
         </span>
       ),
     },
     {
       key: 'mov',
       header: 'Mov.',
-      render: (p) => (
+      render: (period) => (
         <button
           type="button"
           className="nx-linkbutton"
-          onClick={() => setDrill({ from: p.periodStart, to: p.periodEnd, label: p.label })}
-          disabled={p.movementCount === 0}
+          onClick={() =>
+            setDrill({
+              from: period.periodStart,
+              to: period.periodEnd,
+              label: period.label,
+            })
+          }
+          disabled={period.movementCount === 0}
         >
-          {p.movementCount}
+          {period.movementCount}
         </button>
       ),
     },
   ]
 
   const movementColumns: TableColumn<CashFlowMovement>[] = [
-    { key: 'date', header: 'Fecha', render: (m) => m.effectiveDate },
-    { key: 'doc', header: 'Documento', render: (m) => m.documentNumber },
-    { key: 'cat', header: 'Categoría', render: (m) => m.category },
-    { key: 'concept', header: 'Concepto', render: (m) => m.concept ?? m.counterparty ?? '—' },
+    { key: 'date', header: 'Fecha', render: (movement) => movement.effectiveDate },
+    { key: 'doc', header: 'Documento', render: (movement) => movement.documentNumber },
+    { key: 'cat', header: 'Categoría', render: (movement) => movement.category },
+    {
+      key: 'concept',
+      header: 'Concepto',
+      render: (movement) => movement.concept ?? movement.counterparty ?? '—',
+    },
     {
       key: 'amount',
       header: 'Importe',
-      render: (m) => (
+      render: (movement) => (
         <span
           style={{
-            color: m.direction === 'OUTFLOW' ? 'var(--nx-color-negative)' : 'var(--nx-color-positive)',
+            color:
+              movement.direction === 'OUTFLOW'
+                ? 'var(--nx-color-negative)'
+                : 'var(--nx-color-positive)',
             fontWeight: 600,
           }}
         >
-          {m.direction === 'OUTFLOW' ? '−' : '+'}
-          {money(m.amount)}
+          {movement.direction === 'OUTFLOW' ? '−' : '+'}
+          {money(movement.amount)}
         </span>
       ),
     },
   ]
 
-  const periodRows = mode === 'REALIZADO' ? rows.map((r) => r.period).filter((p): p is CashFlowPeriod => Boolean(p)) : []
+  const periodRows =
+    mode === 'REALIZADO'
+      ? rows.map((row) => row.period).filter((period): period is CashFlowPeriod => Boolean(period))
+      : []
 
   return (
     <div>
@@ -168,6 +240,8 @@ export function CashForecastPage() {
           <LoadingState label={mode === 'REALIZADO' ? 'Cargando movimiento real…' : 'Proyectando…'} />
         ) : seriesError ? (
           <ErrorState description="No se pudo calcular el flujo de caja." onRetry={seriesRefetch} />
+        ) : responseCurrencyMismatch ? (
+          <ErrorState description="La moneda devuelta por el flujo de caja no coincide con la moneda funcional de la compañía activa." />
         ) : hasMovement ? (
           <>
             {summary ? <CashFlowSummary summary={summary} /> : null}
@@ -178,7 +252,7 @@ export function CashForecastPage() {
                 <Table
                   columns={periodColumns}
                   rows={periodRows}
-                  getRowKey={(p) => String(p.index)}
+                  getRowKey={(period) => String(period.index)}
                   emptyMessage="Sin períodos."
                 />
               </>
@@ -201,12 +275,15 @@ export function CashForecastPage() {
           {drillQuery.isLoading ? (
             <LoadingState label="Cargando movimientos…" />
           ) : drillQuery.isError ? (
-            <ErrorState description="No se pudieron cargar los movimientos." onRetry={() => drillQuery.refetch()} />
+            <ErrorState
+              description="No se pudieron cargar los movimientos."
+              onRetry={() => drillQuery.refetch()}
+            />
           ) : (
             <Table
               columns={movementColumns}
               rows={drillQuery.data ?? []}
-              getRowKey={(m) => m.documentId}
+              getRowKey={(movement) => movement.documentId}
               emptyMessage="Sin movimientos en este período."
             />
           )}

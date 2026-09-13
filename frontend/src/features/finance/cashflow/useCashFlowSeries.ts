@@ -1,13 +1,13 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { cashForecastService } from '../../../services/cashForecastService'
 import {
   cashFlowActualService,
   type CashFlowGranularity,
   type CashFlowPeriod,
 } from '../../../services/cashFlowActualService'
-import { formatPeriodLabel } from './periodLabel'
+import { cashForecastService } from '../../../services/cashForecastService'
 import { businessDateDaysAgoIso, businessTodayIso } from '../../../utils/businessDate'
+import { formatPeriodLabel } from './periodLabel'
 
 export type CashFlowMode = 'REALIZADO' | 'PROYECTADO'
 export type CashFlowRange = '1M' | '3M' | '6M' | '12M'
@@ -149,7 +149,7 @@ export function useCashFlowSeries({
         dateFrom: s.dateFrom,
         dateTo: s.dateTo,
         granularityLabel: GRANULARITY_LABEL[s.granularity] ?? null,
-        currencyCode: s.currencyCode ?? 'HNL',
+        currencyCode: s.currencyCode,
         liquidityAlert: null,
       }
     }
@@ -168,7 +168,7 @@ export function useCashFlowSeries({
       dateFrom: f.weeks[0]?.weekStart ?? null,
       dateTo: f.weeks.at(-1)?.weekEnd ?? null,
       granularityLabel: 'semanal',
-      currencyCode: f.currencyCode ?? 'HNL',
+      currencyCode: f.currencyCode,
       liquidityAlert: f.hasLiquidityAlert
         ? {
             minBalance: f.minProjectedBalance,

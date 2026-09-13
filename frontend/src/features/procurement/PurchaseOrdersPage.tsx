@@ -17,12 +17,13 @@ import {
 import type { TableColumn } from '../../design-system'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { useMutationError } from '../../hooks/useMutationError'
-import { procurementService } from '../../services/procurementService'
 import { apService } from '../../services/apArService'
+import { procurementService } from '../../services/procurementService'
 import type { PurchaseOrder, ThreeWayMatch } from '../../types/procurement'
 
 export function PurchaseOrdersPage() {
   const { activeCompanyId, activeCompany, isLoading: loadingCompanies } = useActiveCompany()
+  const activeCurrency = activeCompany?.functionalCurrencyCode ?? null
   const handleMutationError = useMutationError()
   const [modalOpen, setModalOpen] = useState(false)
   const [supplierId, setSupplierId] = useState<string | null>(null)
@@ -59,17 +60,22 @@ export function PurchaseOrdersPage() {
     enabled: Boolean(activeCompanyId),
   })
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['procurement', 'purchase-orders', activeCompanyId] })
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ['procurement', 'purchase-orders', activeCompanyId] })
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      procurementService.createPurchaseOrder({
-        companyId: activeCompanyId as string,
+    mutationFn: () => {
+      if (!activeCompanyId || !activeCurrency) {
+        throw new Error('Selecciona una compañía con moneda funcional antes de crear la orden.')
+      }
+      return procurementService.createPurchaseOrder({
+        companyId: activeCompanyId,
         supplierId: supplierId as string,
-        currencyCode: activeCompany?.functionalCurrencyCode ?? 'HNL',
+        currencyCode: activeCurrency,
         fulfillmentType,
         lines: [{ description, quantity, unitPrice }],
-      }),
+      })
+    },
     onSuccess: () => {
       invalidate()
       setModalOpen(false)
@@ -93,11 +99,12 @@ export function PurchaseOrdersPage() {
     onError: (error) => handleMutationError(error, 'Enviar orden de compra'),
   })
   const matchMutation = useMutation({
-    mutationFn: () => procurementService.runThreeWayMatch({
-      purchaseOrderId: matchOrder?.id as string,
-      supplierInvoiceId: matchInvoiceId,
-      supplierInvoiceQuantity: invoiceQuantity,
-    }),
+    mutationFn: () =>
+      procurementService.runThreeWayMatch({
+        purchaseOrderId: matchOrder?.id as string,
+        supplierInvoiceId: matchInvoiceId,
+        supplierInvoiceQuantity: invoiceQuantity,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['procurement', 'three-way-match', activeCompanyId] })
       setMatchOrder(null)
@@ -107,7 +114,8 @@ export function PurchaseOrdersPage() {
     onError: (error) => handleMutationError(error, 'Conciliar factura con orden y recepción'),
   })
   const overrideMutation = useMutation({
-    mutationFn: () => procurementService.overrideThreeWayMatch(overrideMatch?.id as string, overrideReason),
+    mutationFn: () =>
+      procurementService.overrideThreeWayMatch(overrideMatch?.id as string, overrideReason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['procurement', 'three-way-match', activeCompanyId] })
       setOverrideMatch(null)
@@ -123,7 +131,11 @@ export function PurchaseOrdersPage() {
 
   const columns: TableColumn<PurchaseOrder>[] = [
     { key: 'number', header: 'Número', render: (row) => row.poNumber },
-    { key: 'status', header: 'Estado', render: (row) => <Badge>{row.status.replaceAll('_', ' ')}</Badge> },
+    {
+      key: 'status',
+      header: 'Estado',
+      render: (row) => <Badge>{row.status.replaceAll('_', ' ')}</Badge>,
+    },
     {
       key: 'match',
       header: 'Conciliación',
@@ -151,12 +163,20 @@ export function PurchaseOrdersPage() {
       render: (row) => (
         <>
           {row.status === 'DRAFT' ? (
-            <Button variant="secondary" onClick={() => approveMutation.mutate(row.id)} loading={approveMutation.isPending}>
+            <Button
+              variant="secondary"
+              onClick={() => approveMutation.mutate(row.id)}
+              loading={approveMutation.isPending}
+            >
               Aprobar
             </Button>
           ) : null}
           {row.status === 'APPROVED' ? (
-            <Button variant="secondary" onClick={() => sendMutation.mutate(row.id)} loading={sendMutation.isPending}>
+            <Button
+              variant="secondary"
+              onClick={() => sendMutation.mutate(row.id)}
+              loading={sendMutation.isPending}
+            >
               Enviar
             </Button>
           ) : null}
@@ -175,11 +195,28 @@ export function PurchaseOrdersPage() {
   ]
 
   if (loadingCompanies) return <LoadingState label="Cargando compañías…" />
-  if (!activeCompanyId) {
-    return <EmptyState title="Configura una compañía primero" description="No hay compañías registradas todavía." />
+  if (!activeCompanyId || !activeCompany) {
+    return (
+      <EmptyState
+        title="Selecciona una compañía"
+        description="Las órdenes de compra requieren una compañía activa explícita."
+      />
+    )
+  }
+  if (!activeCurrency) {
+    return (
+      <EmptyState
+        icon="warning"
+        title="La compañía activa no tiene moneda funcional"
+        description="Configura la moneda funcional antes de crear órdenes de compra."
+      />
+    )
   }
 
-  const supplierOptions = (suppliersQuery.data ?? []).map((s) => ({ id: s.id, label: s.legalName }))
+  const supplierOptions = (suppliersQuery.data ?? []).map((supplier) => ({
+    id: supplier.id,
+    label: supplier.legalName,
+  }))
 
   return (
     <div>
@@ -219,10 +256,29 @@ export function PurchaseOrdersPage() {
             <option value="GOODS">Bienes · recepción de mercadería</option>
             <option value="SERVICE">Servicios · aceptación por período</option>
           </Select>
-          <Input label="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} required />
-          <Input label="Cantidad" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
-          <Input label="Precio unitario" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} required />
-          <Button type="submit" loading={createMutation.isPending} disabled={!supplierId || !description || !quantity || !unitPrice}>
+          <Input
+            label="Descripción"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            required
+          />
+          <Input
+            label="Cantidad"
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            required
+          />
+          <Input
+            label={`Precio unitario (${activeCurrency})`}
+            value={unitPrice}
+            onChange={(event) => setUnitPrice(event.target.value)}
+            required
+          />
+          <Button
+            type="submit"
+            loading={createMutation.isPending}
+            disabled={!supplierId || !description || !quantity || !unitPrice}
+          >
             Guardar
           </Button>
         </form>
@@ -233,7 +289,12 @@ export function PurchaseOrdersPage() {
         title={`Conciliación tres vías · ${matchOrder?.poNumber ?? ''}`}
         onClose={() => setMatchOrder(null)}
       >
-        <form onSubmit={(event) => { event.preventDefault(); matchMutation.mutate() }}>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            matchMutation.mutate()
+          }}
+        >
           <Select
             label="Factura de proveedor"
             value={matchInvoiceId}
@@ -243,7 +304,11 @@ export function PurchaseOrdersPage() {
             <option value="">Selecciona una factura vinculada</option>
             {(invoicesQuery.data ?? [])
               .filter((invoice) => invoice.purchaseOrderId === matchOrder?.id)
-              .map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.invoiceNumber}</option>)}
+              .map((invoice) => (
+                <option key={invoice.id} value={invoice.id}>
+                  {invoice.invoiceNumber}
+                </option>
+              ))}
           </Select>
           <Input
             label="Cantidad facturada"
@@ -268,7 +333,12 @@ export function PurchaseOrdersPage() {
         title="Autorizar excepción de conciliación"
         onClose={() => setOverrideMatch(null)}
       >
-        <form onSubmit={(event) => { event.preventDefault(); overrideMutation.mutate() }}>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            overrideMutation.mutate()
+          }}
+        >
           <Textarea
             label="Motivo de autorización"
             value={overrideReason}
@@ -276,7 +346,11 @@ export function PurchaseOrdersPage() {
             minLength={10}
             required
           />
-          <Button type="submit" loading={overrideMutation.isPending} disabled={overrideReason.trim().length < 10}>
+          <Button
+            type="submit"
+            loading={overrideMutation.isPending}
+            disabled={overrideReason.trim().length < 10}
+          >
             Autorizar excepción
           </Button>
         </form>

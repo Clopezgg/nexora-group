@@ -827,7 +827,7 @@ function GeneralExpenseModal({
   })
   const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : []
   const selectedTreasuryAccount = treasuryAccounts.find((account) => account.id === treasuryAccountId)
-  const selectedCurrency = selectedTreasuryAccount?.currencyCode ?? 'HNL'
+  const selectedCurrency = selectedTreasuryAccount?.currencyCode
 
   const mutation = useMutation({
     mutationFn: ({
@@ -871,7 +871,7 @@ function GeneralExpenseModal({
               projectId: scope === 'PROJECT' ? projectId : null,
               category,
               amount: String(amount ?? 0),
-              currencyCode: selectedCurrency,
+              currencyCode: selectedCurrency as string,
               expenseDate,
               description,
               ...(contractGuardMessage && acknowledgeContractGuard
@@ -1030,6 +1030,7 @@ function GeneralExpenseModal({
             !description.trim() ||
             !expenseDate ||
             !treasuryAccountId ||
+            !selectedCurrency ||
             !expenseAccountId ||
             (scope === 'PROJECT' && !projectId) ||
             (Boolean(contractGuardMessage) &&
@@ -1087,7 +1088,7 @@ function TransferModal({
               sourceTreasuryAccountId: sourceId,
               destinationTreasuryAccountId: destinationId,
               amount: String(amount ?? 0),
-              currencyCode: source?.currencyCode ?? 'HNL',
+              currencyCode: source?.currencyCode as string,
               transferDate: businessTodayIso(),
             },
             idempotencyKey: crypto.randomUUID(),
@@ -1125,7 +1126,7 @@ function TransferModal({
         <Button
           type="submit"
           loading={mutation.isPending}
-          disabled={!amount || sourceId === destinationId}
+          disabled={!amount || !source || sourceId === destinationId}
         >
           Transferir
         </Button>

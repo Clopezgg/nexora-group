@@ -326,7 +326,11 @@ def change_asset_status(db: Session, *, asset_id: uuid.UUID, status: str, commit
 
 
 def apply_capitalization_reversal(
-    db: Session, *, asset_id: uuid.UUID, document_type_code: str
+    db: Session,
+    *,
+    asset_id: uuid.UUID,
+    document_type_code: str,
+    effective_date: date,
 ) -> None:
     """Synchronize a formal CAP reversal with the source asset.
 
@@ -352,15 +356,8 @@ def apply_capitalization_reversal(
         raise InvalidAssetStateError(
             "No se puede revertir la capitalización de un activo con depreciaciones registradas"
         )
-    disposal_date = None
-    if asset.capitalization_document_id is not None:
-        cap_doc = db.get(AccountingDocument, asset.capitalization_document_id)
-        if cap_doc is not None:
-            disposal_date = cap_doc.effective_date
-    if disposal_date is None:
-        disposal_date = date.today()
     asset.status = "RETIRED"
-    asset.disposal_date = disposal_date
+    asset.disposal_date = effective_date
 
 
 def _accumulated_depreciation_total(db: Session, *, asset_id: uuid.UUID) -> Decimal:

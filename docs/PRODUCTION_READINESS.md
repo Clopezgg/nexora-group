@@ -1,5 +1,23 @@
 # NEXORA GROUP — Production Readiness Gate (Definición Absoluta de 100%)
 
+## Certificación de cierre PR #135 — 2026-09-12
+
+El código del cierre se certificó localmente con 677 pruebas backend sobre
+PostgreSQL real, 250 pruebas frontend, compileall, Ruff completo, pip-audit,
+npm audit, typecheck, lint, build/PWA, migración desde base limpia con un solo
+head (`f2c3d4e5f6a7`), Bicep y matriz visual SAP GUI 4 variantes × 7 anchos.
+La rama huérfana `fix/schema-sync-and-asset-disposal-date` fue auditada:
+se portaron sus constraints de modelo y la semántica válida de
+`disposal_date`; sus migraciones duplicadas/destructivas no se integraron.
+
+La evidencia definitiva del release no se atribuye a estos resultados
+locales: requiere CI verde del HEAD exacto del PR, merge, CI del SHA exacto de
+`main`, deployment real (no solo what-if), coincidencia de imagen/revisión y
+smoke autenticado de producción. Los identificadores finales se conservan en
+GitHub Actions y en el reporte de cierre de la ejecución que realiza el
+deployment, evitando incorporar a Git una afirmación circular sobre el propio
+commit antes de desplegarlo.
+
 ## Live production evidence — 2026-08-27
 
 The earlier Azure authorization/provisioning blocker is no longer current.
@@ -33,19 +51,15 @@ archivo + `CLAUDE.md` + `docs/MASTER_PLAN.md` +
 `docs/REQUIREMENTS_TRACEABILITY.md` son la fuente de verdad — no se
 reinterpreta esta orden desde cero.
 
-**Estado actual (2026-08-26):** 113/124 requisitos completos (110
+**Snapshot histórico (2026-08-26):** 113/124 requisitos completos (110
 IMPLEMENTED + 3 VERIFIED). 11 requisitos restantes: 8 IN_PROGRESS
 (Azure infrastructure, BLOCKED por §11.1), 1 NOT_STARTED (OIDC), 2
 BLOCKED_EXTERNAL (production). Ver `docs/REQUIREMENTS_TRACEABILITY.md`
 para el detalle fila por fila.
 
-**No aplicar todavía.** Esta orden gobierna la fase 90-100% (feature
-freeze → certificación de producción). Mientras el sistema esté en
-Build Width First (completando tracks funcionales, actualmente
-construyendo Track G), estos gates NO son trabajo activo — son la
-definición de destino. Ejecutarlos prematuramente sobre un sistema
-todavía incompleto sería desperdiciar el trabajo (p.ej. un load test
-antes de que existan los módulos que se van a cargar).
+**Nota histórica.** Este bloque describía la transición desde Build Width
+First hacia feature freeze. El repositorio ya alcanzó la fase de
+certificación; los gates siguientes son ahora obligatorios y activos.
 
 **Regla no negociable:** ninguna de las frases "implementation
 complete", "code complete", "feature complete", "all modules merged",

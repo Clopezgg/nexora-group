@@ -218,7 +218,7 @@ function CreateQuotationModal({
             required
           />
         </label>
-        <MoneyInput label="Monto (HNL)" value={amount} onChange={setAmount} />
+        <MoneyInput label={`Monto (${currencyCode})`} value={amount} onChange={setAmount} />
         {mutation.isError ? (
           <p className="nx-field__error">{(mutation.error as Error).message}</p>
         ) : null}

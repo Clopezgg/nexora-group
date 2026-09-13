@@ -282,3 +282,7 @@ class InvalidCashFlowActivityError(Exception):
 class RateLimitExceededError(Exception):
     """Se superó el límite de intentos configurado para un `bucket_key`
     (p.ej. IP en `/api/auth/login`) dentro de la ventana vigente."""
+
+class FinancialContextRequiredError(Exception):
+    """NXR-DASHBOARD-001: Se requiere una compañía activa para consultar el dashboard financiero."""
+

@@ -1,9 +1,13 @@
-export const DEFAULT_CURRENCY = 'HNL'
-
 const symbolCache = new Map<string, string>()
 
-function currencySymbol(currency: string): string {
-  const key = currency || DEFAULT_CURRENCY
+function normalizeCurrency(currency?: string | null): string | null {
+  const key = currency?.trim().toUpperCase() ?? ''
+  return /^[A-Z]{3}$/.test(key) ? key : null
+}
+
+function currencySymbol(currency?: string | null): string | null {
+  const key = normalizeCurrency(currency)
+  if (!key) return null
   let symbol = symbolCache.get(key)
   if (!symbol) {
     try {
@@ -26,16 +30,25 @@ function currencySymbol(currency: string): string {
  * La representación financiera autoritativa viaja como string; aquí se
  * normaliza a centavos con BigInt y redondeo decimal exacto. Los `number`
  * siguen aceptándose para inputs/UI no autoritativos por compatibilidad.
- * Se conserva el espacio no separable que utilizaba Intl.NumberFormat para
- * no romper snapshots/E2E ni permitir saltos de línea entre símbolo y monto.
+ *
+ * No existe moneda implícita: si el llamador no aporta un código ISO válido,
+ * el formatter falla cerrado visualmente con `—` en vez de inventar HNL u
+ * otra divisa. Los flujos de creación/posting deben además bloquear antes de
+ * llegar a esta capa de presentación.
  */
-export function formatMoney(value: number | string, currency = DEFAULT_CURRENCY): string {
-  const raw = typeof value === 'number'
-    ? (Number.isFinite(value) ? value.toFixed(2) : '0')
-    : String(value).trim()
+export function formatMoney(value: number | string, currency?: string | null): string {
+  const symbol = currencySymbol(currency)
+  if (!symbol) return '—'
+
+  const raw =
+    typeof value === 'number'
+      ? Number.isFinite(value)
+        ? value.toFixed(2)
+        : '0'
+      : String(value).trim()
   const match = raw.match(/^([+-]?)(\d+)(?:\.(\d+))?$/)
   const separator = '\u00a0'
-  if (!match) return `${currencySymbol(currency)}${separator}0.00`
+  if (!match) return `${symbol}${separator}0.00`
 
   const negative = match[1] === '-'
   const integer = BigInt(match[2])
@@ -47,18 +60,26 @@ export function formatMoney(value: number | string, currency = DEFAULT_CURRENCY)
   const decimal = String(cents % 100n).padStart(2, '0')
   const grouped = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   const sign = negative && cents !== 0n ? '-' : ''
-  return `${sign}${currencySymbol(currency || DEFAULT_CURRENCY)}${separator}${grouped}.${decimal}`
+  return `${sign}${symbol}${separator}${grouped}.${decimal}`
 }
 
 /** Abbreviated money is deliberately presentational (axes/sparklines), never
  * used as an accounting value or request payload. */
-export function formatMoneyCompact(value: number | string, currency = DEFAULT_CURRENCY): string {
+export function formatMoneyCompact(
+  value: number | string,
+  currency?: string | null,
+): string {
+  const symbol = currencySymbol(currency)
+  if (!symbol) return '—'
   const amount = Number(value)
   if (!Number.isFinite(amount)) return formatMoney(0, currency)
-  const symbol = currencySymbol(currency)
   const sign = amount < 0 ? '-' : ''
   const abs = Math.abs(amount)
-  if (abs >= 1_000_000) return `${sign}${symbol} ${(abs / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}M`
-  if (abs >= 1_000) return `${sign}${symbol} ${(abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1)}K`
+  if (abs >= 1_000_000) {
+    return `${sign}${symbol} ${(abs / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}M`
+  }
+  if (abs >= 1_000) {
+    return `${sign}${symbol} ${(abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1)}K`
+  }
   return `${sign}${symbol} ${abs.toFixed(0)}`
 }

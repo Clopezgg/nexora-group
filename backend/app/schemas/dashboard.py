@@ -28,7 +28,7 @@ class DashboardSummaryResponse(CamelModel):
     receivables_outstanding: Decimal = Decimal("0")
     cash_flow: list[CashFlowPointResponse] = Field(default_factory=list)
     expenses_by_scope: list[ScopeAmountResponse] = Field(default_factory=list)
-    currency: str = "HNL"
+    currency: str
     fiscal_period_label: str | None = None
     fiscal_period_status: str | None = None
     fiscal_period_start: date | None = None

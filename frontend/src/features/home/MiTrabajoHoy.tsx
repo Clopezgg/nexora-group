@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Icon, type IconName } from '../../design-system'
-import { formatMoney } from '../../utils/currency'
 import type { DashboardSummary } from '../../types/dashboard'
+import { formatMoney } from '../../utils/currency'
 
 interface MiTrabajoHoyProps {
   summary: DashboardSummary
@@ -19,7 +19,6 @@ interface WorkTile {
 /** "Mi trabajo hoy" (§18) — tarjetas compactas, todas clicables, hacia el
  * trabajo pendiente real del usuario. Sin tarjetas decorativas. */
 export function MiTrabajoHoy({ summary }: MiTrabajoHoyProps) {
-  const currency = summary.currency || 'HNL'
   const pendingApprovals = summary.pendingApprovals ?? 0
   const overduePayables = summary.overduePayables ?? 0
   const tiles: WorkTile[] = [
@@ -35,14 +34,14 @@ export function MiTrabajoHoy({ summary }: MiTrabajoHoyProps) {
       icon: 'card',
       to: '/finanzas/cuentas-por-pagar',
       count: overduePayables,
-      hint: formatMoney(summary.overduePayablesAmount ?? 0, currency),
+      hint: formatMoney(summary.overduePayablesAmount ?? 0, summary.currency),
       tone: overduePayables > 0 ? 'danger' : 'neutral',
     },
     {
       label: 'Por cobrar',
       icon: 'receipt',
       to: '/finanzas/cuentas-por-cobrar',
-      hint: formatMoney(summary.receivablesOutstanding ?? 0, currency),
+      hint: formatMoney(summary.receivablesOutstanding ?? 0, summary.currency),
       tone: 'neutral',
     },
     {

@@ -56,7 +56,7 @@ cuentas usar para un caso de negocio que no conoce.
 # así que el hook debe inspeccionar document_type_code y decidir si
 # aplica o si debe rechazar la reversión (lanzando) para no dejar un
 # estado a medias.
-ReversalHook = Callable[[Session, uuid.UUID, str], None]
+ReversalHook = Callable[[Session, uuid.UUID, str, date], None]
 _REVERSAL_HOOKS: dict[str, ReversalHook] = {}
 
 
@@ -333,13 +333,14 @@ def reverse_document(
             f"Solo se puede revertir un documento POSTED (estado actual: {original.status})"
         )
 
+    reversal_effective_date = business_today()
     link = db.execute(
         select(AccountingSourceLink).where(AccountingSourceLink.accounting_document_id == original.id)
     ).scalar_one_or_none()
     if link is not None:
         hook = _REVERSAL_HOOKS.get(link.source_type)
         if hook is not None:
-            hook(db, link.source_id, original.document_type_code)
+            hook(db, link.source_id, original.document_type_code, reversal_effective_date)
 
     original_lines = db.execute(
         select(JournalLine).where(JournalLine.accounting_document_id == original.id)
@@ -368,6 +369,7 @@ def reverse_document(
         fx_rate=original.fx_rate,
         lines=reversal_lines,
         description=f"Reversal de {original.document_number}: {reason}",
+        effective_date=reversal_effective_date,
         commit=False,
     )
 

@@ -103,9 +103,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const saveMutation = useMutation({
     mutationFn: (body: { themeId: string | null; density: Density | null }) =>
       preferencesService.update(body),
-    onSuccess: () => {
-      setPreviewState(null)
-      queryClient.invalidateQueries({ queryKey: ['me', 'preferences'] })
+    onSuccess: (saved, requested) => {
+      // Publish the authoritative response before dropping the preview so the
+      // UI never flashes back to stale cached preferences. If the user has
+      // already selected another preview while this request was in flight,
+      // preserve that newer intent instead of overwriting it.
+      queryClient.setQueryData(['me', 'preferences'], saved)
+      setPreviewState((current) =>
+        current?.themeId === requested.themeId && current.density === requested.density
+          ? null
+          : current,
+      )
     },
   })
 

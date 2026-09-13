@@ -1,8 +1,14 @@
+import uuid
 from datetime import timedelta
 
+import pytest
+from pydantic import ValidationError
+
 from app.core.business_time import business_today
+from app.models.company import Company
 from app.models.permission import UserCompanyAccess, UserProjectAccess
 from app.models.project import Project
+from app.schemas.dashboard import DashboardSummaryResponse
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
 from tests.helpers import (
     create_account,
@@ -25,22 +31,44 @@ def test_dashboard_summary_requires_auth(client):
     assert response.status_code == 401
 
 
-def test_dashboard_summary_returns_real_zeroed_values_on_fresh_db(client):
+def test_dashboard_summary_requires_explicit_company_context(client):
     _login(client)
+
     response = client.get("/api/dashboard/summary")
-    assert response.status_code == 200
-    body = response.json()
-    assert float(body["treasuryBalance"]) == 0.0
-    assert float(body["periodIncome"]) == 0.0
-    assert float(body["periodExpense"]) == 0.0
-    assert body["activeProjects"] == 0
-    assert body["pendingApprovals"] == 0
-    assert body["overduePayables"] == 0
-    assert float(body["overduePayablesAmount"]) == 0.0
-    assert float(body["receivablesOutstanding"]) == 0.0
-    assert len(body["cashFlow"]) == 6
-    assert body["expensesByScope"] == []
-    assert body["currency"] == "HNL"
+
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "NXR-DASHBOARD-001"
+
+
+def test_dashboard_schema_requires_explicit_currency():
+    with pytest.raises(ValidationError):
+        DashboardSummaryResponse(
+            treasury_balance="0.00",
+            period_income="0.00",
+            period_expense="0.00",
+            active_projects=0,
+        )
+
+
+def test_dashboard_unknown_company_is_not_found(client):
+    _login(client)
+
+    response = client.get(f"/api/dashboard/summary?companyId={uuid.uuid4()}")
+
+    assert response.status_code == 404, response.text
+    assert response.json()["error"]["code"] == "NXR-DATA-002"
+
+
+def test_dashboard_company_without_functional_currency_fails_closed(client, db_session):
+    _login(client)
+    company = Company(name="Compañía sin moneda")
+    db_session.add(company)
+    db_session.commit()
+
+    response = client.get(f"/api/dashboard/summary?companyId={company.id}")
+
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "NXR-DASHBOARD-001"
 
 
 def test_dashboard_money_fields_serialize_as_decimal_safe_strings_not_float(client):
@@ -54,9 +82,15 @@ def test_dashboard_money_fields_serialize_as_decimal_safe_strings_not_float(clie
         client, company_id=company["id"], code="1100", name="Bancos", account_type="ASSET"
     )
     contributions = create_account(
-        client, company_id=company["id"], code="3100", name="Aportes de socios", account_type="EQUITY"
+        client,
+        company_id=company["id"],
+        code="3100",
+        name="Aportes de socios",
+        account_type="EQUITY",
     )
-    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+    bank = create_treasury_account(
+        client, company_id=company["id"], gl_account_id=bank_gl["id"]
+    )
     response = client.post(
         "/api/treasury/remittances",
         json={
@@ -71,59 +105,118 @@ def test_dashboard_money_fields_serialize_as_decimal_safe_strings_not_float(clie
     )
     assert response.status_code == 201, response.text
 
-    body = client.get("/api/dashboard/summary").json()
+    dashboard = client.get(f"/api/dashboard/summary?companyId={company['id']}")
+    assert dashboard.status_code == 200, dashboard.text
+    body = dashboard.json()
     assert isinstance(body["treasuryBalance"], str), (
         f"treasuryBalance debe ser un string Decimal-safe, no float: {body['treasuryBalance']!r}"
     )
     assert body["treasuryBalance"] == "50000.00"
 
 
-def test_company_dashboard_uses_its_functional_currency_instead_of_hnl(client):
-    """A USD company must never get a zeroed HNL dashboard while its USD ledger has cash."""
+def test_company_dashboard_isolates_companies_and_functional_currencies(client):
+    """Dos compañías visibles con monedas distintas nunca se mezclan ni heredan
+    la moneda de la primera fila de `companies`."""
     _login(client)
-    company = create_company(client, name="Nexora USD", currency="USD")
-    bank_gl = create_account(
-        client, company_id=company["id"], code="1100", name="USD Bank", account_type="ASSET"
+
+    hnl_company = create_company(client, name="Nexora HNL", currency="HNL")
+    hnl_bank_gl = create_account(
+        client,
+        company_id=hnl_company["id"],
+        code="1100-HNL",
+        name="Banco HNL",
+        account_type="ASSET",
     )
-    equity = create_account(
-        client, company_id=company["id"], code="3100", name="USD Equity", account_type="EQUITY"
+    hnl_equity = create_account(
+        client,
+        company_id=hnl_company["id"],
+        code="3100-HNL",
+        name="Capital HNL",
+        account_type="EQUITY",
     )
-    bank = client.post(
+    hnl_bank = client.post(
         "/api/treasury/accounts",
         json={
-            "companyId": company["id"],
-            "name": "USD Bank",
+            "companyId": hnl_company["id"],
+            "name": "Banco HNL",
             "kind": "BANK",
-            "currencyCode": "USD",
-            "glAccountId": bank_gl["id"],
+            "currencyCode": "HNL",
+            "glAccountId": hnl_bank_gl["id"],
         },
     )
-    assert bank.status_code == 201, bank.text
-    remittance = client.post(
+    assert hnl_bank.status_code == 201, hnl_bank.text
+    hnl_remittance = client.post(
         "/api/treasury/remittances",
         json={
-            "companyId": company["id"],
-            "treasuryAccountId": bank.json()["id"],
-            "counterAccountId": equity["id"],
+            "companyId": hnl_company["id"],
+            "treasuryAccountId": hnl_bank.json()["id"],
+            "counterAccountId": hnl_equity["id"],
+            "sender": "HNL owner",
+            "currencyCode": "HNL",
+            "originalAmount": "700.25",
+            "remittanceDate": str(business_today()),
+        },
+    )
+    assert hnl_remittance.status_code == 201, hnl_remittance.text
+
+    usd_company = create_company(client, name="Nexora USD", currency="USD")
+    usd_bank_gl = create_account(
+        client,
+        company_id=usd_company["id"],
+        code="1100-USD",
+        name="Banco USD",
+        account_type="ASSET",
+    )
+    usd_equity = create_account(
+        client,
+        company_id=usd_company["id"],
+        code="3100-USD",
+        name="Capital USD",
+        account_type="EQUITY",
+    )
+    usd_bank = client.post(
+        "/api/treasury/accounts",
+        json={
+            "companyId": usd_company["id"],
+            "name": "Banco USD",
+            "kind": "BANK",
+            "currencyCode": "USD",
+            "glAccountId": usd_bank_gl["id"],
+        },
+    )
+    assert usd_bank.status_code == 201, usd_bank.text
+    usd_remittance = client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": usd_company["id"],
+            "treasuryAccountId": usd_bank.json()["id"],
+            "counterAccountId": usd_equity["id"],
             "sender": "USD owner",
             "currencyCode": "USD",
             "originalAmount": "125.50",
             "remittanceDate": str(business_today()),
         },
     )
-    assert remittance.status_code == 201, remittance.text
+    assert usd_remittance.status_code == 201, usd_remittance.text
 
-    response = client.get(f"/api/dashboard/summary?companyId={company['id']}")
-    assert response.status_code == 200, response.text
-    assert response.json()["currency"] == "USD"
-    assert response.json()["treasuryBalance"] == "125.50"
+    hnl_response = client.get(f"/api/dashboard/summary?companyId={hnl_company['id']}")
+    usd_response = client.get(f"/api/dashboard/summary?companyId={usd_company['id']}")
+
+    assert hnl_response.status_code == 200, hnl_response.text
+    assert hnl_response.json()["currency"] == "HNL"
+    assert hnl_response.json()["treasuryBalance"] == "700.25"
+
+    assert usd_response.status_code == 200, usd_response.text
+    assert usd_response.json()["currency"] == "USD"
+    assert usd_response.json()["treasuryBalance"] == "125.50"
 
 
 def test_dashboard_active_projects_never_counts_another_companys_projects(client, db_session):
-    """INV-COMP-001: `active_projects` no puede filtrarse cross-company --
-    un usuario sin scope ANY solo debe ver el conteo real de las
-    compañías a las que tiene acceso, nunca el agregado de toda la
-    plataforma."""
+    """INV-COMP-001: un dashboard con Company explícita nunca cuenta proyectos
+    de otra Company. La autorización de lectura de la Company respeta RBAC:
+    `SCOPE_ANY` puede abrir otra Company, pero el project scope sigue filtrando
+    estrictamente los proyectos visibles y no convierte al usuario en miembro
+    operativo de esa Company."""
     _login(client)
     company_a = create_company(client, name="Dashboard A")
     company_b = create_company(client, name="Dashboard B")
@@ -133,9 +226,12 @@ def test_dashboard_active_projects_never_counts_another_companys_projects(client
     db_session.add_all([project_a1, project_a2, project_b1])
     db_session.commit()
 
-    admin_summary = client.get("/api/dashboard/summary")
-    assert admin_summary.status_code == 200, admin_summary.text
-    assert admin_summary.json()["activeProjects"] == 3
+    admin_a = client.get(f"/api/dashboard/summary?companyId={company_a['id']}")
+    admin_b = client.get(f"/api/dashboard/summary?companyId={company_b['id']}")
+    assert admin_a.status_code == 200, admin_a.text
+    assert admin_b.status_code == 200, admin_b.text
+    assert admin_a.json()["activeProjects"] == 2
+    assert admin_b.json()["activeProjects"] == 1
 
     user = create_user_with_role(
         db_session, email="dashboard-scoped@nexora.group", role_name="Project Manager"
@@ -150,9 +246,39 @@ def test_dashboard_active_projects_never_counts_another_companys_projects(client
     db_session.commit()
     login_as(client, email="dashboard-scoped@nexora.group")
 
-    scoped_summary = client.get("/api/dashboard/summary")
+    scoped_summary = client.get(f"/api/dashboard/summary?companyId={company_a['id']}")
+    cross_company_summary = client.get(f"/api/dashboard/summary?companyId={company_b['id']}")
     assert scoped_summary.status_code == 200, scoped_summary.text
     assert scoped_summary.json()["activeProjects"] == 2
+    # Project Manager tiene `core.company/read` SCOPE_ANY por diseño para vistas
+    # cross-company, pero sus proyectos siguen en SCOPE_OWN: company B puede
+    # abrirse sin filtrar/leakear el proyecto B1 que no le fue asignado.
+    assert cross_company_summary.status_code == 200, cross_company_summary.text
+    assert cross_company_summary.json()["activeProjects"] == 0
+
+
+def test_dashboard_scope_own_blocks_unassigned_company(client, db_session):
+    """Un rol con `core.company/read` SCOPE_OWN debe recibir 403 cuando intenta
+    consultar una Company que no está en UserCompanyAccess. Esto preserva el
+    fail-closed exigido por la Orden Maestra sin romper los roles que poseen
+    SCOPE_ANY explícito para lectura cross-company."""
+    _login(client)
+    company_a = create_company(client, name="Finance Dashboard A")
+    company_b = create_company(client, name="Finance Dashboard B")
+    user = create_user_with_role(
+        db_session,
+        email="dashboard-finance-own@nexora.group",
+        role_name="Finance Manager",
+    )
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_a["id"]))
+    db_session.commit()
+    login_as(client, email="dashboard-finance-own@nexora.group")
+
+    allowed = client.get(f"/api/dashboard/summary?companyId={company_a['id']}")
+    forbidden = client.get(f"/api/dashboard/summary?companyId={company_b['id']}")
+
+    assert allowed.status_code == 200, allowed.text
+    assert forbidden.status_code == 403, forbidden.text
 
 
 def test_dashboard_active_projects_respects_explicit_project_assignments(client, db_session):
@@ -183,14 +309,28 @@ def test_dashboard_period_metrics_group_by_effective_date_not_posted_at(client):
     anterior NO cuenta en el período económico actual, aunque se contabilice hoy."""
     _login(client)
     company = create_company(client, name="Dashboard EffDate")
-    expense = create_account(client, company_id=company["id"], code="5100", name="Gasto", account_type="EXPENSE")
-    payable = create_account(client, company_id=company["id"], code="2100", name="Pasivo", account_type="LIABILITY")
+    expense = create_account(
+        client,
+        company_id=company["id"],
+        code="5100",
+        name="Gasto",
+        account_type="EXPENSE",
+    )
+    payable = create_account(
+        client,
+        company_id=company["id"],
+        code="2100",
+        name="Pasivo",
+        account_type="LIABILITY",
+    )
 
     def _entry(eff_date, amount):
-        r = client.post(
+        response = client.post(
             "/api/accounting/journal-entries",
             json={
-                "companyId": company["id"], "scope": "GENERAL", "currencyCode": "HNL",
+                "companyId": company["id"],
+                "scope": "GENERAL",
+                "currencyCode": "HNL",
                 "effectiveDate": eff_date,
                 "lines": [
                     {"accountId": expense["id"], "debitAmount": amount},
@@ -198,18 +338,16 @@ def test_dashboard_period_metrics_group_by_effective_date_not_posted_at(client):
                 ],
             },
         )
-        assert r.status_code == 201, r.text
+        assert response.status_code == 201, response.text
 
-    # El dashboard agrupa por fecha de negocio (America/Tegucigalpa); en CI
-    # (UTC) ``date.today()`` adelanta el asiento un día entre las 18:00 y las
-    # 23:59 de Honduras y lo saca del período económico actual.
     today = business_today()
     prev_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
-    _entry(prev_month.isoformat(), "400.00")   # fuera del período económico actual
-    _entry(today.isoformat(), "125.00")        # dentro
+    _entry(prev_month.isoformat(), "400.00")
+    _entry(today.isoformat(), "125.00")
 
-    body = client.get(f"/api/dashboard/summary?companyId={company['id']}").json()
-    assert float(body["periodExpense"]) == 125.0
+    response = client.get(f"/api/dashboard/summary?companyId={company['id']}")
+    assert response.status_code == 200, response.text
+    assert float(response.json()["periodExpense"]) == 125.0
 
 
 def test_dashboard_financial_totals_net_formal_reversals(client):

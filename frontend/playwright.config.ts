@@ -9,9 +9,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
  * NXR-REQ-0112/0113 (E2E + Critical Journey). Corre contra un backend +
  * frontend reales levantados exclusivamente para este suite (puertos y
  * base de datos propios, nunca la DB de desarrollo ni la de pytest) --
- * ver e2e/README.md para el setup exacto. Un solo worker: el Critical
- * Journey es un recorrido secuencial con estado real (mismo login, mismo
- * proyecto), no tests aislados que puedan correr en paralelo.
+ * ver e2e/README.md para el setup exacto. Chromium ejecuta la suite completa;
+ * Firefox y WebKit ejecutan el recorrido de compatibilidad crítico para no
+ * triplicar la matriz SAP/visual pesada.
  */
 const E2E_BACKEND_PORT = 8010
 const E2E_FRONTEND_PORT = 5175
@@ -43,7 +43,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'e2e-report' }]],
-  timeout: 60_000,
+  timeout: 90_000,
   use: {
     baseURL: process.env.E2E_BASE_URL ?? E2E_FRONTEND_URL,
     trace: 'retain-on-failure',
@@ -53,6 +53,16 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      testMatch: /cross-browser-critical\.spec\.ts/,
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      testMatch: /cross-browser-critical\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
     },
   ],
   webServer: [

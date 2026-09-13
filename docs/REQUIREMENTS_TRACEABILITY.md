@@ -305,21 +305,21 @@ todavía).
 | NXR-REQ-0111 | Integration tests (PostgreSQL) | ➖➖✅➖➖➖➖✅➖ | IMPLEMENTED | Track A: pruebas reales contra PostgreSQL para lifecycle, aislamiento, constraints, postings, idempotencia y conciliación |
 | NXR-REQ-0112 | E2E (Playwright) | ➖➖➖➖➖➖➖➖✅ | VERIFIED | `npx playwright test e2e/critical-journey.spec.ts` real (`frontend/playwright.config.ts`, DB propia `nexora_e2e`, fresh-install `alembic upgrade head` sobre DB vacía, backend+frontend reales en :8010/:5175) — 2/2 corridas consecutivas en verde |
 | NXR-REQ-0113 | Critical User Journey | ➖➖➖➖➖➖➖➖✅ | VERIFIED | Un solo recorrido secuencial real (`frontend/e2e/critical-journey.spec.ts`) cubre login→company/project/ActiveUIContext→WBS→Treasury/remesa CENTRAL→gasto GENERAL→budget/PR/aprobación→RFQ/cotización/comparativo/PO→recepción/factura/3-way-match/pago→inventario→cuadrilla/tiempo→equipo/combustible/mantenimiento→avance/reporte diario/calidad/seguridad/RFI/submittal/orden de cambio→reversal→CRM lead→oportunidad→cotización→contrato→AR→Approval Inbox (INV-SOD-001 real, con segundo usuario real)→notificaciones→búsqueda global→reportes (TB/GL/BS/Estado de resultados)→auditoría→logout/login/persistencia. Encontró y corrigió 3 bugs reales en el camino: (1) `treasury_service` permitía contrapartida = misma cuenta GL del banco, anulando el movimiento neto; (2) `ap.py submit_supplier_invoice_for_approval` usaba `user_has_company_access` crudo sin fallback SCOPE_ANY, rechazando falsamente a Administrator/Auditor sin fila explícita `UserCompanyAccess`, y no tenía guard real de SoD en el propio submit (ahora `SegregationOfDutiesError`/`NXR-WORKFLOW-001`); (3) `ProjectsPage`/`companyService.create` nunca fijaba `functionalCurrencyCode`, dejando compañías creadas por el flujo principal permanentemente incapaces de tener Budget (`functional_currency_code` es inmutable post-creación) |
-| NXR-REQ-0114 | CI/CD | ➖➖🔶➖➖➖➖🔶➖ | IN_PROGRESS | workflows build+test+bicep-what-if existen; falta gate completo §118-119 |
+| NXR-REQ-0114 | CI/CD | ➖➖✅➖✅✅✅✅✅ | IMPLEMENTED | `.github/workflows/ci.yml` exige backend completo, frontend completo, Docker Compose smoke, Bicep y Playwright Chromium/Firefox/WebKit; `.github/workflows/deploy-azure.yml` separa what-if de deployment real, registra autorización, despliega imagen/SWA y ejecuta smoke autenticado. La certificación de cada release sigue exigiendo runs verdes del SHA exacto. |
 
 ## AZURE
 
 | ID | Requirement | Trazabilidad | Status | Evidence |
 |---|---|---|---|---|
-| NXR-REQ-0115 | Bicep (IaC) | ➖➖➖➖➖➖➖✅⬜ | IN_PROGRESS | `az bicep build` 7/7 OK, `what-if` Succeeded contra sub UNAH; sin deploy real |
-| NXR-REQ-0116 | Static Web Apps | ➖➖➖➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep escrito, sin desplegar |
-| NXR-REQ-0117 | Container Apps | ➖➖➖➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep escrito, sin desplegar |
-| NXR-REQ-0118 | Azure Database for PostgreSQL | ➖➖➖➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep escrito, sin desplegar |
-| NXR-REQ-0119 | Blob Storage | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep + cliente `azure_blob.py`, sin desplegar |
-| NXR-REQ-0120 | Key Vault | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep + cliente `azure_keyvault.py`, sin desplegar |
-| NXR-REQ-0121 | Monitor / Application Insights | ➖➖🔶➖➖➖➖⬜⬜ | IN_PROGRESS | módulo Bicep + wiring opcional en `main.py`, sin desplegar |
+| NXR-REQ-0115 | Bicep (IaC) | ➖➖➖➖➖➖➖✅✅ | IMPLEMENTED | `infra/main.bicep` y módulos compilan; Deploy Azure `33348100953` aplicó la infraestructura real y los runs posteriores validan what-if. |
+| NXR-REQ-0116 | Static Web Apps | ➖➖➖➖➖➖➖✅✅ | IMPLEMENTED | Static Web App real `jolly-plant-0d6bf700f.7.azurestaticapps.net`, desplegada por el workflow y verificada en producción. |
+| NXR-REQ-0117 | Container Apps | ➖➖➖➖➖➖➖✅✅ | IMPLEMENTED | Container App real desplegada por SHA, revisión healthy/ready y acceso directo bloqueado; tráfico de navegador por linked backend first-party. |
+| NXR-REQ-0118 | Azure Database for PostgreSQL | ➖➖➖➖➖➖➖✅✅ | IMPLEMENTED | PostgreSQL Flexible Server declarado en Bicep, desplegado y ejercitado por `/api/readyz`, migraciones y smoke autenticado de producción. |
+| NXR-REQ-0119 | Blob Storage | ➖➖✅➖➖➖➖✅✅ | IMPLEMENTED | módulo Bicep + `azure_blob.py`; backend de evidencia Azure Blob configurado y ejercitado por el Critical Journey del pipeline con upload real no simulado. |
+| NXR-REQ-0120 | Key Vault | ➖➖✅➖➖➖➖✅✅ | IMPLEMENTED | módulo Bicep + `azure_keyvault.py`; deployment inyecta secretos por identidad/configuración Azure y Protected Edit falla cerrado si faltan sus secretos independientes. |
+| NXR-REQ-0121 | Monitor / Application Insights | ➖➖✅➖➖➖➖✅✅ | IMPLEMENTED | Application Insights/Log Analytics declarados en Bicep y wiring de telemetría/log estructurado activo; health/ready y diagnósticos se comprueban en deploy. |
 | NXR-REQ-0122 | OIDC deployment (federated credentials) | ➖➖✅➖➖➖➖✅⬜ | IMPLEMENTED | 2026-09-08: GitHub Actions autenticó por OIDC en el workflow oficial de PR #113; el job Bicep what-if completó PASS (`34265350393`). Esto prueba las credenciales federadas y el acceso de lectura/what-if. El despliegue productivo del SHA final sigue siendo un gate separado y no se marca VERIFIED hasta que corra sobre `main`. |
-| NXR-REQ-0123 | Production smoke | ⬜ | BLOCKED_EXTERNAL | requiere confirmación puntual de despliegue real (`CLAUDE.md` §11.1) |
+| NXR-REQ-0123 | Production smoke | ✅ | IMPLEMENTED | El paso `Verify production` del workflow oficial valida frontend, health/ready, login/cookie, lecturas company-scoped, dashboard, fiscal, Protected Edit fail-closed, logout/relogin, CORS y bloqueo del FQDN directo. Fue ejecutado con éxito en producción; cada release debe repetirlo sobre su SHA final. |
 | NXR-REQ-0124 | Production E2E | ➖➖✅✅✅✅✅✅✅ | IMPLEMENTED | 2026-08-31: tras corregir el fallo troncal de Safari (API cross-site → first-party via Static Web Apps linked backend, PRs #37–#40), Deploy Azure run `33348100953` (`main@50fde56`) certifica producción a través del origen first-party `$FRONTEND_URL/api`: Container App `nexora-backend-dev--0000043` `Running`/`Healthy`/`latest==ready`, imagen = SHA exacto de `main`, `healthz`/`readyz` 200, login real → cookie `Secure`+`HttpOnly`+`Path=/`, `auth/me` 200, `master-data/companies` 200 (1 visible), `projects` 200, `master-data/accounts` 200, `dashboard` 200 (`HNL`), `fiscal/periods/current` 200, `logout`→401→`relogin`→200; FQDN directo locked (401). Ver `docs/PROGRESS.md` (entrada 2026-08-31). |
 
 ## Resumen
@@ -341,7 +341,9 @@ histórico):
   pero mover cada fila individual a `VERIFIED` exige mapear su alcance
   exacto contra lo que el recorrido realmente cubre, fila por fila — pasada
   pendiente, no asumida aquí.
-- **IMPLEMENTED:** 112 / 124 (2026-09-08: +`NXR-REQ-0122` OIDC probado por el workflow oficial de PR #113).
+- **IMPLEMENTED:** 121 / 124. La pasada de cierre 2026-09-12 reconcilió
+  `NXR-REQ-0114..0121` y `0123` con la infraestructura y el smoke real ya
+  ejecutados; la certificación del release final se registra aparte por SHA.
   `NXR-REQ-0016` (Financial statements,
   incluyendo Cash Flow), `NXR-REQ-0106` (Migrations), `NXR-REQ-0105`
   (Accessibility), `NXR-REQ-0108` (Observability), `NXR-REQ-0109`
@@ -349,21 +351,17 @@ histórico):
   `IMPLEMENTED` el 2026-08-25; `NXR-REQ-0093` (Reporting) y
   `NXR-REQ-0107` (Security) movieron a `IMPLEMENTED` el 2026-08-26
   tras Playwright E2E 3/3.
-- **IN_PROGRESS:** 8 / 124 — NXR-REQ-0114/0115/0116/0117/0118/
-  0119/0120/0121 (Azure infrastructure). El blocker de "deployment real" ya
-  no aplica (Deploy Azure ejecuta y certifica producción, ver
-  `docs/PROGRESS.md` 2026-08-30); pendiente una pasada de re-mapeo fila por
-  fila antes de moverlos a `IMPLEMENTED` — no se infla aquí.
+- **IN_PROGRESS:** 0 / 124.
 - **NOT_STARTED:** 0 / 124 — NXR-REQ-0122 dejó de ser un bloqueo: OIDC fue ejercitado por el workflow oficial de PR #113 el 2026-09-08.
-- **BLOCKED_EXTERNAL:** 1 / 124 — NXR-REQ-0123 (production smoke pipeline;
-  re-evaluar contra el gate de `Verify production` del run `33341601256`).
+- **BLOCKED_EXTERNAL:** 0 / 124.
 
-Suma actualizada contra las 124 filas: 3+112+8+0+1 = 124. No usar estos conteos históricos como certificación del HEAD; recontar con
+Suma actualizada contra las 124 filas: 3+121 = 124. No usar estos conteos históricos como certificación del HEAD; recontar con
 `grep -oE '\| (NOT_STARTED|IN_PROGRESS|IMPLEMENTED|VERIFIED|BLOCKED_EXTERNAL) \|' docs/REQUIREMENTS_TRACEABILITY.md | sort | uniq -c`
 antes de fiarse de este resumen prosa, que puede desincronizarse de la
-tabla real). El sistema combinado pasó 338 pruebas backend sobre
-PostgreSQL, 92 pruebas frontend, typecheck, lint, build, y el Critical Journey
-+ Accessibility E2E real en verde (3/3). Playwright E2E cubre reporting
+tabla real). En la certificación local 2026-09-12 el sistema pasó **677**
+pruebas backend sobre PostgreSQL y **250** pruebas frontend, además de
+typecheck, lint, build y la matriz SAP Chromium; la CI del SHA de cierre es
+la autoridad para el recorrido completo con Blob Storage y cross-browser. Playwright E2E cubre reporting
 (steps 35-38) y audit trail (step 39) del Critical Journey.
 
 ## Certificación remota 2026-08-30 — PR #24

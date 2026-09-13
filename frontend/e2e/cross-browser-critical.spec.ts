@@ -46,6 +46,9 @@ async function ensureCompany(page: Page): Promise<{ id: string; functionalCurren
   return (await created.json()) as { id: string; functionalCurrencyCode: string }
 }
 
+/**
+ * Verifies that a route loads its application shell without server or page errors.
+ */
 async function expectOperationalRoute(page: Page, path: string) {
   const response = await page.goto(path)
   expect(response?.status(), `${path}: HTTP`).toBeLessThan(500)
@@ -55,9 +58,18 @@ async function expectOperationalRoute(page: Page, path: string) {
   await expect(page.locator('body')).not.toContainText('Application error')
 }
 
-test('cross-browser critical compatibility', async ({ page }) => {
+/**
+ * Verifies the critical authenticated journey across browsers and SAP GUI variants.
+ */
+async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
   const pageErrors: string[] = []
-  page.on('pageerror', (error) => pageErrors.push(String(error)))
+  page.on(
+    'pageerror',
+    /**
+     * Records browser errors across the complete compatibility journey.
+     */
+    (error) => pageErrors.push(String(error)),
+  )
 
   await login(page)
   const company = await ensureCompany(page)
@@ -65,14 +77,19 @@ test('cross-browser critical compatibility', async ({ page }) => {
   await page.evaluate((companyId) => {
     window.localStorage.setItem('nexora.activeCompanyId', companyId)
   }, company.id)
-  const dashboardResponsePromise = page.waitForResponse((response) => {
-    const url = new URL(response.url())
-    return (
-      response.request().method() === 'GET' &&
-      url.pathname === '/api/dashboard/summary' &&
-      url.searchParams.get('companyId') === company.id
-    )
-  })
+  const dashboardResponsePromise = page.waitForResponse(
+    /**
+     * Matches the dashboard request issued for the active company.
+     */
+    (response) => {
+      const url = new URL(response.url())
+      return (
+        response.request().method() === 'GET' &&
+        url.pathname === '/api/dashboard/summary' &&
+        url.searchParams.get('companyId') === company.id
+      )
+    },
+  )
   await page.reload()
 
   // Await the request owned by the mounted dashboard before any navigation
@@ -142,4 +159,6 @@ test('cross-browser critical compatibility', async ({ page }) => {
   await page.getByRole('button', { name: 'Cerrar sesión' }).click()
   await expect(page).toHaveURL(/\/login/, { timeout: 10_000 })
   expect(pageErrors).toEqual([])
-})
+}
+
+test('cross-browser critical compatibility', verifyCrossBrowserCompatibility)

@@ -21,6 +21,9 @@ async function ensureCompany(request: APIRequestContext) {
 function formatViolations(results: Awaited<ReturnType<AxeBuilder['analyze']>>) {
   return results.violations
     .map(
+      /**
+       * Formats one accessibility violation with its affected targets.
+       */
       (violation) =>
         `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`,
     )
@@ -74,9 +77,10 @@ async function unlockProtectedEdit(page: Page) {
   await expect(dialog).not.toBeVisible()
 }
 
-test('SAP GUI confirmation, variants and representative routes use one global shell', async ({
-  page,
-}) => {
+/**
+ * Verifies SAP GUI confirmation, variants, routes, accessibility, and responsive layout.
+ */
+async function verifySapGuiConfirmation({ page }: { page: Page }) {
   await login(page)
   await unlockProtectedEdit(page)
   await ensureCompany(page.request)
@@ -148,7 +152,12 @@ test('SAP GUI confirmation, variants and representative routes use one global sh
     clientWidth: document.documentElement.clientWidth,
   }))
   expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth + 1)
-})
+}
+
+test(
+  'SAP GUI confirmation, variants and representative routes use one global shell',
+  verifySapGuiConfirmation,
+)
 
 const SAP_VARIANTS = [
   {
@@ -255,9 +264,10 @@ const FULL_ROUTE_INVENTORY = [
   '/control/auditoria',
 ]
 
-test('all four SAP GUI variants render representative routes with real chrome', async ({
-  page,
-}) => {
+/**
+ * Verifies each SAP GUI variant across representative routes and accessibility checks.
+ */
+async function verifySapGuiVariants({ page }: { page: Page }) {
   await login(page)
   await unlockProtectedEdit(page)
   await ensureCompany(page.request)
@@ -306,7 +316,12 @@ test('all four SAP GUI variants render representative routes with real chrome', 
       .analyze()
     expect(accessibility.violations, `${id}: ${formatViolations(accessibility)}`).toEqual([])
   }
-})
+}
+
+test(
+  'all four SAP GUI variants render representative routes with real chrome',
+  verifySapGuiVariants,
+)
 
 test('SAP GUI full route inventory: no crash, no overflow, chrome intact', async ({ page }) => {
   await login(page)

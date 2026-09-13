@@ -65,11 +65,14 @@ def upgrade() -> None:
         table='change_orders',
         expr="status IN ('DRAFT','SUBMITTED','APPROVED','REJECTED','IMPLEMENTED','CANCELLED')",
     ))
-    op.execute(_CHECK_EXISTS.format(
-        name='ck_wbs_nodes_status_valid',
-        table='wbs_nodes',
-        expr="status IN ('PLANNED','ACTIVE','ON_HOLD','COMPLETED','CANCELLED')",
-    ))
+    op.execute("""\
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_wbs_nodes_status_valid' AND conrelid = 'wbs_nodes'::regclass) THEN
+    ALTER TABLE wbs_nodes DROP CONSTRAINT ck_wbs_nodes_status_valid;
+  END IF;
+  ALTER TABLE wbs_nodes ADD CONSTRAINT ck_wbs_nodes_status_valid CHECK (status IN ('PLANNING','ACTIVE','ON_HOLD','COMPLETED','CANCELLED'));
+END $$;""")
     op.execute(_CHECK_EXISTS.format(
         name='ck_physical_counts_status_valid',
         table='physical_counts',

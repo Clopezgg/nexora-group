@@ -47,12 +47,6 @@ def upgrade() -> None:
     op.execute(_DROP_CONSTRAINT.format(name='ck_fixed_assets_accumulated_depreciation_non_negative', table='fixed_assets'))
     op.execute(_DROP_CONSTRAINT.format(name='ck_fixed_assets_disposal_date', table='fixed_assets'))
     op.execute(_DROP_CONSTRAINT.format(name='ck_fixed_assets_disposal_proceeds_non_negative', table='fixed_assets'))
-    op.execute(_DROP_CONSTRAINT.format(name='fk_physical_counts_inventory_account', table='physical_counts'))
-    op.execute(_DROP_CONSTRAINT.format(name='fk_physical_counts_adjustment_gain_account', table='physical_counts'))
-    op.execute(_DROP_CONSTRAINT.format(name='fk_physical_counts_adjustment_loss_account', table='physical_counts'))
-    op.execute(_DROP_COL.format(table='physical_counts', col='adjustment_gain_account_id'))
-    op.execute(_DROP_COL.format(table='physical_counts', col='inventory_account_id'))
-    op.execute(_DROP_COL.format(table='physical_counts', col='adjustment_loss_account_id'))
     op.execute(_DROP_INDEX.format(name='ix_purchase_orders_supplier_contract_id', table='purchase_orders'))
     op.execute(_DROP_CONSTRAINT.format(name='ck_purchase_requisitions_priority_valid', table='purchase_requisitions'))
     op.execute(_DROP_INDEX.format(name='ix_supplier_invoice_plan_invoice', table='supplier_invoice_payment_plan_items'))
@@ -102,28 +96,6 @@ END $$;""")
     op.execute("""DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'ix_purchase_orders_supplier_contract_id') THEN
     CREATE INDEX ix_purchase_orders_supplier_contract_id ON purchase_orders (supplier_contract_id);
-  END IF;
-END $$;""")
-    conn = op.get_bind()
-    if not conn.execute(sa.text("SELECT 1 FROM information_schema.columns WHERE table_name='physical_counts' AND column_name='adjustment_loss_account_id'")).fetchone():
-        op.add_column('physical_counts', sa.Column('adjustment_loss_account_id', sa.UUID(), autoincrement=False, nullable=True))
-    if not conn.execute(sa.text("SELECT 1 FROM information_schema.columns WHERE table_name='physical_counts' AND column_name='inventory_account_id'")).fetchone():
-        op.add_column('physical_counts', sa.Column('inventory_account_id', sa.UUID(), autoincrement=False, nullable=True))
-    if not conn.execute(sa.text("SELECT 1 FROM information_schema.columns WHERE table_name='physical_counts' AND column_name='adjustment_gain_account_id'")).fetchone():
-        op.add_column('physical_counts', sa.Column('adjustment_gain_account_id', sa.UUID(), autoincrement=False, nullable=True))
-    op.execute("""DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_physical_counts_adjustment_loss_account' AND conrelid = 'physical_counts'::regclass) THEN
-    ALTER TABLE physical_counts ADD CONSTRAINT fk_physical_counts_adjustment_loss_account FOREIGN KEY (adjustment_loss_account_id) REFERENCES accounts(id) ON DELETE RESTRICT;
-  END IF;
-END $$;""")
-    op.execute("""DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_physical_counts_adjustment_gain_account' AND conrelid = 'physical_counts'::regclass) THEN
-    ALTER TABLE physical_counts ADD CONSTRAINT fk_physical_counts_adjustment_gain_account FOREIGN KEY (adjustment_gain_account_id) REFERENCES accounts(id) ON DELETE RESTRICT;
-  END IF;
-END $$;""")
-    op.execute("""DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_physical_counts_inventory_account' AND conrelid = 'physical_counts'::regclass) THEN
-    ALTER TABLE physical_counts ADD CONSTRAINT fk_physical_counts_inventory_account FOREIGN KEY (inventory_account_id) REFERENCES accounts(id) ON DELETE RESTRICT;
   END IF;
 END $$;""")
     op.execute("""DO $$ BEGIN

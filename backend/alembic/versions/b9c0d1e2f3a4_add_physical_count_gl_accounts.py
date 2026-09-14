@@ -6,6 +6,7 @@ Create Date: 2026-09-09
 """
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -16,9 +17,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("physical_counts", sa.Column("inventory_account_id", sa.dialects.postgresql.UUID(), nullable=True))
-    op.add_column("physical_counts", sa.Column("adjustment_gain_account_id", sa.dialects.postgresql.UUID(), nullable=True))
-    op.add_column("physical_counts", sa.Column("adjustment_loss_account_id", sa.dialects.postgresql.UUID(), nullable=True))
+    op.add_column("physical_counts", sa.Column("inventory_account_id", postgresql.UUID(as_uuid=True), nullable=True))
+    op.add_column("physical_counts", sa.Column("adjustment_gain_account_id", postgresql.UUID(as_uuid=True), nullable=True))
+    op.add_column("physical_counts", sa.Column("adjustment_loss_account_id", postgresql.UUID(as_uuid=True), nullable=True))
     op.create_foreign_key(
         "fk_physical_counts_inventory_account", "physical_counts", "accounts",
         ["inventory_account_id"], ["id"], ondelete="RESTRICT",

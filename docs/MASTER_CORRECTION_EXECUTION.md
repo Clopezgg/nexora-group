@@ -195,3 +195,46 @@ fail-closed FX, moneda funcional, inventario/activos/GL). Ninguno estaba en
   en `a3cc6136` (PR #121) hasta una autorización puntual.
 - Artefacto local preservado sin tocar: log de terminal `-a` (untracked, fuera
   de Git).
+
+## Iteración 22 (2026-09-13) — PR #140: SAP GUI fidelity + production smoke fix
+
+Estado inicial: `origin/main` en `1f3b7ab8` (merge de PR #144, constraints de
+check en tablas). PR #140 (`fix/sap-fidelity-and-production-smoke`) estaba
+siendo alimentado por un agente paralelo (fidelity SAP GUI, e2e crítico
+reforzado, manifest de convergencia) y contenía la corrección del smoke de
+producción fallido del deploy `0d251c78` (run `34741454477`): "Verify
+production" ahora extrae `functionalCurrencyCode` real de companies (fail-closed)
+y pasa `companyId` a `/dashboard/summary` en lugar de hardcodear `HNL`.
+
+- **Causa raíz del deploy fallido:** smoke comparaba `.currency` contra `HNL`
+  fijo mientras `dashboard_service.py` deriva la moneda de
+  `company.functional_currency_code`. Corrección en `.github/workflows/deploy-azure.yml`.
+- **Verificación local sobre `1f3b7ab8`:**
+  - Backend completo `pytest -q`: **696 passed** en 20:39, DB aislada
+    `nexora_verify_tests_20260913_nexora_group`, log
+    `/tmp/nexora-main-full-20260913.log`.
+  - Alembic: único head `eb8ce8e18b2d`; cadena f2c3d…→…→eb8ce8e verificada.
+  - Bicep: `backendImage` en `infra/main.bicep` **sin default** (param requerido) —
+    layout de imagem docker no hardcodeado.
+- **E2E main previo (`1f3b7ab8`, run `34771651091`):** `e2e` falló en WebKit en
+  `/finanzas/contabilidad` por fetch de dashboard abortado por la navegación
+  (`Fetch API cannot load … due to access control checks.`). La versión de PR
+  #140 resuelve la raza: pageErrors global al final del journey + waitForResponse
+  del dashboard tras reload + espera real de la respuesta PUT `/api/me/preferences`.
+- **CI de PR #140** en el SHA convergido `1ea63420` (0 behind / 11 ahead, merge
+  de main incluido): **backend, frontend, e2e** success + Compile Azure Bicep,
+  Docker Compose smoke, Bicep what-if, CodeQL, gitleaks, GitGuardian, NEXORA
+  Domain/Financial classier/Final Certification, coverage, review. `Deploy infra
+  + apps` correctamente **skipped** (input `deploy` no seteado).
+- **Merge:** PR #140 → `gh pr merge --merge` → **`41339f12`** en `origin/main`.
+- **CI de main post-merge (run `34774003714`):** **5/5 gates success**
+  (backend, frontend, e2e, Compile Azure Bicep, Docker Compose smoke) en el
+  SHA del merge — el e2e que fallaba en `1f3b7ab8` ahora es verde con la
+  versión reforzada de PR #140.
+- **Pendiente inalterado (F3.16):** desplegar Azure real del SHA certificado
+  (`41339f12`) con smoke de producción (el paso "Verify production" corregido).
+  Continúa BLOCKED: requiere confirmación explícita puntual (AGENTS.md §11 —
+  suscripción activa = tenant UNAH). Producción sigue en `a3cc6136` hasta
+  autorización.
+- Artefacto local preservado sin tocar: log de terminal `-a` (untracked, fuera
+  de Git) y `backend/.backup_restore_test_nexora_group.dump`.

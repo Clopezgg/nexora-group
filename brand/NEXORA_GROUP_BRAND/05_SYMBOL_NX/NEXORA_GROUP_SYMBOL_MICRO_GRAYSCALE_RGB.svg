@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   height="360"
+   version="1.1"
+   viewBox="0 0 620 360"
+   width="620"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <g
+     transform="translate(50,30) scale(1.0)"
+     id="g1">
+    <path
+       d="M54,25 Q54,14 69,14 L190,14 L338,162 L429,162 L508,241 L338,241 L158,61 L158,199 L230,199 L157,272 L54,272 Z M103,114 L160,171 L160,214 L103,214 Z"
+       fill="#4A5563"
+       fill-rule="evenodd"
+       id="path1" />
+    <polygon
+       fill="#8A94A1"
+       points="340,24 443,24 391,82 288,82"
+       id="polygon1" />
+  </g>
+</svg>

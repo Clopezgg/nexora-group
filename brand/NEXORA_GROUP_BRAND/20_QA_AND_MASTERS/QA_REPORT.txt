@@ -1,0 +1,26 @@
+NEXORA GROUP BRAND QA REPORT - PASS
+
+Files validated before QA artifacts: 297
+SVG: 82 | PDF: 50 | EPS: 25 | PNG: 99
+Maximum raster long side: 16000px
+Max raster file: 05_SYMBOL_NX/NEXORA_GROUP_SYMBOL_STANDARD_COLOR_RGB_16000.png
+
+Errors: 0
+
+Warnings / documented limitations: 3
+NOTE - Native Adobe Illustrator .AI not supplied; environment has no Adobe Illustrator. SVG/PDF/EPS masters are genuine vector and Illustrator-compatible.
+NOTE - Raster ceiling is 16,000 px rather than 32K/48K; vector masters are scale-independent and are the correct source for larger output.
+NOTE - Pantone not physically certified; physical swatch approval is required before industrial production.
+
+Checks performed:
+- 20-folder structure
+- non-empty files/directories
+- XML parse for SVG
+- no raster <image> in 01_MASTER SVG
+- no live <text> in 01_MASTER SVG
+- PDF readability via pdfinfo
+- EPS PostScript signature
+- PNG decode and maximum dimensions
+- micro sizes 16/24/32/48/64
+- PWA 180/192/512/1024
+- vector/raster limitation disclosure

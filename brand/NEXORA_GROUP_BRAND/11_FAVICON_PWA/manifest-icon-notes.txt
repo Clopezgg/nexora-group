@@ -1,0 +1,5 @@
+Recommended web manifest icons:
+192x192: NEXORA_PWA_ICON_192.png
+512x512: NEXORA_PWA_ICON_512.png
+maskable: NEXORA_PWA_MASKABLE_512.png
+Apple touch: NEXORA_PWA_ICON_180.png

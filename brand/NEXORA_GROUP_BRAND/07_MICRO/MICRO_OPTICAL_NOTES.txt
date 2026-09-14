@@ -1,0 +1,3 @@
+The micro mark is not a simple reduction of the standard symbol.
+The internal aperture is enlarged and outer masses are slightly adjusted so the NX reading survives at 16-48 px.
+Approved targets: 16, 24, 32, 48 and 64 px.

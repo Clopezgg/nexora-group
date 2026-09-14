@@ -1,0 +1,6 @@
+NEXORA GROUP Print Specifications
+Master vector should be preferred for all professional production.
+CMYK PDF files are generated through DeviceCMYK conversion and should be preflighted by the selected print provider against their ICC workflow.
+Raster proof files: 300 and 600 DPI-equivalent at A4-class width.
+Pantone: no physical Pantone assignment is certified in this package. Select/approve using a physical Pantone guide before industrial production.
+Bleed: application-specific; 3 mm is a common starting point for stationery but printer specifications govern.

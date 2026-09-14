@@ -1,0 +1,1 @@
+Motion principle: connection -> intersection -> NX resolution -> NEXORA -> tagline. Supplied: animated SVG, MP4, WebM and GIF preview. Lottie JSON is intentionally omitted because no Lottie renderer/validator is available in this environment; an unvalidated JSON file would violate the no-fake/no-invalid-assets rule.

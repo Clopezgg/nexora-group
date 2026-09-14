@@ -1,0 +1,1 @@
+UI files are brand-application mockups, not certified screenshots of the deployed application. They test brand behavior across NEXORA, Horizon, Quartz, Belize, SAP GUI and dark visual families without changing product logic.

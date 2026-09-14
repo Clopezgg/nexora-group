@@ -1,0 +1,1 @@
+NEXORA corporate branding is separate from private client-company logos stored inside the ERP Evidence model. Corporate marks identify the NEXORA platform/group; client voucher branding remains tenant/company-specific.

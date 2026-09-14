@@ -27,15 +27,29 @@ def _upload(client, *, company_id: str, filename: str = "foto.jpg", content: byt
 
 
 class FakeContainerClient:
-    def __init__(self):
+    def __init__(self, *, download_content: bytes = b""):
         self.uploaded: list[dict] = []
         self.deleted: list[str] = []
+        self.download_content = download_content
+        self.downloaded: list[str] = []
 
     def upload_blob(self, **kwargs):
         self.uploaded.append(kwargs)
 
     def delete_blob(self, blob_key: str):
         self.deleted.append(blob_key)
+
+    def download_blob(self, blob_key: str):
+        self.downloaded.append(blob_key)
+        content = self.download_content
+
+        class Downloader:
+            def chunks(self):
+                midpoint = max(1, len(content) // 2)
+                yield content[:midpoint]
+                yield content[midpoint:]
+
+        return Downloader()
 
 
 def test_evidence_rejects_unsupported_mime_type(client):
@@ -532,3 +546,54 @@ def test_evidence_heic_gets_a_derived_jpeg_render(client, db_session, monkeypatc
     assert render.status_code == 200, render.text
     assert render.headers["content-type"].startswith("image/jpeg")
     assert render.content.startswith(b"\xff\xd8\xff")
+
+
+def test_evidence_download_streams_private_blob_with_safe_headers(client, db_session, monkeypatch):
+    login_admin(client)
+    company = create_company(client, name="Evidence Download Co")
+    container = FakeContainerClient(download_content=b"%PDF-1.7\nprivate evidence")
+    monkeypatch.setattr(
+        "app.services.evidence_service.get_evidence_container_client",
+        lambda settings: container,
+    )
+    uploaded = _upload(
+        client,
+        company_id=company["id"],
+        filename="informe privado.pdf",
+        content=b"%PDF-1.7\nprivate evidence",
+        mime="application/pdf",
+    )
+    assert uploaded.status_code == 201, uploaded.text
+
+    response = client.get(f"/api/evidence/{uploaded.json()['id']}/download")
+
+    assert response.status_code == 200, response.text
+    assert response.content == b"%PDF-1.7\nprivate evidence"
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["content-length"] == str(len(response.content))
+    assert "attachment" in response.headers["content-disposition"]
+    assert "informe%20privado.pdf" in response.headers["content-disposition"]
+    assert container.downloaded == [uploaded.json()["blobKey"]]
+
+
+def test_evidence_download_without_storage_returns_real_503(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Evidence Download Missing Storage Co")
+    admin = db_session.execute(
+        select(User).where(User.email == BOOTSTRAP_ADMIN_EMAIL)
+    ).scalar_one()
+    evidence = Evidence(
+        company_id=uuid.UUID(company["id"]),
+        blob_key=f"{company['id']}/missing.pdf",
+        original_filename="missing.pdf",
+        mime_type="application/pdf",
+        size_bytes=10,
+        uploaded_by=admin.id,
+    )
+    db_session.add(evidence)
+    db_session.commit()
+
+    response = client.get(f"/api/evidence/{evidence.id}/download")
+
+    assert response.status_code == 503, response.text
+    assert response.json()["error"]["code"] == "NXR-EVIDENCE-001"

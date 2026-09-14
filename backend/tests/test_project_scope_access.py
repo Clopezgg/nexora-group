@@ -17,8 +17,11 @@ from app.models.role import Role
 from app.models.user import User
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL
 from tests.helpers import (
+    create_account,
     create_company,
+    create_customer,
     create_supplier,
+    create_treasury_account,
     create_user_with_role,
     login_admin,
     login_as,
@@ -513,3 +516,175 @@ def test_evidence_rejects_unknown_polymorphic_context_before_storage(client):
     )
     assert response.status_code == 422, response.text
     assert "no soportado" in response.json()["detail"]
+
+
+def test_project_scope_blocks_ap_ar_invoice_payment_receipt_indirect_ids(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Financial IDOR Scope Co")
+    project_a = _create_project(client, company["id"], "Proyecto permitido", "FIN-A")
+    project_b = _create_project(client, company["id"], "Proyecto restringido", "FIN-B")
+    supplier = create_supplier(client, company_id=company["id"])
+    customer = create_customer(client, company_id=company["id"])
+    expense = create_account(
+        client, company_id=company["id"], code="5100", name="Gasto", account_type="EXPENSE"
+    )
+    payable = create_account(
+        client, company_id=company["id"], code="2100", name="CxP", account_type="LIABILITY"
+    )
+    revenue = create_account(
+        client, company_id=company["id"], code="4100", name="Ingreso", account_type="REVENUE"
+    )
+    receivable = create_account(
+        client, company_id=company["id"], code="1200", name="CxC", account_type="ASSET"
+    )
+    bank_gl = create_account(
+        client, company_id=company["id"], code="1100", name="Banco", account_type="ASSET"
+    )
+    equity = create_account(
+        client, company_id=company["id"], code="3100", name="Capital", account_type="EQUITY"
+    )
+    treasury_account = create_treasury_account(
+        client, company_id=company["id"], gl_account_id=bank_gl["id"]
+    )
+    funding = client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"],
+            "treasuryAccountId": treasury_account["id"],
+            "counterAccountId": equity["id"],
+            "sender": "Capital de prueba",
+            "currencyCode": "HNL",
+            "originalAmount": "1000.00",
+            "remittanceDate": "2026-08-01",
+        },
+    )
+    assert funding.status_code == 201, funding.text
+
+    ap_invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"],
+            "supplierId": supplier["id"],
+            "invoiceNumber": "IDOR-AP-B",
+            "scope": "PROJECT",
+            "projectId": project_b["id"],
+            "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"],
+            "currencyCode": "HNL",
+            "amount": "100.00",
+            "invoiceDate": "2026-08-02",
+            "dueDate": "2026-09-02",
+        },
+    )
+    assert ap_invoice.status_code == 201, ap_invoice.text
+    ap_invoice = ap_invoice.json()
+    approved_ap = client.post(f"/api/ap/supplier-invoices/{ap_invoice['id']}/approve")
+    assert approved_ap.status_code == 200, approved_ap.text
+    ap_payment = client.post(
+        f"/api/ap/supplier-invoices/{ap_invoice['id']}/payments",
+        json={
+            "treasuryAccountId": treasury_account["id"],
+            "amount": "100.00",
+            "paymentDate": "2026-08-03",
+        },
+    )
+    assert ap_payment.status_code == 201, ap_payment.text
+    ap_payment = ap_payment.json()
+
+    ar_invoice = client.post(
+        "/api/ar/customer-invoices",
+        json={
+            "companyId": company["id"],
+            "customerId": customer["id"],
+            "invoiceNumber": "IDOR-AR-B",
+            "scope": "PROJECT",
+            "projectId": project_b["id"],
+            "revenueAccountId": revenue["id"],
+            "receivableAccountId": receivable["id"],
+            "currencyCode": "HNL",
+            "amount": "100.00",
+            "invoiceDate": "2026-08-02",
+            "dueDate": "2026-09-02",
+        },
+    )
+    assert ar_invoice.status_code == 201, ar_invoice.text
+    ar_invoice = ar_invoice.json()
+    approved_ar = client.post(f"/api/ar/customer-invoices/{ar_invoice['id']}/approve")
+    assert approved_ar.status_code == 200, approved_ar.text
+    ar_receipt = client.post(
+        f"/api/ar/customer-invoices/{ar_invoice['id']}/receipts",
+        json={
+            "treasuryAccountId": treasury_account["id"],
+            "amount": "100.00",
+            "receiptDate": "2026-08-03",
+        },
+    )
+    assert ar_receipt.status_code == 201, ar_receipt.text
+    ar_receipt = ar_receipt.json()
+
+    scoped_admin = create_user_with_role(
+        db_session,
+        email="financial-idor@nexora.group",
+        role_name="Administrator",
+    )
+    db_session.add_all(
+        [
+            UserCompanyAccess(user_id=scoped_admin.id, company_id=company["id"]),
+            UserProjectAccess(user_id=scoped_admin.id, project_id=project_a["id"]),
+        ]
+    )
+    db_session.commit()
+    _restrict_administrator_to_own_projects(db_session)
+    login_as(client, email="financial-idor@nexora.group")
+
+    denied_requests = [
+        client.get(f"/api/ap/supplier-invoices/{ap_invoice['id']}"),
+        client.post(f"/api/ap/supplier-invoices/{ap_invoice['id']}/approve"),
+        client.get(f"/api/ap/supplier-invoices/{ap_invoice['id']}/payments"),
+        client.post(
+            f"/api/ap/supplier-payments/{ap_payment['id']}/reverse",
+            json={"reason": "Ataque IDOR AP"},
+        ),
+        client.get(f"/api/ar/customer-invoices/{ar_invoice['id']}"),
+        client.post(f"/api/ar/customer-invoices/{ar_invoice['id']}/approve"),
+        client.get(f"/api/ar/customer-invoices/{ar_invoice['id']}/receipts"),
+        client.post(
+            f"/api/ar/customer-receipts/{ar_receipt['id']}/reverse",
+            json={"reason": "Ataque IDOR AR"},
+        ),
+        client.post(
+            "/api/ap/supplier-invoices",
+            json={
+                "companyId": company["id"],
+                "supplierId": supplier["id"],
+                "invoiceNumber": "IDOR-AP-BODY",
+                "scope": "PROJECT",
+                "projectId": project_b["id"],
+                "expenseAccountId": expense["id"],
+                "payableAccountId": payable["id"],
+                "currencyCode": "HNL",
+                "amount": "10.00",
+                "invoiceDate": "2026-08-02",
+                "dueDate": "2026-09-02",
+            },
+        ),
+        client.post(
+            "/api/ar/customer-invoices",
+            json={
+                "companyId": company["id"],
+                "customerId": customer["id"],
+                "invoiceNumber": "IDOR-AR-BODY",
+                "scope": "PROJECT",
+                "projectId": project_b["id"],
+                "revenueAccountId": revenue["id"],
+                "receivableAccountId": receivable["id"],
+                "currencyCode": "HNL",
+                "amount": "10.00",
+                "invoiceDate": "2026-08-02",
+                "dueDate": "2026-09-02",
+            },
+        ),
+    ]
+    assert all(response.status_code == 403 for response in denied_requests), [
+        (response.status_code, response.text) for response in denied_requests
+    ]

@@ -1,0 +1,6 @@
+LinkedIn avatar 800x800; banner 1584x396
+GitHub avatar 1024x1024
+Instagram avatar 1080x1080
+YouTube avatar 800x800; banner 2560x1440
+Facebook cover 1640x624
+X avatar 800x800; header 1500x500

@@ -1,0 +1,30 @@
+NEXORA GROUP Corporate Identity v1.0
+03-A NX NEGATIVE 2.0
+Tagline: Conectamos visión con resultados
+
+Total files before final manifest refresh: 303
+Total package bytes: 24421380
+
+Format counts:
+.css: 1
+.csv: 1
+.eps: 25
+.gif: 1
+.ico: 1
+.jpg: 10
+.json: 2
+.mp4: 1
+.pdf: 50
+.png: 99
+.scss: 1
+.svg: 82
+.txt: 18
+.webm: 1
+.webp: 10
+
+Production notes:
+- Maximum raster long side delivered: 16,000 px.
+- True vector masters: SVG, PDF, EPS.
+- Native .AI intentionally not fabricated because Adobe Illustrator is unavailable.
+- Pantone requires physical swatch verification.
+- QA status: PASS; see QA_REPORT.pdf / QA_REPORT.txt.

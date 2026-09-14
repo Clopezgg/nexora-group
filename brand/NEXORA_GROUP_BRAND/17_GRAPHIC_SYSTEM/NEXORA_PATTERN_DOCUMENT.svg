@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<path d="M-400 900 L360 0" stroke="#64707F" stroke-width="28" opacity="0.04"/>
+<path d="M-240 900 L520 0" stroke="#64707F" stroke-width="6" opacity="0.027999999999999997"/>
+<path d="M-120 900 L640 0" stroke="#64707F" stroke-width="28" opacity="0.04"/>
+<path d="M40 900 L800 0" stroke="#64707F" stroke-width="6" opacity="0.027999999999999997"/>
+<path d="M160 900 L920 0" stroke="#64707F" stroke-width="28" opacity="0.04"/>
+<path d="M320 900 L1080 0" stroke="#64707F" stroke-width="6" opacity="0.027999999999999997"/>
+<path d="M440 900 L1200 0" stroke="#64707F" stroke-width="28" opacity="0.04"/>
+<path d="M600 900 L1360 0" stroke="#64707F" stroke-width="6" opacity="0.027999999999999997"/>
+<path d="M720 900 L1480 0" stroke="#64707F" stroke-width="28" opacity="0.04"/>
+<path d="M880 900 L1640 0" stroke="#64707F" stroke-width="6" opacity="0.027999999999999997"/>
+<path d="M1000 900 L1760 0" stroke="#64707F" stroke-width="28" opacity="0.04"/>
+<path d="M1160 900 L1920 0" stroke="#64707F" stroke-width="6" opacity="0.027999999999999997"/>
+<path d="M1280 900 L2040 0" stroke="#64707F" stroke-width="28" opacity="0.04"/>
+<path d="M1440 900 L2200 0" stroke="#64707F" stroke-width="6" opacity="0.027999999999999997"/>
+<path d="M1560 900 L2320 0" stroke="#64707F" stroke-width="28" opacity="0.04"/>
+<path d="M1720 900 L2480 0" stroke="#64707F" stroke-width="6" opacity="0.027999999999999997"/>
+<rect x="0" y="0" width="125" height="18" transform="rotate(-40 0 0)" fill="#64707F" opacity="0.055999999999999994"/>
+<rect x="420" y="560" width="125" height="18" transform="rotate(-40 420 560)" fill="#64707F" opacity="0.055999999999999994"/>
+<rect x="840" y="420" width="125" height="18" transform="rotate(-40 840 420)" fill="#64707F" opacity="0.055999999999999994"/>
+<rect x="1260" y="280" width="125" height="18" transform="rotate(-40 1260 280)" fill="#64707F" opacity="0.055999999999999994"/>
+</svg>

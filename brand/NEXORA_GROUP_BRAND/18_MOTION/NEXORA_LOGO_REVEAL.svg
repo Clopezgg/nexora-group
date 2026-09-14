@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+<rect width="1280" height="720" fill="#0B1F3A"/>
+<g transform="translate(390 170)">
+ <path fill="#fff" fill-rule="evenodd" d="M60 25 Q60 15 72 15 L185 15 L335 165 L425 165 L505 245 L340 245 L155 60 L155 205 L220 205 L155 270 L60 270 Z M115 125 L155 165 L155 208 L115 208 Z" opacity="0"><animate attributeName="opacity" values="0;1;1" keyTimes="0;.35;1" dur="3s" fill="freeze"/></path>
+ <polygon points="335,25 440,25 387,82 282,82" fill="#2E76F6" opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;.25;.5;1" dur="3s" fill="freeze"/></polygon>
+</g>
+<text x="640" y="530" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="66" font-weight="700" letter-spacing="10" fill="#fff" opacity="0">NEXORA<animate attributeName="opacity" values="0;0;1;1" keyTimes="0;.42;.68;1" dur="3s" fill="freeze"/></text>
+<text x="640" y="590" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="22" letter-spacing="5" fill="#E6E8EB" opacity="0">CONECTAMOS VISIÓN CON RESULTADOS<animate attributeName="opacity" values="0;0;1" keyTimes="0;.68;1" dur="3s" fill="freeze"/></text>
+</svg>

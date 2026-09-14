@@ -10,6 +10,7 @@ from app.domain.errors import (
     NotFoundError,
     SegregationOfDutiesError,
 )
+from app.models.ap import SupplierInvoice, SupplierPayment
 from app.schemas.ap import (
     PaymentPlanItemResponse,
     PaymentPlanRequest,

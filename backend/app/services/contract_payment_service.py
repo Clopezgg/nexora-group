@@ -736,7 +736,6 @@ def installment_summaries(
     for r in rows:
         paid = paid_map.get(r.id, _ZERO)
         installment_net_due = _q(r.net_due)
-        installment_scheduled = _q(r.scheduled_amount)
         kind = getattr(r, "installment_kind", "REGULAR")
 
         # "Neto" for display = running contract balance BEFORE this row's payments

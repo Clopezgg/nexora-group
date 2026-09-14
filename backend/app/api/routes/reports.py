@@ -527,6 +527,7 @@ def _ledger_entry_response(entry) -> ContractLedgerEntryResponse:
                 scheduled_amount=i.scheduled_amount,
                 retention_amount=i.retention_amount,
                 net_due=i.net_due,
+                running_contract_balance_before=i.running_contract_balance_before,
                 paid=i.paid,
                 remaining=i.remaining,
                 status=i.status,

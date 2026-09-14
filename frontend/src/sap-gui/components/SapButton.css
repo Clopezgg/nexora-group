@@ -1,0 +1,264 @@
+/**
+ * NEXORA SAP GUI Classic — Button Styles
+ * 
+ * Estilos para botones compactos estilo SAP GUI Classic (JPL Signature).
+ * Altura 28px, bevel clásico, navegación por teclado.
+ */
+
+.nx-sap-btn {
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--sap-button-height, 28px);
+  min-height: var(--sap-button-height, 28px);
+  padding: 0 12px;
+  
+  /* Tipografía */
+  font-family: var(--sap-font-family);
+  font-size: var(--sap-font-size-base, 13px);
+  font-weight: var(--sap-font-weight-normal, 400);
+  line-height: 1;
+  white-space: nowrap;
+  
+  /* Apariencia base */
+  border: var(--sap-border, 1px) solid;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background var(--sap-transition-fast, 60ms) var(--sap-transition-easing),
+              border-color var(--sap-transition-fast, 60ms) var(--sap-transition-easing),
+              box-shadow var(--sap-transition-fast, 60ms) var(--sap-transition-easing);
+  
+  /* Focus visible */
+  outline: none;
+}
+
+.nx-sap-btn:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: 2px;
+}
+
+.nx-sap-btn:disabled,
+.nx-sap-btn.nx-disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* ============================================================
+   VARIANTES
+   ============================================================ */
+
+/* Estándar — Bevel clásico JPL Signature */
+.nx-sap-btn--standard {
+  color: var(--sap-color-button-text, #172e50);
+  background: var(--sap-color-button-bg, linear-gradient(#fefcef, #feee9e));
+  border-color: var(--sap-color-button-border, #8e9eab);
+  box-shadow: inset 1px 1px #fff, inset -1px -1px #b8ac75;
+}
+
+.nx-sap-btn--standard:hover:not(:disabled):not(.nx-disabled) {
+  background: var(--sap-color-button-hover-bg, linear-gradient(#fffcef, #ffe58a));
+  border-color: var(--sap-color-button-hover-border, #265b8f);
+  box-shadow: inset 1px 1px #fff, inset -1px -1px #b8ac75;
+}
+
+.nx-sap-btn--standard:active:not(:disabled):not(.nx-disabled) {
+  background: var(--sap-color-button-pressed-bg, linear-gradient(#fdf2d0, #f5d890));
+  box-shadow: inset 1px 1px #b8ac75, inset -1px -1px #fff;
+}
+
+/* Primario — Azul gradiente */
+.nx-sap-btn--primary {
+  color: var(--sap-color-button-primary-text, #ffffff);
+  background: var(--sap-color-button-primary-bg, linear-gradient(#2f537e, #172e50));
+  border-color: var(--sap-color-border-strong, #466dbd);
+  box-shadow: none;
+}
+
+.nx-sap-btn--primary:hover:not(:disabled):not(.nx-disabled) {
+  background: var(--sap-color-button-primary-hover-bg, linear-gradient(#3a6b9e, #1f3d6e));
+}
+
+.nx-sap-btn--primary:active:not(:disabled):not(.nx-disabled) {
+  background: linear-gradient(#1a3a5a, #102540);
+}
+
+/* Peligro — Rojo */
+.nx-sap-btn--danger {
+  color: #ffffff;
+  background: linear-gradient(var(--sap-color-negative, #a12121), #7a1515);
+  border-color: #8a1a1a;
+  box-shadow: none;
+}
+
+.nx-sap-btn--danger:hover:not(:disabled):not(.nx-disabled) {
+  background: linear-gradient(#c02626, #951818);
+}
+
+.nx-sap-btn--danger:active:not(:disabled):not(.nx-disabled) {
+  background: linear-gradient(#8a1515, #6b0f0f);
+}
+
+/* Toolbar — Solo icono, 28x28px */
+.nx-sap-btn--toolbar {
+  padding: 0;
+  width: var(--sap-button-height, 28px);
+  min-width: var(--sap-button-height, 28px);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--sap-color-toolbar-text, #182a53);
+}
+
+.nx-sap-btn--toolbar:hover:not(:disabled):not(.nx-disabled) {
+  background: var(--sap-color-surface-sunken, #d6dbe5);
+}
+
+.nx-sap-btn--toolbar:active:not(:disabled):not(.nx-disabled) {
+  background: var(--sap-color-border, #a8b8c7);
+}
+
+.nx-sap-btn--toolbar.nx-pressed {
+  background: var(--sap-color-border, #a8b8c7);
+  box-shadow: inset 1px 1px 2px rgba(24,42,83,0.2);
+}
+
+/* Compacto — 24px altura */
+.nx-sap-btn--compact {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+/* Solo icono */
+.nx-sap-btn--icon-only {
+  padding: 0;
+  width: var(--sap-button-height, 28px);
+  min-width: var(--sap-button-height, 28px);
+  justify-content: center;
+}
+
+.nx-sap-btn__content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ============================================================
+   TOOLBAR BUTTON — Barra de herramientas (icono 28x28)
+   ============================================================ */
+
+.nx-sap-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sap-button-height, 28px);
+  height: var(--sap-button-height, 28px);
+  min-width: var(--sap-button-height, 28px);
+  min-height: var(--sap-button-height, 28px);
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--sap-color-toolbar-text, #182a53);
+  cursor: pointer;
+  transition: background var(--sap-transition-fast, 60ms) var(--sap-transition-easing);
+  outline: none;
+}
+
+.nx-sap-toolbar-btn:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: -2px;
+}
+
+.nx-sap-toolbar-btn:hover:not(:disabled):not(.nx-disabled) {
+  background: var(--sap-color-surface-sunken, #d6dbe5);
+}
+
+.nx-sap-toolbar-btn:active:not(:disabled):not(.nx-disabled) {
+  background: var(--sap-color-border, #a8b8c7);
+}
+
+.nx-sap-toolbar-btn.nx-pressed {
+  background: var(--sap-color-border, #a8b8c7);
+  box-shadow: inset 1px 1px 2px rgba(24,42,83,0.2);
+}
+
+.nx-sap-toolbar-btn:disabled,
+.nx-sap-toolbar-btn.nx-disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+.nx-sap-toolbar-btn__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+/* ============================================================
+   COMMAND BUTTON — Botón de campo de comandos
+   ============================================================ */
+
+.nx-sap-cmd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--sap-color-button-bg, linear-gradient(#fefcef, #feee9e));
+  border: 1px solid var(--sap-color-button-border, #8e9eab);
+  color: var(--sap-color-button-text, #172e50);
+  cursor: pointer;
+  transition: background var(--sap-transition-fast) var(--sap-transition-easing),
+              border-color var(--sap-transition-fast) var(--sap-transition-easing);
+}
+
+.nx-sap-cmd-btn:hover:not(:disabled) {
+  background: linear-gradient(#fffcef, #ffe58a);
+  border-color: var(--sap-color-button-hover-border, #265b8f);
+}
+
+.nx-sap-cmd-btn.nx-checked {
+  background: linear-gradient(#dfeaf3, #c3d8eb);
+  border-color: var(--sap-color-accent, #265b8f);
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 760px) {
+  .nx-sap-btn {
+    height: 40px;
+    min-height: 40px;
+    font-size: 14px;
+    padding: 0 14px;
+  }
+  
+  .nx-sap-btn--compact {
+    height: 36px;
+    min-height: 36px;
+  }
+  
+  .nx-sap-btn--toolbar,
+  .nx-sap-toolbar-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+  
+  .nx-sap-cmd-btn {
+    width: 36px;
+    height: 36px;
+  }
+}

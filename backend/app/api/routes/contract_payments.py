@@ -56,6 +56,7 @@ def _installments_payload(
             scheduled_amount=s.scheduled_amount,
             retention_amount=s.retention_amount,
             net_due=s.net_due,
+            running_contract_balance_before=s.running_contract_balance_before,
             paid=s.paid,
             remaining=s.remaining,
             status=s.status,

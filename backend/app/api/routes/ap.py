@@ -441,3 +441,65 @@ def payment_proposal(
     return ap_service.build_payment_proposal(
         db, company_id=company_id, as_of=business_today(), horizon_days=horizon_days
     )
+
+
+@router.patch(
+    "/supplier-payments/{payment_id}",
+    response_model=SupplierPaymentResponse,
+)
+def update_supplier_payment_bank_reference(
+    payment_id: uuid.UUID,
+    payload: dict,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("ap.supplier_payment", "update")),
+    correlation_id: str = Depends(get_correlation_id),
+) -> SupplierPaymentResponse:
+    """Update bank transaction reference on a supplier payment.
+    Only the bank_transaction_reference field can be updated.
+    Requires Protected Edit capability."""
+    payment = db.get(SupplierPayment, payment_id)
+    if payment is None:
+        raise HTTPException(status_code=404, detail="Pago no encontrado")
+    invoice = db.get(SupplierInvoice, payment.supplier_invoice_id)
+    if invoice is None:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+    assert_company_access(
+        db,
+        user_id=user.id,
+        resource="ap.supplier_payment",
+        action="update",
+        company_id=invoice.company_id,
+    )
+    if payment.reversed_at is not None:
+        raise HTTPException(
+            status_code=422, detail="No se puede modificar un pago revertido"
+        )
+    allowed_fields = {"bankTransactionReference"}
+    for field in payload.keys():
+        if field not in allowed_fields:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Campo no permitido: {field}. Solo se permite 'bankTransactionReference'.",
+            )
+    old_reference = payment.bank_transaction_reference
+    new_reference = payload.get("bankTransactionReference")
+    if new_reference is not None and len(new_reference.strip()) > 120:
+        raise HTTPException(
+            status_code=422, detail="La referencia bancaria no puede exceder 120 caracteres"
+        )
+    payment.bank_transaction_reference = new_reference.strip() if new_reference else None
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="ap.supplier_payment.update_bank_reference",
+        entity_type="ap.supplier_payment",
+        entity_id=payment.id,
+        company_id=invoice.company_id,
+        project_id=invoice.project_id,
+        before={"bankTransactionReference": old_reference},
+        after={"bankTransactionReference": payment.bank_transaction_reference},
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    db.refresh(payment)
+    return SupplierPaymentResponse.model_validate(payment, from_attributes=True)

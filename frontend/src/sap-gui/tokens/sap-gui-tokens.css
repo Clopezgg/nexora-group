@@ -1,0 +1,412 @@
+/**
+ * NEXORA SAP GUI Classic — Design Tokens
+ * 
+ * Sistema de tokens para reconstruir la experiencia visual y operacional
+ * de SAP GUI Classic (estación de trabajo empresarial) dentro del navegador.
+ * 
+ * Basado en SAP GUI for Windows — Signature / Tradeshow / Horizon
+ * Sin usar activos propietarios de SAP. Identidad: NEXORA GROUP.
+ */
+
+:root[data-nx-family='sap-gui'] {
+  /* ============================================================
+     PALETA FUNCIONAL — Colores SAP GUI Classic
+     ============================================================ */
+  
+  /* Fondos de trabajo */
+  --sap-color-window-bg: #cbd4e1;           /* Fondo principal: acero azulado clásico */
+  --sap-color-workarea-bg: #eaf1f6;         /* Área de trabajo: gris azulado claro */
+  --sap-color-surface: #ffffff;             /* Superficies: blanco */
+  --sap-color-surface-raised: #ffffff;      /* Superficies elevadas */
+  --sap-color-surface-sunken: #d6dbe5;      /* Superficies hundidas */
+  --sap-color-surface-tinted: #e3eaf2;      /* Superficies teñidas (paneles) */
+  
+  /* Textos */
+  --sap-color-text: #182a53;                /* Texto principal: azul petróleo oscuro */
+  --sap-color-text-muted: #33475f;          /* Texto secundario */
+  --sap-color-text-subtle: #59697a;         /* Texto sutil */
+  
+  /* Bordes */
+  --sap-color-border: #a8b8c7;              /* Borde estándar: gris azulado medio */
+  --sap-color-border-strong: #668db5;       /* Borde fuerte: azul acero */
+  --sap-color-border-focus: #466dbd;        /* Foco */
+  
+  /* Acentos / Interactivos */
+  --sap-color-accent: #265b8f;              /* Acento principal: azul SAP */
+  --sap-color-accent-hover: #172e50;        /* Hover */
+  --sap-color-accent-pressed: #102038;      /* Pressed */
+  --sap-color-accent-contrast: #ffffff;     /* Contraste sobre acento */
+  
+  /* Estados semánticos */
+  --sap-color-positive: #216635;            /* Éxito: verde oscuro */
+  --sap-color-negative: #a12121;            /* Error: rojo oscuro */
+  --sap-color-warning: #8a5200;             /* Advertencia: ámbar */
+  --sap-color-info: #265b8f;                /* Información: azul */
+  
+  /* Estados de selección / foco */
+  --sap-color-selection-bg: #2f537e;        /* Fondo selección: azul medio */
+  --sap-color-selection-text: #ffffff;      /* Texto selección */
+  --sap-color-selection-hover: #dfeaf3;     /* Hover fila */
+  
+  /* Barras / Shell */
+  --sap-color-titlebar-bg: #c3ccd7;         /* Title bar: gris azulado */
+  --sap-color-titlebar-text: #182a53;
+  --sap-color-menubar-bg: #c3ccd7;
+  --sap-color-menubar-text: #182a53;
+  --sap-color-toolbar-bg: #c3ccd7;          /* Toolbar estándar */
+  --sap-color-toolbar-text: #182a53;
+  --sap-color-commandbar-bg: #ffffff;
+  --sap-color-commandbar-border: #a8b8c7;
+  --sap-color-statusbar-bg: #c3ccd7;
+  --sap-color-statusbar-text: #182a53;
+  
+  /* Sidebar / Tree */
+  --sap-color-sidebar-bg: #dfeaf3;
+  --sap-color-sidebar-text: #182a53;
+  --sap-color-sidebar-active-bg: #2f537e;
+  --sap-color-sidebar-active-text: #ffffff;
+  --sap-color-sidebar-hover-bg: #d6e3ed;
+  
+  /* Tablas / Grid */
+  --sap-color-table-header-bg: #c3ccd7;
+  --sap-color-table-header-text: #182a53;
+  --sap-color-table-row-hover: #dfeaf3;
+  --sap-color-table-stripe: #f4f7fa;
+  --sap-color-table-divider: #a8b8c7;
+  --sap-color-table-selection-bg: #2f537e;
+  --sap-color-table-selection-text: #ffffff;
+  
+  /* Inputs / Campos */
+  --sap-color-input-bg: #ffffff;
+  --sap-color-input-border: #a8b8c7;
+  --sap-color-input-border-focus: #265b8f;
+  --sap-color-input-text: #182a53;
+  --sap-color-input-placeholder: #7c8da6;
+  --sap-color-input-readonly-bg: #f4f7fa;
+  --sap-color-input-readonly-border: #c3ccd7;
+  --sap-color-input-disabled-bg: #f0f2f5;
+  --sap-color-input-disabled-border: #d1d9e1;
+  
+  /* Botones */
+  --sap-color-button-bg: linear-gradient(#fefcef, #feee9e);  /* Bevel clásico JPL */
+  --sap-color-button-border: #8e9eab;
+  --sap-color-button-text: #172e50;
+  --sap-color-button-hover-bg: linear-gradient(#fffcef, #ffe58a);
+  --sap-color-button-hover-border: #265b8f;
+  --sap-color-button-pressed-bg: linear-gradient(#fdf2d0, #f5d890);
+  --sap-color-button-primary-bg: linear-gradient(#2f537e, #172e50);
+  --sap-color-button-primary-text: #ffffff;
+  --sap-color-button-primary-hover-bg: linear-gradient(#3a6b9e, #1f3d6e);
+  --sap-color-button-disabled-bg: linear-gradient(#f5f5f0, #e8e0d0);
+  --sap-color-button-disabled-text: #a0a8b3;
+  --sap-color-button-disabled-border: #c3ccd7;
+  
+  /* Tabs */
+  --sap-color-tab-bg: linear-gradient(#dee9f3, #c2d8eb);
+  --sap-color-tab-border: #668db5;
+  --sap-color-tab-text: #172e50;
+  --sap-color-tab-active-bg: linear-gradient(#8cb1da, #bdd4e9);
+  --sap-color-tab-active-text: #172e50;
+  --sap-color-tab-active-border: #bdd4e9;
+  
+  /* Panels / Group Boxes */
+  --sap-color-panel-bg: #dfebf5;
+  --sap-color-panel-border: #668db5;
+  --sap-color-panel-header-bg: #c0d6ea;
+  --sap-color-panel-header-border: #668db5;
+  --sap-color-panel-header-text: #172e50;
+  
+  /* Dialog / Modal */
+  --sap-color-dialog-bg: #eaf1f6;
+  --sap-color-dialog-border: #668db5;
+  --sap-color-dialog-header-bg: #c3ccd7;
+  --sap-color-dialog-header-text: #182a53;
+  --sap-color-dialog-scrim: rgba(24, 46, 83, 0.38);
+  
+  /* Scrollbar */
+  --sap-color-scrollbar-track: transparent;
+  --sap-color-scrollbar-thumb: #a8b8c7;
+  --sap-color-scrollbar-thumb-hover: #8e9eab;
+  
+  /* ============================================================
+     MÉTRICAS ESTRUCTURALES — Dimensiones SAP GUI Classic
+     ============================================================ */
+  
+  /* Alturas de barra */
+  --sap-title-height: 26px;
+  --sap-menu-height: 25px;
+  --sap-command-height: 34px;
+  --sap-toolbar-height: 26px;
+  --sap-status-height: 24px;
+  
+  /* Controles */
+  --sap-field-height: 28px;
+  --sap-button-height: 28px;
+  --sap-row-height: 26px;
+  --sap-tab-height: 28px;
+  --sap-panel-header-height: 26px;
+  
+  /* Sidebar */
+  --sap-sidebar-width: 224px;
+  
+  /* Espaciado */
+  --sap-space: 6px;
+  --sap-border: 1px;
+  
+  /* Tipografía */
+  --sap-font-family: Arial, Helvetica, system-ui, sans-serif;
+  --sap-font-size-base: 13px;
+  --sap-font-size-label: 12px;
+  --sap-font-size-caption: 11px;
+  --sap-font-weight-normal: 400;
+  --sap-font-weight-bold: 700;
+  --sap-line-height-base: 1.3;
+  
+  /* Sombras / Elevación */
+  --sap-shadow-card: none;
+  --sap-shadow-raised: 1px 1px 0 rgba(255,255,255,0.8), 2px 2px 4px rgba(24,42,83,0.22);
+  --sap-shadow-overlay: 2px 3px 10px rgba(24,42,83,0.38);
+  
+  /* Transiciones */
+  --sap-transition-fast: 60ms;
+  --sap-transition-base: 100ms;
+  --sap-transition-easing: linear;
+  
+  /* Focus ring */
+  --sap-focus-ring: #466dbd;
+  --sap-focus-width: 2px;
+  --sap-focus-offset: 2px;
+  
+  /* Z-index layers */
+  --sap-z-titlebar: 10;
+  --sap-z-menubar: 40;
+  --sap-z-commandbar: 30;
+  --sap-z-toolbar: 20;
+  --sap-z-topbar: 20;
+  --sap-z-popup: 100;
+  --sap-z-modal: 200;
+  --sap-z-tooltip: 300;
+  --sap-z-statusbar: 10;
+}
+
+/* ============================================================
+   VARIANTES DE TEMA — Tradeshow / Horizon / Horizon Dark
+   ============================================================ */
+
+/* Tradeshow — Bandas azul profundo, contraste superior */
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] {
+  --sap-color-window-bg: #b6c1cd;
+  --sap-color-workarea-bg: #dfeaf3;
+  --sap-color-surface: #ffffff;
+  --sap-color-surface-sunken: #c3ccd7;
+  --sap-color-text: #172e50;
+  --sap-color-text-muted: #2d4563;
+  --sap-color-border: #8e9eab;
+  --sap-color-border-strong: #466dbd;
+  --sap-color-accent: #182a53;
+  --sap-color-accent-hover: #21386b;
+  --sap-color-selection-bg: #34548a;
+  --sap-color-titlebar-bg: #182a53;
+  --sap-color-titlebar-text: #ffffff;
+  --sap-color-menubar-bg: #182a53;
+  --sap-color-menubar-text: #ffffff;
+  --sap-color-toolbar-bg: #182a53;
+  --sap-color-statusbar-bg: #182a53;
+  --sap-color-statusbar-text: #ffffff;
+  --sap-color-sidebar-bg: #172e50;
+  --sap-color-sidebar-text: #dfeaf3;
+  --sap-color-sidebar-active-bg: #34548a;
+  --sap-color-table-header-bg: #668db5;
+  --sap-color-table-header-text: #ffffff;
+  --sap-color-table-row-hover: #d6e3ef;
+  --sap-color-panel-bg: #eaf1f6;
+  --sap-color-panel-border: #8e9eab;
+  --sap-color-panel-header-bg: #466dbd;
+  --sap-color-panel-header-text: #ffffff;
+  --sap-color-dialog-bg: #dfeaf3;
+  --sap-color-dialog-header-bg: #182a53;
+  --sap-color-dialog-header-text: #ffffff;
+  --sap-focus-ring: #466dbd;
+  --sap-font-family: Arial, Helvetica, system-ui, sans-serif;
+}
+
+/* Horizon — Modernización con superficies limpias */
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon'] {
+  --sap-color-window-bg: #e8edf3;
+  --sap-color-workarea-bg: #f7fafd;
+  --sap-color-surface: #ffffff;
+  --sap-color-surface-sunken: #e3eaf2;
+  --sap-color-text: #12263f;
+  --sap-color-text-muted: #46586e;
+  --sap-color-border: #c4d0de;
+  --sap-color-border-strong: #8fa3ba;
+  --sap-color-accent: #0a6ed1;
+  --sap-color-accent-hover: #085aad;
+  --sap-color-selection-bg: #0a6ed1;
+  --sap-color-titlebar-bg: #dbe4ee;
+  --sap-color-titlebar-text: #12263f;
+  --sap-color-menubar-bg: #dbe4ee;
+  --sap-color-toolbar-bg: #dbe4ee;
+  --sap-color-statusbar-bg: #dbe4ee;
+  --sap-color-sidebar-bg: #eef3f8;
+  --sap-color-sidebar-text: #12263f;
+  --sap-color-sidebar-active-bg: #0a6ed1;
+  --sap-color-table-header-bg: #dbe4ee;
+  --sap-color-table-header-text: #12263f;
+  --sap-color-table-row-hover: #e9f1f9;
+  --sap-color-panel-bg: #f7fafd;
+  --sap-color-panel-border: #c4d0de;
+  --sap-color-panel-header-bg: #0a6ed1;
+  --sap-color-panel-header-text: #ffffff;
+  --sap-color-dialog-bg: #f7fafd;
+  --sap-color-dialog-header-bg: #dbe4ee;
+  --sap-focus-ring: #0a6ed1;
+  --sap-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Horizon Dark — Modo oscuro real */
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='horizon-dark'] {
+  --sap-color-window-bg: #0d141d;
+  --sap-color-workarea-bg: #16202c;
+  --sap-color-surface: #1e2b3a;
+  --sap-color-surface-sunken: #0a1118;
+  --sap-color-text: #e6edf5;
+  --sap-color-text-muted: #a3b3c5;
+  --sap-color-border: #2b3a4d;
+  --sap-color-border-strong: #43566e;
+  --sap-color-accent: #4da3ff;
+  --sap-color-accent-hover: #71b8ff;
+  --sap-color-selection-bg: #1f4d80;
+  --sap-color-titlebar-bg: #16202c;
+  --sap-color-titlebar-text: #e6edf5;
+  --sap-color-menubar-bg: #16202c;
+  --sap-color-toolbar-bg: #16202c;
+  --sap-color-statusbar-bg: #16202c;
+  --sap-color-sidebar-bg: #101922;
+  --sap-color-sidebar-text: #c9d6e4;
+  --sap-color-sidebar-active-bg: #1f4d80;
+  --sap-color-table-header-bg: #1e2b3a;
+  --sap-color-table-header-text: #a3b3c5;
+  --sap-color-table-row-hover: #1b2836;
+  --sap-color-panel-bg: #1e2b3a;
+  --sap-color-panel-border: #2b3a4d;
+  --sap-color-panel-header-bg: #1f4d80;
+  --sap-color-panel-header-text: #ffffff;
+  --sap-color-dialog-bg: #1e2b3a;
+  --sap-color-dialog-header-bg: #16202c;
+  --sap-focus-ring: #4da3ff;
+  --sap-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Menubar clásico-moderno */
+:root[data-nx-family='sap-gui'][data-nx-menubar='classic-modern'] {
+  --sap-title-height: 28px;
+  --sap-menu-height: 28px;
+  --sap-field-height: 30px;
+  --sap-button-height: 30px;
+  --sap-row-height: 30px;
+  --sap-tab-height: 32px;
+  --sap-space: 8px;
+}
+
+/* Densidad Finance Dense */
+:root[data-nx-family='sap-gui'][data-nx-density='finance-dense'] {
+  --sap-field-height: 28px;
+  --sap-button-height: 28px;
+  --sap-row-height: 24px;
+  --sap-space: 4px;
+}
+
+/* ============================================================
+   RESPONSIVE — Breakpoints SAP GUI
+   ============================================================ */
+
+@media (max-width: 1024px) {
+  :root[data-nx-family='sap-gui'] {
+    --sap-sidebar-width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  :root[data-nx-family='sap-gui'] {
+    --sap-title-height: 26px;
+    --sap-menu-height: 40px;
+    --sap-command-height: auto;
+    --sap-toolbar-height: 40px;
+    --sap-status-height: 28px;
+    --sap-field-height: 40px;
+    --sap-button-height: 40px;
+    --sap-tab-height: 40px;
+    --sap-sidebar-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  :root[data-nx-family='sap-gui'] {
+    --sap-row-height: auto;
+  }
+}
+
+/* ============================================================
+   UTILIDADES CSS — Clases de ayuda
+   ============================================================ */
+
+/* Focus visible universal */
+:root[data-nx-family='sap-gui'] *:focus-visible {
+  outline: var(--sap-focus-width) solid var(--sap-focus-ring);
+  outline-offset: var(--sap-focus-offset);
+}
+
+/* Deshabilitado universal */
+:root[data-nx-family='sap-gui'] [disabled],
+:root[data-nx-family='sap-gui'] .nx-disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Solo lectura */
+:root[data-nx-family='sap-gui'] [readonly] {
+  background-color: var(--sap-color-input-readonly-bg);
+  border-color: var(--sap-color-input-readonly-border);
+  color: var(--sap-color-input-text);
+}
+
+/* Texto truncado */
+.nx-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Monospace numérico */
+.nx-mono {
+  font-family: var(--sap-font-family);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbar custom */
+:root[data-nx-family='sap-gui'] ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+:root[data-nx-family='sap-gui'] ::-webkit-scrollbar-track {
+  background: var(--sap-color-scrollbar-track);
+}
+
+:root[data-nx-family='sap-gui'] ::-webkit-scrollbar-thumb {
+  background: var(--sap-color-scrollbar-thumb);
+  border: 3px solid var(--sap-color-scrollbar-track);
+  border-radius: 6px;
+}
+
+:root[data-nx-family='sap-gui'] ::-webkit-scrollbar-thumb:hover {
+  background: var(--sap-color-scrollbar-thumb-hover);
+}
+
+/* Selección de texto */
+:root[data-nx-family='sap-gui'] ::selection {
+  background-color: var(--sap-color-selection-bg);
+  color: var(--sap-color-selection-text);
+}

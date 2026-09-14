@@ -1,0 +1,675 @@
+/**
+ * NEXORA SAP GUI Classic — Workstation Shell Styles
+ * 
+ * Composición completa: Title Bar, Menu Bar, Command Row, Sidebar, Main, Status Bar
+ * Grid layout: columnas y filas fijas estilo SAP GUI Classic
+ */
+
+.nx-sap-workstation {
+  display: grid;
+  grid-template-columns: var(--sap-sidebar-width, 224px) minmax(0, 1fr);
+  grid-template-rows: 
+    var(--sap-title-height, 26px)      /* Title Bar */
+    var(--sap-menu-height, 25px)        /* Menu Bar */
+    var(--sap-command-height, 34px)     /* Command Row */
+    minmax(0, 1fr)                      /* Work Area */
+    var(--sap-status-height, 24px);     /* Status Bar */
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  font-family: var(--sap-font-family);
+  background: var(--sap-color-window-bg, #cbd4e1);
+  color: var(--sap-color-text, #182a53);
+}
+
+/* ============================================================
+   TITLE BAR
+   ============================================================ */
+
+.nx-sap-titlebar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: var(--sap-title-height, 26px);
+  background: var(--sap-color-titlebar-bg, #c3ccd7);
+  border-bottom: 1px solid var(--sap-color-border, #a8b8c7);
+  font-family: var(--sap-font-family);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sap-color-titlebar-text, #182a53);
+  z-index: var(--sap-z-titlebar, 10);
+}
+
+.nx-sap-titlebar strong {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.nx-sap-titlebar span:last-child {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+/* ============================================================
+   MENU BAR
+   ============================================================ */
+
+.nx-sap-menubar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: stretch;
+  height: var(--sap-menu-height, 25px);
+  background: var(--sap-color-menubar-bg, #c3ccd7);
+  border-bottom: 1px solid var(--sap-color-border, #a8b8c7);
+  overflow: visible;
+  position: relative;
+  z-index: var(--sap-z-menubar, 40);
+}
+
+.nx-sap-menubar .nx-sap-menu {
+  display: flex;
+  align-items: stretch;
+  position: relative;
+}
+
+.nx-sap-menubar .nx-sap-menu__button {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--sap-color-menubar-text, #182a53);
+  font-family: var(--sap-font-family);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+}
+
+.nx-sap-menubar .nx-sap-menu__button:hover,
+.nx-sap-menubar .nx-sap-menu__button--open {
+  background: var(--sap-color-surface-sunken, #d6dbe5);
+}
+
+.nx-sap-menubar .nx-sap-menu__list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 200px;
+  max-height: min(65dvh, 520px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 2px 0;
+  background: var(--sap-color-surface, #ffffff);
+  border: 1px solid var(--sap-color-border-strong, #668db5);
+  box-shadow: var(--sap-shadow-overlay, 2px 3px 10px rgba(24,42,83,0.38));
+  list-style: none;
+  z-index: 100;
+}
+
+.nx-sap-menubar .nx-sap-menu__list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--sap-color-text, #182a53);
+  font-family: var(--sap-font-family);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.nx-sap-menubar .nx-sap-menu__list button:hover:not(:disabled) {
+  background: var(--sap-color-surface-sunken, #d6dbe5);
+}
+
+.nx-sap-menubar .nx-sap-menu__list button:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: -2px;
+}
+
+.nx-sap-menubar .nx-sap-menu__hint {
+  color: var(--sap-color-text-muted, #33475f);
+  font-size: 11px;
+  margin-left: auto;
+  padding-right: 24px;
+}
+
+/* ============================================================
+   COMMAND ROW
+   ============================================================ */
+
+.nx-sap-commandrow {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  align-items: stretch;
+  height: var(--sap-command-height, 34px);
+  background: var(--sap-color-toolbar-bg, #c3ccd7);
+  border-bottom: 1px solid var(--sap-color-border, #a8b8c7);
+  overflow: visible;
+  position: relative;
+  z-index: var(--sap-z-commandbar, 30);
+  flex-wrap: wrap;
+}
+
+/* Command Bar */
+.nx-sap-commandbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 430px;
+  padding: 4px 8px;
+  height: 100%;
+  min-width: 0;
+}
+
+.nx-sap-commandbar__ok {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--sap-color-positive, #216635);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.nx-sap-commandbar__nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--sap-color-toolbar-text, #182a53);
+  cursor: pointer;
+  outline: none;
+  border-radius: 0;
+}
+
+.nx-sap-commandbar__nav:hover:not(:disabled) {
+  background: var(--sap-color-surface-sunken, #d6dbe5);
+}
+
+.nx-sap-commandbar__nav:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: -2px;
+}
+
+.nx-sap-commandbar__field {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  min-width: 0;
+}
+
+.nx-sap-commandbar__field input {
+  width: 100%;
+  height: 100%;
+  padding: 0 8px;
+  border: 1px solid var(--sap-color-commandbar-border, #a8b8c7);
+  background: var(--sap-color-commandbar-bg, #ffffff);
+  color: var(--sap-color-text, #182a53);
+  font-family: var(--sap-font-family);
+  font-size: 13px;
+  outline: none;
+  border-radius: 0;
+  transition: border-color 60ms linear;
+}
+
+.nx-sap-commandbar__field input:focus {
+  border-color: var(--sap-color-accent, #265b8f);
+  outline: none;
+}
+
+.nx-sap-commandbar__field input:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: -1px;
+}
+
+.nx-sap-commandbar__results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 2px;
+  background: var(--sap-color-surface, #ffffff);
+  border: 1px solid var(--sap-color-border-strong, #668db5);
+  box-shadow: var(--sap-shadow-overlay, 2px 3px 10px rgba(24,42,83,0.38));
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 2px 0;
+  z-index: 100;
+}
+
+.nx-sap-commandbar__option {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.nx-sap-commandbar__option:hover,
+.nx-sap-commandbar__option--active {
+  background: var(--sap-color-selection-hover, #dfeaf3);
+}
+
+.nx-sap-commandbar__group {
+  font-size: 10px;
+  color: var(--sap-color-text-muted, #33475f);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+/* Toolbar */
+.nx-sap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  width: 100%;
+  height: 100%;
+  padding: 0 4px;
+  background: var(--sap-color-toolbar-bg, #c3ccd7);
+  border-left: 1px solid var(--sap-color-border, #a8b8c7);
+  justify-content: flex-end;
+  border-top: 1px solid var(--sap-color-border, #a8b8c7);
+  border-left: none;
+  position: relative;
+  z-index: 30;
+}
+
+.nx-sap-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sap-button-height, 28px);
+  height: var(--sap-toolbar-height, 26px);
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--sap-color-toolbar-text, #182a53);
+  cursor: pointer;
+  outline: none;
+  border-radius: 0;
+  transition: background 60ms linear;
+}
+
+.nx-sap-toolbar button:hover:not(:disabled) {
+  background: var(--sap-color-surface-sunken, #d6dbe5);
+}
+
+.nx-sap-toolbar button:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: -2px;
+}
+
+.nx-sap-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.nx-sap-toolbar__separator {
+  width: 1px;
+  height: 16px;
+  background: var(--sap-color-border, #a8b8c7);
+  margin: 0 2px;
+}
+
+/* ============================================================
+   SIDEBAR / EASY ACCESS
+   ============================================================ */
+
+.nx-sap-workstation .nx-sap-sidebar {
+  grid-column: 1;
+  grid-row: 4;
+  display: flex;
+  flex-direction: column;
+  width: var(--sap-sidebar-width, 224px);
+  min-width: 0;
+  background: var(--sap-color-sidebar-bg, #dfeaf3);
+  border-right: 1px solid var(--sap-color-border, #a8b8c7);
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+}
+
+.nx-sap-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  min-height: 40px;
+  border-bottom: 1px solid var(--sap-color-border, #a8b8c7);
+  background: var(--sap-color-sidebar-bg, #dfeaf3);
+}
+
+.nx-sap-sidebar__brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--sap-color-accent, #265b8f);
+  flex-shrink: 0;
+}
+
+.nx-sap-sidebar__brand-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.nx-sap-sidebar__brand-name {
+  font-family: var(--sap-font-family);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sap-color-sidebar-text, #182a53);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nx-sap-sidebar__brand-tagline {
+  font-size: 9px;
+  color: var(--sap-color-text-subtle, #59697a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================================
+   MAIN AREA
+   ============================================================ */
+
+.nx-sap-workarea {
+  grid-column: 2;
+  grid-row: 4;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.nx-sap-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.nx-sap-content {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 8px;
+  background: var(--sap-color-workarea-bg, #eaf1f6);
+}
+
+.nx-sap-content {
+  padding: 0;
+  margin: 5px;
+  box-shadow: none;
+}
+
+/* ============================================================
+   SCREEN FRAME
+   ============================================================ */
+
+.nx-sap-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.nx-sap-screen__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sap-space, 6px);
+  padding: 4px 9px;
+  min-height: var(--sap-panel-header-height, 26px);
+  background: linear-gradient(var(--sap-color-surface-raised), var(--sap-color-surface-sunken));
+  border-bottom: 1px solid var(--sap-color-border-strong, #668db5);
+}
+
+.nx-sap-screen__title {
+  font-family: var(--sap-font-family);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sap-color-text, #182a53);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nx-sap-screen__context {
+  margin-left: auto;
+  font-family: var(--sap-font-family);
+  font-size: 11px;
+  color: var(--sap-color-text-muted, #33475f);
+}
+
+.nx-sap-screen__workarea {
+  flex: 1;
+  padding: 9px;
+  overflow: auto;
+}
+
+/* Tradeshow variant */
+:root[data-nx-sap-variant='tradeshow'] .nx-sap-screen__header {
+  color: #fff;
+  background: linear-gradient(#365c86, #21386b);
+}
+
+:root[data-nx-sap-variant='tradeshow'] .nx-sap-screen__header span {
+  color: inherit;
+}
+
+/* Classic Modern */
+:root[data-nx-menubar='classic-modern'] .nx-sap-screen__header {
+  background: var(--sap-color-surface-raised);
+  border-bottom: 1px solid var(--sap-color-border);
+  min-height: 34px;
+}
+
+:root[data-nx-menubar='classic-modern'] .nx-sap-tree .nx-sap-tree__group-label {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--sap-color-border);
+  min-height: 28px;
+}
+
+/* ============================================================
+   STATUSBAR
+   ============================================================ */
+
+.nx-sap-statusbar {
+  grid-column: 1 / -1;
+  grid-row: 5;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px;
+  height: var(--sap-status-height, 24px);
+  background: var(--sap-color-statusbar-bg, #c3ccd7);
+  border-top: 1px solid var(--sap-color-border-strong, #668db5);
+  font-family: var(--sap-font-family);
+  font-size: 11px;
+  color: var(--sap-color-statusbar-text, #182a53);
+  white-space: nowrap;
+  z-index: var(--sap-z-statusbar, 10);
+}
+
+.nx-sap-statusbar__ready {
+  font-weight: 600;
+  color: var(--sap-color-positive, #216635);
+}
+
+.nx-sap-statusbar span {
+  flex-shrink: 0;
+}
+
+/* Tradeshow status bar */
+:root[data-nx-sap-variant='tradeshow'] .nx-sap-statusbar {
+  color: #fff;
+  background: linear-gradient(#365c86, #21386b);
+}
+
+:root[data-nx-sap-variant='tradeshow'] .nx-sap-statusbar span {
+  color: inherit;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 1024px) {
+  .nx-sap-workstation {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  
+  .nx-sap-workstation .nx-sap-sidebar {
+    grid-column: 1;
+    grid-row: 5;
+    width: 100%;
+    max-height: 40vh;
+    border-right: none;
+    border-top: 1px solid var(--sap-color-border, #a8b8c7);
+  }
+  
+  .nx-sap-main {
+    grid-column: 1;
+    grid-row: 4;
+  }
+  
+  .nx-sap-statusbar {
+    grid-row: 6;
+  }
+}
+
+@media (max-width: 760px) {
+  .nx-sap-workstation {
+    grid-template-rows: 
+      var(--sap-title-height, 26px)
+      var(--sap-menu-height, 40px)
+      auto
+      minmax(0, 1fr)
+      var(--sap-status-height, 28px);
+  }
+  
+  .nx-sap-menubar {
+    flex-wrap: wrap;
+  }
+  
+  .nx-sap-menubar > .nx-sap-menu {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .nx-sap-menubar button {
+    min-height: 40px;
+    padding: 0 7px;
+  }
+  
+  .nx-sap-commandbar {
+    flex-basis: 100%;
+    order: 3;
+    padding: 2px 4px;
+  }
+  
+  .nx-sap-toolbar {
+    padding: 2px;
+    justify-content: flex-start;
+    border-top: 1px solid var(--sap-color-border, #a8b8c7);
+    border-left: 0;
+  }
+  
+  .nx-sap-toolbar button {
+    min-height: 40px;
+    min-width: 40px;
+  }
+  
+  .nx-sap-commandbar__field input {
+    height: 40px;
+    min-width: 0;
+  }
+  
+  .nx-sap-commandbar__ok {
+    height: 40px;
+    min-width: 40px;
+  }
+  
+  .nx-sap-screen__workarea {
+    padding: 7px;
+  }
+  
+  .nx-sap-tree .nx-sidebar__group-label,
+  .nx-sap-tree .nx-sap-tree__link {
+    min-height: 40px;
+  }
+  
+  .nx-sap-tree .nx-sidebar__list {
+    position: fixed;
+    top: 66px;
+    left: 5px;
+    right: 5px;
+    max-width: none;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .nx-sap-workstation .nx-topbar {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  
+  .nx-sap-workstation .nx-topbar__left {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  
+  .nx-sap-workstation .nx-topbar__context {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .nx-sap-workstation .nx-topbar__context .nx-select {
+    min-width: 0;
+    width: 100%;
+  }
+  
+  .nx-sap-workstation .nx-topbar__right {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+  
+  .nx-sap-toolbar {
+    justify-content: flex-start;
+  }
+}
+
+/* Topbar z-index */
+.nx-sap-workstation .nx-topbar {
+  z-index: 20;
+}

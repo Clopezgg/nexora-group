@@ -164,6 +164,11 @@ export const apService = {
       method: 'POST',
       body: JSON.stringify({ reason }),
     }),
+  updateSupplierPaymentBankReference: (paymentId: string, payload: { bankTransactionReference: string | null }) =>
+    apiFetch<SupplierPayment>(`/ap/supplier-payments/${paymentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
 }
 
 export const arService = {

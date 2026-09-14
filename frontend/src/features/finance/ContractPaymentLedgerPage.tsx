@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Badge,
@@ -7,11 +7,13 @@ import {
   CompanySelector,
   EmptyState,
   ErrorState,
+  Input,
   LoadingState,
   StatCard,
   Table,
   type TableColumn,
 } from '../../design-system'
+import { editAccessService } from '../../services/editAccessService'
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { apService } from '../../services/apArService'
 import {
@@ -44,6 +46,14 @@ export function ContractPaymentLedgerPage() {
     entry: ContractLedgerEntry
     installment: ContractInstallment
   } | null>(null)
+  const [editingAllocation, setEditingAllocation] = useState<{
+    entry: ContractLedgerEntry
+    allocation: LedgerAllocation
+  } | null>(null)
+  const [bankReferenceInput, setBankReferenceInput] = useState('')
+  const [unlocked, setUnlocked] = useState(() => editAccessService.isUnlocked())
+  
+
   const {
     companies,
     activeCompanyId,
@@ -54,6 +64,38 @@ export function ContractPaymentLedgerPage() {
     refetch,
   } = useActiveCompany()
   const currency = activeCompany?.functionalCurrencyCode ?? null
+
+  useEffect(() => {
+    const refresh = () => setUnlocked(editAccessService.isUnlocked())
+    window.addEventListener('nexora:edit-access-changed', refresh)
+    return () => window.removeEventListener('nexora:edit-access-changed', refresh)
+  }, [])
+
+  const handleEditBankReference = (entry: ContractLedgerEntry, allocation: LedgerAllocation) => {
+    if (!unlocked) return
+    setEditingAllocation({ entry, allocation })
+    setBankReferenceInput(allocation.bankTransactionReference ?? '')
+  }
+
+  const handleSaveBankReference = async () => {
+    if (!editingAllocation) return
+    const { allocation } = editingAllocation
+    try {
+      await apService.updateSupplierPaymentBankReference(allocation.sourceId, {
+        bankTransactionReference: bankReferenceInput.trim() || null,
+      })
+      queryClient.invalidateQueries({ queryKey: ['contract-payment-ledger', activeCompanyId] })
+      setEditingAllocation(null)
+      setBankReferenceInput('')
+    } catch (error) {
+      console.error('Error updating bank reference:', error)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingAllocation(null)
+    setBankReferenceInput('')
+  }
 
   const query = useQuery({
     queryKey: ['contract-payment-ledger', activeCompanyId],
@@ -150,7 +192,7 @@ export function ContractPaymentLedgerPage() {
       render: (row) => row.periodLabel,
     },
     { key: 'dueDate', header: 'Vence', render: (row) => row.dueDate },
-    { key: 'netDue', header: 'Neto', render: (row) => formatMoney(row.netDue, currency) },
+    { key: 'runningContractBalanceBefore', header: 'Neto', render: (row) => formatMoney(row.runningContractBalanceBefore, currency) },
     { key: 'paid', header: 'Pagado', render: (row) => formatMoney(row.paid, currency) },
     {
       key: 'remaining',
@@ -215,7 +257,9 @@ export function ContractPaymentLedgerPage() {
     },
   ]
 
-  const allocationColumns: TableColumn<LedgerAllocation>[] = [
+  const allocationColumns = (entry: ContractLedgerEntry): TableColumn<LedgerAllocation>[] => {
+    
+    return [
     { key: 'paymentDate', header: 'Fecha económica', render: (row) => row.paymentDate },
     {
       key: 'sourceType',
@@ -236,7 +280,33 @@ export function ContractPaymentLedgerPage() {
     {
       key: 'bankTransactionReference',
       header: 'Referencia bancaria',
-      render: (row) => row.bankTransactionReference ?? '—',
+      render: (row) => {
+        const isEditing = editingAllocation?.allocation.sourceId === row.sourceId && editingAllocation?.allocation.installmentSequence === row.installmentSequence
+        if (isEditing) {
+          return (
+            <div className="nx-treasury__bank-ref-edit">
+              <Input
+                value={bankReferenceInput}
+                onChange={(e) => setBankReferenceInput(e.target.value)}
+                onBlur={handleSaveBankReference}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveBankReference(); if (e.key === 'Escape') handleCancelEdit(); }}
+                autoFocus
+                style={{ width: '100%', minWidth: '180px' }}
+              />
+            </div>
+          )
+        }
+        const canEdit = unlocked && !row.reversed && row.sourceType === 'SUPPLIER_PAYMENT'
+        return (
+          <span
+            className={canEdit ? 'nx-treasury__bank-ref--editable' : ''}
+            onClick={() => canEdit && handleEditBankReference(entry, row)}
+            title={canEdit ? 'Clic para editar referencia' : undefined}
+          >
+            {row.bankTransactionReference ?? '—'}
+          </span>
+        )
+      },
     },
     {
       key: 'reversed',
@@ -248,6 +318,7 @@ export function ContractPaymentLedgerPage() {
       ),
     },
   ]
+}
 
   return (
     <div>
@@ -299,45 +370,45 @@ export function ContractPaymentLedgerPage() {
               />
             </div>
 
-            {query.data.entries.map((entry: ContractLedgerEntry) => (
-              <Card key={entry.scheduleId}>
-                <header className="nx-page__header">
-                  <div>
-                    <h2 className="nx-dashboard__subtitle">
-                      {entry.contractNumber}
-                      {entry.supplierLegalName ? ` · ${entry.supplierLegalName}` : ''}
-                    </h2>
-                    <p className="nx-field__hint">
-                      Valor {formatMoney(entry.contractValue, entry.currencyCode)} · Pagado{' '}
-                      {formatMoney(entry.paidAccumulated, entry.currencyCode)} · Saldo{' '}
-                      {formatMoney(entry.contractBalance, entry.currencyCode)}
-                      {Number(entry.overdueBalance) > 0
-                        ? ` · Vencido ${formatMoney(entry.overdueBalance, entry.currencyCode)}`
-                        : ''}
-                    </p>
-                  </div>
-                </header>
+{query.data.entries.map((entry: ContractLedgerEntry) => (
+                <Card key={entry.scheduleId}>
+                  <header className="nx-page__header">
+                    <div>
+                      <h2 className="nx-dashboard__subtitle">
+                        {entry.contractNumber}
+                        {entry.supplierLegalName ? ` · ${entry.supplierLegalName}` : ''}
+                      </h2>
+                      <p className="nx-field__hint">
+                        Valor {formatMoney(entry.contractValue, entry.currencyCode)} · Pagado{' '}
+                        {formatMoney(entry.paidAccumulated, entry.currencyCode)} · Saldo{' '}
+                        {formatMoney(entry.contractBalance, entry.currencyCode)}
+                        {Number(entry.overdueBalance) > 0
+                          ? ` · Vencido ${formatMoney(entry.overdueBalance, entry.currencyCode)}`
+                          : ''}
+                        </p>
+                      </div>
+                    </header>
 
-                <h3 className="nx-field__label">Cuotas</h3>
-                <Table
-                  columns={installmentColumns(entry)}
-                  rows={entry.installments}
-                  getRowKey={(row) => row.installmentId}
-                  emptyMessage="Sin cuotas."
-                />
+                    <h3 className="nx-field__label">Cuotas</h3>
+                    <Table
+                      columns={installmentColumns(entry)}
+                      rows={entry.installments}
+                      getRowKey={(row) => row.installmentId}
+                      emptyMessage="Sin cuotas."
+                    />
 
-                <h3 className="nx-field__label">Asignaciones de pago</h3>
-                <Table
-                  columns={allocationColumns}
-                  rows={entry.allocations}
-                  getRowKey={(row) =>
-                    `${row.sourceType}-${row.sourceId}-${row.installmentSequence}`
-                  }
-                  emptyMessage="Todavía no se ha aplicado ningún pago a este contrato."
-                />
-              </Card>
-            ))}
-          </>
+                    <h3 className="nx-field__label">Asignaciones de pago</h3>
+                    <Table
+                      columns={allocationColumns(entry)}
+                      rows={entry.allocations}
+                      getRowKey={(row) =>
+                        `${row.sourceType}-${row.sourceId}-${row.installmentSequence}`
+                      }
+                      emptyMessage="Todavía no se ha aplicado ningún pago a este contrato."
+                    />
+                  </Card>
+              ))}
+            </>
         )
       ) : null}
 

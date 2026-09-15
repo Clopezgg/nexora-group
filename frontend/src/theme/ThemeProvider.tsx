@@ -16,6 +16,7 @@ import {
   type UiScale,
 } from './themes'
 import './themes.css'
+import '../sap-gui/tokens/sap-gui-tokens.css'
 
 const UI_SCALE_KEY = 'nx.ui-scale'
 

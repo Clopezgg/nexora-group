@@ -1,0 +1,4 @@
+Raster master policy
+Requested ceiling: 48K where technically appropriate.
+Delivered maximum raster long side: 16,000 px.
+Reason: the identity is supplied as true vector SVG/PDF/EPS, which is scale-independent. 32K/48K flat rasters add storage and memory risk without increasing the quality of the vector master. 16K is retained as the ultra-premium raster production ceiling for this package; larger physical output should use the vector master.

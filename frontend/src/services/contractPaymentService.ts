@@ -13,6 +13,8 @@ export interface ContractInstallment {
   scheduledAmount: string
   retentionAmount: string
   netDue: string
+  // Running contract balance BEFORE this row's payments (shown as "Neto" in UI).
+  runningContractBalanceBefore: string
   paid: string
   remaining: string
   status: string

@@ -1,0 +1,113 @@
+/**
+ * NEXORA SAP GUI Classic — Screen Frame Styles
+ * 
+ * Encabezado de pantalla transaccional estilo SAP GUI Classic.
+ */
+
+.nx-sap-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: var(--sap-font-family);
+}
+
+.nx-sap-screen__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sap-space, 6px);
+  padding: 4px 9px;
+  min-height: var(--sap-panel-header-height, 26px);
+  background: linear-gradient(var(--sap-color-surface-raised), var(--sap-color-surface-sunken));
+  border-bottom: 1px solid var(--sap-color-border-strong, #668db5);
+}
+
+.nx-sap-screen__title {
+  font-family: var(--sap-font-family);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sap-color-text, #182a53);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nx-sap-screen__context {
+  margin-left: auto;
+  font-family: var(--sap-font-family);
+  font-size: 11px;
+  color: var(--sap-color-text-muted, #33475f);
+}
+
+.nx-sap-screen__workarea {
+  flex: 1;
+  padding: 9px;
+  overflow: auto;
+  background: var(--sap-color-workarea-bg, #eaf1f6);
+}
+
+/* Tradeshow variant */
+:root[data-nx-sap-variant='tradeshow'] .nx-sap-screen__header {
+  color: #fff;
+  background: linear-gradient(#365c86, #21386b);
+}
+
+:root[data-nx-sap-variant='tradeshow'] .nx-sap-screen__header span {
+  color: inherit;
+}
+
+/* Classic Modern */
+:root[data-nx-menubar='classic-modern'] .nx-sap-screen__header {
+  background: var(--sap-color-surface-raised);
+  border-bottom: 1px solid var(--sap-color-border);
+  min-height: 34px;
+}
+
+:root[data-nx-menubar='classic-modern'] .nx-sap-tree .nx-sidebar__group-label {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--sap-color-border);
+  min-height: 28px;
+}
+
+/* Tree styles within screen */
+:root[data-nx-family='sap-gui'] .nx-sap-tree .nx-sidebar__list {
+  border-left: 1px dotted var(--sap-color-border-strong, #668db5);
+  margin-left: 10px;
+  padding-left: 5px;
+}
+
+:root[data-nx-family='sap-gui'] .nx-sap-tree .nx-sidebar__group-label {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--sap-color-border);
+  min-height: 28px;
+}
+
+:root[data-nx-family='sap-gui'] .nx-sap-tree .nx-sidebar__link {
+  color: var(--sap-color-sidebar-text, #182a53);
+}
+
+:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sidebar__link {
+  color: var(--sap-color-sidebar-text, #dfeaf3);
+}
+
+:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sidebar__link:hover {
+  color: var(--sap-color-sidebar-active-text, #ffffff);
+}
+
+/* Responsive */
+@media (max-width: 760px) {
+  .nx-sap-screen__workarea {
+    padding: 7px;
+  }
+  
+  .nx-sap-screen__header {
+    min-height: 30px;
+    padding: 4px 8px;
+  }
+  
+  .nx-sap-screen__title {
+    font-size: 12px;
+  }
+}

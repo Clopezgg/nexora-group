@@ -1,0 +1,277 @@
+/**
+ * NEXORA SAP GUI Classic — Input Styles
+ * 
+ * Estilos para campos de entrada compactos estilo SAP GUI Classic.
+ * Altura 28px, border 1px, sin radius, fondo blanco.
+ */
+
+.nx-sap-input-wrapper {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+  max-width: 100%;
+}
+
+.nx-sap-input__label {
+  font-family: var(--sap-font-family);
+  font-size: var(--sap-font-size-label, 12px);
+  font-weight: 600;
+  color: var(--sap-color-text-muted, #33475f);
+  white-space: nowrap;
+}
+
+/* Campo + Value Help */
+.nx-sap-input__field-wrapper {
+  display: inline-flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.nx-sap-input {
+  /* Layout */
+  flex: 1;
+  height: var(--sap-field-height, 28px);
+  min-height: var(--sap-field-height, 28px);
+  padding: 0 8px;
+  min-width: 0;
+  width: 100%;
+  
+  /* Tipografía */
+  font-family: var(--sap-font-family);
+  font-size: var(--sap-font-size-base, 13px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  
+  /* Apariencia */
+  background-color: var(--sap-color-input-bg, #ffffff);
+  border: 1px solid var(--sap-color-input-border, #a8b8c7);
+  border-radius: 0;
+  color: var(--sap-color-input-text, #182a53);
+  outline: none;
+  transition: border-color 60ms linear, box-shadow 60ms linear;
+}
+
+.nx-sap-input::placeholder {
+  color: var(--sap-color-input-placeholder, #7c8da6);
+}
+
+.nx-sap-input:focus {
+  border-color: var(--sap-color-input-border-focus, #265b8f);
+  box-shadow: 0 0 0 1px var(--sap-color-input-border-focus, #265b8f);
+  outline: none;
+}
+
+.nx-sap-input:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: 2px;
+}
+
+/* Read-only */
+.nx-sap-input-wrapper.nx-readonly .nx-sap-input,
+.nx-sap-input[readonly] {
+  background-color: var(--sap-color-input-readonly-bg, #f4f7fa);
+  border-color: var(--sap-color-input-readonly-border, #c3ccd7);
+  color: var(--sap-color-input-text, #182a53);
+  cursor: default;
+}
+
+.nx-sap-input-wrapper.nx-readonly .nx-sap-input:focus {
+  border-color: var(--sap-color-input-readonly-border, #c3ccd7);
+  box-shadow: none;
+}
+
+/* Deshabilitado */
+.nx-sap-input-wrapper.nx-disabled .nx-sap-input,
+.nx-sap-input:disabled {
+  background-color: var(--sap-color-input-disabled-bg, #f0f2f5);
+  border-color: var(--sap-color-input-disabled-border, #d1d9e1);
+  color: var(--sap-color-text-subtle, #59697a);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+/* Value Help button */
+.nx-sap-input__field-wrapper {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.nx-sap-input__valuehelp,
+.nx-sap-select__valuehelp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sap-field-height, 28px);
+  height: var(--sap-field-height, 28px);
+  padding: 0;
+  background: var(--sap-color-surface-sunken, #d6dbe5);
+  border: none;
+  border-left: 1px solid var(--sap-color-input-border, #a8b8c7);
+  border-radius: 0;
+  color: var(--sap-color-text-muted, #33475f);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 60ms linear, color 60ms linear;
+  flex-shrink: 0;
+}
+
+.nx-sap-input__valuehelp:hover:not(:disabled),
+.nx-sap-select__valuehelp:hover:not(:disabled) {
+  background: var(--sap-color-border, #a8b8c7);
+  color: var(--sap-color-text, #182a53);
+}
+
+.nx-sap-input__valuehelp:active:not(:disabled),
+.nx-sap-select__valuehelp:active:not(:disabled) {
+  background: var(--sap-color-border, #a8b8c7);
+}
+
+.nx-sap-input__valuehelp:disabled,
+.nx-sap-select__valuehelp:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   SELECT / COMBOBOX
+   ============================================================ */
+
+.nx-sap-select-wrapper {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+  max-width: 100%;
+}
+
+.nx-sap-select__label {
+  font-family: var(--sap-font-family);
+  font-size: var(--sap-font-size-label, 12px);
+  font-weight: 600;
+  color: var(--sap-color-text-muted, #33475f);
+  white-space: nowrap;
+}
+
+.nx-sap-select__field-wrapper {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.nx-sap-select {
+  flex: 1;
+  height: var(--sap-field-height, 28px);
+  min-height: var(--sap-field-height, 28px);
+  padding: 0 28px 0 8px;
+  min-width: 0;
+  width: 100%;
+  
+  font-family: var(--sap-font-family);
+  font-size: var(--sap-font-size-base, 13px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  
+  appearance: none;
+  background-color: var(--sap-color-input-bg, #ffffff);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%2333475f' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+  
+  background-color: var(--sap-color-input-bg, #ffffff);
+  border: 1px solid var(--sap-color-input-border, #a8b8c7);
+  border-radius: 0;
+  color: var(--sap-color-input-text, #182a53);
+  outline: none;
+  transition: border-color 60ms linear, box-shadow 60ms linear;
+  padding-right: 32px;
+}
+
+.nx-sap-select:focus {
+  border-color: var(--sap-color-input-border-focus, #265b8f);
+  box-shadow: 0 0 0 1px var(--sap-color-input-border-focus, #265b8f);
+  outline: none;
+}
+
+.nx-sap-select:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: 2px;
+}
+
+.nx-sap-select:disabled {
+  background-color: var(--sap-color-input-disabled-bg, #f0f2f5);
+  border-color: var(--sap-color-input-disabled-border, #d1d9e1);
+  color: var(--sap-color-text-subtle, #59697a);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.nx-sap-select__valuehelp {
+  width: var(--sap-field-height, 28px);
+  height: var(--sap-field-height, 28px);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   DISPLAY FIELD — Campo de solo lectura (display only)
+   ============================================================ */
+
+.nx-sap-display-field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.nx-sap-display-field__label {
+  font-family: var(--sap-font-family);
+  font-size: var(--sap-font-size-label, 12px);
+  font-weight: 600;
+  color: var(--sap-color-text-muted, #33475f);
+  white-space: nowrap;
+}
+
+.nx-sap-display-field__value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  height: var(--sap-field-height, 28px);
+  padding: 0 8px;
+  background-color: var(--sap-color-input-readonly-bg, #f4f7fa);
+  border: 1px solid var(--sap-color-input-readonly-border, #c3ccd7);
+  border-radius: 0;
+  color: var(--sap-color-input-text, #182a53);
+  font-family: var(--sap-font-family);
+  font-size: var(--sap-font-size-base, 13px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.nx-sap-display-field__unit {
+  color: var(--sap-color-text-muted, #33475f);
+  font-size: var(--sap-font-size-label, 12px);
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 760px) {
+  .nx-sap-input,
+  .nx-sap-select,
+  .nx-sap-display-field__value,
+  .nx-sap-input__valuehelp,
+  .nx-sap-select__valuehelp {
+    height: 40px;
+    min-height: 40px;
+    font-size: 14px;
+  }
+  
+  .nx-sap-select {
+    padding-right: 40px;
+    background-size: 14px;
+  }
+}

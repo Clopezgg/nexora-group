@@ -52,7 +52,7 @@ async function ensureCompany(page: Page): Promise<{ id: string; functionalCurren
 async function expectOperationalRoute(page: Page, path: string) {
   const response = await page.goto(path)
   expect(response?.status(), `${path}: HTTP`).toBeLessThan(500)
-  await expect(page.locator('.nx-app-shell')).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator('.nx-app-shell, .nx-sap-workstation').first()).toBeVisible({ timeout: 15_000 })
   await expect(page.locator('main')).toBeVisible()
   await page.waitForLoadState('networkidle')
   await expect(page.locator('body')).not.toContainText('Application error')

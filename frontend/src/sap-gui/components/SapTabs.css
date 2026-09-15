@@ -1,0 +1,214 @@
+/**
+ * NEXORA SAP GUI Classic — Tabs Styles
+ * 
+ * Pestañas estilo carpeta SAP GUI Classic (JPL Signature / Tradeshow).
+ * - Hombro diagonal (clip-path) estilo JPL
+ * - Sin radius en pestañas
+ * - Solo un tab stop
+ * - Navegación por teclado completa
+ */
+
+.nx-sap-tabs {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  font-family: var(--sap-font-family);
+}
+
+.nx-sap-tabs__list {
+  display: flex;
+  align-items: flex-end;
+  padding-top: 4px;
+  border-bottom: 1px solid var(--sap-color-border, #a8b8c7);
+  gap: 0;
+}
+
+.nx-sap-tabs__tab {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--sap-tab-height, 28px);
+  padding: 0 16px;
+  padding-left: 24px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  
+  font-family: var(--sap-font-family);
+  font-size: var(--sap-font-size-base, 13px);
+  font-weight: 400;
+  color: var(--sap-color-tab-text, #172e50);
+  
+  background: var(--sap-color-tab-bg, linear-gradient(#dee9f3, #c2d8eb));
+  border: var(--sap-border, 1px) solid var(--sap-color-tab-border, #668db5);
+  border-bottom: none;
+  border-radius: 0;
+  clip-path: polygon(18px 0, 100% 0, 100% 100%, 0 100%, 0 18px);
+  margin-top: 3px;
+  z-index: 1;
+  cursor: pointer;
+  transition: background 60ms linear, border-color 60ms linear, color 60ms linear;
+}
+
+.nx-sap-tabs__tab::before {
+  content: '';
+  position: absolute;
+  width: 26px;
+  height: 1px;
+  top: 8px;
+  left: -5px;
+  transform: rotate(-45deg);
+  background: var(--sap-color-border-strong, #668db5);
+  pointer-events: none;
+}
+
+.nx-sap-tabs__tab:hover:not(.nx-disabled):not(.nx-sap-tabs__tab--active) {
+  background: linear-gradient(#e8f0f8, #cad5e6);
+}
+
+.nx-sap-tabs__tab:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: -3px;
+}
+
+.nx-sap-tabs__tab.nx-disabled {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
+
+.nx-sap-tabs__tab--active {
+  background: var(--sap-color-tab-active-bg, linear-gradient(#8cb1da, #bdd4e9));
+  color: var(--sap-color-tab-active-text, #172e50);
+  border-bottom-color: var(--sap-color-tab-active-border, #bdd4e9);
+  margin-top: 0;
+  min-height: calc(var(--sap-tab-height, 28px) + 3px);
+  z-index: 2;
+}
+
+.nx-sap-tabs__tab--active::before {
+  background: var(--sap-color-tab-active-border, #bdd4e9);
+}
+
+/* Panel */
+.nx-sap-tabs__panel {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  padding: 12px;
+  border-top: 2px solid var(--sap-color-tab-active-border, #bdd4e9);
+  background: var(--sap-color-workarea-bg, #eaf1f6);
+  outline: none;
+}
+
+.nx-sap-tabs__panel:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: -2px;
+}
+
+/* ============================================================
+   VARIANTES
+   ============================================================ */
+
+/* Raised Folder — Tradeshow style */
+.nx-sap-tabs--raised-folder .nx-sap-tabs__tab {
+  border-radius: 0;
+  margin-top: 3px;
+  background: linear-gradient(#edf4fa, #a8b8c7);
+  box-shadow: inset 1px 1px #fff;
+  border-color: #6289ae;
+  color: #172e50;
+}
+
+.nx-sap-tabs--raised-folder .nx-sap-tabs__tab::before {
+  background: var(--sap-color-border-strong, #6289ae);
+}
+
+.nx-sap-tabs--raised-folder .nx-sap-tabs__tab:hover:not(.nx-disabled):not(.nx-sap-tabs__tab--active) {
+  background: linear-gradient(#f5f9fc, #b8c8d7);
+}
+
+.nx-sap-tabs--raised-folder .nx-sap-tabs__tab--active {
+  min-height: calc(var(--sap-tab-height, 28px) + 4px);
+  margin-top: 0;
+  border-top: 3px solid #21386b;
+  border-bottom-color: #265b8f;
+  background: #265b8f;
+  color: #fff;
+  box-shadow: inset 0 1px #87abd6;
+}
+
+.nx-sap-tabs--raised-folder .nx-sap-tabs__tab--active::before {
+  background: transparent;
+}
+
+.nx-sap-tabs--raised-folder .nx-sap-tabs__panel {
+  border-top: 2px solid #265b8f;
+}
+
+/* Modern Folder — Estilo moderno */
+.nx-sap-tabs--modern-folder .nx-sap-tabs__tab {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  clip-path: none;
+  margin-top: 2px;
+  background: var(--sap-color-surface-sunken, #d6dbe5);
+  border-color: var(--sap-color-border, #a8b8c7);
+}
+
+.nx-sap-tabs--modern-folder .nx-sap-tabs__tab::before {
+  display: none;
+}
+
+.nx-sap-tabs--modern-folder .nx-sap-tabs__tab:hover:not(.nx-disabled):not(.nx-sap-tabs__tab--active) {
+  background: var(--sap-color-surface, #ffffff);
+}
+
+.nx-sap-tabs--modern-folder .nx-sap-tabs__tab--active {
+  border-top: 2px solid var(--sap-color-accent, #0a6ed1);
+  border-bottom-color: var(--sap-color-surface, #ffffff);
+  background: var(--sap-color-surface, #ffffff);
+  box-shadow: inset 0 -2px var(--sap-color-accent);
+}
+
+.nx-sap-tabs--modern-folder .nx-sap-tabs__panel {
+  border-top: 2px solid var(--sap-color-accent);
+}
+
+/* Deshabilitado */
+.nx-sap-tabs__tab.nx-disabled {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Focus visible */
+.nx-sap-tabs__tab:focus-visible {
+  outline: 2px solid var(--sap-focus-ring, #466dbd);
+  outline-offset: -3px;
+}
+
+/* Panel responsive */
+@media (max-width: 760px) {
+  .nx-sap-tabs__list {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .nx-sap-tabs__tab {
+    flex-shrink: 0;
+    min-width: 120px;
+  }
+}
+
+/* Animación sutil */
+.nx-sap-tabs__panel {
+  animation: nx-sap-tabs-panel-fade 100ms linear;
+}
+
+@keyframes nx-sap-tabs-panel-fade {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}

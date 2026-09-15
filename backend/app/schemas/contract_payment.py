@@ -45,6 +45,8 @@ class InstallmentResponse(CamelModel):
     scheduled_amount: Decimal
     retention_amount: Decimal
     net_due: Decimal
+    # Running contract balance BEFORE this row's payments (shown as "Neto" in UI).
+    running_contract_balance_before: Decimal
     paid: Decimal
     remaining: Decimal
     status: str

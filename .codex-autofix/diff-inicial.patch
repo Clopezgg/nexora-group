@@ -1,0 +1,89 @@
+diff --git a/frontend/e2e/cross-browser-critical.spec.ts b/frontend/e2e/cross-browser-critical.spec.ts
+index d7e497f6..bad67070 100644
+--- a/frontend/e2e/cross-browser-critical.spec.ts
++++ b/frontend/e2e/cross-browser-critical.spec.ts
+@@ -52,7 +52,7 @@ async function ensureCompany(page: Page): Promise<{ id: string; functionalCurren
+ async function expectOperationalRoute(page: Page, path: string) {
+   const response = await page.goto(path)
+   expect(response?.status(), `${path}: HTTP`).toBeLessThan(500)
+-  await expect(page.locator('.nx-app-shell')).toBeVisible({ timeout: 15_000 })
++  await expect(page.locator('.nx-app-shell, .nx-sap-workstation').first()).toBeVisible({ timeout: 15_000 })
+   await expect(page.locator('main')).toBeVisible()
+   await page.waitForLoadState('networkidle')
+   await expect(page.locator('body')).not.toContainText('Application error')
+diff --git a/frontend/src/sap-gui/components/SapTree.css b/frontend/src/sap-gui/components/SapTree.css
+index 0c7e93f9..d10f14ba 100644
+--- a/frontend/src/sap-gui/components/SapTree.css
++++ b/frontend/src/sap-gui/components/SapTree.css
+@@ -177,12 +177,12 @@
+ 
+ :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label:hover {
+   background: var(--sap-color-sidebar-hover-bg, rgba(255,255,255,0.12));
+-  color: #ffffff !important;
++  color: #0b1f3a !important;
+ }
+ 
+ :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label[aria-expanded="true"] {
+   background: var(--sap-color-sidebar-hover-bg, rgba(255,255,255,0.12));
+-  color: #ffffff !important;
++  color: #0b1f3a !important;
+ }
+ 
+ :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__link {
+@@ -267,4 +267,41 @@
+ 
+ :root[data-nx-sap-variant='horizon-dark'] .nx-sap-tree__list::-webkit-scrollbar-thumb {
+   background: var(--sap-color-border, #2b3a4d);
+-}
+\ No newline at end of file
++}
++
++/* NEXORA_TRADESHOW_A11Y_BEGIN */
++
++/*
++ * WCAG AA contract for Tradeshow navigation.
++ *
++ * Normal groups:
++ *   foreground #FFFFFF
++ *   effective background #172E50
++ *
++ * Interaction/open states:
++ *   foreground #0B1F3A
++ *   background #D6E3ED
++ */
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
++.nx-sap-tree {
++  background-color: #172e50;
++}
++
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
++.nx-sap-tree .nx-sap-tree__group-label {
++  color: #ffffff !important;
++}
++
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
++.nx-sap-tree .nx-sap-tree__group-label:hover,
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
++.nx-sap-tree .nx-sap-tree__group-label[aria-expanded="true"],
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
++.nx-sap-tree .nx-sap-tree__group-label[aria-selected="true"],
++:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
++.nx-sap-tree .nx-sap-tree__group-label:focus-visible {
++  background-color: #d6e3ed !important;
++  color: #0b1f3a !important;
++}
++
++/* NEXORA_TRADESHOW_A11Y_END */
+diff --git a/frontend/src/sap-gui/components/SapWorkstation.tsx b/frontend/src/sap-gui/components/SapWorkstation.tsx
+index b5c383be..e117768c 100644
+--- a/frontend/src/sap-gui/components/SapWorkstation.tsx
++++ b/frontend/src/sap-gui/components/SapWorkstation.tsx
+@@ -119,7 +119,7 @@ export const SapWorkstation = forwardRef<HTMLDivElement, SapWorkstationProps>(
+               <span className="nx-sap-sidebar__brand-mark" aria-hidden="true">
+                 <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true">
+                   <rect x="4" y="4" width="24" height="24" rx="2" fill="currentColor"/>
+-                  <text x="16" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="white" font-family="Arial">NX</text>
++                  <text x="16" y="22" textAnchor="middle" fontSize="14" fontWeight="bold" fill="white" fontFamily="Arial">NX</text>
+                 </svg>
+               </span>
+               <span className="nx-sap-sidebar__brand-copy">

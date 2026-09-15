@@ -65,9 +65,11 @@ class InstallmentSummary:
     scheduled_amount: Decimal
     retention_amount: Decimal
     net_due: Decimal
-    paid: Decimal
-    remaining: Decimal
-    status: str
+    # Running contract balance BEFORE this row's payments (shown as "Neto" in UI).
+    running_contract_balance_before: Decimal = _ZERO
+    paid: Decimal = _ZERO
+    remaining: Decimal = _ZERO
+    status: str = ""
     # Numeración visible SOLO entre cuotas REGULAR (§6): "Cuota 1 de 7".
     regular_number: int | None = None
     regular_count: int | None = None
@@ -726,12 +728,31 @@ def installment_summaries(
     out: list[InstallmentSummary] = []
     schedule = db.get(ContractPaymentSchedule, schedule_id)
     contract = db.get(SupplierContract, schedule.supplier_contract_id) if schedule else None
-    running_paid = _ZERO
+
+    # Running contract balance: starts at total contract value, decreases only when
+    # payments are actually applied to each installment.
+    running_contract_balance = _q(contract.value if contract else _ZERO)
+
     for r in rows:
         paid = paid_map.get(r.id, _ZERO)
-        net = _q(r.net_due)
+        installment_net_due = _q(r.net_due)
         kind = getattr(r, "installment_kind", "REGULAR")
-        running_paid += paid
+
+        # "Neto" for display = running contract balance BEFORE this row's payments
+        running_balance_before = running_contract_balance
+
+        # "Pagado" = payments applied to THIS installment only
+        paid_for_this = paid
+
+        # "Pendiente cuota" = installment's own remaining (its scheduled net_due - paid for this installment)
+        installment_remaining = _q(max(installment_net_due - paid_for_this, _ZERO))
+
+        # "Saldo contractual" = running balance AFTER this row's payments
+        contract_balance_after = _q(max(running_contract_balance - paid_for_this, _ZERO))
+
+        # Update running balance for next row
+        running_contract_balance = contract_balance_after
+
         out.append(
             InstallmentSummary(
                 installment_id=r.id,
@@ -748,26 +769,27 @@ def installment_summaries(
                 due_date=r.due_date,
                 scheduled_amount=_q(r.scheduled_amount),
                 retention_amount=_q(r.retention_amount),
-                net_due=net,
-                paid=paid,
-                remaining=_q(max(net - paid, _ZERO)),
-                status=_status_for(r, paid, as_of=as_of),
+                net_due=installment_net_due,
+                running_contract_balance_before=running_balance_before,
+                paid=paid_for_this,
+                remaining=installment_remaining,
+                status=_status_for(r, paid_for_this, as_of=as_of),
                 regular_number=regular_number_by_id.get(r.id),
                 regular_count=regular_count if kind == "REGULAR" else None,
                 payable_now=(
-                    paid < net and _status_for(r, paid, as_of=as_of) not in {"CANCELLED", "UPCOMING"}
+                    paid_for_this < installment_net_due and _status_for(r, paid_for_this, as_of=as_of) not in {"CANCELLED", "UPCOMING"}
                     and is_installment_payable(r, business_date=as_of)
                 ),
                 payment_blocked_reason=(
                     "La cuota ya está pagada."
-                    if paid >= net
+                    if paid_for_this >= installment_net_due
                     else "La cuota está cancelada."
                     if r.status == "CANCELLED"
                     else "El período contractual todavía es futuro."
                     if not is_installment_payable(r, business_date=as_of)
                     else None
                 ),
-                contract_balance_after=_q(max((contract.value if contract else _ZERO) - running_paid, _ZERO)),
+                contract_balance_after=contract_balance_after,
             )
         )
     return out

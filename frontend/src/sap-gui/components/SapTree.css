@@ -168,25 +168,25 @@
 /* Tradeshow variant */
 :root[data-nx-sap-variant='tradeshow'] .nx-sap-tree {
   background: var(--sap-color-sidebar-bg, #172e50);
-  color: var(--sap-color-sidebar-text, #ffffff);
+  color: #ffffff;
 }
 
 :root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__group-label {
-  color: var(--sap-color-sidebar-text, #ffffff);
+  color: #ffffff;
 }
 
 :root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__group-label:hover {
   background: var(--sap-color-sidebar-hover-bg, rgba(255,255,255,0.12));
-  color: var(--sap-color-sidebar-text, #ffffff);
+  color: #ffffff;
 }
 
 :root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__group-label[aria-expanded="true"] {
   background: var(--sap-color-sidebar-hover-bg, rgba(255,255,255,0.12));
-  color: var(--sap-color-sidebar-text, #ffffff);
+  color: #ffffff;
 }
 
 :root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__link {
-  color: var(--sap-color-sidebar-text, #ffffff);
+  color: #ffffff;
 }
 
 :root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__link:hover {

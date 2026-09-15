@@ -119,7 +119,7 @@ export const SapWorkstation = forwardRef<HTMLDivElement, SapWorkstationProps>(
               <span className="nx-sap-sidebar__brand-mark" aria-hidden="true">
                 <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true">
                   <rect x="4" y="4" width="24" height="24" rx="2" fill="currentColor"/>
-                  <text x="16" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="white" font-family="Arial">NX</text>
+                  <text x="16" y="22" textAnchor="middle" fontSize="14" fontWeight="bold" fill="white" fontFamily="Arial">NX</text>
                 </svg>
               </span>
               <span className="nx-sap-sidebar__brand-copy">

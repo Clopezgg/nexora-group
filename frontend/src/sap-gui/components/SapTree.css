@@ -12,8 +12,15 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
   min-width: 0;
-  overflow: hidden;
+  /*
+   * The tree, rather than each nested role="group", owns scrolling. A group
+   * is structural ARIA markup and must not become an independent scroll
+   * region without its own keyboard entry point.
+   */
+  overflow-x: hidden;
+  overflow-y: auto;
   font-family: var(--sap-font-family);
   background: var(--sap-color-sidebar-bg, #dfeaf3);
   color: var(--sap-color-sidebar-text, #182a53);
@@ -93,8 +100,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: min(65dvh, 520px);
-  overflow-y: auto;
 }
 
 .nx-sap-tree__link {
@@ -160,11 +165,6 @@
   background: var(--sap-color-sidebar-bg, #dfeaf3);
 }
 
-.nx-sap-tree--drawer .nx-sap-tree__list {
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
 /* Tradeshow variant */
 :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree {
   background: var(--sap-color-sidebar-bg, #172e50);
@@ -177,12 +177,12 @@
 
 :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label:hover {
   background: var(--sap-color-sidebar-hover-bg, rgba(255,255,255,0.12));
-  color: #ffffff !important;
+  color: #0b1f3a !important;
 }
 
 :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label[aria-expanded="true"] {
   background: var(--sap-color-sidebar-hover-bg, rgba(255,255,255,0.12));
-  color: #ffffff !important;
+  color: #0b1f3a !important;
 }
 
 :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__link {
@@ -234,37 +234,67 @@
   color: var(--sap-color-sidebar-active-text, #ffffff);
 }
 
-/* Responsive */
-@media (max-width: 760px) {
-  .nx-sap-tree__list {
-    max-height: 50vh;
-  }
-}
-
 /* Scrollbar */
-.nx-sap-tree__list::-webkit-scrollbar {
+.nx-sap-tree::-webkit-scrollbar {
   width: 8px;
 }
 
-.nx-sap-tree__list::-webkit-scrollbar-track {
+.nx-sap-tree::-webkit-scrollbar-track {
   background: transparent;
 }
 
-:root[data-nx-family='sap-gui'] .nx-sap-tree__list::-webkit-scrollbar-thumb {
+:root[data-nx-family='sap-gui'] .nx-sap-tree::-webkit-scrollbar-thumb {
   background: var(--sap-color-border, #a8b8c7);
   border: 2px solid transparent;
   border-radius: 4px;
   background-clip: padding-box;
 }
 
-:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__list::-webkit-scrollbar-thumb {
+:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree::-webkit-scrollbar-thumb {
   background: var(--sap-color-border, #8e9eab);
 }
 
-:root[data-nx-sap-variant='horizon'] .nx-sap-tree__list::-webkit-scrollbar-thumb {
+:root[data-nx-sap-variant='horizon'] .nx-sap-tree::-webkit-scrollbar-thumb {
   background: var(--sap-color-border, #c4d0de);
 }
 
-:root[data-nx-sap-variant='horizon-dark'] .nx-sap-tree__list::-webkit-scrollbar-thumb {
+:root[data-nx-sap-variant='horizon-dark'] .nx-sap-tree::-webkit-scrollbar-thumb {
   background: var(--sap-color-border, #2b3a4d);
 }
+
+/* NEXORA_TRADESHOW_A11Y_BEGIN */
+
+/*
+ * WCAG AA contract for Tradeshow navigation.
+ *
+ * Normal groups:
+ *   foreground #FFFFFF
+ *   effective background #172E50
+ *
+ * Interaction/open states:
+ *   foreground #0B1F3A
+ *   background #D6E3ED
+ */
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
+.nx-sap-tree {
+  background-color: #172e50;
+}
+
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
+.nx-sap-tree .nx-sap-tree__group-label {
+  color: #ffffff !important;
+}
+
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
+.nx-sap-tree .nx-sap-tree__group-label:hover,
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
+.nx-sap-tree .nx-sap-tree__group-label[aria-expanded="true"],
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
+.nx-sap-tree .nx-sap-tree__group-label[aria-selected="true"],
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
+.nx-sap-tree .nx-sap-tree__group-label:focus-visible {
+  background-color: #d6e3ed !important;
+  color: #0b1f3a !important;
+}
+
+/* NEXORA_TRADESHOW_A11Y_END */

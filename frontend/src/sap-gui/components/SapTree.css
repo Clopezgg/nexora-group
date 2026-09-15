@@ -166,37 +166,37 @@
 }
 
 /* Tradeshow variant */
-:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree {
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree {
   background: var(--sap-color-sidebar-bg, #172e50);
   color: #ffffff;
 }
 
-:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__group-label {
-  color: #ffffff;
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label {
+  color: #ffffff !important;
 }
 
-:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__group-label:hover {
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label:hover {
   background: var(--sap-color-sidebar-hover-bg, rgba(255,255,255,0.12));
-  color: #ffffff;
+  color: #ffffff !important;
 }
 
-:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__group-label[aria-expanded="true"] {
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label[aria-expanded="true"] {
   background: var(--sap-color-sidebar-hover-bg, rgba(255,255,255,0.12));
-  color: #ffffff;
+  color: #ffffff !important;
 }
 
-:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__link {
-  color: #ffffff;
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__link {
+  color: #ffffff !important;
 }
 
-:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__link:hover {
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__link:hover {
   background: rgba(255,255,255,0.12);
-  color: var(--sap-color-sidebar-active-text, #ffffff);
+  color: var(--sap-color-sidebar-active-text, #ffffff) !important;
 }
 
-:root[data-nx-sap-variant='tradeshow'] .nx-sap-tree__link--active {
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__link--active {
   background: var(--sap-color-sidebar-active-bg, #34548a);
-  color: var(--sap-color-sidebar-active-text, #ffffff);
+  color: var(--sap-color-sidebar-active-text, #ffffff) !important;
 }
 
 /* Horizon variant */

@@ -23,6 +23,7 @@ from app.services import (
 )
 from app.services.permission_service import (
     assert_company_access,
+    assert_project_access,
     require_permission,
     user_has_permission,
 )
@@ -132,7 +133,7 @@ def transition_project_status(
     project_id: uuid.UUID,
     payload: ProjectStatusTransitionRequest,
     db: Session = Depends(get_db),
-    user=Depends(require_permission("project", "create")),
+    user=Depends(require_permission("project", "update")),
     correlation_id: str = Depends(get_correlation_id),
 ) -> ProjectResponse:
     # Authorization can use an unlocked read. The mutation itself must claim
@@ -140,7 +141,7 @@ def transition_project_status(
     # cannot both validate the same prior state and last-write-win.
     project = _get_project_or_404(db, project_id)
     assert_company_access(
-        db, user_id=user.id, resource="project", action="create", company_id=project.company_id
+        db, user_id=user.id, resource="project", action="update", company_id=project.company_id
     )
     project = project_repository.get_by_id_for_update(db, project_id)
     if project is None:
@@ -148,6 +149,16 @@ def transition_project_status(
     has_lifecycle = user_has_permission(
         db, user_id=user.id, resource="project.lifecycle", action="manage"
     )
+    # The normal transition is authorized by project:update. Sensitive lifecycle
+    # authority has its own resource and must honor its company/project scopes too.
+    if has_lifecycle and project_lifecycle_service.is_sensitive(project.status, payload.status):
+        assert_project_access(
+            db,
+            user_id=user.id,
+            resource="project.lifecycle",
+            action="manage",
+            project_id=project.id,
+        )
     if payload.status in ("COMPLETED", "CLOSED"):
         blockers = check_close_blockers(
             db, project_id=project.id, target_status=payload.status

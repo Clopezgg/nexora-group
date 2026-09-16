@@ -1,18 +1,29 @@
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import select
 
 from app.core.business_time import business_today
 from app.models.company import Company
-from app.models.permission import UserCompanyAccess, UserProjectAccess
+from app.models.permission import (
+    SCOPE_OWN,
+    Permission,
+    RolePermission,
+    UserCompanyAccess,
+    UserProjectAccess,
+)
 from app.models.project import Project
+from app.models.role import Role
 from app.schemas.dashboard import DashboardSummaryResponse
 from tests.conftest import BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD
 from tests.helpers import (
     create_account,
     create_company,
+    create_customer,
+    create_supplier,
     create_treasury_account,
     create_user_with_role,
     login_as,
@@ -24,6 +35,101 @@ def _login(client):
         "/api/auth/login",
         json={"email": BOOTSTRAP_ADMIN_EMAIL, "password": BOOTSTRAP_ADMIN_PASSWORD},
     )
+
+
+def _create_dashboard_role(db_session, *, name: str, permissions: tuple[tuple[str, str], ...]) -> Role:
+    role = Role(name=name)
+    db_session.add(role)
+    db_session.flush()
+    for resource, action in {("core.company", "read"), *permissions}:
+        permission = db_session.scalar(
+            select(Permission).where(Permission.resource == resource, Permission.action == action)
+        )
+        assert permission is not None
+        db_session.add(
+            RolePermission(
+                role_id=role.id,
+                permission_id=permission.id,
+                company_scope=SCOPE_OWN,
+            )
+        )
+    db_session.commit()
+    return role
+
+
+def _create_dashboard_user(db_session, *, role: Role, email: str, company_id: str):
+    user = create_user_with_role(db_session, email=email, role_name=role.name)
+    db_session.add(UserCompanyAccess(user_id=user.id, company_id=company_id))
+    db_session.commit()
+    return user
+
+
+def _financial_dashboard_fixture(client) -> dict:
+    company = create_company(client, name="Dashboard permissions", currency="HNL")
+    bank_gl = create_account(
+        client, company_id=company["id"], code="1100", name="Banco", account_type="ASSET"
+    )
+    equity = create_account(
+        client, company_id=company["id"], code="3100", name="Capital", account_type="EQUITY"
+    )
+    expense = create_account(
+        client, company_id=company["id"], code="5100", name="Gasto", account_type="EXPENSE"
+    )
+    payable = create_account(
+        client, company_id=company["id"], code="2100", name="Pasivo", account_type="LIABILITY"
+    )
+    revenue = create_account(
+        client, company_id=company["id"], code="4100", name="Ingreso", account_type="REVENUE"
+    )
+    receivable = create_account(
+        client, company_id=company["id"], code="1200", name="Cobro", account_type="ASSET"
+    )
+    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+    today = business_today()
+    assert client.post(
+        "/api/treasury/remittances",
+        json={
+            "companyId": company["id"], "treasuryAccountId": bank["id"],
+            "counterAccountId": equity["id"], "sender": "Fondeo", "currencyCode": "HNL",
+            "originalAmount": "100.00", "remittanceDate": str(today),
+        },
+    ).status_code == 201
+    assert client.post(
+        "/api/accounting/journal-entries",
+        json={
+            "companyId": company["id"], "scope": "GENERAL", "currencyCode": "HNL",
+            "effectiveDate": str(today),
+            "lines": [
+                {"accountId": expense["id"], "debitAmount": "30.00"},
+                {"accountId": payable["id"], "creditAmount": "30.00"},
+            ],
+        },
+    ).status_code == 201
+    supplier = create_supplier(client, company_id=company["id"])
+    ap_invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"], "supplierId": supplier["id"], "invoiceNumber": "DASH-AP",
+            "scope": "GENERAL", "expenseAccountId": expense["id"],
+            "payableAccountId": payable["id"], "currencyCode": "HNL", "amount": "40.00",
+            "invoiceDate": str(today), "dueDate": str(today - timedelta(days=1)),
+        },
+    )
+    assert ap_invoice.status_code == 201, ap_invoice.text
+    assert client.post(f"/api/ap/supplier-invoices/{ap_invoice.json()['id']}/approve").status_code == 200
+    customer = create_customer(client, company_id=company["id"])
+    ar_invoice = client.post(
+        "/api/ar/customer-invoices",
+        json={
+            "companyId": company["id"], "customerId": customer["id"], "invoiceNumber": "DASH-AR",
+            "scope": "GENERAL", "revenueAccountId": revenue["id"],
+            "receivableAccountId": receivable["id"], "currencyCode": "HNL", "amount": "50.00",
+            "invoiceDate": str(today), "dueDate": str(today + timedelta(days=15)),
+        },
+    )
+    assert ar_invoice.status_code == 201, ar_invoice.text
+    assert client.post(f"/api/ar/customer-invoices/{ar_invoice.json()['id']}/approve").status_code == 200
+    return company
 
 
 def test_dashboard_summary_requires_auth(client):
@@ -393,3 +499,151 @@ def test_dashboard_financial_totals_net_formal_reversals(client):
 
     assert after.status_code == 200, after.text
     assert float(after.json()["periodExpense"]) == 0.0
+
+
+def test_dashboard_financial_kpis_are_authorized_per_domain(client, db_session):
+    """A domain read grant exposes only that domain's aggregate, never a Treasury proxy."""
+    _login(client)
+    company = _financial_dashboard_fixture(client)
+    roles = {
+        "treasury": _create_dashboard_role(
+            db_session, name="Dashboard Treasury", permissions=(("treasury.account", "read"),)
+        ),
+        "accounting": _create_dashboard_role(
+            db_session,
+            name="Dashboard Accounting",
+            permissions=(("accounting.journal_entry", "read"),),
+        ),
+        "ap": _create_dashboard_role(
+            db_session, name="Dashboard AP", permissions=(("ap.supplier_invoice", "read"),)
+        ),
+        "ar": _create_dashboard_role(
+            db_session, name="Dashboard AR", permissions=(("ar.customer_invoice", "read"),)
+        ),
+    }
+    for name, role in roles.items():
+        _create_dashboard_user(
+            db_session,
+            role=role,
+            email=f"dashboard-{name}@nexora.group",
+            company_id=company["id"],
+        )
+
+    def summary(name: str) -> dict:
+        login_as(client, email=f"dashboard-{name}@nexora.group")
+        response = client.get(f"/api/dashboard/summary?companyId={company['id']}")
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    treasury = summary("treasury")
+    assert treasury["treasuryBalance"] == "100.00"
+    assert Decimal(treasury["periodExpense"]) == 0
+    assert treasury["overduePayables"] == 0
+    assert Decimal(treasury["receivablesOutstanding"]) == 0
+
+    accounting = summary("accounting")
+    assert Decimal(accounting["treasuryBalance"]) == 0
+    assert accounting["periodExpense"] == "70.00"
+    assert accounting["overduePayables"] == 0
+    assert Decimal(accounting["receivablesOutstanding"]) == 0
+    assert any(Decimal(point["expense"]) != 0 for point in accounting["cashFlow"])
+
+    ap = summary("ap")
+    assert Decimal(ap["treasuryBalance"]) == 0
+    assert Decimal(ap["periodExpense"]) == 0
+    assert ap["overduePayables"] == 1
+    assert ap["overduePayablesAmount"] == "40.00"
+    assert Decimal(ap["receivablesOutstanding"]) == 0
+
+    ar = summary("ar")
+    assert Decimal(ar["treasuryBalance"]) == 0
+    assert Decimal(ar["periodExpense"]) == 0
+    assert ar["overduePayables"] == 0
+    assert ar["receivablesOutstanding"] == "50.00"
+
+
+def test_dashboard_domain_scope_never_leaks_an_unassigned_company(client, db_session):
+    _login(client)
+    company_a = _financial_dashboard_fixture(client)
+    company_b = _financial_dashboard_fixture(client)
+    role = _create_dashboard_role(
+        db_session,
+        name="Dashboard scoped AP",
+        permissions=(("ap.supplier_invoice", "read"),),
+    )
+    _create_dashboard_user(
+        db_session,
+        role=role,
+        email="dashboard-company-scope@nexora.group",
+        company_id=company_a["id"],
+    )
+
+    login_as(client, email="dashboard-company-scope@nexora.group")
+    allowed = client.get(f"/api/dashboard/summary?companyId={company_a['id']}")
+    denied = client.get(f"/api/dashboard/summary?companyId={company_b['id']}")
+    assert allowed.status_code == 200, allowed.text
+    assert allowed.json()["overduePayablesAmount"] == "40.00"
+    assert denied.status_code == 403, denied.text
+
+
+def test_dashboard_accounting_aggregate_respects_project_scope(client, db_session):
+    _login(client)
+    company = _financial_dashboard_fixture(client)
+    allowed_project = client.post(
+        "/api/projects",
+        json={"companyId": company["id"], "name": "Dashboard allowed", "currencyCode": "HNL"},
+    ).json()
+    denied_project = client.post(
+        "/api/projects",
+        json={"companyId": company["id"], "name": "Dashboard denied", "currencyCode": "HNL"},
+    ).json()
+    expense = create_account(
+        client, company_id=company["id"], code="5200", name="Gasto de proyecto", account_type="EXPENSE"
+    )
+    payable = create_account(
+        client, company_id=company["id"], code="2200", name="Pasivo de proyecto", account_type="LIABILITY"
+    )
+    for project, amount in ((allowed_project, "11.00"), (denied_project, "19.00")):
+        response = client.post(
+            "/api/accounting/journal-entries",
+            json={
+                "companyId": company["id"], "scope": "PROJECT", "projectId": project["id"],
+                "currencyCode": "HNL", "effectiveDate": str(business_today()),
+                "lines": [
+                    {"accountId": expense["id"], "debitAmount": amount},
+                    {"accountId": payable["id"], "creditAmount": amount},
+                ],
+            },
+        )
+        assert response.status_code == 201, response.text
+
+    role = _create_dashboard_role(
+        db_session,
+        name="Dashboard project-scoped accounting",
+        permissions=(("accounting.journal_entry", "read"),),
+    )
+    grant = db_session.scalar(
+        select(RolePermission)
+        .join(Permission, RolePermission.permission_id == Permission.id)
+        .where(
+            RolePermission.role_id == role.id,
+            Permission.resource == "accounting.journal_entry",
+            Permission.action == "read",
+        )
+    )
+    assert grant is not None
+    grant.project_scope = SCOPE_OWN
+    user = _create_dashboard_user(
+        db_session,
+        role=role,
+        email="dashboard-project-accounting@nexora.group",
+        company_id=company["id"],
+    )
+    db_session.add(UserProjectAccess(user_id=user.id, project_id=allowed_project["id"]))
+    db_session.commit()
+
+    login_as(client, email="dashboard-project-accounting@nexora.group")
+    response = client.get(f"/api/dashboard/summary?companyId={company['id']}")
+    assert response.status_code == 200, response.text
+    # General data remains visible; only the assigned project contributes its project-scoped entry.
+    assert Decimal(response.json()["periodExpense"]) == Decimal("81.00")

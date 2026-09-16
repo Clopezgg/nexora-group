@@ -182,4 +182,11 @@ describe('HomePage', () => {
     expect(screen.queryByText('Saldo Tesorería')).not.toBeInTheDocument()
     expect(screen.getByText('Presupuesto vs. actual')).toBeInTheDocument()
   })
+
+  it('maps every operational role to a real role home instead of a self-link', async () => {
+    stubAuthenticatedFetch(['Equipment Manager'])
+    render(renderApp('/inicio'))
+    expect(await screen.findByRole('heading', { name: /inicio — equipos/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /mantenimiento/i })).toHaveAttribute('href', '/recursos/mantenimiento')
+  })
 })

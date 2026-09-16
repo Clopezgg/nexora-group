@@ -27,7 +27,7 @@ STATUS_LABELS_ES: dict[str, str] = {
     "ARCHIVED": "Archivado",
 }
 
-# Transiciones normales (permiso `project:create`).
+# Transiciones normales (permiso `project:update`).
 _TRANSITIONS: dict[str, set[str]] = {
     "PLANNING": {"ACTIVE", "CANCELLED", "ARCHIVED"},
     "ACTIVE": {"ON_HOLD", "COMPLETED", "CANCELLED", "ARCHIVED"},

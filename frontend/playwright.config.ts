@@ -15,8 +15,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
  */
 const E2E_BACKEND_PORT = 8010
 const E2E_FRONTEND_PORT = 5175
-const E2E_FRONTEND_URL = `http://localhost:${E2E_FRONTEND_PORT}`
-const E2E_BACKEND_URL = `http://localhost:${E2E_BACKEND_PORT}`
+// WebKit can resolve localhost through IPv6 while Vite's proxy/backend use
+// IPv4, producing an intermittent access-control failure in CI. Keep every
+// browser-facing E2E origin explicitly on the same IPv4 loopback address.
+const E2E_LOOPBACK_HOST = '127.0.0.1'
+const E2E_FRONTEND_URL = `http://${E2E_LOOPBACK_HOST}:${E2E_FRONTEND_PORT}`
+const E2E_BACKEND_URL = `http://${E2E_LOOPBACK_HOST}:${E2E_BACKEND_PORT}`
 const E2E_AZURE_STORAGE_CONNECTION_STRING = process.env.E2E_AZURE_STORAGE_CONNECTION_STRING ?? ''
 
 // Playwright evaluates this config separately for the web server and worker.
@@ -85,7 +89,10 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: `VITE_API_PROXY_TARGET=${E2E_BACKEND_URL} npx vite --port ${E2E_FRONTEND_PORT} --strictPort`,
+      command: [
+        `VITE_API_PROXY_TARGET=${E2E_BACKEND_URL}`,
+        `npx vite --host ${E2E_LOOPBACK_HOST} --port ${E2E_FRONTEND_PORT} --strictPort`,
+      ].join(' '),
       url: E2E_FRONTEND_URL,
       reuseExistingServer: false,
       timeout: 60_000,

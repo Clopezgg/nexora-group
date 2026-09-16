@@ -60,6 +60,11 @@ nuevo AGREGA sus propias filas a esa matriz cuando construye su módulo; no
 se inventan permisos para recursos que todavía no existen (eso violaría
 "no placeholders" del CLAUDE.md).
 
+Las transiciones normales del ciclo de vida de un proyecto requieren
+`project:update`; `project:create` solo autoriza altas. Reabrir, restaurar y
+archivar siguen requiriendo además `project.lifecycle:manage` y un motivo
+auditable.
+
 ## UserCompanyAccess / UserProjectAccess
 
 `UserCompanyAccess(user_id, company_id)` y

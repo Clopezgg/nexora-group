@@ -4,7 +4,16 @@ Grafo único de transiciones, ARCHIVED como soft-delete, reopen/restore con
 motivo + permiso + audit, idempotencia de mismo-estado, filtros de listado.
 """
 
-from app.models.permission import UserCompanyAccess, UserProjectAccess
+from sqlalchemy import select
+
+from app.models.permission import (
+    SCOPE_ANY,
+    Permission,
+    RolePermission,
+    UserCompanyAccess,
+    UserProjectAccess,
+)
+from app.models.role import Role
 from tests.helpers import (
     create_company,
     create_user_with_role,
@@ -27,6 +36,22 @@ def _status(client, project_id, target, *, reason=None):
     if reason is not None:
         body["reason"] = reason
     return client.post(f"/api/projects/{project_id}/status", json=body)
+
+
+def _revoke_role_permission(db_session, *, role_name: str, resource: str, action: str) -> None:
+    grant = db_session.scalar(
+        select(RolePermission)
+        .join(Role, RolePermission.role_id == Role.id)
+        .join(Permission, RolePermission.permission_id == Permission.id)
+        .where(
+            Role.name == role_name,
+            Permission.resource == resource,
+            Permission.action == action,
+        )
+    )
+    assert grant is not None
+    db_session.delete(grant)
+    db_session.commit()
 
 
 def test_full_lifecycle_planning_to_closed_and_reopen(client):
@@ -139,6 +164,119 @@ def test_sensitive_transition_requires_lifecycle_permission(client, db_session):
     login_as(client, email="pm-no-lifecycle@nexora.group")
     denied = _status(client, p["id"], "ACTIVE", reason="Intento de reapertura sin permiso")
     assert denied.status_code in (403, 422), denied.text
+
+
+def test_normal_transition_requires_project_update_not_project_create(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Semantic lifecycle permission")
+    project = _project(client, company["id"])
+    manager = create_user_with_role(
+        db_session, email="project-update@nexora.group", role_name="Project Manager"
+    )
+    db_session.add(UserCompanyAccess(user_id=manager.id, company_id=company["id"]))
+    db_session.add(UserProjectAccess(user_id=manager.id, project_id=project["id"]))
+    db_session.commit()
+
+    login_as(client, email="project-update@nexora.group")
+    allowed = _status(client, project["id"], "ACTIVE")
+    assert allowed.status_code == 200, allowed.text
+
+    _revoke_role_permission(
+        db_session, role_name="Project Manager", resource="project", action="update"
+    )
+    denied = _status(client, project["id"], "ON_HOLD")
+    assert denied.status_code == 403, denied.text
+
+
+def test_sensitive_transition_still_requires_lifecycle_manage(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Sensitive lifecycle permission")
+    project = _project(client, company["id"])
+    assert _status(client, project["id"], "ACTIVE").status_code == 200
+    assert _status(client, project["id"], "COMPLETED").status_code == 200
+    assert _status(client, project["id"], "CLOSED").status_code == 200
+
+    manager = create_user_with_role(
+        db_session, email="project-no-lifecycle@nexora.group", role_name="Project Manager"
+    )
+    db_session.add(UserCompanyAccess(user_id=manager.id, company_id=company["id"]))
+    db_session.add(UserProjectAccess(user_id=manager.id, project_id=project["id"]))
+    db_session.commit()
+    _revoke_role_permission(
+        db_session, role_name="Project Manager", resource="project.lifecycle", action="manage"
+    )
+
+    login_as(client, email="project-no-lifecycle@nexora.group")
+    denied = _status(client, project["id"], "ACTIVE", reason="Reapertura controlada")
+    assert denied.status_code == 422, denied.text
+
+
+def test_sensitive_transition_honors_lifecycle_project_scope(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Lifecycle project scope")
+    assigned = _project(client, company["id"], name="Lifecycle assigned")
+    unassigned = _project(client, company["id"], name="Lifecycle unassigned")
+    for project in (assigned, unassigned):
+        assert _status(client, project["id"], "ACTIVE").status_code == 200
+        assert _status(client, project["id"], "COMPLETED").status_code == 200
+        assert _status(client, project["id"], "CLOSED").status_code == 200
+
+    manager = create_user_with_role(
+        db_session, email="project-lifecycle-scope@nexora.group", role_name="Project Manager"
+    )
+    db_session.add(UserCompanyAccess(user_id=manager.id, company_id=company["id"]))
+    db_session.add(UserProjectAccess(user_id=manager.id, project_id=assigned["id"]))
+    db_session.commit()
+
+    login_as(client, email="project-lifecycle-scope@nexora.group")
+    allowed = _status(client, assigned["id"], "ACTIVE", reason="Reapertura autorizada")
+    denied = _status(client, unassigned["id"], "ACTIVE", reason="Reapertura no autorizada")
+    assert allowed.status_code == 200, allowed.text
+    assert denied.status_code == 403, denied.text
+
+
+def test_normal_transition_does_not_require_lifecycle_scope(client, db_session):
+    login_admin(client)
+    company = create_company(client, name="Normal lifecycle authority")
+    project = _project(client, company["id"])
+    manager = create_user_with_role(
+        db_session, email="project-normal-authority@nexora.group", role_name="Project Manager"
+    )
+    role = db_session.scalar(select(Role).where(Role.name == "Project Manager"))
+    assert role is not None
+    update_grant = db_session.scalar(
+        select(RolePermission)
+        .join(Permission, RolePermission.permission_id == Permission.id)
+        .where(
+            RolePermission.role_id == role.id,
+            Permission.resource == "project",
+            Permission.action == "update",
+        )
+    )
+    assert update_grant is not None
+    update_grant.company_scope = SCOPE_ANY
+    update_grant.project_scope = SCOPE_ANY
+    db_session.commit()
+
+    login_as(client, email="project-normal-authority@nexora.group")
+    allowed = _status(client, project["id"], "ACTIVE")
+    assert allowed.status_code == 200, allowed.text
+
+
+def test_lifecycle_transition_preserves_company_isolation(client, db_session):
+    login_admin(client)
+    company_a = create_company(client, name="Lifecycle company A")
+    company_b = create_company(client, name="Lifecycle company B")
+    project_b = _project(client, company_b["id"])
+    manager = create_user_with_role(
+        db_session, email="project-company-scope@nexora.group", role_name="Project Manager"
+    )
+    db_session.add(UserCompanyAccess(user_id=manager.id, company_id=company_a["id"]))
+    db_session.commit()
+
+    login_as(client, email="project-company-scope@nexora.group")
+    denied = _status(client, project_b["id"], "ACTIVE")
+    assert denied.status_code == 403, denied.text
 
 
 def test_invalid_transition_gives_readable_business_error(client):

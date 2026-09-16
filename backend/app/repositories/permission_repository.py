@@ -478,6 +478,7 @@ _ROLE_GRANTS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("core.company", "read", SCOPE_ANY),
         ("core.user", "read", SCOPE_ANY),
         ("project", "create", SCOPE_OWN),
+        ("project", "update", SCOPE_OWN),
         ("project", "read", SCOPE_OWN),
         ("project.lifecycle", "manage", SCOPE_OWN),
         ("project.wbs", "create", SCOPE_OWN),
@@ -731,31 +732,6 @@ def ensure_base_permissions(db: Session) -> None:
                 )
             elif existing_grants[key].company_scope != company_scope:
                 existing_grants[key].company_scope = company_scope
-
-    # Before `project:update` existed, the project edit endpoint deliberately
-    # used `project:create`. Preserve those established grants exactly (same
-    # company/project scopes) while moving the endpoint to the semantic
-    # permission. This is idempotent for both upgraded and fresh databases.
-    update_permission = existing_permissions.get(("project", "update"))
-    if update_permission is not None:
-        create_permission = existing_permissions.get(("project", "create"))
-        if create_permission is not None:
-            create_grants = list(
-                db.execute(
-                    select(RolePermission).where(RolePermission.permission_id == create_permission.id)
-                ).scalars()
-            )
-            for create_grant in create_grants:
-                key = (create_grant.role_id, update_permission.id)
-                if key not in existing_grants:
-                    db.add(
-                        RolePermission(
-                            role_id=create_grant.role_id,
-                            permission_id=update_permission.id,
-                            company_scope=create_grant.company_scope,
-                            project_scope=create_grant.project_scope,
-                        )
-                    )
 
     db.flush()
 

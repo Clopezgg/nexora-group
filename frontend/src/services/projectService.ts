@@ -8,8 +8,10 @@ import type {
   Project,
   ProjectFinancialSummary,
   ProjectLifecycle,
+  ProjectTask,
   ProjectStatus,
   ProgressRecord,
+  Milestone,
   WBSFinancialSummary,
   WBSNode,
   WBSStatus,
@@ -105,6 +107,13 @@ export const projectService = {
   listWbsFinancials: (projectId: string) => apiFetch<WBSFinancialSummary[]>(`/projects/${projectId}/wbs/financial-summary`),
   createWbs: (projectId: string, input: Required<Pick<WBSInput, 'code' | 'name'>> & WBSInput) => apiFetch<WBSNode>(`/projects/${projectId}/wbs`, { method: 'POST', body: JSON.stringify(input) }),
   updateWbs: (projectId: string, nodeId: string, input: WBSInput) => apiFetch<WBSNode>(`/projects/${projectId}/wbs/${nodeId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+
+  listTasks: (projectId: string) => apiFetch<ProjectTask[]>(`/projects/${projectId}/tasks`),
+  createTask: (projectId: string, input: { name: string; owner?: string; plannedStart?: string; plannedEnd?: string; dependsOnTaskId?: string }) =>
+    apiFetch<ProjectTask>(`/projects/${projectId}/tasks`, { method: 'POST', body: JSON.stringify(input) }),
+  listMilestones: (projectId: string) => apiFetch<Milestone[]>(`/projects/${projectId}/milestones`),
+  createMilestone: (projectId: string, input: { name: string; dueDate: string }) =>
+    apiFetch<Milestone>(`/projects/${projectId}/milestones`, { method: 'POST', body: JSON.stringify(input) }),
 
   getBudgetSummary: (projectId: string) => apiFetch<BudgetSummary>(`/projects/${projectId}/budgets/summary`),
   getActiveBudget: (projectId: string) => apiFetch<Budget>(`/projects/${projectId}/budgets/active`),

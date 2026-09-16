@@ -52,6 +52,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { path: '/proyectos', label: 'Proyectos', icon: 'project', requiredAny: read('project:read') },
       { path: '/proyectos/wbs', label: 'WBS', icon: 'grid', requiredAny: read('project.wbs:read') },
+      { path: '/proyectos/planeacion', label: 'Planeación', icon: 'chart', requiredAny: read('project.planning:read') },
       { path: '/proyectos/presupuestos', label: 'Presupuestos', icon: 'ruler', requiredAny: read('project.budget:read') },
       { path: '/proyectos/cockpit', label: 'Cockpit financiero', icon: 'chart', requiredAny: read('project.budget:read') },
       { path: '/proyectos/avances', label: 'Avances', icon: 'chart', requiredAny: read('project.progress:read') },

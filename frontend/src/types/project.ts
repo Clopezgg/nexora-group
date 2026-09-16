@@ -122,6 +122,28 @@ export interface WBSFinancialSummary {
   variance: string | null
 }
 
+export interface ProjectTask {
+  id: string
+  projectId: string
+  wbsNodeId: string | null
+  name: string
+  owner: string | null
+  plannedStart: string | null
+  plannedEnd: string | null
+  dependsOnTaskId: string | null
+  status: 'PLANNED' | 'IN_PROGRESS' | 'DONE' | 'BLOCKED' | 'CANCELLED'
+}
+
+export interface Milestone {
+  id: string
+  projectId: string
+  wbsNodeId: string | null
+  name: string
+  dueDate: string
+  achievedDate: string | null
+  status: 'PLANNED' | 'ACHIEVED' | 'MISSED' | 'CANCELLED'
+}
+
 export interface BudgetLine {
   id: string
   wbsNodeId: string | null

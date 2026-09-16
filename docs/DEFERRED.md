@@ -24,6 +24,18 @@ Los últimos gaps funcionales reales detectados en la auditoría final quedaron 
 
 ## Decisiones de alcance explícitas
 
+### Políticas externas aún requeridas
+
+La recuperación de contraseña y las notificaciones financieras no se presentan
+como funcionalidades completas hasta que exista una decisión empresarial
+autoritativa. Password reset requiere un adaptador de entrega de enlace/token
+seguro; no hay proveedor ni canal configurado en este repositorio. Las alertas
+de presupuesto excedido y factura AP vencida requieren destinatario, umbral,
+deduplicación/escalación y, para el vencimiento temporal, un mecanismo de
+ejecución compatible con Azure declarado en `infra/`. NEXORA no envía ni
+simula mensajes por un canal inventado. Estos son bloqueos de política externa,
+no capacidades Future/Optional ni datos ficticios.
+
 ### Transferencias internas entre monedas diferentes
 
 El producto final soporta de forma autoritativa transferencias de Treasury **entre cuentas de la misma moneda**. Una transferencia interna entre monedas distintas permanece deliberadamente bloqueada: NEXORA no inventa un tipo de cambio ni una cuenta de ganancia/pérdida cambiaria.

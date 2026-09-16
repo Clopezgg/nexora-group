@@ -34,7 +34,7 @@ export const equipmentService = {
     apiFetch<MaintenanceOrder[]>(`/equipment/${equipmentId}/maintenance-orders`),
   createMaintenanceOrder: (
     equipmentId: string,
-    payload: { orderType: 'PREVENTIVE' | 'CORRECTIVE'; openedAt: string; description?: string },
+    payload: { orderType: 'PREVENTIVE' | 'CORRECTIVE'; openedAt: string; description?: string; planId?: string },
   ) =>
     apiFetch<MaintenanceOrder>(`/equipment/${equipmentId}/maintenance-orders`, {
       method: 'POST',

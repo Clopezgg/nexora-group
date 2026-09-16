@@ -18,7 +18,7 @@ import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { formatMoney } from '../../utils/currency'
 import { equipmentService } from '../../services/equipmentService'
 import { projectService } from '../../services/projectService'
-import type { Equipment, FuelLog, MaintenanceOrder } from '../../types/equipment'
+import type { Equipment, FuelLog, MaintenanceOrder, MaintenancePlan } from '../../types/equipment'
 
 const EQUIPMENT_STATUS_TONE: Record<Equipment['status'], 'success' | 'warning' | 'neutral' | 'danger' | 'info'> = {
   AVAILABLE: 'success',
@@ -258,11 +258,18 @@ function MaintenanceTab({ companyId }: { companyId: string }) {
   const equipmentQuery = useEquipmentList(companyId)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm] = useState({ orderType: 'CORRECTIVE' as 'PREVENTIVE' | 'CORRECTIVE', openedAt: '', description: '' })
+  const [form, setForm] = useState({ orderType: 'CORRECTIVE' as 'PREVENTIVE' | 'CORRECTIVE', openedAt: '', description: '', planId: '' })
+  const [planModalOpen, setPlanModalOpen] = useState(false)
+  const [planForm, setPlanForm] = useState({ name: '', triggerType: 'DATE' as MaintenancePlan['triggerType'], triggerValue: '', description: '' })
 
   const ordersQuery = useQuery({
     queryKey: ['equipment', 'maintenance-orders', selectedEquipmentId],
     queryFn: () => equipmentService.listMaintenanceOrders(selectedEquipmentId),
+    enabled: Boolean(selectedEquipmentId),
+  })
+  const plansQuery = useQuery({
+    queryKey: ['equipment', 'maintenance-plans', selectedEquipmentId],
+    queryFn: () => equipmentService.listMaintenancePlans(selectedEquipmentId),
     enabled: Boolean(selectedEquipmentId),
   })
 
@@ -272,12 +279,27 @@ function MaintenanceTab({ companyId }: { companyId: string }) {
         orderType: form.orderType,
         openedAt: form.openedAt,
         description: form.description || undefined,
+        planId: form.orderType === 'PREVENTIVE' ? form.planId || undefined : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment', 'maintenance-orders', selectedEquipmentId] })
       queryClient.invalidateQueries({ queryKey: ['equipment', 'list', companyId] })
       setModalOpen(false)
-      setForm({ orderType: 'CORRECTIVE', openedAt: '', description: '' })
+      setForm({ orderType: 'CORRECTIVE', openedAt: '', description: '', planId: '' })
+    },
+  })
+
+  const createPlanMutation = useMutation({
+    mutationFn: () => equipmentService.createMaintenancePlan(selectedEquipmentId, {
+      name: planForm.name,
+      triggerType: planForm.triggerType,
+      triggerValue: planForm.triggerValue,
+      description: planForm.description || undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment', 'maintenance-plans', selectedEquipmentId] })
+      setPlanModalOpen(false)
+      setPlanForm({ name: '', triggerType: 'DATE', triggerValue: '', description: '' })
     },
   })
 
@@ -321,6 +343,9 @@ function MaintenanceTab({ companyId }: { companyId: string }) {
         <Button onClick={() => setModalOpen(true)} disabled={!selectedEquipmentId}>
           Nueva orden
         </Button>
+        <Button variant="secondary" onClick={() => setPlanModalOpen(true)} disabled={!selectedEquipmentId}>
+          Nuevo plan
+        </Button>
       </div>
       {!selectedEquipmentId ? (
         <EmptyState title="Selecciona un equipo" description="Elige un equipo para ver sus órdenes de mantenimiento." />
@@ -329,7 +354,21 @@ function MaintenanceTab({ companyId }: { companyId: string }) {
       ) : ordersQuery.isError ? (
         <ErrorState onRetry={() => ordersQuery.refetch()} />
       ) : (
-        <Table columns={columns} rows={ordersQuery.data ?? []} getRowKey={(row) => row.id} emptyMessage="Sin órdenes de mantenimiento." />
+        <>
+          {plansQuery.isLoading ? <LoadingState label="Cargando planes…" /> : plansQuery.isError ? <ErrorState onRetry={() => plansQuery.refetch()} /> : (
+            <Table
+              columns={[
+                { key: 'name', header: 'Plan', render: (row: MaintenancePlan) => row.name },
+                { key: 'triggerType', header: 'Disparador', render: (row: MaintenancePlan) => row.triggerType },
+                { key: 'triggerValue', header: 'Valor', render: (row: MaintenancePlan) => row.triggerValue },
+              ]}
+              rows={plansQuery.data ?? []}
+              getRowKey={(row) => row.id}
+              emptyMessage="Sin planes de mantenimiento."
+            />
+          )}
+          <Table columns={columns} rows={ordersQuery.data ?? []} getRowKey={(row) => row.id} emptyMessage="Sin órdenes de mantenimiento." />
+        </>
       )}
 
       <Modal open={modalOpen} title="Nueva orden de mantenimiento" onClose={() => setModalOpen(false)}>
@@ -339,14 +378,20 @@ function MaintenanceTab({ companyId }: { companyId: string }) {
             createMutation.mutate()
           }}
         >
-          <Select
+            <Select
             label="Tipo"
             value={form.orderType}
-            onChange={(e) => setForm({ ...form, orderType: e.target.value as 'PREVENTIVE' | 'CORRECTIVE' })}
+            onChange={(e) => setForm({ ...form, orderType: e.target.value as 'PREVENTIVE' | 'CORRECTIVE', planId: '' })}
           >
             <option value="CORRECTIVE">Correctivo</option>
             <option value="PREVENTIVE">Preventivo</option>
           </Select>
+          {form.orderType === 'PREVENTIVE' ? (
+            <Select label="Plan de mantenimiento" value={form.planId} onChange={(e) => setForm({ ...form, planId: e.target.value })}>
+              <option value="">Sin plan vinculado</option>
+              {(plansQuery.data ?? []).map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+            </Select>
+          ) : null}
           <Input label="Fecha de apertura" type="date" value={form.openedAt} onChange={(e) => setForm({ ...form, openedAt: e.target.value })} required />
           <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           {createMutation.isError ? (
@@ -355,6 +400,20 @@ function MaintenanceTab({ companyId }: { companyId: string }) {
           <Button type="submit" loading={createMutation.isPending}>
             Guardar
           </Button>
+        </form>
+      </Modal>
+      <Modal open={planModalOpen} title="Nuevo plan de mantenimiento" onClose={() => setPlanModalOpen(false)}>
+        <form onSubmit={(event) => { event.preventDefault(); createPlanMutation.mutate() }}>
+          <Input label="Nombre" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} required />
+          <Select label="Disparador" value={planForm.triggerType} onChange={(e) => setPlanForm({ ...planForm, triggerType: e.target.value as MaintenancePlan['triggerType'] })}>
+            <option value="DATE">Fecha</option>
+            <option value="HOURS">Horas</option>
+            <option value="ODOMETER">Odómetro</option>
+          </Select>
+          <Input label="Valor del disparador" value={planForm.triggerValue} onChange={(e) => setPlanForm({ ...planForm, triggerValue: e.target.value })} required />
+          <Input label="Descripción" value={planForm.description} onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })} />
+          {createPlanMutation.isError ? <p className="nx-field__error">{(createPlanMutation.error as Error).message}</p> : null}
+          <Button type="submit" loading={createPlanMutation.isPending}>Guardar plan</Button>
         </form>
       </Modal>
     </Card>

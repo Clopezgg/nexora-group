@@ -19,8 +19,9 @@ _PROTECTED_COMMANDS = {
     "post", "pay", "payments", "collect", "receipts", "reconcile", "match",
     "unmatch", "exclude", "release", "dispose", "depreciate", "capitalize",
     "receive", "issue-to-project", "transfer", "return-to-supplier",
-    "hard-close", "execute", "baseline", "submit", "reject", "response",
-    "decision", "status",
+    "hard-close", "execute", "baseline", "submit", "reject", "respond", "response",
+    "decision", "status", "redistribute-unassigned", "retention-releases",
+    "rebuild", "generate-monthly-periods", "advance-invoice",
 }
 _PROTECTED_POST_PATHS = {
     "/api/treasury/remittances",

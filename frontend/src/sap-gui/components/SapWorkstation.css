@@ -161,7 +161,7 @@
   overflow: visible;
   position: relative;
   z-index: var(--sap-z-commandbar, 30);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 /* Command Bar */
@@ -284,15 +284,15 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  flex: 0 0 auto;
-  width: 100%;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
   height: 100%;
   padding: 0 4px;
   background: var(--sap-color-toolbar-bg, #c3ccd7);
   border-left: 1px solid var(--sap-color-border, #a8b8c7);
+  border-top: 0;
   justify-content: flex-end;
-  border-top: 1px solid var(--sap-color-border, #a8b8c7);
-  border-left: none;
   position: relative;
   z-index: 30;
 }
@@ -588,13 +588,20 @@
     padding: 0 7px;
   }
   
+  .nx-sap-commandrow {
+    flex-wrap: wrap;
+  }
+
   .nx-sap-commandbar {
-    flex-basis: 100%;
+    flex: 1 1 100%;
     order: 3;
     padding: 2px 4px;
   }
   
   .nx-sap-toolbar {
+    flex: 1 1 100%;
+    width: 100%;
+    height: var(--sap-toolbar-height, 40px);
     padding: 2px;
     justify-content: flex-start;
     border-top: 1px solid var(--sap-color-border, #a8b8c7);

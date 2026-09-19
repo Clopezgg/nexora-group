@@ -125,7 +125,7 @@
   --nx-bottom-nav-height: 58px;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 768px) {
   :root {
     --nx-text-display: 34px;
     --nx-text-h1: 26px;

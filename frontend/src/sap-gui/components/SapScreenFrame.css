@@ -97,7 +97,7 @@
 }
 
 /* Responsive */
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .nx-sap-screen__workarea {
     padding: 7px;
   }

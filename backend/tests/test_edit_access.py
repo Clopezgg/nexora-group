@@ -86,9 +86,12 @@ def test_sensitive_business_commands_are_protected_across_modules():
     for command in (
         "approve", "payments", "receipts", "cancel", "send", "reconcile",
         "dispose", "receive", "issue-to-project", "transfer", "hard-close",
+        "respond", "redistribute-unassigned", "retention-releases", "rebuild",
+        "generate-monthly-periods", "advance-invoice",
     ):
         assert _requires_protected_edit("POST", f"/api/module/x/{command}")
     assert not _requires_protected_edit("POST", "/api/module")
+    assert not _requires_protected_edit("POST", "/api/contract-payments/schedules/x/fifo-preview")
 
 
 def test_financial_and_inventory_collection_commands_fail_closed():

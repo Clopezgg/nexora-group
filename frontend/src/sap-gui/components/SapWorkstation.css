@@ -567,7 +567,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .nx-sap-statusbar {
     gap: 8px;
     overflow: hidden;
@@ -654,7 +654,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .nx-sap-workstation .nx-topbar {
     flex-wrap: wrap;
     overflow: visible;

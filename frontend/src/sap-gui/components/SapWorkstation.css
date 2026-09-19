@@ -523,8 +523,10 @@
 }
 
 .nx-sap-statusbar__ready {
-  font-weight: 600;
-  color: var(--sap-color-positive, #216635);
+  font-weight: 700;
+  /* "Listo" is explicit text, so do not rely on green alone for semantics.
+     The status-bar foreground is guaranteed against every SAP chrome variant. */
+  color: var(--sap-color-statusbar-text, #182a53);
 }
 
 .nx-sap-statusbar span {
@@ -630,9 +632,12 @@
     min-width: 0;
   }
   
-  .nx-sap-commandbar__ok {
+  .nx-sap-commandbar__ok,
+  .nx-sap-commandbar__nav {
+    width: 40px;
     height: 40px;
     min-width: 40px;
+    min-height: 40px;
   }
   
   .nx-sap-screen__workarea {

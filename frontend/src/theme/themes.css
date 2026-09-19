@@ -725,7 +725,7 @@
 :root[data-nx-family='sap-gui'] body .recharts-cartesian-axis tick { stroke: var(--nx-chart-axis); }
 :root[data-nx-family='sap-gui'] body .recharts-default-tooltip { border: 1px solid var(--nx-color-border-strong) !important; border-radius: 0 !important; }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   :root[data-nx-family='sap-gui'] body .nx-input,
   :root[data-nx-family='sap-gui'] body .nx-select,
   :root[data-nx-family='sap-gui'] body .nx-button { min-height: 40px; }
@@ -1305,7 +1305,7 @@
   }
   :root[data-nx-family='sap-gui'] body .nx-form-grid > .nx-button { justify-self: start; }
 }
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   :root[data-nx-family='sap-gui'] {
     --sap-menu-height: 40px;
     --sap-field-height: 40px;
@@ -1319,7 +1319,7 @@
 /* Responsive records must grow with their cells; desktop row density cannot
    constrain a stacked record to a single row and overlap adjacent records. */
 :root[data-nx-family='sap-gui'] body .nx-table tbody tr { height: var(--sap-row-height); }
-@media (max-width: 640px) {
+@media (max-width: 430px) {
   :root[data-nx-family='sap-gui'] body .nx-table--responsive tbody tr { height: auto; padding: 5px 7px; }
   :root[data-nx-family='sap-gui'] body .nx-table--responsive tbody td {
     height: auto;

@@ -1,7 +1,10 @@
 """Atomic, resumable initial Project configuration."""
 
+import uuid
+
 from sqlalchemy import select
 
+from app.models.audit import AuditLog
 from app.models.project import Project
 from app.models.project_setup import ProjectSetupRun
 from app.models.wbs import WBSNode
@@ -49,6 +52,11 @@ def test_project_setup_is_idempotent_and_executes_as_one_command(client, db_sess
     assert second_execute.status_code == 200, second_execute.text
     assert second_execute.json()["projectId"] == finished.json()["projectId"]
     assert len(db_session.execute(select(Project)).scalars().all()) == 1
+    setup_audits = db_session.scalars(
+        select(AuditLog).where(AuditLog.entity_id == uuid.UUID(run["id"]))
+    ).all()
+    assert [row.action for row in setup_audits].count("project.setup.create") == 1
+    assert [row.action for row in setup_audits].count("project.setup.complete") == 1
 
 
 def test_project_setup_failure_rolls_back_all_core_rows_and_is_retryable(client, db_session, monkeypatch):
@@ -72,6 +80,10 @@ def test_project_setup_failure_rolls_back_all_core_rows_and_is_retryable(client,
     stored = db_session.get(ProjectSetupRun, run["id"])
     assert stored.status == "FAILED"
     assert stored.failure_step == "WBS"
+    failed_audits = db_session.scalars(
+        select(AuditLog).where(AuditLog.entity_id == uuid.UUID(run["id"]))
+    ).all()
+    assert [row.action for row in failed_audits].count("project.setup.fail") == 1
 
     monkeypatch.setattr(project_setup_service.project_control_repository, "create_wbs_node", original)
     retried = client.post(f"/api/projects/setup-runs/{run['id']}/execute")

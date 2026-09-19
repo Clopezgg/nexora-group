@@ -22,11 +22,15 @@ _PROTECTED_COMMANDS = {
     "hard-close", "execute", "baseline", "submit", "reject", "respond", "response",
     "decision", "status", "redistribute-unassigned", "retention-releases",
     "rebuild", "generate-monthly-periods", "advance-invoice",
+    "override", "accept", "convert", "bill",
 }
 _PROTECTED_POST_PATHS = {
     "/api/treasury/remittances",
     "/api/treasury/general-expenses",
     "/api/treasury/cash-closings",
+    "/api/treasury/transfers",
+    "/api/accounting/journal-entries",
+    "/api/equipment/fuel-logs",
     "/api/procurement/goods-receipts",
     "/api/procurement/service-entries",
     "/api/procurement/three-way-match",

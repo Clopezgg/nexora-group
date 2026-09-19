@@ -187,6 +187,18 @@ function auditViewport(vp: (typeof VIEWPORTS)[number]) {
     test.setTimeout(240_000)
     await login(page)
     await ensureCompany(page.request)
+    // This suite certifies the modern shell. SAP has its own exhaustive matrix
+    // in sap-gui-visual.spec.ts; never inherit a persisted SAP preference from
+    // another E2E test running with the same bootstrap user.
+    await page.evaluate(() => {
+      window.localStorage.setItem('nx.visual-audit.theme', 'nexora-horizon-light')
+    })
+    await page.request.put('/api/me/preferences', {
+      data: { themeId: 'nexora-horizon-light', density: 'comfortable' },
+    })
+    await page.reload()
+    await expect.poll(() => page.locator('html').getAttribute('data-nx-theme')).toBe('nexora-horizon-light')
+    await expect(page.locator('html')).not.toHaveAttribute('data-nx-family', 'sap-gui')
     await page.setViewportSize({ width: vp.width, height: vp.height })
 
     const consoleErrors: string[] = []

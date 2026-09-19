@@ -528,7 +528,10 @@
 }
 
 .nx-sap-statusbar span {
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Tradeshow status bar */
@@ -565,6 +568,15 @@
 }
 
 @media (max-width: 760px) {
+  .nx-sap-statusbar {
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  .nx-sap-statusbar span:not(.nx-sap-statusbar__ready) {
+    flex: 1 1 0;
+  }
+
   .nx-sap-workstation {
     grid-template-rows: 
       var(--sap-title-height, 26px)

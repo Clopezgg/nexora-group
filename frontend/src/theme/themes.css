@@ -76,6 +76,14 @@
 :root[data-nx-themed='on'] body .nx-topbar__user-role {
   color: color-mix(in srgb, var(--nx-shell-topbar-text) 72%, transparent);
 }
+
+/* SAP chrome uses compact text (9–10px). Semi-transparent labels fall just
+   below WCAG AA on the classic Signature topbar, so keep them on the shell's
+   authoritative foreground color instead of reducing opacity. */
+:root[data-nx-themed='on'][data-nx-family='sap-gui'] body .nx-topbar__context-label,
+:root[data-nx-themed='on'][data-nx-family='sap-gui'] body .nx-topbar__user-role {
+  color: var(--nx-shell-topbar-text);
+}
 :root[data-nx-themed='on'] body .nx-topbar .nx-select {
   background: var(--nx-theme-surface-2);
   border-color: var(--nx-theme-border);

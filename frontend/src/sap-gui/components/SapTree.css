@@ -165,38 +165,35 @@
   background: var(--sap-color-sidebar-bg, #dfeaf3);
 }
 
-/* Tradeshow variant */
+/* Tradeshow variant — one authoritative contrast contract. */
 :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree {
   background: var(--sap-color-sidebar-bg, #172e50);
-  color: #ffffff;
+  color: var(--sap-color-sidebar-text, #ffffff);
 }
 
 :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label {
-  color: #ffffff !important;
+  color: #ffffff;
 }
 
-:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label:hover {
-  background: var(--sap-color-sidebar-hover-bg, rgba(255,255,255,0.12));
-  color: #0b1f3a !important;
-}
-
-:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label[aria-expanded="true"] {
-  background: var(--sap-color-sidebar-hover-bg, rgba(255,255,255,0.12));
-  color: #0b1f3a !important;
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label:hover,
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label[aria-expanded="true"],
+:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__group-label:focus-visible {
+  background: #d6e3ed;
+  color: #0b1f3a;
 }
 
 :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__link {
-  color: #ffffff !important;
+  color: #ffffff;
 }
 
 :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__link:hover {
   background: rgba(255,255,255,0.12);
-  color: var(--sap-color-sidebar-active-text, #ffffff) !important;
+  color: var(--sap-color-sidebar-active-text, #ffffff);
 }
 
 :root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow'] .nx-sap-tree .nx-sap-tree__link--active {
   background: var(--sap-color-sidebar-active-bg, #34548a);
-  color: var(--sap-color-sidebar-active-text, #ffffff) !important;
+  color: var(--sap-color-sidebar-active-text, #ffffff);
 }
 
 /* Horizon variant */
@@ -261,40 +258,3 @@
 :root[data-nx-sap-variant='horizon-dark'] .nx-sap-tree::-webkit-scrollbar-thumb {
   background: var(--sap-color-border, #2b3a4d);
 }
-
-/* NEXORA_TRADESHOW_A11Y_BEGIN */
-
-/*
- * WCAG AA contract for Tradeshow navigation.
- *
- * Normal groups:
- *   foreground #FFFFFF
- *   effective background #172E50
- *
- * Interaction/open states:
- *   foreground #0B1F3A
- *   background #D6E3ED
- */
-:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
-.nx-sap-tree {
-  background-color: #172e50;
-}
-
-:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
-.nx-sap-tree .nx-sap-tree__group-label {
-  color: #ffffff !important;
-}
-
-:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
-.nx-sap-tree .nx-sap-tree__group-label:hover,
-:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
-.nx-sap-tree .nx-sap-tree__group-label[aria-expanded="true"],
-:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
-.nx-sap-tree .nx-sap-tree__group-label[aria-selected="true"],
-:root[data-nx-family='sap-gui'][data-nx-sap-variant='tradeshow']
-.nx-sap-tree .nx-sap-tree__group-label:focus-visible {
-  background-color: #d6e3ed !important;
-  color: #0b1f3a !important;
-}
-
-/* NEXORA_TRADESHOW_A11Y_END */

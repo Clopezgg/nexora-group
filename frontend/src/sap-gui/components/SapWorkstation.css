@@ -14,8 +14,9 @@
     var(--sap-command-height, 34px)     /* Command Row */
     minmax(0, 1fr)                      /* Work Area */
     var(--sap-status-height, 24px);     /* Status Bar */
-  height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  min-height: 0;
+  width: 100%;
   overflow: hidden;
   font-family: var(--sap-font-family);
   background: var(--sap-color-window-bg, #cbd4e1);
@@ -401,11 +402,12 @@
    ============================================================ */
 
 .nx-sap-workarea {
-  grid-column: 2;
+  grid-column: 1 / -1;
   grid-row: 4;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: var(--sap-sidebar-width, 224px) minmax(0, 1fr);
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -547,23 +549,18 @@
   .nx-sap-workstation {
     grid-template-columns: minmax(0, 1fr);
   }
-  
-  .nx-sap-workstation .nx-sap-sidebar {
-    grid-column: 1;
-    grid-row: 5;
-    width: 100%;
-    max-height: 40vh;
-    border-right: none;
-    border-top: 1px solid var(--sap-color-border, #a8b8c7);
+
+  .nx-sap-workarea {
+    grid-template-columns: minmax(0, 1fr);
   }
-  
+
+  .nx-sap-workstation .nx-sap-sidebar {
+    display: none;
+  }
+
   .nx-sap-main {
     grid-column: 1;
-    grid-row: 4;
-  }
-  
-  .nx-sap-statusbar {
-    grid-row: 6;
+    min-width: 0;
   }
 }
 

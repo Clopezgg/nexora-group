@@ -238,4 +238,8 @@ test('SAP GUI visual acceptance matrix', async ({ page }) => {
       }
     }
   }
+
+  // The visual-audit suite that follows certifies the modern shell. Restore a
+  // modern preference so its screenshots cannot accidentally certify SAP GUI.
+  await setTheme(page, 'nexora-horizon-light')
 })

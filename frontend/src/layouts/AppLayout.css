@@ -1,18 +1,18 @@
 .nx-app-shell {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-columns: var(--nx-layout-sidebar-width) minmax(0, 1fr);
   min-height: 100vh;
-  background: #eef3f9;
+  min-height: 100dvh;
+  background: var(--nx-color-page-bg, #eef3f9);
 }
 
 .nx-sidebar {
   position: sticky;
   top: 0;
   height: 100vh;
-  background:
-    radial-gradient(circle at 15% 0%, rgba(42, 125, 225, .20), transparent 24%),
-    linear-gradient(180deg, #071a33 0%, #081b34 58%, #06152a 100%);
-  color: #fff;
+  height: 100dvh;
+  background: var(--nx-shell-sidebar-bg, #071a33);
+  color: var(--nx-shell-sidebar-text, #fff);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -138,18 +138,19 @@
   flex-direction: column;
   min-width: 0;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .nx-topbar {
-  min-height: 64px;
+  min-height: var(--nx-layout-topbar-min-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   padding: 9px 22px;
-  background: linear-gradient(90deg, #0a203c 0%, #0d2b50 56%, #0a203d 100%);
-  border-bottom: 1px solid rgba(255,255,255,.07);
-  color: #fff;
+  background: var(--nx-shell-topbar-bg, #0a203c);
+  border-bottom: 1px solid var(--nx-shell-topbar-border, rgba(255,255,255,.07));
+  color: var(--nx-shell-topbar-text, #fff);
   position: sticky;
   top: 0;
   z-index: var(--nx-z-sticky);
@@ -246,24 +247,24 @@
   flex: 1;
   min-width: 0;
   width: 100%;
-  max-width: 1720px;
+  max-width: var(--nx-layout-content-max-width);
   margin: 0 auto;
 }
 
-@media (min-width: 1500px) {
-  .nx-app-shell { grid-template-columns: 246px minmax(0, 1fr); }
+@media (min-width: 1440px) {
+  .nx-app-shell { grid-template-columns: var(--nx-layout-sidebar-width-wide) minmax(0, 1fr); }
   .nx-app-shell__content { padding: 26px 30px 40px; }
 }
 
-@media (max-width: 1180px) {
-  .nx-app-shell { grid-template-columns: 210px minmax(0, 1fr); }
+@media (max-width: 1279px) {
+  .nx-app-shell { grid-template-columns: var(--nx-layout-sidebar-width-narrow) minmax(0, 1fr); }
   .nx-sidebar__brand-tagline { display: none; }
   .nx-topbar__context-label { display: none; }
   .nx-topbar .nx-select { min-width: 155px; }
 }
 
 @media (max-width: 1024px) {
-  .nx-app-shell { grid-template-columns: 1fr; }
+  .nx-app-shell { grid-template-columns: minmax(0, 1fr); }
   .nx-sidebar { display: none; }
   .nx-topbar__nav-toggle { display: inline-flex; }
   .nx-topbar__company { display: none; }
@@ -271,19 +272,34 @@
   .nx-app-shell__content { padding: 18px; }
 }
 
-@media (max-width: 760px) {
-  .nx-topbar { flex-wrap: wrap; align-items: flex-start; }
-  .nx-topbar__left { width: 100%; order: 2; }
-  .nx-topbar__right { width: 100%; order: 1; }
-  .nx-topbar__context { flex: 1; }
+@media (max-width: 768px) {
+  .nx-topbar {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+  }
+  .nx-topbar__left {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    gap: 6px;
+  }
+  .nx-topbar__right {
+    flex: 0 0 auto;
+    width: auto;
+    gap: 4px;
+  }
+  .nx-topbar__context { flex: 1 1 auto; min-width: 0; }
   .nx-topbar .nx-select { width: 100%; min-width: 0; }
+  .nx-topbar__period,
+  .nx-topbar__action--approvals { display: none; }
   .nx-topbar__user-info { display: none; }
-  .nx-topbar__logout { display: inline-flex; align-items: center; justify-content: center; }
 }
 
 @media (max-width: 430px) {
   .nx-app-shell__content { padding: 14px 12px 28px; }
-  .nx-topbar .nx-badge { display: none; }
+  .nx-topbar__user { display: none; }
 }
 
 /* SAP GUI owns its shell geometry in sap-gui/components/SapWorkstation.css.

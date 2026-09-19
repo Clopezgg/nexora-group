@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SapToolbar } from './SapToolbar'
+import { SapToolbar } from '../../sap-gui/components/SapToolbar'
 
 afterEach(cleanup)
 

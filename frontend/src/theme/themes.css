@@ -59,22 +59,30 @@
 
 /* Topbar — LIGHT CLEAN: superficie del tema, texto e iconos oscuros. */
 :root[data-nx-themed='on'] body .nx-topbar {
-  background: var(--nx-theme-surface);
-  color: var(--nx-theme-text);
-  border-bottom: 1px solid var(--nx-theme-border);
+  background: var(--nx-shell-topbar-bg);
+  color: var(--nx-shell-topbar-text);
+  border-bottom: 1px solid var(--nx-shell-topbar-border);
   box-shadow: 0 1px 2px rgba(7, 26, 51, 0.05);
 }
 :root[data-nx-themed='on'] body .nx-topbar__company,
 :root[data-nx-themed='on'] body .nx-topbar__user {
-  border-color: var(--nx-theme-border);
+  border-color: color-mix(in srgb, var(--nx-shell-topbar-text) 18%, transparent);
 }
 :root[data-nx-themed='on'] body .nx-topbar__company-name,
 :root[data-nx-themed='on'] body .nx-topbar__user-name {
-  color: var(--nx-theme-text);
+  color: var(--nx-shell-topbar-text);
 }
 :root[data-nx-themed='on'] body .nx-topbar__context-label,
 :root[data-nx-themed='on'] body .nx-topbar__user-role {
-  color: var(--nx-theme-text-muted);
+  color: color-mix(in srgb, var(--nx-shell-topbar-text) 72%, transparent);
+}
+
+/* SAP chrome uses compact text (9–10px). Semi-transparent labels fall just
+   below WCAG AA on the classic Signature topbar, so keep them on the shell's
+   authoritative foreground color instead of reducing opacity. */
+:root[data-nx-themed='on'][data-nx-family='sap-gui'] body .nx-topbar__context-label,
+:root[data-nx-themed='on'][data-nx-family='sap-gui'] body .nx-topbar__user-role {
+  color: var(--nx-shell-topbar-text);
 }
 :root[data-nx-themed='on'] body .nx-topbar .nx-select {
   background: var(--nx-theme-surface-2);
@@ -725,7 +733,7 @@
 :root[data-nx-family='sap-gui'] body .recharts-cartesian-axis tick { stroke: var(--nx-chart-axis); }
 :root[data-nx-family='sap-gui'] body .recharts-default-tooltip { border: 1px solid var(--nx-color-border-strong) !important; border-radius: 0 !important; }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   :root[data-nx-family='sap-gui'] body .nx-input,
   :root[data-nx-family='sap-gui'] body .nx-select,
   :root[data-nx-family='sap-gui'] body .nx-button { min-height: 40px; }
@@ -1305,7 +1313,7 @@
   }
   :root[data-nx-family='sap-gui'] body .nx-form-grid > .nx-button { justify-self: start; }
 }
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   :root[data-nx-family='sap-gui'] {
     --sap-menu-height: 40px;
     --sap-field-height: 40px;
@@ -1319,7 +1327,7 @@
 /* Responsive records must grow with their cells; desktop row density cannot
    constrain a stacked record to a single row and overlap adjacent records. */
 :root[data-nx-family='sap-gui'] body .nx-table tbody tr { height: var(--sap-row-height); }
-@media (max-width: 640px) {
+@media (max-width: 430px) {
   :root[data-nx-family='sap-gui'] body .nx-table--responsive tbody tr { height: auto; padding: 5px 7px; }
   :root[data-nx-family='sap-gui'] body .nx-table--responsive tbody td {
     height: auto;

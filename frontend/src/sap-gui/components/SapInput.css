@@ -259,7 +259,7 @@
    RESPONSIVE
    ============================================================ */
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .nx-sap-input,
   .nx-sap-select,
   .nx-sap-display-field__value,

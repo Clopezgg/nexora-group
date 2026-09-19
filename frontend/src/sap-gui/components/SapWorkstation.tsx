@@ -29,6 +29,7 @@ import { Drawer } from '../../design-system/primitives/Overlays';
 import { SapButton } from './SapButton';
 import { Topbar } from '../../layouts/Topbar';
 import '../../sap-gui/tokens/sap-gui-tokens.css';
+import './SapWorkstation.css';
 
 export interface SapWorkstationProps {
   children?: ReactNode;

@@ -577,6 +577,13 @@ def generate_depreciation_entry(
     if period_end < asset.acquisition_date:
         raise InvalidAssetStateError("No se puede depreciar antes de la fecha de adquisición")
 
+    acquisition_month = asset.acquisition_date.year * 12 + asset.acquisition_date.month - 1
+    requested_month = period_start.year * 12 + period_start.month - 1
+    if requested_month - acquisition_month >= asset.useful_life_months:
+        raise InvalidAssetStateError(
+            "El período solicitado está fuera de la vida útil del activo"
+        )
+
     existing = asset_repository.get_depreciation_entry_for_period(
         db, asset_id=asset_id, period_start=period_start
     )

@@ -74,6 +74,7 @@ def create_setup_run(
     idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=128),
     db: Session = Depends(get_db),
     user=Depends(require_permission("project", "create")),
+    correlation_id: str = Depends(get_correlation_id),
 ) -> ProjectSetupRunResponse:
     """Persist an initial project command; it creates no Project rows yet."""
     assert_company_access(db, user_id=user.id, resource="project", action="create", company_id=payload.project.company_id)
@@ -85,6 +86,18 @@ def create_setup_run(
         return _setup_response(db, existing)
     try:
         run = project_setup_service.create_run(db, company_id=payload.project.company_id, requested_by=user.id, key=idempotency_key, payload=body, activate=payload.activate)
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="project.setup.create",
+            entity_type="project.setup",
+            entity_id=run.id,
+            company_id=run.company_id,
+            project_id=None,
+            before=None,
+            after={"status": run.status, "activate": run.activate},
+            correlation_id=correlation_id,
+        )
         db.commit()
         db.refresh(run)
         return _setup_response(db, run)
@@ -126,8 +139,21 @@ def execute_setup_run(
         raise HTTPException(status_code=403, detail="Solo quien inició esta configuración puede reanudarla")
     if run.status == "COMPLETED":
         return _setup_response(db, run)
+    before_status = run.status
     try:
-        project_setup_service.execute(db, run=run, correlation_id=correlation_id)
+        run = project_setup_service.execute(db, run=run, correlation_id=correlation_id)
+        audit_service.record(
+            db,
+            actor_user_id=user.id,
+            action="project.setup.complete",
+            entity_type="project.setup",
+            entity_id=run.id,
+            company_id=run.company_id,
+            project_id=run.project_id,
+            before={"status": before_status},
+            after={"status": run.status, "projectId": str(run.project_id) if run.project_id else None},
+            correlation_id=correlation_id,
+        )
         db.commit()
         db.refresh(run)
         return _setup_response(db, run)
@@ -138,6 +164,18 @@ def execute_setup_run(
             failed.status = "FAILED"
             failed.failure_step = getattr(exc, "step", "CORE_TRANSACTION")
             failed.failure_message = str(exc)[:2000]
+            audit_service.record(
+                db,
+                actor_user_id=user.id,
+                action="project.setup.fail",
+                entity_type="project.setup",
+                entity_id=failed.id,
+                company_id=failed.company_id,
+                project_id=failed.project_id,
+                before={"status": before_status},
+                after={"status": failed.status, "failureStep": failed.failure_step},
+                correlation_id=correlation_id,
+            )
             db.commit()
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

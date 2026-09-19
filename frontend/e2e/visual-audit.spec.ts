@@ -2,7 +2,8 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
 
 /**
  * ORDEN MAESTRA §44-§47 — auditoría visual sistemática de TODAS las rutas
- * autenticadas de `routes.tsx` en desktop 1440, tablet 768 y móvil 390.
+ * autenticadas de `routes.tsx` en los nueve anchos de aceptación: 360, 390,
+ * 430, 768, 1024, 1280, 1366, 1440 y 1920 px.
  *
  * Gates duros (fallan el test):
  *  - scroll horizontal a nivel de documento,
@@ -21,9 +22,15 @@ const ADMIN_EMAIL = 'admin@nexora.group'
 const ADMIN_PASSWORD = 'NexoraAdmin123!'
 
 const VIEWPORTS = [
+  { name: 'desktop-1920', width: 1920, height: 1080 },
   { name: 'desktop-1440', width: 1440, height: 900 },
+  { name: 'desktop-1366', width: 1366, height: 900 },
+  { name: 'desktop-1280', width: 1280, height: 900 },
+  { name: 'laptop-1024', width: 1024, height: 900 },
   { name: 'tablet-768', width: 768, height: 1024 },
+  { name: 'mobile-430', width: 430, height: 932 },
   { name: 'mobile-390', width: 390, height: 844 },
+  { name: 'mobile-360', width: 360, height: 800 },
 ] as const
 
 // routes.tsx real — todas las rutas autenticadas (sin /login, /verificar/:token).
@@ -210,7 +217,7 @@ function auditViewport(vp: (typeof VIEWPORTS)[number]) {
         const label = `${vp.name} ${route.path}`
         await assertNoHorizontalScroll(page, label)
         await assertNothingOverflowsViewport(page, label)
-        if (vp.width <= 400) await assertTouchTargets(page, label)
+        if (vp.width <= 430) await assertTouchTargets(page, label)
 
         // Errores nuevos en esta ruta.
         const newErrors = consoleErrors.slice(before)

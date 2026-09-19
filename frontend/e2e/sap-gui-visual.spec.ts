@@ -17,7 +17,9 @@ const VARIANTS = [
 ] as const
 
 const VIEWPORTS = [
+  { name: '1920', width: 1920, height: 1080 },
   { name: '1440', width: 1440, height: 900 },
+  { name: '1366', width: 1366, height: 900 },
   { name: '1280', width: 1280, height: 900 },
   { name: '1024', width: 1024, height: 900 },
   { name: '768', width: 768, height: 1024 },
@@ -215,7 +217,7 @@ async function captureRoute(
 }
 
 test('SAP GUI visual acceptance matrix', async ({ page }) => {
-  test.setTimeout(60 * 60_000)
+  test.setTimeout(90 * 60_000)
   await login(page)
   await unlockProtectedEdit(page)
   await ensureCompany(page)
@@ -236,4 +238,8 @@ test('SAP GUI visual acceptance matrix', async ({ page }) => {
       }
     }
   }
+
+  // The visual-audit suite that follows certifies the modern shell. Restore a
+  // modern preference so its screenshots cannot accidentally certify SAP GUI.
+  await setTheme(page, 'nexora-horizon-light')
 })

@@ -96,6 +96,27 @@ def test_generate_depreciation_entry_posts_balanced_dep_document(client):
     assert len(response.json()) == 1
 
 
+def test_depreciation_rejects_period_after_useful_life(client):
+    login_admin(client)
+    company, expense, accumulated = _setup_asset_company(client)
+    asset = _create_asset(
+        client,
+        company=company,
+        expense=expense,
+        accumulated=accumulated,
+        cost="1200.00",
+        useful_life=12,
+    )
+
+    response = client.post(
+        f"/api/assets/{asset['id']}/depreciation-entries",
+        json={"periodStart": "2027-01-01", "periodEnd": "2027-01-31"},
+    )
+
+    assert response.status_code == 409, response.text
+    assert "vida útil" in response.text
+
+
 def test_approved_supplier_invoice_capitalizes_one_project_asset_through_gl(client, db_session):
     login_admin(client)
     company, depreciation_expense, accumulated = _setup_asset_company(client)

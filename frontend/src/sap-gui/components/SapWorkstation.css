@@ -670,3 +670,16 @@
 .nx-sap-workstation .nx-topbar {
   z-index: 20;
 }
+
+/* The workstation is the sole SAP shell. Legacy AppLayout selectors must not
+   participate in SAP geometry; these classes are scoped to the workstation DOM. */
+.nx-sap-workstation .nx-sap-main {
+  grid-column: 2;
+  min-height: 0;
+}
+
+@media (max-width: 1024px) {
+  .nx-sap-workstation .nx-sap-main {
+    grid-column: 1;
+  }
+}

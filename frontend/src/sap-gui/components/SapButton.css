@@ -236,7 +236,7 @@
    RESPONSIVE
    ============================================================ */
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .nx-sap-btn {
     height: 40px;
     min-height: 40px;

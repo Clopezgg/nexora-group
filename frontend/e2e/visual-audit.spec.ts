@@ -211,7 +211,7 @@ function auditViewport(vp: (typeof VIEWPORTS)[number]) {
       await test.step(`${vp.name} · ${route.name}`, async () => {
         const before = consoleErrors.length
         await page.goto(route.path)
-        await page.waitForLoadState('networkidle').catch(() => {})
+        await page.waitForLoadState('networkidle', { timeout: 15_000 })
         await page.waitForTimeout(350)
 
         const label = `${vp.name} ${route.path}`

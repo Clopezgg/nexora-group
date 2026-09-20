@@ -391,7 +391,7 @@
 
 .nx-sap-sidebar__brand-tagline {
   font-size: 9px;
-  color: var(--sap-color-text-subtle, #59697a);
+  color: var(--sap-color-sidebar-text, #182a53);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

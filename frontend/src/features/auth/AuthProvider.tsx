@@ -42,7 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   const logoutMutation = useMutation({
-    mutationFn: authService.logout,
+    mutationFn: async () => {
+      await queryClient.cancelQueries()
+      return authService.logout()
+    },
     onSuccess: () => {
       queryClient.setQueryData(['auth', 'me'], null)
     },

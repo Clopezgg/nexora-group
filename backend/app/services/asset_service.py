@@ -566,8 +566,15 @@ def generate_depreciation_entry(
     DEP. La verificación aquí es defensa en profundidad (rechazo temprano,
     mensaje de dominio claro); el constraint real de PostgreSQL
     (`uq_depreciation_entries_asset_period`) es la garantía última bajo
-    escritura concurrente."""
-    asset = asset_repository.get_fixed_asset(db, asset_id)
+    escritura concurrente. La fila del activo se bloquea antes de leer su
+    estado y depreciación acumulada: baja y depreciación son excluyentes.
+    """
+    asset = db.execute(
+        select(FixedAsset)
+        .where(FixedAsset.id == asset_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
     if asset is None:
         raise ValueError(f"FixedAsset {asset_id} no existe")
     if asset.status in _ASSET_TERMINAL_STATUSES:

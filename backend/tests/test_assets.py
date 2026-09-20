@@ -117,6 +117,38 @@ def test_depreciation_rejects_period_after_useful_life(client):
     assert "vida útil" in response.text
 
 
+def test_depreciation_refreshes_stale_asset_state_before_posting(client, db_session):
+    """Another transaction may retire an asset after this session cached ACTIVE.
+
+    The depreciation row lock must reload authoritative state and never add a
+    late DEP after the terminal transition; no production data is changed.
+    """
+    from sqlalchemy.orm import Session
+
+    login_admin(client)
+    company, expense, accumulated = _setup_asset_company(client)
+    asset = _create_asset(client, company=company, expense=expense, accumulated=accumulated)
+    asset_id = uuid.UUID(asset["id"])
+    cached = db_session.get(FixedAsset, asset_id)
+    assert cached.status == "ACTIVE"
+
+    # Simulate a committed terminal transition from an independent session.
+    with Session(db_session.get_bind()) as other:
+        terminal = other.get(FixedAsset, asset_id)
+        terminal.status = "RETIRED"
+        terminal.disposal_date = date(2026, 1, 15)
+        other.commit()
+
+    with pytest.raises(asset_service.InvalidAssetStateError, match="no se puede depreciar"):
+        asset_service.generate_depreciation_entry(
+            db_session, asset_id=asset_id,
+            period_start=date(2026, 1, 1), period_end=date(2026, 1, 31),
+        )
+    db_session.rollback()
+    assert db_session.scalars(
+        select(DepreciationEntry).where(DepreciationEntry.asset_id == asset_id)
+    ).all() == []
+
 def test_approved_supplier_invoice_capitalizes_one_project_asset_through_gl(client, db_session):
     login_admin(client)
     company, depreciation_expense, accumulated = _setup_asset_company(client)

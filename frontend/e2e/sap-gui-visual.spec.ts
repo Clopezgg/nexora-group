@@ -186,6 +186,20 @@ async function captureRoute(
       `${variant} ${viewport.name} ${path}: sin overflow de documento`,
     ).toBeLessThanOrEqual(overflow.clientWidth + 1)
     await page.waitForLoadState('networkidle')
+    if (viewport.width <= 768) {
+      const chrome = await page.evaluate(() => {
+        const rect = (selector: string) => document.querySelector(selector)?.getBoundingClientRect()
+        const menu = rect('.nx-sap-menubar')
+        const command = rect('.nx-sap-commandrow')
+        const topbar = rect('.nx-sap-main .nx-topbar')
+        return {
+          menuBottom: menu?.bottom ?? -1, commandTop: command?.top ?? -1,
+          commandBottom: command?.bottom ?? -1, topbarTop: topbar?.top ?? -1,
+        }
+      })
+      expect(chrome.menuBottom, 'menú SAP no invade barra de comandos').toBeLessThanOrEqual(chrome.commandTop + 1)
+      expect(chrome.commandBottom, 'barra de comandos SAP no cubre Topbar').toBeLessThanOrEqual(chrome.topbarTop + 1)
+    }
     if (path === '/proyectos/cockpit') {
       await page.getByLabel('Proyecto', { exact: true }).selectOption({ label: 'SAP-QA · Proyecto de verificación visual' })
       await expect(page.getByText('Presupuesto (BAC)', { exact: true })).toBeVisible()

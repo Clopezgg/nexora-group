@@ -570,6 +570,15 @@
 }
 
 @media (max-width: 768px) {
+  /* Mobile chrome is two real rows; do not squeeze 40px controls into the
+     desktop 34px command row or 25px menu row. Geometry owns these tokens. */
+  .nx-sap-workstation {
+    --sap-menu-height: 40px;
+    --sap-command-height: 88px;
+    --sap-toolbar-height: 40px;
+    --sap-status-height: 28px;
+  }
+
   .nx-sap-statusbar {
     gap: 8px;
     overflow: hidden;
@@ -608,12 +617,14 @@
 
   .nx-sap-commandbar {
     flex: 1 1 100%;
-    order: 3;
+    order: 2;
+    height: 48px;
     padding: 2px 4px;
   }
   
   .nx-sap-toolbar {
     flex: 1 1 100%;
+    order: 1;
     width: 100%;
     height: var(--sap-toolbar-height, 40px);
     padding: 2px;

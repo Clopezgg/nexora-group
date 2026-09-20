@@ -1,0 +1,53 @@
+name: Temporary scoped visual repair
+on:
+  push:
+    branches:
+      - audit/visual-shell-root-cause-v2-20260918
+    paths:
+      - .github/workflows/nexora-visual-repair-once.yml
+permissions:
+  contents: write
+jobs:
+  scoped-repair:
+    if: github.repository == 'Clopezgg/nexora-group' && github.ref == 'refs/heads/audit/visual-shell-root-cause-v2-20260918'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Apply checked source fixes and remove this one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          def change(path, old, new):
+              file = Path(path)
+              content = file.read_text()
+              if content.count(old) != 1:
+                  raise SystemExit(f'{path}: expected exactly one source anchor, found {content.count(old)}')
+              file.write_text(content.replace(old, new, 1))
+          change('frontend/src/sap-gui/components/SapWorkstation.css',
+                 '.nx-sap-sidebar__brand-tagline {\n  font-size: 9px;\n  color: var(--sap-color-text-subtle, #59697a);',
+                 '.nx-sap-sidebar__brand-tagline {\n  font-size: 9px;\n  color: var(--sap-color-sidebar-text, #182a53);')
+          change('frontend/e2e/critical-journey.spec.ts',
+                 "    const duplicate = await page.request.post(`/api/ap/supplier-payments/${apPaymentId}/reverse`, {\n      headers: { 'X-Nexora-Edit-Access': editCapability },\n      data: { reason: 'Segundo intento no permitido' },\n    })\n    expect(duplicate.status()).toBe(409)",
+                 "    // A finite Protected Edit capability can be exhausted by prior\n    // postings. Re-authorize before asserting the business-level conflict:\n    // 428 without a capability is correct, but does not test double reversal.\n    const duplicateUnlock = await page.request.post('/api/edit-access/verify', {\n      data: { token: process.env.E2E_EDIT_ACCESS_TOKEN! },\n    })\n    expect(duplicateUnlock.ok(), await duplicateUnlock.text()).toBeTruthy()\n    const duplicateCapability = (await duplicateUnlock.json()) as { capability: string }\n    const duplicate = await page.request.post(`/api/ap/supplier-payments/${apPaymentId}/reverse`, {\n      headers: { 'X-Nexora-Edit-Access': duplicateCapability.capability },\n      data: { reason: 'Segundo intento no permitido' },\n    })\n    expect(duplicate.status()).toBe(409)")
+          change('frontend/src/services/dashboardService.ts',
+                 '  getSummary: (companyId?: string | null) =>\n    apiFetch<DashboardSummary>(\n      companyId ? `/dashboard/summary?companyId=${companyId}` : \'/dashboard/summary\',\n    ),',
+                 '  getSummary: (companyId?: string | null, signal?: AbortSignal) =>\n    apiFetch<DashboardSummary>(\n      companyId ? `/dashboard/summary?companyId=${companyId}` : \'/dashboard/summary\',\n      { signal },\n    ),')
+          change('frontend/src/features/home/HomePage.tsx',
+                 '    queryFn: () => dashboardService.getSummary(activeCompanyId),',
+                 '    // React Query aborts this request on unmount/navigation. Do not leave\n    // dashboard fetches active after logout (WebKit treats the abort as a page error).\n    queryFn: ({ signal }) => dashboardService.getSummary(activeCompanyId, signal),')
+          change('frontend/src/features/auth/AuthProvider.tsx',
+                 '  const logoutMutation = useMutation({\n    mutationFn: authService.logout,',
+                 '  const logoutMutation = useMutation({\n    mutationFn: async () => {\n      await queryClient.cancelQueries()\n      return authService.logout()\n    },')
+          Path('.github/workflows/nexora-visual-repair-once.yml').unlink()
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/src/sap-gui/components/SapWorkstation.css frontend/e2e/critical-journey.spec.ts frontend/src/services/dashboardService.ts frontend/src/features/home/HomePage.tsx frontend/src/features/auth/AuthProvider.tsx .github/workflows/nexora-visual-repair-once.yml
+          git diff --cached --check
+          git commit -m 'fix(ui): close contrast, finite-capability E2E and WebKit query cancellation'
+          git push origin HEAD:refs/heads/audit/visual-shell-root-cause-v2-20260918

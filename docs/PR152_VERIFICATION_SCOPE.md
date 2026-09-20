@@ -1,6 +1,6 @@
 # PR #152 — criterios comprobables de cierre
 
-Esta nota delimita la comprobación del PR de reparación visual; **no constituye certificación de producción**.
+Esta nota delimita la comprobación del PR de reparación visual y de invariantes críticos; **no constituye certificación de producción**.
 
 ## Cambios que requieren regresión
 
@@ -12,6 +12,7 @@ Esta nota delimita la comprobación del PR de reparación visual; **no constituy
 - El recorrido de reversión AP obtiene una capacidad Protected Edit nueva antes de comprobar que un segundo reversal recibe el conflicto de negocio `409`; un `428` sin capacidad válida es la protección correcta y no debe eliminarse.
 - La consulta del dashboard recibe una señal AbortSignal para cancelarse cuando la vista se desmonta y AuthProvider cancela consultas al cerrar sesión; validar WebKit sin filtrar errores de página.
 - Project Setup: decisión `COMPLETED` y auditoría se realizan con la misma fila bloqueada. La prueba de dos sesiones concurrentes exige un solo proyecto y un solo `project.setup.complete` para el mismo run.
+- Activos fijos: generación de depreciación y baja usan bloqueo exclusivo de la misma fila antes de comprobar el estado y sumar depreciaciones. La prueba con sesión obsoleta comprueba que no se emite DEP después de una transición terminal confirmada por otra sesión.
 
 ## Condiciones de aceptación
 

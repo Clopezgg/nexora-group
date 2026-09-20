@@ -230,7 +230,7 @@ function ReceiptHistoryModal({ invoice, treasuryAccounts, onClose, onReversed }:
   const columns: TableColumn<CustomerReceipt>[] = [
     { key: 'date', header: 'Fecha', render: (row) => row.receiptDate },
     { key: 'account', header: 'Cuenta receptora', render: (row) => accountNames.get(row.treasuryAccountId) ?? 'Cuenta de Tesorería' },
-    { key: 'amount', header: 'Monto', render: (row) => formatMoney(Number(row.amount), invoice.currencyCode) },
+    { key: 'amount', header: 'Monto', render: (row) => formatMoney(row.amount, invoice.currencyCode) },
     { key: 'document', header: 'Documento GL', render: (row) => <code>{row.accountingDocumentId.slice(0, 8)}…</code> },
     {
       key: 'reversal',

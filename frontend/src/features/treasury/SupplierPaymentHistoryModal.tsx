@@ -56,7 +56,7 @@ export function SupplierPaymentHistoryModal({
     {
       key: 'amount',
       header: 'Monto',
-      render: (row) => formatMoney(Number(row.amount), invoice.currencyCode),
+      render: (row) => formatMoney(row.amount, invoice.currencyCode),
     },
     {
       key: 'document',

@@ -18,7 +18,7 @@ import './HomePage.css'
 const FinancialCharts = lazy(() => import('./FinancialCharts'))
 
 function money(value: string | null, currency: string) {
-  return value === null ? '—' : formatMoney(Number(value), currency)
+  return value === null ? '—' : formatMoney(value, currency)
 }
 
 function percent(value: string | null) {

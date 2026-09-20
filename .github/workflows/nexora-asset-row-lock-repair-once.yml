@@ -1,0 +1,49 @@
+name: Temporary asset row-lock repair
+on:
+  push:
+    branches:
+      - audit/visual-shell-root-cause-v2-20260918
+    paths:
+      - .github/workflows/nexora-asset-row-lock-repair-once.yml
+permissions:
+  contents: write
+jobs:
+  scoped-repair:
+    if: github.repository == 'Clopezgg/nexora-group' && github.ref == 'refs/heads/audit/visual-shell-root-cause-v2-20260918'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Lock fixed asset before depreciation eligibility and ledger checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          def change(path, old, new):
+              file=Path(path)
+              content=file.read_text()
+              if content.count(old)!=1:
+                  raise SystemExit(f'{path}: expected exactly one source anchor, found {content.count(old)}')
+              file.write_text(content.replace(old,new,1))
+          change('backend/app/services/asset_service.py',
+                 '    (`uq_depreciation_entries_asset_period`) es la garantía última bajo\n    escritura concurrente."""\n    asset = asset_repository.get_fixed_asset(db, asset_id)',
+                 '    (`uq_depreciation_entries_asset_period`) es la garantía última bajo\n    escritura concurrente. La fila del activo se bloquea antes de leer su\n    estado y depreciación acumulada: baja y depreciación son excluyentes.\n    """\n    asset = db.execute(\n        select(FixedAsset)\n        .where(FixedAsset.id == asset_id)\n        .with_for_update()\n        .execution_options(populate_existing=True)\n    ).scalar_one_or_none()')
+          path='backend/tests/test_assets.py'
+          file=Path(path)
+          content=file.read_text()
+          marker='\ndef test_approved_supplier_invoice_capitalizes_one_project_asset_through_gl(client, db_session):'
+          if content.count(marker)!=1:
+              raise SystemExit('Asset regression insertion anchor not unique')
+          content=content.replace(marker, '''\ndef test_depreciation_refreshes_stale_asset_state_before_posting(client, db_session):\n    """Another transaction may retire an asset after this session cached ACTIVE.\n\n    The depreciation row lock must reload authoritative state and never add a\n    late DEP after the terminal transition; no production data is changed.\n    """\n    from sqlalchemy.orm import Session\n\n    login_admin(client)\n    company, expense, accumulated = _setup_asset_company(client)\n    asset = _create_asset(client, company=company, expense=expense, accumulated=accumulated)\n    asset_id = uuid.UUID(asset["id"])\n    cached = db_session.get(FixedAsset, asset_id)\n    assert cached.status == "ACTIVE"\n\n    # Simulate a committed terminal transition from an independent session.\n    with Session(db_session.get_bind()) as other:\n        terminal = other.get(FixedAsset, asset_id)\n        terminal.status = "RETIRED"\n        terminal.disposal_date = date(2026, 1, 15)\n        other.commit()\n\n    with pytest.raises(asset_service.InvalidAssetStateError, match="no se puede depreciar"):\n        asset_service.generate_depreciation_entry(\n            db_session, asset_id=asset_id,\n            period_start=date(2026, 1, 1), period_end=date(2026, 1, 31),\n        )\n    db_session.rollback()\n    assert db_session.scalars(\n        select(DepreciationEntry).where(DepreciationEntry.asset_id == asset_id)\n    ).all() == []\n''' + marker, 1)
+          file.write_text(content)
+          Path('.github/workflows/nexora-asset-row-lock-repair-once.yml').unlink()
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/app/services/asset_service.py backend/tests/test_assets.py .github/workflows/nexora-asset-row-lock-repair-once.yml
+          git diff --cached --check
+          git commit -m 'fix(assets): serialize depreciation and disposal on asset row lock'
+          git push origin HEAD:refs/heads/audit/visual-shell-root-cause-v2-20260918

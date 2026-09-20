@@ -68,6 +68,22 @@ def reconciliation_candidates(db: Session, *, line: BankStatementLine) -> list[d
         raise InvalidFinancialReferenceError("La cuenta de tesorería del estado no existe")
 
     amount_column = JournalLine.debit_amount if line.amount > 0 else JournalLine.credit_amount
+    # Aggregate allocations once and join them to candidates. Querying this
+    # aggregate inside the candidate loop caused N+1 round trips.
+    allocation_totals = (
+        select(
+            ReconciliationMatch.accounting_document_id.label("document_id"),
+            func.coalesce(func.sum(ReconciliationMatch.matched_amount), 0).label("allocated"),
+        )
+        .join(BankStatementLine, ReconciliationMatch.bank_statement_line_id == BankStatementLine.id)
+        .join(BankStatement, BankStatementLine.bank_statement_id == BankStatement.id)
+        .where(
+            BankStatement.treasury_account_id == treasury_account.id,
+            (BankStatementLine.amount > 0) if line.amount > 0 else (BankStatementLine.amount < 0),
+        )
+        .group_by(ReconciliationMatch.accounting_document_id)
+        .subquery()
+    )
     rows = db.execute(
         select(
             AccountingDocument.id,
@@ -75,8 +91,10 @@ def reconciliation_candidates(db: Session, *, line: BankStatementLine) -> list[d
             AccountingDocument.document_type_code,
             AccountingDocument.description,
             func.sum(amount_column).label("capacity"),
+            func.coalesce(allocation_totals.c.allocated, 0).label("allocated"),
         )
         .join(JournalLine, JournalLine.accounting_document_id == AccountingDocument.id)
+        .outerjoin(allocation_totals, allocation_totals.c.document_id == AccountingDocument.id)
         .where(
             AccountingDocument.company_id == treasury_account.company_id,
             AccountingDocument.status == "POSTED",
@@ -88,26 +106,15 @@ def reconciliation_candidates(db: Session, *, line: BankStatementLine) -> list[d
             AccountingDocument.document_number,
             AccountingDocument.document_type_code,
             AccountingDocument.description,
+            allocation_totals.c.allocated,
         )
         .order_by(AccountingDocument.posted_at.desc())
     ).all()
 
     result: list[dict] = []
     target = abs(line.amount)
-    for document_id, number, type_code, description, capacity in rows:
-        allocated = Decimal(
-            db.execute(
-                select(func.coalesce(func.sum(ReconciliationMatch.matched_amount), 0))
-                .join(BankStatementLine, ReconciliationMatch.bank_statement_line_id == BankStatementLine.id)
-                .join(BankStatement, BankStatementLine.bank_statement_id == BankStatement.id)
-                .where(
-                    ReconciliationMatch.accounting_document_id == document_id,
-                    BankStatement.treasury_account_id == treasury_account.id,
-                    (BankStatementLine.amount > 0) if line.amount > 0 else (BankStatementLine.amount < 0),
-                )
-            ).scalar_one()
-        )
-        available = Decimal(capacity) - allocated
+    for document_id, number, type_code, description, capacity, allocated in rows:
+        available = Decimal(capacity) - Decimal(allocated)
         if available <= 0:
             continue
         result.append(

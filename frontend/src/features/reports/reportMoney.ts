@@ -8,6 +8,6 @@ export function useReportCurrency() {
   const { activeCompany } = useActiveCompany()
   const currency = activeCompany?.functionalCurrencyCode
   const fmt = (value: string | number | null | undefined): string =>
-    value === null || value === undefined || value === '' || !currency ? '—' : formatMoney(Number(value), currency)
+    value === null || value === undefined || value === '' || !currency ? '—' : formatMoney(value, currency)
   return { currency, fmt }
 }

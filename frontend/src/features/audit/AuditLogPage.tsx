@@ -14,7 +14,7 @@ import {
 import { useActiveCompany } from '../../hooks/useActiveCompany'
 import { auditService } from '../../services/auditService'
 import type { AuditLogEntry } from '../../types/audit'
-import './AuditLogPage.css'
+import '../../styles/detail-list.css'
 import { auditActorLabel, humanizeAuditAction, redactSensitive } from './humanizeAudit'
 
 function formatDateTime(value: string): string {

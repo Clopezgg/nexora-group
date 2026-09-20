@@ -21,7 +21,7 @@ import {
 } from '../../services/transactionInspectorService'
 import { formatMoney } from '../../utils/currency'
 import { statusLabel } from '../../utils/statusLabels'
-import './TransactionInspectorPage.css'
+import '../../styles/detail-list.css'
 
 export function TransactionInspectorPage() {
   const { companies, activeCompanyId, setActiveCompanyId, activeCompany, isLoading, isError, refetch } =

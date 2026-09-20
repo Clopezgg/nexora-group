@@ -4,7 +4,8 @@ Esta nota delimita la comprobación del PR de reparación visual; **no constituy
 
 ## Cambios que requieren regresión
 
-- La composición SAP importa su hoja estructural y no depende de geometría histórica de `AppLayout.css`.
+- SAP Workstation importa su hoja estructural y no depende de geometría histórica de `AppLayout.css`.
+- La navegación y el contenido principal son columnas de la **misma fila 1 del grid interno** `.nx-sap-workarea`; no confundirla con la fila 4 del grid exterior. La prueba visual mide alineación vertical y ausencia de superposición horizontal en escritorio.
 - El lema del sidebar SAP usa el color de texto del sidebar y mantiene contraste en cada variante.
 - El menú SAP móvil mide 40 px y el command row 88 px para alojar dos filas reales (toolbar 40 px y búsqueda 48 px). La prueba compara rectángulos DOM y exige que menú, command row y Topbar no se superpongan en 360, 390 y 768 px.
 - La matriz visual y las pruebas de accesibilidad recorren navegaciones y tamaños reales, sin sustituir fallos con exclusiones.

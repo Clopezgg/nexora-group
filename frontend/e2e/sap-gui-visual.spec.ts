@@ -186,6 +186,17 @@ async function captureRoute(
       `${variant} ${viewport.name} ${path}: sin overflow de documento`,
     ).toBeLessThanOrEqual(overflow.clientWidth + 1)
     await page.waitForLoadState('networkidle')
+    if (viewport.width > 1024) {
+      const columns = await page.evaluate(() => {
+        const sidebar = document.querySelector('.nx-sap-workarea > .nx-sap-sidebar')?.getBoundingClientRect()
+        const main = document.querySelector('.nx-sap-workarea > .nx-sap-main')?.getBoundingClientRect()
+        return { sidebarTop: sidebar?.top ?? -1, mainTop: main?.top ?? -1,
+          sidebarRight: sidebar?.right ?? -1, mainLeft: main?.left ?? -1 }
+      })
+      expect(columns.sidebarTop, 'SAP sidebar y main deben compartir fila del grid interno').toBeGreaterThanOrEqual(columns.mainTop - 1)
+      expect(columns.sidebarTop, 'SAP sidebar y main deben compartir fila del grid interno').toBeLessThanOrEqual(columns.mainTop + 1)
+      expect(columns.sidebarRight, 'SAP sidebar no debe desplazar el main').toBeLessThanOrEqual(columns.mainLeft + 1)
+    }
     if (viewport.width <= 768) {
       const chrome = await page.evaluate(() => {
         const rect = (selector: string) => document.querySelector(selector)?.getBoundingClientRect()

@@ -338,9 +338,12 @@
    SIDEBAR / EASY ACCESS
    ============================================================ */
 
+/* The sidebar is nested inside .nx-sap-workarea (outer grid row 4).
+   Its own inner grid row is 1, shared with the main content; row 4 here
+   implicitly created three empty tracks and vertically separated them. */
 .nx-sap-workstation .nx-sap-sidebar {
   grid-column: 1;
-  grid-row: 4;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   width: var(--sap-sidebar-width, 224px);

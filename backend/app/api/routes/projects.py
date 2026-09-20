@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -137,6 +138,17 @@ def execute_setup_run(
     assert_company_access(db, user_id=user.id, resource="project", action="create", company_id=run.company_id)
     if run.requested_by != user.id:
         raise HTTPException(status_code=403, detail="Solo quien inició esta configuración puede reanudarla")
+    # The route and the service must make the COMPLETED/idempotency decision
+    # from the same locked row. An unlocked DRAFT read can be stale while an
+    # overlapping executor commits and would otherwise double-write AuditLog.
+    run = db.execute(
+        select(ProjectSetupRun)
+        .where(ProjectSetupRun.id == run_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if run is None:
+        raise HTTPException(status_code=404, detail="Configuración de proyecto no encontrada")
     if run.status == "COMPLETED":
         return _setup_response(db, run)
     before_status = run.status

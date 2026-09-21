@@ -42,6 +42,22 @@ async function expectFinishedOk(response: Response, label: string): Promise<void
   expect(response.ok(), `${label}: HTTP ${response.status()}`).toBeTruthy()
 }
 
+function dashboardResponseFor(page: Page, companyId: string): Promise<Response> {
+  return page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return response.request().method() === 'GET' &&
+      url.pathname === '/api/dashboard/summary' &&
+      url.searchParams.get('companyId') === companyId
+  })
+}
+
+async function assertMountedDashboard(page: Page, company: { id: string; functionalCurrencyCode: string }) {
+  const dashboard = await dashboardResponseFor(page, company.id)
+  await expectFinishedOk(dashboard, 'dashboard montado')
+  const dashboardBody = (await dashboard.json()) as { currency: string }
+  expect(dashboardBody.currency).toBe(company.functionalCurrencyCode)
+}
+
 async function ensureCompany(page: Page): Promise<{ id: string; functionalCurrencyCode: string }> {
   const existing = await page.request.get('/api/master-data/companies')
   expect(existing.ok(), await existing.text()).toBeTruthy()
@@ -98,27 +114,12 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
   await page.evaluate((companyId) => {
     window.localStorage.setItem('nexora.activeCompanyId', companyId)
   }, company.id)
-  const dashboardResponsePromise = page.waitForResponse(
-    /**
-     * Matches the dashboard request issued for the active company.
-     */
-    (response) => {
-      const url = new URL(response.url())
-      return (
-        response.request().method() === 'GET' &&
-        url.pathname === '/api/dashboard/summary' &&
-        url.searchParams.get('companyId') === company.id
-      )
-    },
-  )
+  const initialDashboard = dashboardResponseFor(page, company.id)
   await page.reload()
-
-  // Await the request owned by the mounted dashboard before any navigation
-  // can unmount it. A separate APIRequestContext call would not prove that.
-  const dashboard = await dashboardResponsePromise
-  await expectFinishedOk(dashboard, 'dashboard montado')
-  const dashboardBody = (await dashboard.json()) as { currency: string }
-  expect(dashboardBody.currency).toBe(company.functionalCurrencyCode)
+  // Await the page-owned response before deliberately navigating away. This
+  // distinguishes a completed dashboard request from an aborted proxy fetch.
+  await initialDashboard
+  await assertMountedDashboard(page, company)
 
   for (const route of [
     '/inicio',
@@ -130,7 +131,10 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
     await expectOperationalRoute(page, route)
   }
 
+  const dashboardBeforeEdit = dashboardResponseFor(page, company.id)
   await page.goto('/inicio')
+  await dashboardBeforeEdit
+  await assertMountedDashboard(page, company)
   await page.getByRole('button', { name: 'Edición protegida' }).click()
   const dialog = page.getByRole('dialog', { name: 'Desbloquear edición' })
   await expect(dialog).toBeVisible()
@@ -170,6 +174,7 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
       .getByRole('menuitem', { name: 'Inicio', exact: true })
       .click()
     await expect(page).toHaveURL(/\/inicio/)
+    await assertMountedDashboard(page, company)
     await expectOperationalRoute(page, '/finanzas/contabilidad')
     await expectOperationalRoute(page, '/proyectos/cockpit')
     await expectOperationalRoute(page, '/abastecimiento/inventario')

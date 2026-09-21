@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
+import { navItems } from '../src/app/navigation'
 
 /**
  * ORDEN MAESTRA §44-§47 — auditoría visual sistemática de TODAS las rutas
@@ -34,62 +35,12 @@ const VIEWPORTS = [
 ] as const
 
 // routes.tsx real — todas las rutas autenticadas (sin /login, /verificar/:token).
-const ROUTES: { path: string; name: string }[] = [
-  { path: '/inicio', name: 'home' },
-  { path: '/inicio/aprobaciones', name: 'approvals' },
-  { path: '/proyectos', name: 'projects' },
-  { path: '/proyectos/cockpit', name: 'project-cockpit' },
-  { path: '/proyectos/wbs', name: 'wbs' },
-  { path: '/proyectos/presupuestos', name: 'budget' },
-  { path: '/proyectos/avances', name: 'progress' },
-  { path: '/proyectos/ordenes-de-cambio', name: 'change-orders' },
-  { path: '/proyectos/diario-de-obra', name: 'daily-log' },
-  { path: '/proyectos/rfi-submittals', name: 'rfi-submittals' },
-  { path: '/proyectos/calidad', name: 'quality' },
-  { path: '/proyectos/seguridad', name: 'safety' },
-  { path: '/finanzas/control', name: 'financial-control' },
-  { path: '/finanzas/contabilidad', name: 'accounting' },
-  { path: '/finanzas/conciliacion-subledger', name: 'subledger-recon' },
-  { path: '/finanzas/cierre', name: 'closing-center' },
-  { path: '/finanzas/excepciones', name: 'exception-center' },
-  { path: '/finanzas/inspector', name: 'transaction-inspector' },
-  { path: '/finanzas/libro-contractual', name: 'contract-ledger' },
-  { path: '/finanzas/flujo-13-semanas', name: 'cash-forecast' },
-  { path: '/finanzas/tesoreria', name: 'treasury' },
-  { path: '/finanzas/conciliacion', name: 'bank-reconciliation' },
-  { path: '/finanzas/cierres-caja', name: 'cash-closings' },
-  { path: '/finanzas/restricciones-fondos', name: 'fund-restrictions' },
-  { path: '/finanzas/comprobantes', name: 'vouchers' },
-  { path: '/finanzas/cuentas-por-pagar', name: 'accounts-payable' },
-  { path: '/finanzas/cuentas-por-cobrar', name: 'accounts-receivable' },
-  { path: '/finanzas/activos', name: 'assets' },
-  { path: '/abastecimiento/solicitudes', name: 'purchase-requests' },
-  { path: '/abastecimiento/comparativos', name: 'bid-comparison' },
-  { path: '/abastecimiento/ordenes-de-compra', name: 'purchase-orders' },
-  { path: '/abastecimiento/recepciones', name: 'goods-receipts' },
-  { path: '/abastecimiento/inventario', name: 'inventory' },
-  { path: '/abastecimiento/almacenes', name: 'warehouses' },
-  { path: '/abastecimiento/proveedores', name: 'suppliers-contractors' },
-  { path: '/abastecimiento/contratos', name: 'execution-contracts' },
-  { path: '/comercial/leads', name: 'leads' },
-  { path: '/comercial/oportunidades', name: 'opportunities' },
-  { path: '/comercial/cotizaciones', name: 'sales-quotations' },
-  { path: '/comercial/contratos', name: 'sales-contracts' },
-  { path: '/comercial/clientes', name: 'customers' },
-  { path: '/comercial/facturacion', name: 'ar-billing' },
-  { path: '/comercial/cobros', name: 'ar-collections' },
-  { path: '/recursos/personal', name: 'workforce' },
-  { path: '/recursos/cuadrillas', name: 'crews' },
-  { path: '/recursos/equipos', name: 'equipment' },
-  { path: '/recursos/mantenimiento', name: 'maintenance' },
-  { path: '/recursos/combustible', name: 'fuel' },
-  { path: '/recursos/tiempo', name: 'time-entries' },
-  { path: '/control/documentos', name: 'document-control' },
-  { path: '/control/evidencias', name: 'evidence' },
-  { path: '/control/auditoria', name: 'audit' },
-  { path: '/control/reportes', name: 'reports' },
-  { path: '/control/configuracion', name: 'settings' },
-]
+// The audited inventory derives from production navigation, so adding a
+// navigable route automatically adds it to the visual matrix.
+const ROUTES: { path: string; name: string }[] = navItems.map((item) => ({
+  path: item.path,
+  name: item.path.slice(1).replaceAll('/', '-'),
+}))
 
 // Enums crudos que NUNCA deben ser el texto principal visible (§14/§42).
 const RAW_ENUM = /(^|[\s>([])(DRAFT|POSTED|REVERSED|APPROVED|REVIEW|SCHEDULED|PARTIALLY_PAID|UPCOMING|OVERDUE|CANCELLED|TERMINATED|RECONCILED|NOT_STARTED|IN_PROGRESS|BLOCKED_EXTERNAL)([\s.,)\]<]|$)/

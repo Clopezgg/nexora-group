@@ -51,8 +51,8 @@ function dashboardResponseFor(page: Page, companyId: string): Promise<Response> 
   })
 }
 
-async function assertMountedDashboard(page: Page, company: { id: string; functionalCurrencyCode: string }) {
-  const dashboard = await dashboardResponseFor(page, company.id)
+async function assertMountedDashboard(responsePromise: Promise<Response>, company: { id: string; functionalCurrencyCode: string }) {
+  const dashboard = await responsePromise
   await expectFinishedOk(dashboard, 'dashboard montado')
   const dashboardBody = (await dashboard.json()) as { currency: string }
   expect(dashboardBody.currency).toBe(company.functionalCurrencyCode)
@@ -118,8 +118,7 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
   await page.reload()
   // Await the page-owned response before deliberately navigating away. This
   // distinguishes a completed dashboard request from an aborted proxy fetch.
-  await initialDashboard
-  await assertMountedDashboard(page, company)
+  await assertMountedDashboard(initialDashboard, company)
 
   for (const route of [
     '/inicio',
@@ -133,8 +132,7 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
 
   const dashboardBeforeEdit = dashboardResponseFor(page, company.id)
   await page.goto('/inicio')
-  await dashboardBeforeEdit
-  await assertMountedDashboard(page, company)
+  await assertMountedDashboard(dashboardBeforeEdit, company)
   await page.getByRole('button', { name: 'Edición protegida' }).click()
   const dialog = page.getByRole('dialog', { name: 'Desbloquear edición' })
   await expect(dialog).toBeVisible()
@@ -169,12 +167,13 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
     await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant, { timeout: 10_000 })
     await page.getByRole('menuitem', { name: 'Sistema', exact: true }).click()
     // A real click verifies the menu is not clipped behind the shell bars.
+    const dashboardAfterMenu = dashboardResponseFor(page, company.id)
     await page
       .getByRole('menu', { name: 'Sistema', exact: true })
       .getByRole('menuitem', { name: 'Inicio', exact: true })
       .click()
     await expect(page).toHaveURL(/\/inicio/)
-    await assertMountedDashboard(page, company)
+    await assertMountedDashboard(dashboardAfterMenu, company)
     await expectOperationalRoute(page, '/finanzas/contabilidad')
     await expectOperationalRoute(page, '/proyectos/cockpit')
     await expectOperationalRoute(page, '/abastecimiento/inventario')

@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Page, type Response } from '@playwright/test'
 
 const ADMIN_EMAIL = 'admin@nexora.group'
 const ADMIN_PASSWORD = ['Nexora', 'Admin', '123!'].join('')
@@ -19,6 +19,27 @@ async function unlockEdit(request: APIRequestContext): Promise<string> {
   const body = (await response.json()) as { capability: string }
   expect(body.capability).toBeTruthy()
   return body.capability
+}
+
+/** Wait for a page-owned response before consuming its body. Browser response
+ * bodies may be discarded after navigation; diagnostics are only read on error
+ * and cannot mask the actual status assertion. */
+async function expectFinishedOk(response: Response, label: string): Promise<void> {
+  const finishedError = await response.finished()
+  expect(finishedError, `${label}: la respuesta no finalizó`).toBeNull()
+
+  if (!response.ok()) {
+    let detail = `HTTP ${response.status()}`
+    try {
+      detail = await response.text()
+    } catch (error) {
+      detail += ` (diagnóstico del body no disponible: ${String(error)})`
+    }
+    expect(response.ok(), `${label}: ${detail}`).toBeTruthy()
+    return
+  }
+
+  expect(response.ok(), `${label}: HTTP ${response.status()}`).toBeTruthy()
 }
 
 async function ensureCompany(page: Page): Promise<{ id: string; functionalCurrencyCode: string }> {
@@ -95,7 +116,7 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
   // Await the request owned by the mounted dashboard before any navigation
   // can unmount it. A separate APIRequestContext call would not prove that.
   const dashboard = await dashboardResponsePromise
-  expect(dashboard.ok(), await dashboard.text()).toBeTruthy()
+  await expectFinishedOk(dashboard, 'dashboard montado')
   const dashboardBody = (await dashboard.json()) as { currency: string }
   expect(dashboardBody.currency).toBe(company.functionalCurrencyCode)
 
@@ -138,7 +159,7 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
     )
     await page.getByRole('button', { name: 'Guardar como mi preferencia' }).click()
     const preferenceResponse = await preferenceResponsePromise
-    expect(preferenceResponse.ok(), await preferenceResponse.text()).toBeTruthy()
+    await expectFinishedOk(preferenceResponse, 'guardar preferencia')
     await page.reload()
     await page.waitForLoadState('networkidle')
     await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant, { timeout: 10_000 })

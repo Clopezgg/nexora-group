@@ -1,4 +1,0 @@
- M frontend/e2e/cross-browser-critical.spec.ts
- M frontend/src/sap-gui/components/SapTree.css
- M frontend/src/sap-gui/components/SapWorkstation.tsx
-?? .codex-autofix/

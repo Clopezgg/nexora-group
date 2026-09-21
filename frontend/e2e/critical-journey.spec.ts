@@ -429,8 +429,16 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     expect(Number(arReversal.appliedAmountAfterReversal)).toBe(0)
     expect(arReversal.invoiceStatus).toBe('APPROVED')
 
+    // A finite Protected Edit capability can be exhausted by prior
+    // postings. Re-authorize before asserting the business-level conflict:
+    // 428 without a capability is correct, but does not test double reversal.
+    const duplicateUnlock = await page.request.post('/api/edit-access/verify', {
+      data: { token: process.env.E2E_EDIT_ACCESS_TOKEN! },
+    })
+    expect(duplicateUnlock.ok(), await duplicateUnlock.text()).toBeTruthy()
+    const duplicateCapability = (await duplicateUnlock.json()) as { capability: string }
     const duplicate = await page.request.post(`/api/ap/supplier-payments/${apPaymentId}/reverse`, {
-      headers: { 'X-Nexora-Edit-Access': editCapability },
+      headers: { 'X-Nexora-Edit-Access': duplicateCapability.capability },
       data: { reason: 'Segundo intento no permitido' },
     })
     expect(duplicate.status()).toBe(409)

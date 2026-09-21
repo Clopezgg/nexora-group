@@ -571,3 +571,25 @@ jobs:
             echo "- auth/me, master-data/companies ($COMPANY_COUNT visible), projects, master-data/accounts, dashboard ($COMPANY_CURRENCY), fiscal/periods/current: HTTP 200"
             echo "- logout invalidates session; relogin succeeds"
           } >> "$GITHUB_STEP_SUMMARY"
+
+
+      - name: Install Chromium for production visual verification
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify production visually across responsive viewports
+        working-directory: frontend
+        env:
+          PRODUCTION_BASE_URL: ${{ env.FRONTEND_URL }}
+          PRODUCTION_ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+          PRODUCTION_ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+        run: node e2e/production-visual-smoke.mjs
+
+      - name: Upload production visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-visual-evidence-${{ github.sha }}
+          path: frontend/production-visual/
+          if-no-files-found: error
+          retention-days: 30

@@ -1,8 +1,10 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
+import { navItems } from '../src/app/navigation'
 
 /**
  * ORDEN MAESTRA §44-§47 — auditoría visual sistemática de TODAS las rutas
- * autenticadas de `routes.tsx` en desktop 1440, tablet 768 y móvil 390.
+ * autenticadas de `routes.tsx` en los nueve anchos de aceptación: 360, 390,
+ * 430, 768, 1024, 1280, 1366, 1440 y 1920 px.
  *
  * Gates duros (fallan el test):
  *  - scroll horizontal a nivel de documento,
@@ -21,68 +23,24 @@ const ADMIN_EMAIL = 'admin@nexora.group'
 const ADMIN_PASSWORD = 'NexoraAdmin123!'
 
 const VIEWPORTS = [
+  { name: 'desktop-1920', width: 1920, height: 1080 },
   { name: 'desktop-1440', width: 1440, height: 900 },
+  { name: 'desktop-1366', width: 1366, height: 900 },
+  { name: 'desktop-1280', width: 1280, height: 900 },
+  { name: 'laptop-1024', width: 1024, height: 900 },
   { name: 'tablet-768', width: 768, height: 1024 },
+  { name: 'mobile-430', width: 430, height: 932 },
   { name: 'mobile-390', width: 390, height: 844 },
+  { name: 'mobile-360', width: 360, height: 800 },
 ] as const
 
 // routes.tsx real — todas las rutas autenticadas (sin /login, /verificar/:token).
-const ROUTES: { path: string; name: string }[] = [
-  { path: '/inicio', name: 'home' },
-  { path: '/inicio/aprobaciones', name: 'approvals' },
-  { path: '/proyectos', name: 'projects' },
-  { path: '/proyectos/cockpit', name: 'project-cockpit' },
-  { path: '/proyectos/wbs', name: 'wbs' },
-  { path: '/proyectos/presupuestos', name: 'budget' },
-  { path: '/proyectos/avances', name: 'progress' },
-  { path: '/proyectos/ordenes-de-cambio', name: 'change-orders' },
-  { path: '/proyectos/diario-de-obra', name: 'daily-log' },
-  { path: '/proyectos/rfi-submittals', name: 'rfi-submittals' },
-  { path: '/proyectos/calidad', name: 'quality' },
-  { path: '/proyectos/seguridad', name: 'safety' },
-  { path: '/finanzas/control', name: 'financial-control' },
-  { path: '/finanzas/contabilidad', name: 'accounting' },
-  { path: '/finanzas/conciliacion-subledger', name: 'subledger-recon' },
-  { path: '/finanzas/cierre', name: 'closing-center' },
-  { path: '/finanzas/excepciones', name: 'exception-center' },
-  { path: '/finanzas/inspector', name: 'transaction-inspector' },
-  { path: '/finanzas/libro-contractual', name: 'contract-ledger' },
-  { path: '/finanzas/flujo-13-semanas', name: 'cash-forecast' },
-  { path: '/finanzas/tesoreria', name: 'treasury' },
-  { path: '/finanzas/conciliacion', name: 'bank-reconciliation' },
-  { path: '/finanzas/cierres-caja', name: 'cash-closings' },
-  { path: '/finanzas/restricciones-fondos', name: 'fund-restrictions' },
-  { path: '/finanzas/comprobantes', name: 'vouchers' },
-  { path: '/finanzas/cuentas-por-pagar', name: 'accounts-payable' },
-  { path: '/finanzas/cuentas-por-cobrar', name: 'accounts-receivable' },
-  { path: '/finanzas/activos', name: 'assets' },
-  { path: '/abastecimiento/solicitudes', name: 'purchase-requests' },
-  { path: '/abastecimiento/comparativos', name: 'bid-comparison' },
-  { path: '/abastecimiento/ordenes-de-compra', name: 'purchase-orders' },
-  { path: '/abastecimiento/recepciones', name: 'goods-receipts' },
-  { path: '/abastecimiento/inventario', name: 'inventory' },
-  { path: '/abastecimiento/almacenes', name: 'warehouses' },
-  { path: '/abastecimiento/proveedores', name: 'suppliers-contractors' },
-  { path: '/abastecimiento/contratos', name: 'execution-contracts' },
-  { path: '/comercial/leads', name: 'leads' },
-  { path: '/comercial/oportunidades', name: 'opportunities' },
-  { path: '/comercial/cotizaciones', name: 'sales-quotations' },
-  { path: '/comercial/contratos', name: 'sales-contracts' },
-  { path: '/comercial/clientes', name: 'customers' },
-  { path: '/comercial/facturacion', name: 'ar-billing' },
-  { path: '/comercial/cobros', name: 'ar-collections' },
-  { path: '/recursos/personal', name: 'workforce' },
-  { path: '/recursos/cuadrillas', name: 'crews' },
-  { path: '/recursos/equipos', name: 'equipment' },
-  { path: '/recursos/mantenimiento', name: 'maintenance' },
-  { path: '/recursos/combustible', name: 'fuel' },
-  { path: '/recursos/tiempo', name: 'time-entries' },
-  { path: '/control/documentos', name: 'document-control' },
-  { path: '/control/evidencias', name: 'evidence' },
-  { path: '/control/auditoria', name: 'audit' },
-  { path: '/control/reportes', name: 'reports' },
-  { path: '/control/configuracion', name: 'settings' },
-]
+// The audited inventory derives from production navigation, so adding a
+// navigable route automatically adds it to the visual matrix.
+const ROUTES: { path: string; name: string }[] = navItems.map((item) => ({
+  path: item.path,
+  name: item.path.slice(1).replaceAll('/', '-'),
+}))
 
 // Enums crudos que NUNCA deben ser el texto principal visible (§14/§42).
 const RAW_ENUM = /(^|[\s>([])(DRAFT|POSTED|REVERSED|APPROVED|REVIEW|SCHEDULED|PARTIALLY_PAID|UPCOMING|OVERDUE|CANCELLED|TERMINATED|RECONCILED|NOT_STARTED|IN_PROGRESS|BLOCKED_EXTERNAL)([\s.,)\]<]|$)/
@@ -204,13 +162,13 @@ function auditViewport(vp: (typeof VIEWPORTS)[number]) {
       await test.step(`${vp.name} · ${route.name}`, async () => {
         const before = consoleErrors.length
         await page.goto(route.path)
-        await page.waitForLoadState('networkidle').catch(() => {})
+        await page.waitForLoadState('networkidle', { timeout: 15_000 })
         await page.waitForTimeout(350)
 
         const label = `${vp.name} ${route.path}`
         await assertNoHorizontalScroll(page, label)
         await assertNothingOverflowsViewport(page, label)
-        if (vp.width <= 400) await assertTouchTargets(page, label)
+        if (vp.width <= 430) await assertTouchTargets(page, label)
 
         // Errores nuevos en esta ruta.
         const newErrors = consoleErrors.slice(before)

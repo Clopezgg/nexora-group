@@ -14,7 +14,7 @@ from app.domain.errors import (
 from app.models.accounting import AccountingDocument
 from app.models.ap import (
     SupplierInvoice,
-    SupplierInvoicePaymentPlanItem,
+    SupplierInvoiceCashForecastItem,
     SupplierPayment,
 )
 from app.models.approval_request import ApprovalRequest
@@ -544,12 +544,12 @@ _PLAN_EDITABLE_STATUSES = {"APPROVED", "SCHEDULED"}
 
 def list_payment_plan(
     db: Session, *, invoice_id: uuid.UUID
-) -> list[SupplierInvoicePaymentPlanItem]:
+) -> list[SupplierInvoiceCashForecastItem]:
     return list(
         db.execute(
-            select(SupplierInvoicePaymentPlanItem)
-            .where(SupplierInvoicePaymentPlanItem.supplier_invoice_id == invoice_id)
-            .order_by(SupplierInvoicePaymentPlanItem.sequence)
+            select(SupplierInvoiceCashForecastItem)
+            .where(SupplierInvoiceCashForecastItem.supplier_invoice_id == invoice_id)
+            .order_by(SupplierInvoiceCashForecastItem.sequence)
         ).scalars()
     )
 
@@ -560,7 +560,7 @@ def set_payment_plan(
     invoice_id: uuid.UUID,
     installments: list[dict],
     commit: bool = True,
-) -> list[SupplierInvoicePaymentPlanItem]:
+) -> list[SupplierInvoiceCashForecastItem]:
     invoice = db.execute(
         select(SupplierInvoice).where(SupplierInvoice.id == invoice_id).with_for_update()
     ).scalar_one_or_none()
@@ -597,9 +597,9 @@ def set_payment_plan(
         db.delete(existing)
     db.flush()
 
-    rows: list[SupplierInvoicePaymentPlanItem] = []
+    rows: list[SupplierInvoiceCashForecastItem] = []
     for index, item in enumerate(installments, start=1):
-        row = SupplierInvoicePaymentPlanItem(
+        row = SupplierInvoiceCashForecastItem(
             supplier_invoice_id=invoice_id,
             sequence=index,
             due_date=item["due_date"],

@@ -100,21 +100,24 @@ export function Topbar({ onOpenNav }: TopbarProps) {
             ))}
           </Select>
         </div>
-        <Tooltip
-          label={
-            currentPeriod
-              ? `${currentPeriod.startDate} → ${currentPeriod.endDate}`
-              : 'Configura un año y sus períodos fiscales en Configuración.'
-          }
-        >
-          <Badge tone={currentPeriod?.status === 'CLOSED' ? 'warning' : 'neutral'}>{periodText}</Badge>
-        </Tooltip>
+        <div className="nx-topbar__period">
+          <Tooltip
+            label={
+              currentPeriod
+                ? `${currentPeriod.startDate} → ${currentPeriod.endDate}`
+                : 'Configura un año y sus períodos fiscales en Configuración.'
+            }
+          >
+            <Badge tone={currentPeriod?.status === 'CLOSED' ? 'warning' : 'neutral'}>{periodText}</Badge>
+          </Tooltip>
+        </div>
       </div>
 
       <div className="nx-topbar__right">
         <EditAccessControl />
         <Tooltip label="Búsqueda global (Cmd/Ctrl + K)">
           <IconButton
+            className="nx-topbar__action nx-topbar__action--search"
             label="Búsqueda global"
             icon={<Icon name="search" />}
             onClick={() => {
@@ -124,6 +127,7 @@ export function Topbar({ onOpenNav }: TopbarProps) {
         </Tooltip>
         <Tooltip label="Abrir aprobaciones pendientes">
           <IconButton
+            className="nx-topbar__action nx-topbar__action--approvals"
             label="Aprobaciones"
             icon={<Icon name="inbox" />}
             onClick={() => navigate('/inicio/aprobaciones')}

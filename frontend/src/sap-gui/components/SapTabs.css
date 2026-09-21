@@ -190,7 +190,7 @@
 }
 
 /* Panel responsive */
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .nx-sap-tabs__list {
     overflow-x: auto;
     flex-wrap: nowrap;

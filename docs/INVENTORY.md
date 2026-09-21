@@ -73,10 +73,14 @@ mueve stock, aprueba conteos); `Buyer`/`Procurement Manager` solo lectura;
 
 ## Pendiente / deuda intencional
 
-- `RETURN` (devolución a proveedor) no tiene service function dedicada —
-  se puede modelar como un `_issue` con `movement_type="RETURN"` cuando se
-  necesite; el modelo ya soporta el valor.
-- No hay endpoint de "stock ledger history" (listar todos los movimientos
-  de un ítem/almacén) — solo la posición actual
-  (`GET /inventory/stock/position`). Agregar cuando el reporte "Stock
-  Ledger" (orden maestra §102, Inventory reports) se construya.
+- `RETURN` (devolución a proveedor) está implementado por
+  `inventory_service.return_to_supplier` y expuesto en
+  `POST /api/inventory/stock/return-to-supplier`. Reduce el stock al costo
+  promedio vigente mediante el guard compartido de stock, registra
+  `movement_type="RETURN"` con `source_type="supplier_return"` y
+  `source_id=supplier_id`, valida aislamiento de compañía del proveedor y
+  deja AuditLog atómico con la mutación.
+- Sigue sin existir un endpoint de historial de Stock Ledger para listar
+  movimientos por ítem/almacén; `GET /inventory/stock/position` expone solo
+  la posición actual. El reporte/endpoint "Stock Ledger" de la orden maestra
+  §102 permanece pendiente y no se declara implementado.

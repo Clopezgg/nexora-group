@@ -269,6 +269,8 @@
   --sap-color-window-bg: #0d141d;
   --sap-color-workarea-bg: #16202c;
   --sap-color-surface: #1e2b3a;
+  /* Raised screen headers share the dark surface contract; never inherit light white. */
+  --sap-color-surface-raised: #1e2b3a;
   --sap-color-surface-sunken: #0a1118;
   --sap-color-text: #e6edf5;
   --sap-color-text-muted: #a3b3c5;
@@ -282,6 +284,8 @@
   --sap-color-menubar-bg: #16202c;
   --sap-color-toolbar-bg: #16202c;
   --sap-color-statusbar-bg: #16202c;
+  /* Explicit foreground for every status-bar message, including the ready state. */
+  --sap-color-statusbar-text: #e6edf5;
   --sap-color-sidebar-bg: #101922;
   --sap-color-sidebar-text: #c9d6e4;
   --sap-color-sidebar-hover-bg: #1b2836;
@@ -328,7 +332,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   :root[data-nx-family='sap-gui'] {
     --sap-title-height: 26px;
     --sap-menu-height: 40px;
@@ -342,7 +346,7 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 430px) {
   :root[data-nx-family='sap-gui'] {
     --sap-row-height: auto;
   }

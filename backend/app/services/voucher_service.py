@@ -38,7 +38,7 @@ from app.domain.errors import VoucherNotOutflowError
 from app.models.accounting import AccountingDocument, JournalLine
 from app.models.ap import (
     SupplierInvoice,
-    SupplierInvoicePaymentPlanItem,
+    SupplierInvoiceCashForecastItem,
     SupplierPayment,
 )
 from app.models.chart_of_accounts import Account
@@ -182,7 +182,7 @@ def _qr_flowable(url: str, size: float = 2.6 * cm) -> Drawing:
 
 def _resolve_payment_schedule(
     db: Session, document: AccountingDocument
-) -> tuple[SupplierInvoice, list[SupplierInvoicePaymentPlanItem]] | None:
+) -> tuple[SupplierInvoice, list[SupplierInvoiceCashForecastItem]] | None:
     invoice: SupplierInvoice | None = db.execute(
         select(SupplierInvoice).where(SupplierInvoice.accrual_document_id == document.id)
     ).scalar_one_or_none()
@@ -196,9 +196,9 @@ def _resolve_payment_schedule(
         return None
     plan = list(
         db.execute(
-            select(SupplierInvoicePaymentPlanItem)
-            .where(SupplierInvoicePaymentPlanItem.supplier_invoice_id == invoice.id)
-            .order_by(SupplierInvoicePaymentPlanItem.sequence)
+            select(SupplierInvoiceCashForecastItem)
+            .where(SupplierInvoiceCashForecastItem.supplier_invoice_id == invoice.id)
+            .order_by(SupplierInvoiceCashForecastItem.sequence)
         ).scalars()
     )
     if not plan:

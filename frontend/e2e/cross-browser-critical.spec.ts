@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Page, type Response } from '@playwright/test'
 
 const ADMIN_EMAIL = 'admin@nexora.group'
 const ADMIN_PASSWORD = ['Nexora', 'Admin', '123!'].join('')
@@ -19,6 +19,43 @@ async function unlockEdit(request: APIRequestContext): Promise<string> {
   const body = (await response.json()) as { capability: string }
   expect(body.capability).toBeTruthy()
   return body.capability
+}
+
+/** Wait for a page-owned response before consuming its body. Browser response
+ * bodies may be discarded after navigation; diagnostics are only read on error
+ * and cannot mask the actual status assertion. */
+async function expectFinishedOk(response: Response, label: string): Promise<void> {
+  const finishedError = await response.finished()
+  expect(finishedError, `${label}: la respuesta no finalizó`).toBeNull()
+
+  if (!response.ok()) {
+    let detail = `HTTP ${response.status()}`
+    try {
+      detail = await response.text()
+    } catch (error) {
+      detail += ` (diagnóstico del body no disponible: ${String(error)})`
+    }
+    expect(response.ok(), `${label}: ${detail}`).toBeTruthy()
+    return
+  }
+
+  expect(response.ok(), `${label}: HTTP ${response.status()}`).toBeTruthy()
+}
+
+function dashboardResponseFor(page: Page, companyId: string): Promise<Response> {
+  return page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return response.request().method() === 'GET' &&
+      url.pathname === '/api/dashboard/summary' &&
+      url.searchParams.get('companyId') === companyId
+  })
+}
+
+async function assertMountedDashboard(responsePromise: Promise<Response>, company: { id: string; functionalCurrencyCode: string }) {
+  const dashboard = await responsePromise
+  await expectFinishedOk(dashboard, 'dashboard montado')
+  const dashboardBody = (await dashboard.json()) as { currency: string }
+  expect(dashboardBody.currency).toBe(company.functionalCurrencyCode)
 }
 
 async function ensureCompany(page: Page): Promise<{ id: string; functionalCurrencyCode: string }> {
@@ -77,27 +114,11 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
   await page.evaluate((companyId) => {
     window.localStorage.setItem('nexora.activeCompanyId', companyId)
   }, company.id)
-  const dashboardResponsePromise = page.waitForResponse(
-    /**
-     * Matches the dashboard request issued for the active company.
-     */
-    (response) => {
-      const url = new URL(response.url())
-      return (
-        response.request().method() === 'GET' &&
-        url.pathname === '/api/dashboard/summary' &&
-        url.searchParams.get('companyId') === company.id
-      )
-    },
-  )
+  const initialDashboard = dashboardResponseFor(page, company.id)
   await page.reload()
-
-  // Await the request owned by the mounted dashboard before any navigation
-  // can unmount it. A separate APIRequestContext call would not prove that.
-  const dashboard = await dashboardResponsePromise
-  expect(dashboard.ok(), await dashboard.text()).toBeTruthy()
-  const dashboardBody = (await dashboard.json()) as { currency: string }
-  expect(dashboardBody.currency).toBe(company.functionalCurrencyCode)
+  // Await the page-owned response before deliberately navigating away. This
+  // distinguishes a completed dashboard request from an aborted proxy fetch.
+  await assertMountedDashboard(initialDashboard, company)
 
   for (const route of [
     '/inicio',
@@ -109,7 +130,9 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
     await expectOperationalRoute(page, route)
   }
 
+  const dashboardBeforeEdit = dashboardResponseFor(page, company.id)
   await page.goto('/inicio')
+  await assertMountedDashboard(dashboardBeforeEdit, company)
   await page.getByRole('button', { name: 'Edición protegida' }).click()
   const dialog = page.getByRole('dialog', { name: 'Desbloquear edición' })
   await expect(dialog).toBeVisible()
@@ -138,17 +161,19 @@ async function verifyCrossBrowserCompatibility({ page }: { page: Page }) {
     )
     await page.getByRole('button', { name: 'Guardar como mi preferencia' }).click()
     const preferenceResponse = await preferenceResponsePromise
-    expect(preferenceResponse.ok(), await preferenceResponse.text()).toBeTruthy()
+    await expectFinishedOk(preferenceResponse, 'guardar preferencia')
     await page.reload()
     await page.waitForLoadState('networkidle')
     await expect(page.locator('html')).toHaveAttribute('data-nx-theme', variant, { timeout: 10_000 })
     await page.getByRole('menuitem', { name: 'Sistema', exact: true }).click()
     // A real click verifies the menu is not clipped behind the shell bars.
+    const dashboardAfterMenu = dashboardResponseFor(page, company.id)
     await page
       .getByRole('menu', { name: 'Sistema', exact: true })
       .getByRole('menuitem', { name: 'Inicio', exact: true })
       .click()
     await expect(page).toHaveURL(/\/inicio/)
+    await assertMountedDashboard(dashboardAfterMenu, company)
     await expectOperationalRoute(page, '/finanzas/contabilidad')
     await expectOperationalRoute(page, '/proyectos/cockpit')
     await expectOperationalRoute(page, '/abastecimiento/inventario')

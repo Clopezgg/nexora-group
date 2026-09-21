@@ -18,7 +18,7 @@ import './HomePage.css'
 const FinancialCharts = lazy(() => import('./FinancialCharts'))
 
 function money(value: string | null, currency: string) {
-  return value === null ? '—' : formatMoney(Number(value), currency)
+  return value === null ? '—' : formatMoney(value, currency)
 }
 
 function percent(value: string | null) {
@@ -33,7 +33,9 @@ export function HomePage() {
 
   const companySummaryQuery = useQuery({
     queryKey: ['dashboard', 'summary', activeCompanyId],
-    queryFn: () => dashboardService.getSummary(activeCompanyId),
+    // React Query aborts this request on unmount/navigation. Do not leave
+    // dashboard fetches active after logout (WebKit treats the abort as a page error).
+    queryFn: ({ signal }) => dashboardService.getSummary(activeCompanyId, signal),
     enabled: config.showTreasurySummary && Boolean(activeCompanyId) && !context.activeProjectId,
   })
   const projectQuery = useQuery({

@@ -45,12 +45,10 @@ TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=Fals
 @pytest.fixture
 def _clean_schema():
     from sqlalchemy import MetaData, text
-    # Reflect the live DB to know what tables actually exist right now
+    # Reflection is part of the isolation contract: a connection or schema error
+    # must fail the fixture instead of being hidden and contaminating later tests.
     reflected = MetaData()
-    try:
-        reflected.reflect(bind=engine)
-    except Exception:
-        pass
+    reflected.reflect(bind=engine)
     # Also ensure all Base.metadata tables are accounted for
     all_table_names = set(reflected.tables.keys()) | set(Base.metadata.tables.keys())
     with engine.begin() as conn:

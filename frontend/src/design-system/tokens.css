@@ -64,6 +64,14 @@
   --nx-z-toast: 70;
   --nx-z-command-palette: 80;
 
+  /* Functional shell geometry. Themes may recolor the shell but do not alter
+     these layout invariants. */
+  --nx-layout-sidebar-width: 236px;
+  --nx-layout-sidebar-width-narrow: 210px;
+  --nx-layout-sidebar-width-wide: 246px;
+  --nx-layout-topbar-min-height: 64px;
+  --nx-layout-content-max-width: 1720px;
+
   --nx-bp-mobile-sm: 360px;
   --nx-bp-mobile: 430px;
   --nx-bp-tablet: 768px;
@@ -117,7 +125,7 @@
   --nx-bottom-nav-height: 58px;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 768px) {
   :root {
     --nx-text-display: 34px;
     --nx-text-h1: 26px;

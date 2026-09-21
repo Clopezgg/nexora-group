@@ -59,7 +59,7 @@ export function PaymentPlanModal({
     try { return acc + toCents(row.amount) } catch { return acc }
   }, 0n)
   const balanced = draftTotalCents === totalCents
-  const editable = ['APPROVED', 'SCHEDULED'].includes(invoice.status) && Number(invoice.amountPaid ?? 0) === 0
+  const editable = ['APPROVED', 'SCHEDULED'].includes(invoice.status) && toCents(invoice.amountPaid ?? '0') === 0n
 
   const save = useMutation({
     mutationFn: () =>
@@ -67,7 +67,7 @@ export function PaymentPlanModal({
         invoice.id,
         draft.map<PaymentPlanItemInput>((row) => ({
           dueDate: row.dueDate,
-          amount: Number(row.amount).toFixed(2),
+          amount: fromCents(toCents(row.amount)),
         })),
       ),
     onSuccess: () => {

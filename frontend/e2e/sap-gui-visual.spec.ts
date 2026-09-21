@@ -17,7 +17,9 @@ const VARIANTS = [
 ] as const
 
 const VIEWPORTS = [
+  { name: '1920', width: 1920, height: 1080 },
   { name: '1440', width: 1440, height: 900 },
+  { name: '1366', width: 1366, height: 900 },
   { name: '1280', width: 1280, height: 900 },
   { name: '1024', width: 1024, height: 900 },
   { name: '768', width: 768, height: 1024 },
@@ -184,6 +186,31 @@ async function captureRoute(
       `${variant} ${viewport.name} ${path}: sin overflow de documento`,
     ).toBeLessThanOrEqual(overflow.clientWidth + 1)
     await page.waitForLoadState('networkidle')
+    if (viewport.width > 1024) {
+      const columns = await page.evaluate(() => {
+        const sidebar = document.querySelector('.nx-sap-workarea > .nx-sap-sidebar')?.getBoundingClientRect()
+        const main = document.querySelector('.nx-sap-workarea > .nx-sap-main')?.getBoundingClientRect()
+        return { sidebarTop: sidebar?.top ?? -1, mainTop: main?.top ?? -1,
+          sidebarRight: sidebar?.right ?? -1, mainLeft: main?.left ?? -1 }
+      })
+      expect(columns.sidebarTop, 'SAP sidebar y main deben compartir fila del grid interno').toBeGreaterThanOrEqual(columns.mainTop - 1)
+      expect(columns.sidebarTop, 'SAP sidebar y main deben compartir fila del grid interno').toBeLessThanOrEqual(columns.mainTop + 1)
+      expect(columns.sidebarRight, 'SAP sidebar no debe desplazar el main').toBeLessThanOrEqual(columns.mainLeft + 1)
+    }
+    if (viewport.width <= 768) {
+      const chrome = await page.evaluate(() => {
+        const rect = (selector: string) => document.querySelector(selector)?.getBoundingClientRect()
+        const menu = rect('.nx-sap-menubar')
+        const command = rect('.nx-sap-commandrow')
+        const topbar = rect('.nx-sap-main .nx-topbar')
+        return {
+          menuBottom: menu?.bottom ?? -1, commandTop: command?.top ?? -1,
+          commandBottom: command?.bottom ?? -1, topbarTop: topbar?.top ?? -1,
+        }
+      })
+      expect(chrome.menuBottom, 'menú SAP no invade barra de comandos').toBeLessThanOrEqual(chrome.commandTop + 1)
+      expect(chrome.commandBottom, 'barra de comandos SAP no cubre Topbar').toBeLessThanOrEqual(chrome.topbarTop + 1)
+    }
     if (path === '/proyectos/cockpit') {
       await page.getByLabel('Proyecto', { exact: true }).selectOption({ label: 'SAP-QA · Proyecto de verificación visual' })
       await expect(page.getByText('Presupuesto (BAC)', { exact: true })).toBeVisible()
@@ -215,7 +242,7 @@ async function captureRoute(
 }
 
 test('SAP GUI visual acceptance matrix', async ({ page }) => {
-  test.setTimeout(60 * 60_000)
+  test.setTimeout(90 * 60_000)
   await login(page)
   await unlockProtectedEdit(page)
   await ensureCompany(page)
@@ -236,4 +263,8 @@ test('SAP GUI visual acceptance matrix', async ({ page }) => {
       }
     }
   }
+
+  // The visual-audit suite that follows certifies the modern shell. Restore a
+  // modern preference so its screenshots cannot accidentally certify SAP GUI.
+  await setTheme(page, 'nexora-horizon-light')
 })

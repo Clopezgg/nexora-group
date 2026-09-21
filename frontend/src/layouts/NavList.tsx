@@ -3,8 +3,6 @@ import { NavLink } from 'react-router-dom'
 import { filterNavGroups } from '../app/navigation'
 import { Icon } from '../design-system'
 import { useAuth } from '../features/auth/auth-context'
-import { useTheme } from '../theme/theme-context'
-import { SapEasyAccessTree } from './sap/SapEasyAccessTree'
 
 interface NavListProps {
   onNavigate?: () => void
@@ -13,20 +11,13 @@ interface NavListProps {
 }
 
 /**
- * NavList moderna (sidebar/drawer). En modo SAP GUI delega al árbol
- * SapEasyAccessTree real (estado de expansión por grupo, ARIA viva,
- * teclado completo) en lugar del <details open> forzado.
+ * NavList del shell moderno (sidebar/drawer). SAP GUI usa su propia
+ * SapWorkstation y nunca atraviesa esta composición.
  */
 export function NavList({ onNavigate, variant = 'sidebar' }: NavListProps) {
   const { user } = useAuth()
   const [query, setQuery] = useState('')
-  const { activeFamily } = useTheme()
-  const isSapGui = activeFamily === 'sap-gui'
   const groups = useMemo(() => filterNavGroups(user?.permissions), [user?.permissions])
-
-  if (isSapGui) {
-    return <SapEasyAccessTree variant={variant === 'drawer' ? 'drawer' : 'sidebar'} onNavigate={onNavigate} />
-  }
 
   const normalized = query.trim().toLowerCase()
   const filteredGroups = normalized

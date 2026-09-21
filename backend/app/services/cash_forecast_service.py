@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.business_time import business_today
-from app.models.ap import SupplierInvoice, SupplierInvoicePaymentPlanItem
+from app.models.ap import SupplierInvoice, SupplierInvoiceCashForecastItem
 from app.models.ar import CustomerInvoice
 from app.models.company import Company
 from app.models.treasury import TreasuryAccount
@@ -68,11 +68,11 @@ def _ap_outflows_by_due(db: Session, company_id) -> list[tuple[date, Decimal]]:
 
     plan_items = db.execute(
         select(
-            SupplierInvoicePaymentPlanItem.supplier_invoice_id,
-            SupplierInvoicePaymentPlanItem.due_date,
-            SupplierInvoicePaymentPlanItem.amount,
+            SupplierInvoiceCashForecastItem.supplier_invoice_id,
+            SupplierInvoiceCashForecastItem.due_date,
+            SupplierInvoiceCashForecastItem.amount,
         ).where(
-            SupplierInvoicePaymentPlanItem.supplier_invoice_id.in_([row[0] for row in invoices])
+            SupplierInvoiceCashForecastItem.supplier_invoice_id.in_([row[0] for row in invoices])
         )
     ).all()
     plan_by_invoice: dict = {}

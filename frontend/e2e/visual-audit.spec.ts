@@ -85,7 +85,7 @@ async function assertSapTreeIconIntegrity(page: Page, label: string) {
     if (iconRect.width < 12 || iconRect.height < 12) reasons.push('clipped icon')
     if (labelRect && iconRect.right > labelRect.right + 1) reasons.push('icon outside link bounds')
     return reasons.length ? [reasons.join('; ')] : []
-  })
+  }))
   expect(failures, label + ': SAP tree icons must be SVG and never leak IconName text').toEqual([])
 }
 

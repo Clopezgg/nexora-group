@@ -653,6 +653,176 @@ def apply_schedule_rebuild(
     return before, after
 
 
+
+def _amendment_locked_installments(
+    db: Session, schedule_id: uuid.UUID
+) -> list[ContractPaymentInstallment]:
+    """Cuotas con dinero aplicado que una enmienda nunca puede sustituir."""
+    return list(
+        db.execute(
+            select(ContractPaymentInstallment)
+            .join(
+                ContractPaymentAllocation,
+                ContractPaymentAllocation.installment_id == ContractPaymentInstallment.id,
+            )
+            .where(
+                ContractPaymentInstallment.schedule_id == schedule_id,
+                ContractPaymentAllocation.reversed_at.is_(None),
+            )
+            .order_by(ContractPaymentInstallment.sequence)
+        ).unique().scalars()
+    )
+
+
+def _installment_row(installment: ContractPaymentInstallment) -> dict:
+    return {
+        "installment_kind": installment.installment_kind,
+        "period_year": installment.period_year,
+        "period_month": installment.period_month,
+        "due_date": installment.due_date,
+        "scheduled_amount": _q(installment.scheduled_amount),
+        "retention_amount": _q(installment.retention_amount),
+        "net_due": _q(installment.net_due),
+        "description": installment.description,
+    }
+
+
+def build_schedule_amendment_rows(
+    db: Session,
+    *,
+    schedule: ContractPaymentSchedule,
+    regular_months: int,
+    first_period: date,
+    due_day: int = 1,
+    retention_percentage: Decimal | None = None,
+) -> tuple[SupplierContract, list[ContractPaymentInstallment], list[dict], dict]:
+    """Construye una enmienda sin tocar períodos con dinero aplicado.
+
+    El saldo de las cuotas preservadas se descuenta del valor contractual antes
+    de invocar al motor canónico. Así la enmienda conserva trazabilidad y el
+    total programado final sigue siendo exactamente el valor del contrato.
+    """
+    contract = db.get(SupplierContract, schedule.supplier_contract_id)
+    if contract is None:
+        raise InvalidFinancialReferenceError("El contrato del plan ya no existe.")
+    locked = _amendment_locked_installments(db, schedule.id)
+    preserved_total = sum((_q(i.scheduled_amount) for i in locked), _ZERO)
+    remaining_contract_value = _q(contract.value) - preserved_total
+    if remaining_contract_value < _ZERO:
+        raise InvalidFinancialReferenceError(
+            "Las cuotas preservadas superan el valor contractual; no se puede enmendar."
+        )
+    retention = (
+        retention_percentage if retention_percentage is not None else contract.retention_percentage
+    )
+    replacements = (
+        build_contract_plan(
+            contract_value=remaining_contract_value,
+            advance_amount=_ZERO,
+            advance_due_date=None,
+            retention_percentage=retention,
+            regular_months=regular_months,
+            due_day=due_day,
+            first_period=first_period,
+        )
+        if remaining_contract_value > _ZERO else []
+    )
+    after = {
+        "totalScheduled": str(_q(contract.value)),
+        "installments": _rows_to_snapshot(
+            [_installment_row(i) for i in locked] + replacements
+        ),
+    }
+    return contract, locked, replacements, after
+
+
+def preview_schedule_amendment(
+    db: Session,
+    *,
+    schedule: ContractPaymentSchedule,
+    regular_months: int,
+    first_period: date,
+    due_day: int = 1,
+    retention_percentage: Decimal | None = None,
+) -> tuple[dict, dict]:
+    before = current_schedule_snapshot(db, schedule.id)
+    _contract, _locked, _replacements, after = build_schedule_amendment_rows(
+        db,
+        schedule=schedule,
+        regular_months=regular_months,
+        first_period=first_period,
+        due_day=due_day,
+        retention_percentage=retention_percentage,
+    )
+    return before, after
+
+
+def apply_schedule_amendment(
+    db: Session,
+    *,
+    schedule: ContractPaymentSchedule,
+    regular_months: int,
+    first_period: date,
+    due_day: int = 1,
+    retention_percentage: Decimal | None = None,
+    commit: bool = False,
+) -> tuple[dict, dict]:
+    """Enmienda auditada: preserva cuotas con allocations activas y reemplaza
+    solo el saldo no aplicado. El caller registra el AuditLog y hace commit."""
+    before = current_schedule_snapshot(db, schedule.id)
+    contract, locked, replacements, after = build_schedule_amendment_rows(
+        db,
+        schedule=schedule,
+        regular_months=regular_months,
+        first_period=first_period,
+        due_day=due_day,
+        retention_percentage=retention_percentage,
+    )
+    locked_ids = [i.id for i in locked]
+    delete_stmt = ContractPaymentInstallment.__table__.delete().where(
+        ContractPaymentInstallment.schedule_id == schedule.id
+    )
+    if locked_ids:
+        delete_stmt = delete_stmt.where(~ContractPaymentInstallment.id.in_(locked_ids))
+    db.execute(delete_stmt)
+
+    next_sequence = max((i.sequence for i in locked), default=0)
+    for row in replacements:
+        next_sequence += 1
+        db.add(
+            ContractPaymentInstallment(
+                schedule_id=schedule.id,
+                sequence=next_sequence,
+                installment_kind=row["installment_kind"],
+                period_year=row["period_year"],
+                period_month=row["period_month"],
+                due_date=row["due_date"],
+                scheduled_amount=row["scheduled_amount"],
+                retention_amount=row["retention_amount"],
+                net_due=row["net_due"],
+                status="UPCOMING",
+                description=row.get("description"),
+            )
+        )
+
+    if retention_percentage is not None:
+        contract.retention_percentage = retention_percentage
+    schedule.total_scheduled = _q(contract.value)
+    schedule.due_day = due_day
+    all_rows = [_installment_row(i) for i in locked] + replacements
+    if all_rows:
+        ordered = sorted(
+            all_rows,
+            key=lambda r: (_KIND_ORDER[r["installment_kind"]], r["period_year"], r["period_month"]),
+        )
+        schedule.start_period = date(ordered[0]["period_year"], ordered[0]["period_month"], 1)
+        schedule.end_period = date(ordered[-1]["period_year"], ordered[-1]["period_month"], 1)
+    db.flush()
+    if commit:
+        db.commit()
+    return before, after
+
+
 def find_contractual_duplicate_candidates(
     db: Session,
     *,

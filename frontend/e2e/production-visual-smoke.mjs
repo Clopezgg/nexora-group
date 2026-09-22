@@ -85,6 +85,16 @@ try {
         await page.locator('main').waitFor({ state: 'visible', timeout: 20_000 })
         await page.waitForTimeout(500)
 
+        const sapIconLeaks = await page.locator('.nx-sap-tree__link-icon:visible').evaluateAll((icons) =>
+          icons.flatMap((icon) => {
+            const text = (icon.textContent ?? '').trim()
+            return icon.querySelector('svg.nx-icon') && !text ? [] : [text || 'missing SVG']
+          }),
+        )
+        if (sapIconLeaks.length) {
+          failures.push(`${viewport.name} ${route}: SAP IconName leakage ${sapIconLeaks.join(', ')}`)
+        }
+
         const bodyText = await page.locator('body').innerText()
         if (bodyText.includes('Application error')) {
           failures.push(`${viewport.name} ${route}: Application error visible`)

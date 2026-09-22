@@ -13,6 +13,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import type { NavGroup } from '../../app/navigation';
+import { Icon } from '../../design-system';
 import '../../sap-gui/components/SapTree.css';
 
 export interface SapTreeProps {
@@ -227,7 +228,7 @@ export const SapTree = ({ groups: allGroups, onNavigate, variant = 'sidebar' }: 
                           isActive || selected ? 'nx-sap-tree__link--active' : '',
                         ].filter(Boolean).join(' ')}
                       >
-                        <span className="nx-sap-tree__link-icon" aria-hidden="true">{item.icon}</span>
+                        <span className="nx-sap-tree__link-icon" aria-hidden="true"><Icon name={item.icon} size={16} /></span>
                         {item.label}
                       </NavLink>
                     </li>

@@ -381,11 +381,21 @@ function CorrectPlanSection({ scheduleId, contract, currency, onApplied }: {
     retentionPercentage: terms.retentionPercentage || undefined,
   })
   const previewMutation = useMutation({ mutationFn: () => contractPaymentService.previewRebuild(scheduleId, payload()) })
+  const amendmentPreviewMutation = useMutation({ mutationFn: () => contractPaymentService.previewAmendment(scheduleId, payload()) })
+  const preview = amendmentPreviewMutation.data ?? previewMutation.data
+  const isAmendment = Boolean(amendmentPreviewMutation.data)
   const applyMutation = useMutation({
-    mutationFn: () => contractPaymentService.rebuildPlan(scheduleId, { ...payload(), reason }),
-    onSuccess: () => { previewMutation.reset(); setOpen(false); setReason(''); onApplied() },
+    mutationFn: () => (isAmendment
+      ? contractPaymentService.amendPlan(scheduleId, { ...payload(), reason })
+      : contractPaymentService.rebuildPlan(scheduleId, { ...payload(), reason })),
+    onSuccess: () => {
+      previewMutation.reset()
+      amendmentPreviewMutation.reset()
+      setOpen(false)
+      setReason('')
+      onApplied()
+    },
   })
-  const preview = previewMutation.data
   const reasonValid = reason.trim().length >= 10
 
   if (!open) return <div className="nx-treasury__actions" style={{ marginTop: 16 }}><Button variant="secondary" onClick={() => setOpen(true)}>Corregir plan de pagos</Button></div>
@@ -403,22 +413,23 @@ function CorrectPlanSection({ scheduleId, contract, currency, onApplied }: {
       <Input label="Vencimiento del anticipo" type="date" value={terms.advanceDueDate} onChange={(e) => setTerms({ ...terms, advanceDueDate: e.target.value })} />
       <Input label="Retención (%)" value={terms.retentionPercentage} onChange={(e) => setTerms({ ...terms, retentionPercentage: e.target.value })} />
       <div className="nx-treasury__actions">
-        <Button variant="secondary" loading={previewMutation.isPending} onClick={() => previewMutation.mutate()}>Previsualizar cambios</Button>
+        <Button variant="secondary" loading={previewMutation.isPending || amendmentPreviewMutation.isPending} onClick={() => { amendmentPreviewMutation.reset(); previewMutation.mutate() }}>Previsualizar cambios</Button>
         <Button variant="secondary" onClick={() => { setOpen(false); previewMutation.reset() }}>Cancelar</Button>
       </div>
       {previewMutation.isError ? <p className="nx-field__error" role="alert">{previewMutation.error instanceof ApiError ? previewMutation.error.message : 'No se pudo previsualizar.'}</p> : null}
+      {amendmentPreviewMutation.isError ? <p className="nx-field__error" role="alert">{amendmentPreviewMutation.error instanceof ApiError ? amendmentPreviewMutation.error.message : 'No se pudo previsualizar la enmienda.'}</p> : null}
       {preview ? <>
-        {preview.blocked ? <p className="nx-field__error" role="alert">{preview.blockedReason ?? 'El plan tiene pagos aplicados; no puede recalcularse.'}</p> : null}
+        {preview.blocked ? <div className="nx-field__error" role="alert"><p>{preview.blockedReason ?? 'El plan tiene pagos aplicados; no puede recalcularse.'}</p><Button variant="secondary" loading={amendmentPreviewMutation.isPending} onClick={() => amendmentPreviewMutation.mutate()}>Previsualizar enmienda formal</Button></div> : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 12 }}>
           <SnapshotTable title="ANTES" snapshot={preview.before} currency={currency} />
           {preview.after ? <SnapshotTable title="DESPUÉS" snapshot={preview.after} currency={currency} /> : null}
         </div>
-        {!preview.blocked ? <>
+        {(!preview.blocked || isAmendment) ? <>
           <label className="nx-field" style={{ marginTop: 12 }}>
-            <span className="nx-field__label">Motivo de la corrección (obligatorio)</span>
-            <textarea className="nx-input" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Por qué se corrige el plan (mínimo 10 caracteres)" />
+            <span className="nx-field__label">Motivo de la {isAmendment ? 'enmienda formal' : 'corrección'} (obligatorio)</span>
+            <textarea className="nx-input" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={isAmendment ? 'Por qué se enmienda el plan (mínimo 10 caracteres)' : 'Por qué se corrige el plan (mínimo 10 caracteres)'} />
           </label>
-          <div className="nx-treasury__actions"><Button loading={applyMutation.isPending} disabled={!reasonValid} onClick={() => applyMutation.mutate()}>Aplicar corrección</Button></div>
+          <div className="nx-treasury__actions"><Button loading={applyMutation.isPending} disabled={!reasonValid} onClick={() => applyMutation.mutate()}>{isAmendment ? 'Aplicar enmienda formal' : 'Aplicar corrección'}</Button></div>
           {applyMutation.isError ? <p className="nx-field__error" role="alert">{applyMutation.error instanceof ApiError ? applyMutation.error.message : 'No se pudo aplicar la corrección.'}</p> : null}
         </> : null}
       </> : null}

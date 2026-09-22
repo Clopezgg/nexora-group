@@ -56,7 +56,7 @@ async function assertSapTreeIconIntegrity() {
     if (text) failures.push('visible IconName token: ' + text)
     if (rect.width < 12 || rect.height < 12) failures.push('clipped icon')
     return failures.length ? [failures.join('; ')] : []
-  })
+  }))
 }
 
 

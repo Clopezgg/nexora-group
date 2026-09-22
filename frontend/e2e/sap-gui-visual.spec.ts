@@ -151,6 +151,24 @@ async function setTheme(page: Page, themeId: string) {
   await expect.poll(() => page.locator('html').getAttribute('data-nx-theme')).toBe(themeId)
 }
 
+
+async function assertSapTreeIconIntegrity(page: Page, label: string) {
+  const failures = await page.locator('.nx-sap-tree__link-icon:visible').evaluateAll((nodes) => nodes.flatMap((node) => {
+    const icon = node.querySelector('svg.nx-icon')
+    const token = (node.textContent ?? '').trim()
+    const link = node.closest('a')
+    const iconRect = node.getBoundingClientRect()
+    const labelRect = link ? Array.from(link.childNodes).filter((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim()).map(() => link.getBoundingClientRect())[0] : undefined
+    const reasons: string[] = []
+    if (!icon) reasons.push('missing svg.nx-icon')
+    if (token) reasons.push('visible IconName token: ' + token)
+    if (iconRect.width < 12 || iconRect.height < 12) reasons.push('clipped icon')
+    if (labelRect && iconRect.right > labelRect.right + 1) reasons.push('icon outside link bounds')
+    return reasons.length ? [reasons.join('; ')] : []
+  })
+  expect(failures, label + ': SAP tree icons must be SVG and never leak IconName text').toEqual([])
+}
+
 async function captureRoute(
   page: Page,
   variant: (typeof VARIANTS)[number],
@@ -177,6 +195,7 @@ async function captureRoute(
     expect(response?.status(), `${variant} ${viewport.name} ${path}: HTTP`).toBeLessThan(500)
     await expect(page.locator('main')).toBeVisible({ timeout: 15_000 })
     await expect(page.locator('body')).not.toContainText('Application error')
+    await assertSapTreeIconIntegrity(page, `${variant} ${viewport.name} ${path}`)
     const overflow = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,

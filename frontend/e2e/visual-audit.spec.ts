@@ -71,6 +71,24 @@ async function ensureCompany(request: APIRequestContext) {
   expect(created.ok(), `crear compañía -> ${created.status()}`).toBeTruthy()
 }
 
+
+async function assertSapTreeIconIntegrity(page: Page, label: string) {
+  const failures = await page.locator('.nx-sap-tree__link-icon:visible').evaluateAll((nodes) => nodes.flatMap((node) => {
+    const icon = node.querySelector('svg.nx-icon')
+    const token = (node.textContent ?? '').trim()
+    const link = node.closest('a')
+    const iconRect = node.getBoundingClientRect()
+    const labelRect = link ? Array.from(link.childNodes).filter((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim()).map(() => link.getBoundingClientRect())[0] : undefined
+    const reasons: string[] = []
+    if (!icon) reasons.push('missing svg.nx-icon')
+    if (token) reasons.push('visible IconName token: ' + token)
+    if (iconRect.width < 12 || iconRect.height < 12) reasons.push('clipped icon')
+    if (labelRect && iconRect.right > labelRect.right + 1) reasons.push('icon outside link bounds')
+    return reasons.length ? [reasons.join('; ')] : []
+  })
+  expect(failures, label + ': SAP tree icons must be SVG and never leak IconName text').toEqual([])
+}
+
 async function assertNoHorizontalScroll(page: Page, label: string) {
   const o = await page.evaluate(() => {
     const el = document.documentElement
@@ -167,6 +185,7 @@ function auditViewport(vp: (typeof VIEWPORTS)[number]) {
 
         const label = `${vp.name} ${route.path}`
         await assertNoHorizontalScroll(page, label)
+        await assertSapTreeIconIntegrity(page, label)
         await assertNothingOverflowsViewport(page, label)
         if (vp.width <= 430) await assertTouchTargets(page, label)
 

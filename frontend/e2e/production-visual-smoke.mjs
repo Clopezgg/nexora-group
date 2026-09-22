@@ -47,6 +47,18 @@ const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
 const failures = []
+async function assertSapTreeIconIntegrity() {
+  return page.locator('.nx-sap-tree__link-icon:visible').evaluateAll((nodes) => nodes.flatMap((node) => {
+    const text = (node.textContent ?? '').trim()
+    const rect = node.getBoundingClientRect()
+    const failures = []
+    if (!node.querySelector('svg.nx-icon')) failures.push('missing svg.nx-icon')
+    if (text) failures.push('visible IconName token: ' + text)
+    if (rect.width < 12 || rect.height < 12) failures.push('clipped icon')
+    return failures.length ? [failures.join('; ')] : []
+  })
+}
+
 
 try {
   await page.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 45_000 })
@@ -89,6 +101,7 @@ try {
         if (bodyText.includes('Application error')) {
           failures.push(`${viewport.name} ${route}: Application error visible`)
         }
+        for (const issue of await assertSapTreeIconIntegrity()) failures.push(`${viewport.name} ${route}: SAP tree IconName leakage: ${issue}`)
 
         const overflow = await page.evaluate(() => ({
           scrollWidth: document.documentElement.scrollWidth,

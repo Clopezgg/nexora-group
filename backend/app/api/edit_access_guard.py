@@ -21,7 +21,7 @@ _PROTECTED_COMMANDS = {
     "receive", "issue-to-project", "transfer", "return-to-supplier",
     "hard-close", "execute", "baseline", "submit", "reject", "respond", "response",
     "decision", "status", "redistribute-unassigned", "retention-releases",
-    "rebuild", "generate-monthly-periods", "advance-invoice",
+    "rebuild", "amendment", "generate-monthly-periods", "advance-invoice",
     "override", "accept", "convert", "bill",
 }
 _PROTECTED_POST_PATHS = {

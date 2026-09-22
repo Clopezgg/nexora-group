@@ -1292,3 +1292,51 @@ def propose_fifo(
         )
         remaining -= applied
     return proposal
+
+
+def _amendment_snapshot(rows, paid_by_id, actions):
+    return {"totalScheduled": str(sum((_q(row.scheduled_amount) for row in rows if row.status != "CANCELLED"), _ZERO)), "installments": [{"installmentId": str(row.id), "kind": row.installment_kind, "periodLabel": "Anticipo" if row.installment_kind == "ADVANCE" else period_label(row.period_year, row.period_month), "dueDate": row.due_date.isoformat(), "scheduledAmount": str(_q(row.scheduled_amount)), "retentionAmount": str(_q(row.retention_amount)), "netDue": str(_q(row.net_due)), "paid": str(_q(paid_by_id.get(row.id, _ZERO))), "status": row.status, "action": actions.get(row.id, "PRESERVED")} for row in rows]}
+
+def preview_schedule_amendment(db: Session, *, schedule: ContractPaymentSchedule, regular_months: int, first_period: date, due_day: int = 1, advance_amount: Decimal | None = None, advance_due_date: date | None = None, retention_percentage: Decimal | None = None, lock: bool = False, apply: bool = False):
+    """Formal amendment: payments/allocations stay attached to immutable installments."""
+    stmt = select(ContractPaymentInstallment).where(ContractPaymentInstallment.schedule_id == schedule.id).order_by(ContractPaymentInstallment.sequence)
+    if lock: stmt = stmt.with_for_update()
+    existing = list(db.execute(stmt).scalars())
+    paid_rows = db.execute(select(ContractPaymentAllocation.installment_id, func.coalesce(func.sum(ContractPaymentAllocation.amount_applied), 0)).where(ContractPaymentAllocation.installment_id.in_([row.id for row in existing]), ContractPaymentAllocation.reversed_at.is_(None)).group_by(ContractPaymentAllocation.installment_id)).all() if existing else []
+    paid_by_id = {installment_id: _q(amount) for installment_id, amount in paid_rows}
+    before = _amendment_snapshot(existing, paid_by_id, {})
+    _contract, target_rows, _target = build_rebuild_rows(db, schedule=schedule, regular_months=regular_months, first_period=first_period, due_day=due_day, advance_amount=advance_amount, advance_due_date=advance_due_date, retention_percentage=retention_percentage)
+    def key(row): return (row["installment_kind"], row["period_year"], row["period_month"])
+    targets = {key(row): row for row in target_rows}
+    existing_by_key = {(row.installment_kind, row.period_year, row.period_month): row for row in existing}
+    actions = {}
+    for old_key, row in existing_by_key.items():
+        paid = paid_by_id.get(row.id, _ZERO); target = targets.pop(old_key, None)
+        if paid > _ZERO:
+            if target is None: raise InvalidFinancialReferenceError("Una cuota con pagos aplicados no puede ser cancelada por una enmienda.")
+            if _q(target["scheduled_amount"]) < paid: raise OverpaymentError("Una cuota parcialmente pagada no puede reducirse por debajo de lo ya aplicado.")
+            if (_q(target["scheduled_amount"]), _q(target["retention_amount"]), _q(target["net_due"])) != (_q(row.scheduled_amount), _q(row.retention_amount), _q(row.net_due)): raise InvalidFinancialReferenceError("Las cuotas con pagos aplicados conservan su importe contractual e historial.")
+            actions[row.id] = "PRESERVED_PAID"; continue
+        if target is None:
+            actions[row.id] = "CANCELLED"
+            if apply: row.status = "CANCELLED"
+            continue
+        changed = row.due_date != target["due_date"] or _q(row.scheduled_amount) != _q(target["scheduled_amount"]) or _q(row.retention_amount) != _q(target["retention_amount"]) or _q(row.net_due) != _q(target["net_due"])
+        actions[row.id] = "MODIFIED" if changed else "PRESERVED"
+        if apply:
+            row.due_date, row.scheduled_amount, row.retention_amount, row.net_due, row.description, row.status = target["due_date"], _q(target["scheduled_amount"]), _q(target["retention_amount"]), _q(target["net_due"]), target.get("description"), "UPCOMING"
+    created=[]; next_sequence=max((row.sequence for row in existing), default=0)+1
+    for target in sorted(targets.values(), key=lambda row: (_KIND_ORDER[row["installment_kind"]], row["period_year"], row["period_month"])):
+        row=ContractPaymentInstallment(schedule_id=schedule.id, sequence=next_sequence, installment_kind=target["installment_kind"], period_year=target["period_year"], period_month=target["period_month"], due_date=target["due_date"], scheduled_amount=_q(target["scheduled_amount"]), retention_amount=_q(target["retention_amount"]), net_due=_q(target["net_due"]), status="UPCOMING", description=target.get("description")); next_sequence+=1; created.append(row)
+        if apply: db.add(row)
+    after_rows=existing+created
+    active_total=sum((_q(row.scheduled_amount) for row in after_rows if actions.get(row.id) != "CANCELLED" and row.status != "CANCELLED"), _ZERO)
+    contract=db.get(SupplierContract, schedule.supplier_contract_id)
+    if contract is None or active_total != _q(contract.value): raise InvalidFinancialReferenceError("La enmienda debe conservar exactamente el valor contractual después de preservar los pagos históricos.")
+    if apply:
+        db.flush(); schedule.total_scheduled=active_total; schedule.due_day=due_day
+        active_rows=[row for row in after_rows if row.status != "CANCELLED"]; schedule.start_period=min(date(row.period_year,row.period_month,1) for row in active_rows); schedule.end_period=max(date(row.period_year,row.period_month,1) for row in active_rows); db.flush()
+    for row in created: actions[row.id]="NEW"
+    return before, _amendment_snapshot(after_rows, paid_by_id, actions)
+
+def apply_schedule_amendment(db: Session, **kwargs): return preview_schedule_amendment(db, lock=True, apply=True, **kwargs)

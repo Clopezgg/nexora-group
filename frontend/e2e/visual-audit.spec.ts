@@ -168,6 +168,13 @@ function auditViewport(vp: (typeof VIEWPORTS)[number]) {
         const label = `${vp.name} ${route.path}`
         await assertNoHorizontalScroll(page, label)
         await assertNothingOverflowsViewport(page, label)
+        const sapIconLeaks = await page.locator('.nx-sap-tree__link-icon:visible').evaluateAll((icons) =>
+          icons.flatMap((icon) => {
+            const text = (icon.textContent ?? '').trim()
+            return icon.querySelector('svg.nx-icon') && !text ? [] : [text || 'missing SVG']
+          }),
+        )
+        expect(sapIconLeaks, `${label}: SAP icons must not leak IconName text`).toEqual([])
         if (vp.width <= 430) await assertTouchTargets(page, label)
 
         // Errores nuevos en esta ruta.

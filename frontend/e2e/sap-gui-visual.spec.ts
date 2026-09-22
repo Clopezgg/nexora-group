@@ -186,6 +186,14 @@ async function captureRoute(
       `${variant} ${viewport.name} ${path}: sin overflow de documento`,
     ).toBeLessThanOrEqual(overflow.clientWidth + 1)
     await page.waitForLoadState('networkidle')
+    const sapIconFailures = await page.locator('.nx-sap-tree__link-icon:visible').evaluateAll((icons) =>
+      icons.flatMap((icon) => {
+        const text = (icon.textContent ?? '').trim()
+        const svg = icon.querySelector('svg.nx-icon')
+        return svg && !text ? [] : [`svg=${Boolean(svg)} text=${text || '∅'}`]
+      }),
+    )
+    expect(sapIconFailures, 'SAP Easy Access icons must be SVGs, never IconName text').toEqual([])
     if (viewport.width > 1024) {
       const columns = await page.evaluate(() => {
         const sidebar = document.querySelector('.nx-sap-workarea > .nx-sap-sidebar')?.getBoundingClientRect()

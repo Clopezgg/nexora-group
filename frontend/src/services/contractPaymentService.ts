@@ -162,6 +162,19 @@ export const contractPaymentService = {
       { method: 'POST', body: JSON.stringify(body) },
     ),
 
+  // Enmienda formal: conserva las cuotas con allocations activas.
+  previewAmendment: (scheduleId: string, terms: RebuildTerms) =>
+    apiFetch<SchedulePreview>(
+      `/contract-payments/schedules/${encodeURIComponent(scheduleId)}/amendment/preview`,
+      { method: 'POST', body: JSON.stringify(terms) },
+    ),
+
+  amendPlan: (scheduleId: string, body: RebuildTerms & { reason: string }) =>
+    apiFetch<ContractSchedule>(
+      `/contract-payments/schedules/${encodeURIComponent(scheduleId)}/amendment`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   prepareAdvanceInvoice: (
     scheduleId: string,
     body: { payableAccountId: string; costCenterId?: string; amount?: string },

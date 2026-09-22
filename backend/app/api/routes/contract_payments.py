@@ -469,6 +469,80 @@ def _rebuild_prechecks(db: Session, schedule_id: uuid.UUID, *, regular_months: i
     return schedule, blocked_reason
 
 
+
+@router.post("/schedules/{schedule_id}/amendment/preview", response_model=SchedulePreviewResponse)
+def preview_schedule_amendment(
+    schedule_id: uuid.UUID,
+    payload: SchedulePreviewRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("contract.payment_schedule", "read")),
+) -> SchedulePreviewResponse:
+    """Previsualiza una enmienda que conserva las cuotas ya aplicadas."""
+    if not payload.regular_months or not payload.first_period:
+        raise HTTPException(status_code=422, detail="Indica \`regularMonths\` y \`firstPeriod\`.")
+    schedule = _schedule_or_404(db, schedule_id)
+    assert_company_access(
+        db, user_id=user.id, resource="contract.payment_schedule", action="read",
+        company_id=schedule.company_id,
+    )
+    before, after = cps.preview_schedule_amendment(
+        db,
+        schedule=schedule,
+        regular_months=payload.regular_months,
+        first_period=payload.first_period,
+        due_day=payload.due_day,
+        retention_percentage=payload.retention_percentage,
+    )
+    return SchedulePreviewResponse(
+        blocked=False,
+        before=SchedulePlanSnapshot(**before),
+        after=SchedulePlanSnapshot(**after),
+    )
+
+
+@router.post("/schedules/{schedule_id}/amendment", response_model=ScheduleResponse)
+def amend_schedule(
+    schedule_id: uuid.UUID,
+    payload: ScheduleRebuildRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("contract.payment_schedule", "manage")),
+    correlation_id: str = Depends(get_correlation_id),
+) -> ScheduleResponse:
+    """Enmienda formal auditada que preserva allocations activas."""
+    if len((payload.reason or "").strip()) < 10:
+        raise HTTPException(status_code=422, detail="Indica un motivo (mínimo 10 caracteres).")
+    if not payload.regular_months or not payload.first_period:
+        raise HTTPException(status_code=422, detail="Indica \`regularMonths\` y \`firstPeriod\`.")
+    schedule = _schedule_or_404(db, schedule_id)
+    assert_company_access(
+        db, user_id=user.id, resource="contract.payment_schedule", action="manage",
+        company_id=schedule.company_id,
+    )
+    before, after = cps.apply_schedule_amendment(
+        db,
+        schedule=schedule,
+        regular_months=payload.regular_months,
+        first_period=payload.first_period,
+        due_day=payload.due_day,
+        retention_percentage=payload.retention_percentage,
+    )
+    audit_service.record(
+        db,
+        actor_user_id=user.id,
+        action="contract.payment_schedule.amendment",
+        entity_type="contract.payment_schedule",
+        entity_id=schedule.id,
+        company_id=schedule.company_id,
+        project_id=schedule.project_id,
+        before=before,
+        after={**after, "reason": payload.reason, "preservesActiveAllocations": True},
+        correlation_id=correlation_id,
+    )
+    db.commit()
+    db.refresh(schedule)
+    return _schedule_payload(db, schedule)
+
+
 @router.post("/schedules/{schedule_id}/rebuild/preview", response_model=SchedulePreviewResponse)
 def preview_rebuild_schedule(
     schedule_id: uuid.UUID,

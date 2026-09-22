@@ -175,3 +175,67 @@ def test_rebuild_is_blocked_once_an_installment_has_an_active_payment(client, db
         json=_rebuild_terms(),
     )
     assert applied.status_code == 409, applied.text
+
+
+def test_formal_amendment_preserves_active_allocations_and_audits(client, db_session):
+    login_admin(client)
+    company = create_company(client)
+    supplier = create_supplier(client, company_id=company["id"])
+    contract = _contract(
+        client, company_id=company["id"], supplier_id=supplier["id"],
+        value="1500000.00", number="CTR-RB-4",
+    )
+    schedule = _monthly_plan(
+        db_session, contract["id"], count=7, monthly="214285.71", total="1500000.00"
+    )
+    bank_gl = create_account(client, company_id=company["id"], code="1102", name="Banco", account_type="ASSET")
+    bank = create_treasury_account(client, company_id=company["id"], gl_account_id=bank_gl["id"])
+    expense = create_account(client, company_id=company["id"], code="5101", name="Costo obra", account_type="EXPENSE")
+    payable = create_account(client, company_id=company["id"], code="2101", name="CxP", account_type="LIABILITY")
+
+    first = cps.installment_summaries(db_session, schedule_id=schedule.id)[0]
+    invoice = client.post(
+        "/api/ap/supplier-invoices",
+        json={
+            "companyId": company["id"], "supplierId": supplier["id"],
+            "invoiceNumber": "F-RB-1", "scope": "GENERAL",
+            "expenseAccountId": expense["id"], "payableAccountId": payable["id"],
+            "currencyCode": "HNL", "amount": "214285.71", "invoiceDate": "2026-09-01",
+            "dueDate": "2026-09-30", "supplierContractId": contract["id"],
+        },
+    ).json()
+    client.post(f"/api/ap/supplier-invoices/{invoice['id']}/approve")
+    pay = client.post(
+        f"/api/ap/supplier-invoices/{invoice['id']}/payments",
+        json={
+            "treasuryAccountId": bank["id"], "amount": "214285.71", "paymentDate": "2026-09-03",
+            "contractAllocations": [
+                {"installmentId": str(first.installment_id), "amountApplied": "214285.71"}
+            ],
+        },
+    )
+    assert pay.status_code == 201, pay.text
+
+    amended = client.post(
+        f"/api/contract-payments/schedules/{schedule.id}/amendment",
+        json=_rebuild_terms(
+            reason="Enmienda formal después del pago aplicado",
+            firstPeriod="2026-10-01",
+        ),
+    )
+    assert amended.status_code == 200, amended.text
+    body = amended.json()
+    assert body["totalScheduled"] == "1500000.00"
+
+    db_session.expire_all()
+    summaries = cps.installment_summaries(db_session, schedule_id=schedule.id)
+    paid = next(s for s in summaries if s.installment_id == first.installment_id)
+    assert paid.paid == Decimal("214285.71")
+    assert len(summaries) == 8  # cuota preservada + siete cuotas del saldo
+
+    audit = client.get(
+        f"/api/audit?companyId={company['id']}&entityType=contract.payment_schedule"
+    ).json()
+    entry = next(e for e in audit if e["action"] == "contract.payment_schedule.amendment")
+    assert entry["after"]["preservesActiveAllocations"] is True
+    assert entry["after"]["reason"].startswith("Enmienda formal")

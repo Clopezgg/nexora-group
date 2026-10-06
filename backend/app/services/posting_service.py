@@ -100,17 +100,19 @@ def _validate_tax_lines(tax_lines: list[tuple[uuid.UUID, Decimal, Decimal]] | No
 def _validate_line_scope(
     scope: str, document_project_id: uuid.UUID | None, lines: list[JournalLineInput]
 ) -> None:
-    """A PROJECT posting cannot silently carry lines for another/no project.
+    """Validate project dimensions without forcing callers to duplicate header context.
 
+    For PROJECT documents, an omitted line project_id inherits the document
+    project. An explicitly supplied project must equal the header project.
     CENTRAL/GENERAL may still carry project dimensions on individual lines for
     legitimate allocations; the header itself remains project-less.
     """
     if scope != "PROJECT":
         return
     for line in lines:
-        if line.project_id != document_project_id:
+        if line.project_id is not None and line.project_id != document_project_id:
             raise InvalidOperationScopeError(
-                "scope=PROJECT requiere que cada línea use el mismo project_id del documento"
+                "scope=PROJECT no permite que una línea use un project_id distinto al documento"
             )
 
 
@@ -259,6 +261,7 @@ def post_manual(
     db.flush()
 
     for line in lines:
+        line_project_id = project_id if scope == "PROJECT" and line.project_id is None else line.project_id
         db.add(
             JournalLine(
                 accounting_document_id=document.id,
@@ -266,7 +269,7 @@ def post_manual(
                 debit_amount=line.debit_amount,
                 credit_amount=line.credit_amount,
                 description=line.description,
-                project_id=line.project_id,
+                project_id=line_project_id,
                 cost_center_id=line.cost_center_id,
                 extra_dimensions=line.extra_dimensions,
             )
@@ -348,6 +351,8 @@ def reverse_document(
         lines=reversal_lines,
         description=f"Reversal de {original.document_number}: {reason}",
         effective_date=reversal_effective_date,
+        source_type=link.source_type if link is not None else None,
+        source_id=link.source_id if link is not None else None,
         commit=False,
     )
     original.status = "REVERSED"

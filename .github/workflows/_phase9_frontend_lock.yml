@@ -3,6 +3,8 @@ name: _phase9_frontend_lock
 on:
   workflow_dispatch:
   pull_request:
+  push:
+    branches: [fix/phases9-15-hardening-20261006]
 
 jobs:
   lock:

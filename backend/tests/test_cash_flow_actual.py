@@ -194,7 +194,7 @@ def test_batch_of_historical_remittances_spreads_across_their_real_weeks(client)
     Las fechas se generan relativas a la semana empresarial actual para que la
     prueba siga siendo determinista aunque avance el calendario del CI.
     """
-    from datetime import date, timedelta
+    from datetime import timedelta
 
     from app.core.business_time import business_today
 

@@ -213,7 +213,6 @@ def post_manual(
 ) -> AccountingDocument:
     _validate_scope(scope, project_id)
     _validate_balance(lines)
-    _validate_line_scope(scope, project_id, lines)
     _validate_tax_lines(tax_lines)
     if fx_rate <= 0:
         raise InvalidFinancialReferenceError("fx_rate debe ser mayor que cero")
@@ -234,6 +233,7 @@ def post_manual(
     _validate_financial_references(
         db, company_id=company_id, document_project_id=project_id, lines=lines
     )
+    _validate_line_scope(scope, project_id, lines)
     posting_date = effective_date or business_today()
     _assert_fiscal_period_allows_posting(
         db, company_id=company_id, as_of=posting_date, document_type_code=document_type_code

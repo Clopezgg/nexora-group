@@ -1,0 +1,27 @@
+name: Phase 8 Lock Refresh
+
+on:
+  push:
+    branches:
+      - fix/phase8-accounting-posting-integrity-20261006
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Refresh lockfile without installing scripts
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+      - name: Upload refreshed lockfile
+        uses: actions/upload-artifact@v6
+        with:
+          name: phase8-refreshed-package-lock
+          path: frontend/package-lock.json
+          if-no-files-found: error

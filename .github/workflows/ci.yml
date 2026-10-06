@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -73,6 +76,22 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
+      - name: Synchronize frontend lockfile
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+      - name: Persist synchronized frontend lockfile
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- frontend/package-lock.json; then
+            echo "Frontend lockfile already synchronized"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/package-lock.json
+          git commit -m "fix(phase8): synchronize frontend lockfile"
+          git push origin "HEAD:${{ github.head_ref }}"
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -175,6 +194,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
+      - name: Synchronize frontend lockfile for E2E
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit
       - name: Install backend dependencies in E2E virtualenv
         working-directory: backend
         run: |

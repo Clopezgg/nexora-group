@@ -1,0 +1,22 @@
+name: _phase9_frontend_lock
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Generate patched lockfile
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+      - name: Upload lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase9-frontend-package-lock
+          path: frontend/package-lock.json

@@ -3,10 +3,8 @@ name: _Regenerate Frontend Lockfile
 on:
   push:
     branches: [fix/phases9-15-certified-20261006]
-    paths:
-      - "frontend/package.json"
-      - "frontend/package-lock.json"
-      - ".github/workflows/_regen_frontend_lock.yml"
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read

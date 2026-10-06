@@ -118,6 +118,10 @@ def assert_supplier_belongs_to_company(
         raise InvalidFinancialReferenceError(
             "supplier_id debe pertenecer a la compañía propietaria"
         )
+    if supplier.status in ("BLOCKED", "ARCHIVED"):
+        raise InvalidFinancialReferenceError(
+            f"El proveedor / contratista está {supplier.status} y no admite nuevas operaciones"
+        )
     return supplier
 
 

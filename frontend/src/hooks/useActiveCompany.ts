@@ -1,5 +1,6 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '../features/auth/auth-context'
 import { masterDataService } from '../services/masterDataService'
 
 const STORAGE_KEY = 'nexora.activeCompanyId'
@@ -64,11 +65,16 @@ export function resolveActiveCompanyId(
  * Selección global de compañía. Todos los consumidores comparten el mismo
  * TanStack Query cache y el mismo ID seleccionado, evitando que cada página
  * mantenga una compañía distinta de forma accidental.
+ *
+ * The authenticated user is part of the query identity so a logout/login
+ * transition cannot reuse another user's cached company list.
  */
 export function useActiveCompany() {
+  const { user, isAuthenticated } = useAuth()
   const companiesQuery = useQuery({
-    queryKey: ['master-data', 'companies'],
+    queryKey: ['master-data', 'companies', user?.id ?? null],
     queryFn: masterDataService.listCompanies,
+    enabled: isAuthenticated && Boolean(user?.id),
   })
   const selectedId = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   const companies = useMemo(

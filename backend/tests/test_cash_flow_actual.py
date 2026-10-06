@@ -189,30 +189,61 @@ def test_internal_transfer_is_not_a_cash_flow_movement(client):
 
 
 def test_batch_of_historical_remittances_spreads_across_their_real_weeks(client):
-    """§26 — diez remesas con fechas económicas de julio y agosto,
-    importadas/contabilizadas el mismo día, NO se concentran en una semana:
-    cada una cae en la semana de su fecha real y el total reconcilia."""
+    """§26 — diez remesas históricas se distribuyen por su fecha económica.
+
+    Las fechas se generan relativas a la semana empresarial actual para que la
+    prueba siga siendo determinista aunque avance el calendario del CI.
+    """
+    from datetime import timedelta
+
+    from app.core.business_time import business_today
+
     login_admin(client)
     company, bank = _company_with_bank(client)
-    equity = create_account(client, company_id=company["id"], code="3100", name="Aportes", account_type="EQUITY")
+    equity = create_account(
+        client,
+        company_id=company["id"],
+        code="3100",
+        name="Aportes",
+        account_type="EQUITY",
+    )
 
-    fechas = [
-        "2026-07-02", "2026-07-11", "2026-07-13", "2026-07-18", "2026-07-25",
-        "2026-07-27", "2026-07-29", "2026-08-04", "2026-08-08", "2026-08-15",
+    anchor = business_today()
+    current_week_start = anchor - timedelta(days=anchor.weekday())
+    # Diez movimientos repartidos en seis semanas ISO dentro de la ventana
+    # histórica de 13 semanas del endpoint.
+    offsets = [
+        (6, 0), (6, 4),
+        (5, 1), (5, 5),
+        (4, 0), (3, 2),
+        (2, 1), (1, 3),
+        (0, 1), (0, 3),
     ]
+    fechas = [
+        current_week_start - timedelta(weeks=weeks_ago) + timedelta(days=day_offset)
+        for weeks_ago, day_offset in offsets
+    ]
+    fechas = [f for f in fechas if f <= anchor]
+    assert len(fechas) == 10
+    assert len({(f - timedelta(days=f.weekday())).isoformat() for f in fechas}) >= 6
+
     for f in fechas:
         _remittance(
-            client, company, bank, counter_id=equity["id"],
-            origin_type="CAPITAL_CONTRIBUTION", amount="1000.00", remittance_date=f,
+            client,
+            company,
+            bank,
+            counter_id=equity["id"],
+            origin_type="CAPITAL_CONTRIBUTION",
+            amount="1000.00",
+            remittance_date=f.isoformat(),
         )
 
-    cf = client.get(f"/api/financial-control/cash-flow-actual?companyId={company['id']}").json()
+    cf = client.get(
+        f"/api/financial-control/cash-flow-actual?companyId={company['id']}"
+    ).json()
     weeks_with_inflow = [w for w in cf["weeks"] if Decimal(w["inflows"]) > 0]
-    # 10 fechas distintas repartidas en >= 6 semanas ISO distintas.
     assert len(weeks_with_inflow) >= 6
-    # Ninguna semana concentra más de 3 (la más poblada de julio tiene 3).
     assert max(Decimal(w["inflows"]) for w in weeks_with_inflow) <= Decimal("3000.00")
-    # El total reconcilia exactamente con lo aportado.
     assert Decimal(cf["totalInflows"]) == Decimal("10000.00")
     assert Decimal(cf["closingBalance"]) == Decimal("10000.00")
 

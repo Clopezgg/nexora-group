@@ -103,6 +103,70 @@ test('Critical Journey: login through GL/reports/audit, one continuous real reco
     projectId = project.id
   })
 
+  await test.step('construction controls: RFI + Submittal lifecycle', async () => {
+    const rfi = await api<any>(page.request, 'post', '/rfis', {
+      companyId: companyId,
+      projectId: projectId,
+      subject: 'RFI Critical Journey',
+      question: 'Confirmar detalle constructivo para el recorrido E2E.',
+      responsible: 'Responsable de obra E2E',
+      dueDate: new Date(Date.now() + 4 * 86_400_000).toISOString().slice(0, 10),
+    })
+    expect(rfi.status).toBe('OPEN')
+
+    const respondedRfi = await api<any>(
+      page.request,
+      'post',
+      `/rfis/${rfi.id}/respond`,
+      { response: 'Respuesta técnica registrada en el recorrido E2E.' },
+    )
+    expect(respondedRfi.status).toBe('ANSWERED')
+
+    const closedRfi = await api<any>(page.request, 'post', `/rfis/${rfi.id}/close`, {})
+    expect(closedRfi.status).toBe('CLOSED')
+
+    const submittal = await api<any>(page.request, 'post', '/submittals', {
+      companyId: companyId,
+      projectId: projectId,
+      title: 'Submittal Critical Journey',
+      description: 'Submittal del recorrido de certificación.',
+      submittedAt: new Date().toISOString().slice(0, 10),
+      dueDate: new Date(Date.now() + 6 * 86_400_000).toISOString().slice(0, 10),
+    })
+    expect(submittal.status).toBe('SUBMITTED')
+
+    const respondedSubmittal = await api<any>(
+      page.request,
+      'post',
+      `/submittals/${submittal.id}/response`,
+      { response: 'Revisión técnica registrada en el recorrido E2E.' },
+    )
+    expect(respondedSubmittal.status).toBe('UNDER_REVIEW')
+
+    const decidedSubmittal = await api<any>(
+      page.request,
+      'post',
+      `/submittals/${submittal.id}/decision`,
+      { decision: 'APPROVED' },
+    )
+    expect(decidedSubmittal.status).toBe('APPROVED')
+
+    const rfis = await api<any[]>(
+      page.request,
+      'get',
+      `/rfis?companyId=${companyId}&projectId=${projectId}`,
+    )
+    expect(rfis.some((item) => item.id === rfi.id && item.status === 'CLOSED')).toBeTruthy()
+
+    const submittals = await api<any[]>(
+      page.request,
+      'get',
+      `/submittals?companyId=${companyId}&projectId=${projectId}`,
+    )
+    expect(submittals.some((item) => item.id === submittal.id && item.status === 'APPROVED')).toBeTruthy()
+  })
+
+
   await test.step('WBS', async () => {
     await page.goto('/proyectos/wbs')
     await page.getByLabel('Código', { exact: true }).fill('01')

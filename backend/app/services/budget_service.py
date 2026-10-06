@@ -95,8 +95,6 @@ def create_baseline(
     notes: str | None = None,
     commit: bool = True,
 ) -> Budget:
-    # Lock the project before checking the invariant so two concurrent setup
-    # requests cannot both observe "no BASELINE" and create competing roots.
     project = project_repository.get_by_id_for_update(db, project_id)
     if project is None:
         raise ValueError(f"Project {project_id} no existe")
@@ -156,12 +154,7 @@ def _apply_change_order_delta(
     wbs_node_id: uuid.UUID | None,
     delta: Decimal,
 ) -> None:
-    """Apply a change without ever persisting a negative BudgetLine amount.
-
-    Positive deltas add authorized capacity. Negative deltas reduce existing
-    lines for the affected WBS and fail closed if the requested reduction is
-    greater than the authorized amount.
-    """
+    """Apply a change without ever persisting a negative/zero BudgetLine."""
     if delta == 0:
         return
     if delta > 0:
@@ -175,12 +168,17 @@ def _apply_change_order_delta(
         return
 
     remaining = -delta
-    candidates = budget_repository.list_lines(db, revised_budget_id)
-    candidates = [line for line in candidates if line.wbs_node_id == wbs_node_id]
+    candidates = [
+        line
+        for line in budget_repository.list_lines(db, revised_budget_id)
+        if line.wbs_node_id == wbs_node_id
+    ]
     for line in candidates:
         reduction = min(line.authorized_amount, remaining)
         line.authorized_amount -= reduction
         remaining -= reduction
+        if line.authorized_amount == 0:
+            db.delete(line)
         if remaining == 0:
             break
     if remaining > 0:
@@ -188,9 +186,6 @@ def _apply_change_order_delta(
             "La reducción de presupuesto de la ChangeOrder excede el autorizado "
             "del WBS seleccionado"
         )
-    # Delete zero-value adjustment rows created only by a reduction. This is
-    # deliberately avoided for pre-existing lines: they remain historical
-    # rows and are simply reduced to zero.
 
 
 def approve_change_order(
@@ -209,7 +204,6 @@ def approve_change_order(
             f"Solo se puede aprobar una ChangeOrder en estado SUBMITTED (actual: {change_order.status})"
         )
 
-    # Serialize all revisions for a project on the same project row.
     project = project_repository.get_by_id_for_update(db, change_order.project_id)
     if project is None:
         raise ValueError(f"Project {change_order.project_id} no existe")

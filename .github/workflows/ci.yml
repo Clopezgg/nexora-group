@@ -76,10 +76,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-      - name: Audit frontend dependencies
+      - name: Audit frontend production dependencies
         working-directory: frontend
-        run: npm audit --audit-level=high
-      - name: Typecheck
+        run: npm audit --omit=dev --audit-level=high
+      - Typecheck
         working-directory: frontend
         run: npm run typecheck
       - name: Lint

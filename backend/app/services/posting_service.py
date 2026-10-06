@@ -33,29 +33,12 @@ from app.services.financial_validation_service import (
 
 """Posting Engine central (orden maestra §22, CLAUDE.md §8).
 
-Contrato: ningún módulo de dominio (Treasury, AP, AR, Procurement, ...)
-construye un AccountingDocument/JournalLine a mano. Todos llaman a
-`post_manual()` (o, cuando exista una PostingRule aplicable, a
-`post_via_rule()`) con las líneas ya resueltas por su propia lógica de
-negocio. Este servicio SOLO se encarga de: validar los invariantes de
-dominio contable (doble partida, OperationScope, período fiscal abierto,
-inmutabilidad), numerar el documento y persistirlo -- nunca decide qué
-cuentas usar para un caso de negocio que no conoce.
+Contrato: ningún módulo de dominio construye AccountingDocument/JournalLine a
+mano. Todos llaman a este servicio. El motor valida los invariantes contables,
+la fecha económica, el alcance operativo y las referencias financieras antes de
+persistir el asiento.
 """
 
-# NXR-REQ-0025 (Corrections). Reversal genérico corrige el GL, pero si el
-# AccountingDocument original tiene un AccountingSourceLink (AP accrual,
-# AR invoice, ...) el dominio dueño se desincroniza silenciosamente: una
-# SupplierInvoice queda APPROVED apuntando a un accrual ya REVERSED, y
-# sigue siendo pagable pese a que el GL ya no refleja el gasto. Mismo
-# patrón que approval_service.register_decision_adapter: el dominio se
-# registra a sí mismo, este servicio nunca conoce el modelo de dominio.
-# El hook recibe (db, source_id, document_type_code) -- el mismo
-# source_type puede cubrir más de un document_type_code (p.ej. AP usa
-# "supplier_invoice" tanto para el accrual "SIN" como para el pago "PAY"),
-# así que el hook debe inspeccionar document_type_code y decidir si
-# aplica o si debe rechazar la reversión (lanzando) para no dejar un
-# estado a medias.
 ReversalHook = Callable[[Session, uuid.UUID, str, date], None]
 _REVERSAL_HOOKS: dict[str, ReversalHook] = {}
 
@@ -87,6 +70,8 @@ def _validate_scope(scope: str, project_id: uuid.UUID | None) -> None:
 
 
 def _validate_balance(lines: list[JournalLineInput]) -> None:
+    if not lines:
+        raise UnbalancedJournalEntryError("Un asiento debe contener al menos una línea")
     total_debit = sum((line.debit_amount for line in lines), Decimal("0"))
     total_credit = sum((line.credit_amount for line in lines), Decimal("0"))
     if total_debit != total_credit:
@@ -104,12 +89,32 @@ def _validate_balance(lines: list[JournalLineInput]) -> None:
             raise UnbalancedJournalEntryError("Los montos de línea no pueden ser negativos")
 
 
-def _assert_fiscal_period_open(db: Session, *, company_id: uuid.UUID, as_of: date) -> None:
-    """INV-ACC-003: bootstrap only before a company configures its calendar.
+def _validate_tax_lines(tax_lines: list[tuple[uuid.UUID, Decimal, Decimal]] | None) -> None:
+    for tax_code_id, base_amount, tax_amount in tax_lines or []:
+        if not tax_code_id:
+            raise InvalidFinancialReferenceError("Cada línea fiscal requiere tax_code_id")
+        if base_amount < 0 or tax_amount < 0:
+            raise UnbalancedJournalEntryError("Base y monto fiscal no pueden ser negativos")
 
-    A configured year without periods is an incomplete calendar, not permission
-    to bypass fiscal eligibility. Economic dates in calendar gaps fail closed.
+
+def _validate_line_scope(
+    scope: str, document_project_id: uuid.UUID | None, lines: list[JournalLineInput]
+) -> None:
+    """A PROJECT posting cannot silently carry lines for another/no project.
+
+    CENTRAL/GENERAL may still carry project dimensions on individual lines for
+    legitimate allocations; the header itself remains project-less.
     """
+    if scope != "PROJECT":
+        return
+    for line in lines:
+        if line.project_id != document_project_id:
+            raise InvalidOperationScopeError(
+                "scope=PROJECT requiere que cada línea use el mismo project_id del documento"
+            )
+
+
+def _assert_fiscal_period_open(db: Session, *, company_id: uuid.UUID, as_of: date) -> None:
     period = db.execute(
         select(FiscalPeriod)
         .where(
@@ -128,7 +133,7 @@ def _assert_fiscal_period_open(db: Session, *, company_id: uuid.UUID, as_of: dat
             raise FiscalPeriodClosedError(
                 f"El calendario fiscal tiene un gap para effective_date={as_of.isoformat()}"
             )
-        return  # Explicit bootstrap policy: no fiscal calendar configured.
+        return
     if period.status == "CLOSED":
         raise FiscalPeriodClosedError(
             f"El período fiscal {period.id} está CLOSED, no admite nuevos postings"
@@ -138,12 +143,6 @@ def _assert_fiscal_period_open(db: Session, *, company_id: uuid.UUID, as_of: dat
 def _assert_fiscal_period_allows_posting(
     db: Session, *, company_id: uuid.UUID, as_of: date, document_type_code: str
 ) -> None:
-    """INV-ACC-003 + F1.6 SOFT_CLOSED policy.
-
-    - OPEN: all postings allowed
-    - SOFT_CLOSED: only COR (correction) and ANU (reversal) allowed
-    - CLOSED: no postings allowed (handled by _assert_fiscal_period_open)
-    """
     period = db.execute(
         select(FiscalPeriod)
         .where(
@@ -162,17 +161,15 @@ def _assert_fiscal_period_allows_posting(
             raise FiscalPeriodClosedError(
                 f"El calendario fiscal tiene un gap para effective_date={as_of.isoformat()}"
             )
-        return  # Explicit bootstrap policy: no fiscal calendar configured.
+        return
     if period.status == "CLOSED":
         raise FiscalPeriodClosedError(
             f"El período fiscal {period.id} está CLOSED, no admite nuevos postings"
         )
-    if period.status == "SOFT_CLOSED":
-        allowed_in_soft_close = {"COR", "ANU"}
-        if document_type_code not in allowed_in_soft_close:
-            raise FiscalPeriodClosedError(
-                f"El período fiscal {period.id} está SOFT_CLOSED; solo se permiten correcciones (COR) y anulaciones (ANU)"
-            )
+    if period.status == "SOFT_CLOSED" and document_type_code not in {"COR", "ANU"}:
+        raise FiscalPeriodClosedError(
+            f"El período fiscal {period.id} está SOFT_CLOSED; solo se permiten correcciones (COR) y anulaciones (ANU)"
+        )
 
 
 def _validate_financial_references(
@@ -187,10 +184,7 @@ def _validate_financial_references(
     )
     for line in lines:
         assert_account_belongs_to_company(
-            db,
-            account_id=line.account_id,
-            company_id=company_id,
-            field_name="lines.account_id",
+            db, account_id=line.account_id, company_id=company_id, field_name="lines.account_id"
         )
         assert_project_belongs_to_company(
             db, project_id=line.project_id, company_id=company_id
@@ -217,18 +211,20 @@ def post_manual(
     tax_lines: list[tuple[uuid.UUID, Decimal, Decimal]] | None = None,
     commit: bool = True,
 ) -> AccountingDocument:
-    """Crea y contabiliza (POSTED) un AccountingDocument balanceado. Lanza
-    UnbalancedJournalEntryError / InvalidOperationScopeError /
-    FiscalPeriodClosedError si algún invariante no se cumple -- en ese caso
-    no se persiste nada (la transacción se puede hacer rollback por el
-    caller; este servicio no captura esas excepciones)."""
     _validate_scope(scope, project_id)
     _validate_balance(lines)
+    _validate_line_scope(scope, project_id, lines)
+    _validate_tax_lines(tax_lines)
+    if fx_rate <= 0:
+        raise InvalidFinancialReferenceError("fx_rate debe ser mayor que cero")
+    if (source_type is None) != (source_id is None):
+        raise InvalidFinancialReferenceError(
+            "source_type y source_id deben proporcionarse juntos para preservar trazabilidad"
+        )
+
     company = db.get(Company, company_id)
     if company is None or not company.functional_currency_code:
-        raise InvalidFinancialReferenceError(
-            "La compañía no tiene moneda funcional configurada"
-        )
+        raise InvalidFinancialReferenceError("La compañía no tiene moneda funcional configurada")
     if currency_code != company.functional_currency_code:
         raise InvalidFinancialReferenceError(
             "El Posting Engine requiere importes de línea en la moneda funcional "
@@ -236,14 +232,8 @@ def post_manual(
             f"para contabilizar {currency_code}"
         )
     _validate_financial_references(
-        db,
-        company_id=company_id,
-        document_project_id=project_id,
-        lines=lines,
+        db, company_id=company_id, document_project_id=project_id, lines=lines
     )
-    # Resolve the economic date before checking fiscal eligibility.  `posted_at`
-    # is technical audit time; it (and server "today") must never choose the
-    # accounting period for a source event with an explicit business date.
     posting_date = effective_date or business_today()
     _assert_fiscal_period_allows_posting(
         db, company_id=company_id, as_of=posting_date, document_type_code=document_type_code
@@ -252,7 +242,6 @@ def post_manual(
     document_number = numbering_service.next_document_number(
         db, company_id=company_id, document_type_code=document_type_code
     )
-
     document = AccountingDocument(
         company_id=company_id,
         document_type_code=document_type_code,
@@ -263,9 +252,6 @@ def post_manual(
         fx_rate=fx_rate,
         status="POSTED",
         description=description,
-        # Fecha económica: la del documento fuente de negocio. Si el caller
-        # no la da (asiento manual sin fecha explícita), cae en la fecha de
-        # negocio de hoy — nunca en el timestamp UTC del contenedor.
         effective_date=posting_date,
         posted_at=datetime.now(timezone.utc),
     )
@@ -285,7 +271,6 @@ def post_manual(
                 extra_dimensions=line.extra_dimensions,
             )
         )
-
     for tax_code_id, base_amount, tax_amount in tax_lines or []:
         db.add(
             TaxLine(
@@ -295,14 +280,12 @@ def post_manual(
                 tax_amount=tax_amount,
             )
         )
-
     if source_type is not None and source_id is not None:
         db.add(
             AccountingSourceLink(
                 accounting_document_id=document.id, source_type=source_type, source_id=source_id
             )
         )
-
     if commit:
         db.commit()
     else:
@@ -314,12 +297,6 @@ def post_manual(
 def reverse_document(
     db: Session, *, document_id: uuid.UUID, reason: str, commit: bool = True
 ) -> AccountingDocument:
-    """Reversal completo (orden maestra §83): el original se preserva
-    intacto (nunca se le tocan sus líneas/montos), se crea un nuevo
-    AccountingDocument con débitos/créditos invertidos, y ambos quedan
-    enlazados. La única mutación permitida sobre el original es la
-    transición de estado POSTED -> REVERSED + el link al reversal; sus
-    JournalLine nunca se tocan."""
     original = db.execute(
         select(AccountingDocument)
         .where(AccountingDocument.id == document_id)
@@ -332,10 +309,13 @@ def reverse_document(
         raise ImmutableDocumentError(
             f"Solo se puede revertir un documento POSTED (estado actual: {original.status})"
         )
+    if not reason or not reason.strip():
+        raise ImmutableDocumentError("La reversión requiere un motivo no vacío")
 
     reversal_effective_date = business_today()
     link = db.execute(
-        select(AccountingSourceLink).where(AccountingSourceLink.accounting_document_id == original.id)
+        select(AccountingSourceLink)
+        .where(AccountingSourceLink.accounting_document_id == original.id)
     ).scalar_one_or_none()
     if link is not None:
         hook = _REVERSAL_HOOKS.get(link.source_type)
@@ -345,7 +325,6 @@ def reverse_document(
     original_lines = db.execute(
         select(JournalLine).where(JournalLine.accounting_document_id == original.id)
     ).scalars().all()
-
     reversal_lines = [
         JournalLineInput(
             account_id=line.account_id,
@@ -358,7 +337,6 @@ def reverse_document(
         )
         for line in original_lines
     ]
-
     reversal = post_manual(
         db,
         company_id=original.company_id,
@@ -372,7 +350,6 @@ def reverse_document(
         effective_date=reversal_effective_date,
         commit=False,
     )
-
     original.status = "REVERSED"
     original.reversed_document_id = reversal.id
     original.reversal_reason = reason
@@ -385,8 +362,6 @@ def reverse_document(
 
 
 def assert_document_is_mutable_or_raise(document: AccountingDocument) -> None:
-    """Guard explícito para cualquier código que intente tocar un documento
-    fuera de este servicio. INV-ACC-002."""
     if document.status not in ("DRAFT",):
         raise ImmutableDocumentError(
             f"AccountingDocument {document.document_number} está {document.status}; "

@@ -316,12 +316,14 @@ def test_contract_number_is_unique_per_company_not_globally(client):
 
 
 def test_project_manager_user_id_links_a_real_user(client, db_session):
-    """ORDEN MAESTRA §16: el responsable del proyecto es una FK a users."""
+    """ORDEN MAESTRA §16: el responsable del proyecto es una FK a users
+    y el usuario debe pertenecer explícitamente a la compañía."""
     login_admin(client)
     company = create_company(client, name="Manager FK Co")
     manager = create_user_with_role(
         db_session, email="site-manager@nexora.group", role_name="Project Manager"
     )
+    db_session.add(UserCompanyAccess(user_id=manager.id, company_id=company["id"]))
     db_session.commit()
 
     response = client.post(

@@ -1,0 +1,13 @@
+.git
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/dist
+**/.env
+**/.env.*
+**/*.log
+frontend/test-results
+frontend/e2e-report
+.nexora-context
+.recovery

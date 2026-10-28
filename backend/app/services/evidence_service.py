@@ -25,8 +25,8 @@ from app.repositories import evidence_repository
 
 """Evidence upload/download service (CONSTRUCTION CONTROL).
 
-Evidence is stored only in Azure Blob Storage (or the explicitly configured
-Azurite-compatible development backend). The application never fabricates a
+Evidence is stored in configured private Supabase Storage or Azure Blob Storage
+(including the explicitly configured Azurite development backend). The application never fabricates a
 public URL and never persists evidence payloads to local disk.
 """
 

@@ -1,5 +1,10 @@
 # Nexora Group
 
+**Destino vigente (2026-10-28): Render Free + Supabase Free.**
+Guía de configuración, límites, migración y verificación: [Render + Supabase](docs/RENDER_SUPABASE.md).
+`Dockerfile.render` sirve frontend y API bajo el mismo origen.
+Azure queda como destino histórico/manual; las instrucciones de esa sección no son el camino nuevo.
+
 Plataforma administrativa greenfield de Nexora Group: tesorería, proyectos y
 operaciones. Ver `CLAUDE.md` para las reglas permanentes del proyecto y
 `docs/ROADMAP.md` para el estado por fases.
@@ -75,7 +80,7 @@ El build de producción **falla cerrado** si `VITE_API_BASE_URL` no es
 first-party: acepta un path same-origin (`/api`, el valor real de producción)
 o una URL HTTPS absoluta; rechaza cualquier URL en texto claro.
 
-## Deploy
+## Deploy Azure — histórico y manual
 
 Plataforma oficial: **Microsoft Azure**. Render fue descartado como destino
 de despliegue (ver `CLAUDE.md`).

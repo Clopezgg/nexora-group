@@ -14,6 +14,11 @@ class EvidenceStorageNotConfigured(RuntimeError):
 
 
 def get_evidence_container_client(settings: Settings):
+    # Preserve the existing evidence contract while selecting the configured provider.
+    if settings.evidence_backend == "supabase":
+        from app.integrations.supabase_storage import SupabaseEvidenceContainer
+
+        return SupabaseEvidenceContainer(settings)
     if settings.evidence_backend != "azure_blob":
         raise EvidenceStorageNotConfigured(
             f"evidence_backend={settings.evidence_backend!r}: configura "
@@ -66,7 +71,7 @@ def evidence_storage_is_reachable(settings: Settings) -> tuple[bool, str | None]
     Storage. A single bounded retry absorbs eventual RBAC propagation right
     after a deploy without adding sleeps to the hot path.
     """
-    if settings.evidence_backend != "azure_blob":
+    if settings.evidence_backend == "none":
         return True, None
     last_detail: str | None = None
     for attempt in range(2):

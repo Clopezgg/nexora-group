@@ -2,7 +2,7 @@ import os
 from functools import lru_cache
 from urllib.parse import urlparse
 
-from pydantic import model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,11 +16,14 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://nexora:nexora@localhost:5432/nexora_dev"
     secret_key: str = "dev-secret-key-change-me"
     frontend_url: str = "http://localhost:5173"
+    frontend_dist_dir: str | None = None
+    database_pool_size: int = Field(default=3, ge=1, le=20)
+    database_max_overflow: int = Field(default=2, ge=0, le=20)
 
     # Metadata de build para certificación (ORDEN MAESTRA §21): el pipeline
     # de deploy inyecta el SHA/fecha reales vía env vars; en local quedan
     # "unknown" -- nunca se inventa un valor.
-    git_sha: str = "unknown"
+    git_sha: str = Field(default="unknown", validation_alias=AliasChoices("git_sha", "GIT_SHA", "RENDER_GIT_COMMIT"))
     build_time: str = "unknown"
 
     bootstrap_admin_email: str | None = None
@@ -39,8 +42,12 @@ class Settings(BaseSettings):
     edit_access_window_seconds: int = 900
     edit_access_max_uses: int = 5
 
-    # "none" (por defecto) | "azure_blob". Ver app/integrations/azure_blob.py.
+    # "none" (deshabilitado) | "supabase" | "azure_blob" (compatibilidad).
     evidence_backend: str = "none"
+    supabase_s3_endpoint: str = ""
+    supabase_s3_region: str = ""
+    supabase_s3_access_key_id: str = Field(default="", repr=False)
+    supabase_s3_secret_access_key: str = Field(default="", repr=False)
     evidence_container_name: str = "evidence"
     max_evidence_mb: int = 25
 
@@ -65,6 +72,28 @@ class Settings(BaseSettings):
     lockout_minutes: int = 15
     login_rate_limit_max_attempts: int = 20
     login_rate_limit_window_seconds: int = 60
+
+    @field_validator("database_url")
+    @classmethod
+    def normalize_database_driver(cls, value: str) -> str:
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                return "postgresql+psycopg://" + value[len(prefix):]
+        return value
+
+    @model_validator(mode="after")
+    def validate_storage(self) -> "Settings":
+        if self.evidence_backend == "supabase":
+            endpoint = urlparse(self.supabase_s3_endpoint)
+            if (
+                endpoint.scheme != "https" or not endpoint.netloc
+                or endpoint.username or endpoint.password or endpoint.query or endpoint.fragment
+                or not endpoint.path.rstrip("/").endswith("/storage/v1/s3")
+                or not self.supabase_s3_region or not self.supabase_s3_access_key_id
+                or not self.supabase_s3_secret_access_key or not self.evidence_container_name
+            ):
+                raise ValueError("Supabase requires an HTTPS S3 endpoint, region, access key, secret and private bucket")
+        return self
 
     @property
     def is_production(self) -> bool:

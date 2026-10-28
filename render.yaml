@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: nexora-group
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    healthCheckPath: /api/readyz
+    autoDeployTrigger: "off"
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: EVIDENCE_BACKEND
+        value: supabase
+      - key: EVIDENCE_CONTAINER_NAME
+        value: evidence
+      - key: SUPABASE_S3_ENDPOINT
+        sync: false
+      - key: SUPABASE_S3_REGION
+        sync: false
+      - key: SUPABASE_S3_ACCESS_KEY_ID
+        sync: false
+      - key: SUPABASE_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: EDIT_ACCESS_REQUIRED
+        value: "true"
+      - key: EDIT_ACCESS_TOKEN_SALT
+        sync: false
+      - key: EDIT_ACCESS_TOKEN_DIGEST
+        sync: false
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false

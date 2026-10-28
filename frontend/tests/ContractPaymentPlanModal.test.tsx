@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import { ContractPaymentPlanModal } from '../src/features/procurement/ContractPaymentPlanModal'
+import { AuthProvider } from '../src/features/auth/AuthProvider'
 import type { SupplierContract } from '../src/types/procurement'
 
 const CONTRACT: SupplierContract = {
@@ -48,7 +49,7 @@ const summary = {
 
 function wrap(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
+  return <QueryClientProvider client={qc}><AuthProvider>{ui}</AuthProvider></QueryClientProvider>
 }
 
 describe('ContractPaymentPlanModal — plan de 10101960 (§3/§25/§26)', () => {

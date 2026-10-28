@@ -26,7 +26,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         if request.url.path not in _DOCS_PATHS:
-            response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+            if getattr(request.app.state, "serves_frontend", False) and not request.url.path.startswith("/api/"):
+                response.headers["Content-Security-Policy"] = (
+                    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                    "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; "
+                    "frame-src 'self' blob:; worker-src 'self'; manifest-src 'self'; "
+                    "object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+                )
+            else:
+                response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
         if get_settings().is_production:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response

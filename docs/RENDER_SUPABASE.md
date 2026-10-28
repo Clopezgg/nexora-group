@@ -145,8 +145,15 @@ build Docker en entorno con Docker, despliegue y smoke del destino.
 - FastAPI con el build real: root, ruta de proyecto, asset JS, health/version
   responden; API/asset desconocidos conservan 404. Smoke sin lifespan ni DB.
 - Alembic: un head `eb8ce8e18b2d`; no se aplicaron migraciones a Supabase.
-- YAML comprobado localmente; pendiente validación por Render y build Docker.
-- Cambios locales en rama `feat/render-supabase`; aún no publicados en GitHub.
+- YAML comprobado localmente; Render construyó y publicó la imagen Docker.
+  El despliegue quedó `update_failed`; no se certifica el arranque sin credenciales.
+- Preparación publicada en `feat/render-supabase`, PR #167.
+- Proyecto Supabase `klnfxzyccohplnzbdecy` creado en us-east-1 (Free), activo.
+- Servicio Render `srv-dbh7nrmk1f9s73aug530` creado en Virginia (Free).
+- Integración de ramas de contexto, proyectos/presupuesto, proveedores, contabilidad
+  y certificación en curso; faltan CI completa y merge a main.
+- No se aplicaron migraciones ni se configuraron credenciales S3/DB del proyecto.
+  El acceso seguro al panel fue cancelado; no se modificaron claves desde el navegador.
 
 Referencias oficiales:
 - https://render.com/docs/blueprint-spec

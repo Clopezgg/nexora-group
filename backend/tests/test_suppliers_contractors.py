@@ -98,7 +98,7 @@ def test_blocked_supplier_cannot_get_new_contract(client):
             "value": "100000.00", "currencyCode": "HNL", "startDate": "2026-08-01",
         },
     )
-    assert r.status_code == 409, r.text
+    assert r.status_code == 422, r.text
     assert "bloqueado" in r.text
 
 

@@ -11,6 +11,9 @@ from app.domain.errors import (
 )
 from app.models.budget import Budget, BudgetLine
 from app.models.company import Company
+from app.models.cost_center import CostCenter, EconomicCategory
+from app.models.fiscal import FiscalPeriod
+from app.models.wbs import WBSNode
 from app.repositories import (
     ap_repository,
     budget_repository,
@@ -23,21 +26,10 @@ from app.services import commitment_service
 
 Contrato de versionado: BASELINE se crea una sola vez y sus BudgetLine nunca
 se editan ni eliminan. Una ChangeOrder aprobada genera un nuevo Budget
-version=REVISED (el anterior ACTIVE pasa a SUPERSEDED, nunca se borra) que
-copia las líneas del budget anterior y agrega una línea adicional con el
-delta de la ChangeOrder (positivo o negativo) contra el WBS que indique la
-propia ChangeOrder -- es una simplificación deliberada (no redistribuye
-línea por línea el presupuesto completo) documentada aquí y en
-docs/BUDGET_CONTROLLING.md.
+version=REVISED (el anterior ACTIVE pasa a SUPERSEDED, nunca se borra).
 
 Todo BASELINE usa `Company.functional_currency_code`; no se acepta otra
 moneda hasta que exista una política FX fechada y autoritativa.
-
-Métricas AUTHORIZED/COMMITED/ACCRUED/PAID/AVAILABLE: COMMITTED consume
-Purchase Orders aprobadas de Procurement/Track C. ACCRUED se deriva de
-SupplierInvoices devengadas (AP/Track A) excluyendo anticipos. PAID se
-deriva de SupplierInvoice.amount_paid. Available = authorized -
-open_commitment - accrued (el pago no re-consume presupuesto).
 """
 
 
@@ -53,21 +45,45 @@ class BudgetLineInput:
 @dataclass
 class BudgetSummary:
     authorized: Decimal
-    # `committed` es el compromiso TOTAL canónico (contrato + PO independiente),
-    # sin doble contar las PO que desglosan un contrato (§20).
     committed: Decimal
     accrued: Decimal
     paid: Decimal
     available: Decimal
-    # ORDEN MAESTRA §15 — contractual advances / prepayments (ASSET debit).
-    # Reported alongside, never folded into `accrued` nor deducted from
-    # `available` as recognised cost.
     advances: Decimal = Decimal("0")
-    # ORDEN MAESTRA §20-§21 — desglose del compromiso.
     contract_commitment: Decimal = Decimal("0")
     standalone_po_commitment: Decimal = Decimal("0")
     po_under_contract: Decimal = Decimal("0")
     open_commitment: Decimal = Decimal("0")
+
+
+def _validate_line_references(
+    db: Session,
+    *,
+    project_id: uuid.UUID,
+    company_id: uuid.UUID,
+    line: BudgetLineInput,
+) -> None:
+    """Reject references from another project/company before persistence."""
+    if line.authorized_amount <= 0:
+        raise ValueError("authorized_amount debe ser mayor que cero")
+    if line.wbs_node_id is not None:
+        node = db.get(WBSNode, line.wbs_node_id)
+        if node is None:
+            raise ValueError(f"WBSNode {line.wbs_node_id} no existe")
+        if node.project_id != project_id:
+            raise ValueError("El WBS de una BudgetLine debe pertenecer al mismo proyecto")
+    if line.economic_category_id is not None:
+        category = db.get(EconomicCategory, line.economic_category_id)
+        if category is None or category.company_id != company_id:
+            raise ValueError("La categoría económica debe pertenecer a la compañía del proyecto")
+    if line.cost_center_id is not None:
+        cost_center = db.get(CostCenter, line.cost_center_id)
+        if cost_center is None or cost_center.company_id != company_id:
+            raise ValueError("El centro de costo debe pertenecer a la compañía del proyecto")
+    if line.fiscal_period_id is not None:
+        period = db.get(FiscalPeriod, line.fiscal_period_id)
+        if period is None or period.company_id != company_id:
+            raise ValueError("El período fiscal debe pertenecer a la compañía del proyecto")
 
 
 def create_baseline(
@@ -79,13 +95,13 @@ def create_baseline(
     notes: str | None = None,
     commit: bool = True,
 ) -> Budget:
+    project = project_repository.get_by_id_for_update(db, project_id)
+    if project is None:
+        raise ValueError(f"Project {project_id} no existe")
     if budget_repository.get_baseline_budget(db, project_id) is not None:
         raise BudgetBaselineExistsError(
             f"El proyecto {project_id} ya tiene un BASELINE; no se puede sobrescribir"
         )
-    project = project_repository.get_by_id(db, project_id)
-    if project is None:
-        raise ValueError(f"Project {project_id} no existe")
     company = db.get(Company, project.company_id)
     if company is None:
         raise ValueError(f"Company {project.company_id} no existe")
@@ -98,6 +114,11 @@ def create_baseline(
             f"El Budget usa {currency_code}, pero la moneda funcional de la company es "
             f"{company.functional_currency_code}; no existe una política FX autoritativa"
         )
+    for line in lines:
+        _validate_line_references(
+            db, project_id=project_id, company_id=project.company_id, line=line
+        )
+
     budget = Budget(
         project_id=project_id,
         version="BASELINE",
@@ -126,11 +147,55 @@ def create_baseline(
     return budget
 
 
-def approve_change_order(db: Session, *, change_order_id: uuid.UUID, approved_by: uuid.UUID, commit: bool = True) -> Budget:
-    """Aprueba la ChangeOrder y, si tiene impacto de presupuesto (monto
-    distinto de 0), crea el Budget REVISED correspondiente. El BASELINE (y
-    cualquier REVISED anterior) nunca se modifica -- queda en status
-    SUPERSEDED, intacto."""
+def _apply_change_order_delta(
+    db: Session,
+    *,
+    revised_budget_id: uuid.UUID,
+    wbs_node_id: uuid.UUID | None,
+    delta: Decimal,
+) -> None:
+    """Apply a change without ever persisting a negative/zero BudgetLine."""
+    if delta == 0:
+        return
+    if delta > 0:
+        db.add(
+            BudgetLine(
+                budget_id=revised_budget_id,
+                wbs_node_id=wbs_node_id,
+                authorized_amount=delta,
+            )
+        )
+        return
+
+    remaining = -delta
+    candidates = [
+        line
+        for line in budget_repository.list_lines(db, revised_budget_id)
+        if line.wbs_node_id == wbs_node_id
+    ]
+    for line in candidates:
+        reduction = min(line.authorized_amount, remaining)
+        line.authorized_amount -= reduction
+        remaining -= reduction
+        if line.authorized_amount == 0:
+            db.delete(line)
+        if remaining == 0:
+            break
+    if remaining > 0:
+        raise ValueError(
+            "La reducción de presupuesto de la ChangeOrder excede el autorizado "
+            "del WBS seleccionado"
+        )
+
+
+def approve_change_order(
+    db: Session,
+    *,
+    change_order_id: uuid.UUID,
+    approved_by: uuid.UUID,
+    commit: bool = True,
+) -> Budget:
+    """Approve a submitted ChangeOrder and create an immutable budget revision."""
     change_order = project_control_repository.get_change_order(db, change_order_id)
     if change_order is None:
         raise ValueError(f"ChangeOrder {change_order_id} no existe")
@@ -139,14 +204,22 @@ def approve_change_order(db: Session, *, change_order_id: uuid.UUID, approved_by
             f"Solo se puede aprobar una ChangeOrder en estado SUBMITTED (actual: {change_order.status})"
         )
 
-    previous = budget_repository.get_active_budget(db, change_order.project_id)
+    project = project_repository.get_by_id_for_update(db, change_order.project_id)
+    if project is None:
+        raise ValueError(f"Project {change_order.project_id} no existe")
+    if change_order.wbs_node_id is not None:
+        node = db.get(WBSNode, change_order.wbs_node_id)
+        if node is None or node.project_id != project.id:
+            raise ValueError("El WBS de la ChangeOrder debe pertenecer al mismo proyecto")
+
+    previous = budget_repository.get_active_budget(db, project.id)
     if previous is None:
         raise ValueError(
-            f"El proyecto {change_order.project_id} no tiene un budget activo -- crea el BASELINE primero"
+            f"El proyecto {project.id} no tiene un budget activo -- crea el BASELINE primero"
         )
 
     revised = Budget(
-        project_id=change_order.project_id,
+        project_id=project.id,
         version="REVISED",
         status="ACTIVE",
         currency_code=previous.currency_code,
@@ -168,15 +241,14 @@ def approve_change_order(db: Session, *, change_order_id: uuid.UUID, approved_by
                 authorized_amount=line.authorized_amount,
             )
         )
+    db.flush()
 
-    if change_order.budget_change_amount != 0:
-        db.add(
-            BudgetLine(
-                budget_id=revised.id,
-                wbs_node_id=change_order.wbs_node_id,
-                authorized_amount=change_order.budget_change_amount,
-            )
-        )
+    _apply_change_order_delta(
+        db,
+        revised_budget_id=revised.id,
+        wbs_node_id=change_order.wbs_node_id,
+        delta=change_order.budget_change_amount,
+    )
 
     previous.status = "SUPERSEDED"
     change_order.status = "APPROVED"
@@ -207,9 +279,6 @@ def compute_summary(db: Session, *, project_id: uuid.UUID) -> BudgetSummary:
     paid = ap_repository.project_paid_total(
         db, company_id=project.company_id, project_id=project_id
     )
-    # ORDEN MAESTRA §21/§22 — el disponible descuenta el compromiso ABIERTO
-    # (relevado por lo ya devengado) más el costo devengado. El pago no vuelve
-    # a consumir presupuesto.
     available = authorized - commitment.open_commitment - accrued
     return BudgetSummary(
         authorized=authorized,

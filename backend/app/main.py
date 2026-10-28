@@ -165,6 +165,11 @@ def create_app() -> FastAPI:
     app.include_router(search.router, prefix="/api")
     app.include_router(voucher_verification.router, prefix="/api")
 
+    if settings.frontend_dist_dir:
+        from app.api.frontend import register_frontend
+
+        register_frontend(app, settings.frontend_dist_dir)
+
     return app
 
 

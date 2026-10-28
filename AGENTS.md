@@ -1,3 +1,12 @@
+> **Decisión vigente — 2026-10-28:** el usuario eligió Render Free + Supabase Free.
+> Esta decisión sustituye las instrucciones históricas de despliegue exclusivamente
+> en Azure o de descartar Render. Render ejecuta frontend + API bajo el mismo origen;
+> Supabase aloja PostgreSQL y evidencias en bucket privado. Ver
+> `docs/RENDER_SUPABASE.md`, `render.yaml` y `Dockerfile.render`.
+> Azure se conserva como compatibilidad y recuperación manual; no se eliminan
+> recursos/datos ni se ejecuta un cutover automáticamente. Las reglas de dominio,
+> seguridad, PostgreSQL, stateless y verificación siguen vigentes.
+
 # NEXORA GROUP — Reglas permanentes del proyecto
 
 Estas reglas gobiernan este repositorio y tienen prioridad sobre cualquier

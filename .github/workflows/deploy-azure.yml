@@ -1,19 +1,7 @@
 name: Deploy Azure
 
 on:
-  pull_request:
-    paths:
-      - "infra/**"
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/deploy-azure.yml"
-  push:
-    branches: [main]
-    paths:
-      - "infra/**"
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/deploy-azure.yml"
+  # Legacy destination: manual only after the Render + Supabase decision.
   workflow_dispatch:
     inputs:
       deploy:
